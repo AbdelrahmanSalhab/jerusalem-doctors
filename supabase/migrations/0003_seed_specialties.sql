@@ -1,0 +1,35 @@
+-- 0003_seed_specialties.sql — Seed the 29 specialties from spec §17.
+-- name_ar_normalized values were pre-computed with lib/normalize/arabic.ts so
+-- SQL and JS normalization stay in lockstep. If the JS rules ever change,
+-- regenerate this file; the runtime normalizer is the source of truth.
+
+insert into public.specialties (name_ar, name_ar_normalized, name_he, name_en, sort_order) values
+  ('طب العائلة', 'طب العايلة', 'רפואת המשפחה', 'Family Medicine', 1),
+  ('الطب العام', 'الطب العام', 'רפואה כללית', 'General Medicine', 2),
+  ('الأطفال', 'الاطفال', 'רפואת ילדים', 'Pediatrics', 3),
+  ('النسائية والتوليد', 'النسايية والتوليد', 'מיילדות וגינקולוגיה', 'Obstetrics and Gynecology', 4),
+  ('الباطنية', 'الباطنية', 'רפואה פנימית', 'Internal Medicine', 5),
+  ('القلب', 'القلب', 'קרדיולוגיה', 'Cardiology', 6),
+  ('الغدد الصماء والسكري', 'الغدد الصماء والسكري', 'אנדוקרינולוגיה וסוכרת', 'Endocrinology and Diabetes', 7),
+  ('الجهاز الهضمي', 'الجهاز الهضمي', 'גסטרואנטרולוגיה', 'Gastroenterology', 8),
+  ('الأعصاب', 'الاعصاب', 'נוירולוגיה', 'Neurology', 9),
+  ('الطب النفسي', 'الطب النفسي', 'פסיכיאטריה', 'Psychiatry', 10),
+  ('الجلدية', 'الجلدية', 'דרמטולוגיה', 'Dermatology', 11),
+  ('العظام', 'العظام', 'אורתופדיה', 'Orthopedics', 12),
+  ('العيون', 'العيون', 'רפואת עיניים', 'Ophthalmology', 13),
+  ('الأنف والأذن والحنجرة', 'الانف والاذن والحنجرة', 'אף אוזן וגרון', 'Otolaryngology (ENT)', 14),
+  ('الجراحة العامة', 'الجراحة العامة', 'כירורגיה כללית', 'General Surgery', 15),
+  ('المسالك البولية', 'المسالك البولية', 'אורולוגיה', 'Urology', 16),
+  ('الأشعة', 'الاشعة', 'רדיולוגיה', 'Radiology', 17),
+  ('التخدير', 'التخدير', 'הרדמה', 'Anesthesiology', 18),
+  ('الطوارئ', 'الطواري', 'רפואה דחופה', 'Emergency Medicine', 19),
+  ('طب الشيخوخة', 'طب الشيخوخة', 'גריאטריה', 'Geriatrics', 20),
+  ('الطب الطبيعي وإعادة التأهيل', 'الطب الطبيعي واعادة التاهيل', 'רפואה פיזיקלית ושיקום', 'Physical Medicine and Rehabilitation', 21),
+  ('الأورام', 'الاورام', 'אונקולוגיה', 'Oncology', 22),
+  ('أمراض الدم', 'امراض الدم', 'המטולוגיה', 'Hematology', 23),
+  ('أمراض الكلى', 'امراض الكلي', 'נפרולוגיה', 'Nephrology', 24),
+  ('أمراض الرئة', 'امراض الرية', 'ריאות (פולמונולוגיה)', 'Pulmonology', 25),
+  ('الأمراض المعدية', 'الامراض المعدية', 'מחלות זיהומיות', 'Infectious Diseases', 26),
+  ('الروماتيزم', 'الروماتيزم', 'ראומטולוגיה', 'Rheumatology', 27),
+  ('الصحة العامة', 'الصحة العامة', 'בריאות הציבור', 'Public Health', 28),
+  ('طب العمل', 'طب العمل', 'רפואה תעסוקתית', 'Occupational Medicine', 29);
