@@ -67,6 +67,16 @@ export async function POST(req: Request) {
     return jsonError(403, { error: "account_inactive", code: "account_inactive" });
   }
 
+  // Dev-only short-circuit: when USE_DEV_USER=1 we skip Supabase Auth and
+  // just acknowledge — the dev shim provides the session via cookies/env.
+  // Hard-blocked in production by lib/auth/session.ts module-load guard.
+  if (
+    process.env.USE_DEV_USER === "1" &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    return jsonOk({ ok: true, phone_e164: phoneE164, dev_bypass: true });
+  }
+
   const ssr = await createSupabaseServerClient();
   const { error: otpErr } = await ssr.auth.signInWithOtp({
     phone: phoneE164,

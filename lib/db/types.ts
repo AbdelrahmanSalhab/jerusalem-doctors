@@ -74,6 +74,17 @@ export interface PendingSignup {
   created_at: string;
 }
 
+export interface DoctorWorkplace {
+  id: string;
+  doctor_id: string;
+  name: string;
+  name_normalized: string;
+  is_primary: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MohPractitioner {
   license_number: number;
   hebrew_first_name: string;

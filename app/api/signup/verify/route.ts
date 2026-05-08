@@ -16,6 +16,13 @@ const Body = z.object({
   otp_code: z.string().regex(/^\d{4,8}$/),
 });
 
+interface PendingWorkplace {
+  name: string;
+  name_normalized: string;
+  is_primary: boolean;
+  sort_order: number;
+}
+
 interface PendingPayload {
   phone_e164: string;
   phone_display: string;
@@ -31,6 +38,7 @@ interface PendingPayload {
   subspecialty_normalized: string | null;
   email: string | null;
   specialty_ids: string[];
+  workplaces: PendingWorkplace[];
   license_verification_status:
     | "verified"
     | "soft_match"
@@ -157,6 +165,22 @@ export async function POST(req: Request) {
     if (links.error) {
       console.error("[signup/verify] specialty link failed", links.error);
       // Continue — admin can fix specialty links later.
+    }
+  }
+
+  if (payload.workplaces?.length) {
+    const wp = await service.from("doctor_workplaces").insert(
+      payload.workplaces.map((w) => ({
+        doctor_id: insert.data.id,
+        name: w.name,
+        name_normalized: w.name_normalized,
+        is_primary: w.is_primary,
+        sort_order: w.sort_order,
+      })),
+    );
+    if (wp.error) {
+      console.error("[signup/verify] workplace insert failed", wp.error);
+      // Non-fatal: doctor can add workplaces later from /profile.
     }
   }
 

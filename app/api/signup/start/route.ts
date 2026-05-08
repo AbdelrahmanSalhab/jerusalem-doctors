@@ -27,6 +27,10 @@ const Body = z.object({
   specialty_ids: z.array(z.uuid()).min(1).max(5),
   subspecialty: z.string().trim().optional().nullable(),
   email: z.email().optional().nullable(),
+  // Workplaces. main_workplace is required (primary). other_workplaces is
+  // an unbounded list; we filter empties + dedupe server-side.
+  main_workplace: z.string().trim().min(2).max(120),
+  other_workplaces: z.array(z.string().trim().min(1).max(120)).default([]),
   consent: z.literal(true),
   turnstile_token: z.string().optional(),
   // Soft-match override flow: client confirms registry name; we record it.
@@ -134,6 +138,28 @@ export async function POST(req: Request) {
     ? normalizeArabic(parsed.subspecialty)
     : null;
 
+  // Build the workplace list: primary first, then deduped + non-empty others.
+  const seenWp = new Set<string>();
+  const mainWp = parsed.main_workplace.trim();
+  seenWp.add(normalizeArabic(mainWp));
+  const workplaces: { name: string; name_normalized: string; is_primary: boolean; sort_order: number }[] = [
+    { name: mainWp, name_normalized: normalizeArabic(mainWp), is_primary: true, sort_order: 0 },
+  ];
+  let order = 1;
+  for (const raw of parsed.other_workplaces) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const norm = normalizeArabic(trimmed);
+    if (seenWp.has(norm)) continue;
+    seenWp.add(norm);
+    workplaces.push({
+      name: trimmed,
+      name_normalized: norm,
+      is_primary: false,
+      sort_order: order++,
+    });
+  }
+
   const now = Date.now();
   const expiresAt = new Date(now + PENDING_TTL_MS).toISOString();
 
@@ -160,6 +186,7 @@ export async function POST(req: Request) {
         email: parsed.email?.trim() || null,
 
         specialty_ids: parsed.specialty_ids,
+        workplaces,
 
         license_verification_status: licenseStatusToColumn(
           verified.status,

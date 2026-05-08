@@ -83,12 +83,20 @@ export class MohClient {
    * Direct license-number lookup. Returns null if not present.
    * Used as the live fallback in the signup license-check route when the
    * local `moh_practitioners` mirror doesn't have the row.
+   *
+   * Implementation note: data.gov.il's `datastore_search_sql` rejects
+   * queries with Hebrew column identifiers (403 Security Violation), so we
+   * use `datastore_search` with the `filters` parameter instead.
    */
   async findByLicense(licenseNumber: number): Promise<MohRecord | null> {
     if (!Number.isInteger(licenseNumber) || licenseNumber <= 0) return null;
-    const sql = `SELECT * FROM "${this.resourceId}" WHERE "מספר רישיון רופא" = ${licenseNumber} LIMIT 1`;
-    const params = new URLSearchParams({ sql });
-    const url = `${this.base}/action/datastore_search_sql?${params}`;
+    const filters = JSON.stringify({ "מספר רישיון רופא": licenseNumber });
+    const params = new URLSearchParams({
+      resource_id: this.resourceId,
+      limit: "1",
+      filters,
+    });
+    const url = `${this.base}/action/datastore_search?${params}`;
     const json = await this.requestJSON<{
       success: boolean;
       result: { records: MohRecord[] };

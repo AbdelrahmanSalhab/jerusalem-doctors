@@ -15,6 +15,8 @@ type FormState = {
   specialty_ids: string[];
   subspecialty: string;
   email: string;
+  main_workplace: string;
+  other_workplaces: string[];
   consent: boolean;
 };
 
@@ -28,6 +30,8 @@ const INITIAL: FormState = {
   specialty_ids: [],
   subspecialty: "",
   email: "",
+  main_workplace: "",
+  other_workplaces: [],
   consent: false,
 };
 
@@ -214,7 +218,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       )}
 
       {registryName && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-sm">
+        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-base">
           <p className="mb-2">
             الاسم في سجل وزارة الصحة لرقم الترخيص هذا هو:{" "}
             <strong dir="auto">
@@ -237,7 +241,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </div>
       )}
 
-      <Field label="التخصص (اختر واحدًا أو أكثر، حتى 5)" error={fieldError("specialty_ids")}>
+      <Field label="التخصص (اختر واحدًا أو أكثر)" error={fieldError("specialty_ids")}>
         <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
           {specialties.map((s) => (
             <label
@@ -267,6 +271,57 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         />
       </Field>
 
+      <Field label="مكان العمل الرئيسي" error={fieldError("main_workplace")}>
+        <input
+          required
+          className="input"
+          value={form.main_workplace}
+          onChange={(e) => update("main_workplace", e.target.value)}
+          placeholder="مثلاً: مستشفى هداسا عين كارم"
+        />
+      </Field>
+
+      <Field label="أماكن عمل أخرى (اختياري)">
+        <div className="space-y-2">
+          {form.other_workplaces.map((wp, i) => (
+            <div key={i} className="flex gap-2">
+              <input
+                className="input flex-1"
+                value={wp}
+                onChange={(e) => {
+                  const next = [...form.other_workplaces];
+                  next[i] = e.target.value;
+                  update("other_workplaces", next);
+                }}
+                placeholder="اسم العيادة أو المستشفى"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  update(
+                    "other_workplaces",
+                    form.other_workplaces.filter((_, x) => x !== i),
+                  )
+                }
+                className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
+                aria-label="حذف مكان العمل"
+              >
+                حذف
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              update("other_workplaces", [...form.other_workplaces, ""])
+            }
+            className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
+          >
+            + إضافة مكان عمل آخر
+          </button>
+        </div>
+      </Field>
+
       <Field label="البريد الإلكتروني (اختياري)" error={fieldError("email")}>
         <input
           type="email"
@@ -277,7 +332,17 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         />
       </Field>
 
-      <label className="flex items-start gap-3 rounded border border-foreground/15 p-3 text-sm">
+      <section className="rounded border border-foreground/15 bg-foreground/5 p-4 text-base leading-relaxed">
+        <h2 className="mb-1.5 font-bold">قبل الموافقة</h2>
+        <p className="mb-2">
+          المعلومات التي أدخلتها — الاسم، رقم الهاتف، رقم الترخيص، التخصصات،
+          وأماكن العمل — ستُستخدم داخل المنصة لمساعدة زملائك من الأطباء
+          المسجلين على إيجادك والتواصل معك مهنيًا، ولأي استخدامات تخدم تطوير
+          المنصة أو توسيع شبكة التواصل.
+        </p>
+      </section>
+
+      <label className="flex items-start gap-3 rounded border border-foreground/15 p-3 text-base">
         <input
           type="checkbox"
           required
@@ -286,8 +351,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           className="mt-1"
         />
         <span>
-          أوافق على استخدام معلوماتي داخل دليل أطباء القدس لمساعدة الأطباء
-          المسجلين على العثور عليّ والتواصل معي لأغراض مهنية.
+          أوافق على ما ورد أعلاه، وأؤكد أنني طبيب/ة وأن المعلومات المدخلة
+          صحيحة، وأوافق على استخدامها لأغراض المنصة كما ذُكر.
         </span>
       </label>
 
@@ -299,7 +364,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
       <button
         type="submit"
-        disabled={submitting || form.specialty_ids.length === 0 || !form.consent}
+        disabled={
+          submitting ||
+          form.specialty_ids.length === 0 ||
+          !form.main_workplace.trim() ||
+          !form.consent
+        }
         className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
       >
         {submitting
@@ -307,7 +377,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           : "تسجيل وإرسال رمز التحقق عبر رسالة نصية"}
       </button>
 
-      <p className="text-center text-sm text-foreground/70">
+      <p className="text-center text-base text-foreground/70">
         لديك حساب بالفعل؟{" "}
         <a className="underline" href="/login">
           تسجيل الدخول
@@ -317,7 +387,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       <style jsx>{`
         :global(.input) {
           width: 100%;
-          padding: 0.625rem 0.75rem;
+          padding: 0.75rem 0.875rem;
+          font-size: 1rem;
           border-radius: 0.375rem;
           border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
           background: transparent;
@@ -342,7 +413,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium">{label}</label>
+      <label className="mb-1.5 block text-base font-medium">{label}</label>
       {children}
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>

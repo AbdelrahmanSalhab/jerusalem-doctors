@@ -321,6 +321,19 @@ create table doctor_specialties (
   primary key (doctor_id, specialty_id)
 );
 
+-- Workplaces (added in migration 0004): main + arbitrary number of others.
+-- Partial unique index enforces "at most one primary per doctor".
+create table doctor_workplaces (
+  id              uuid primary key default gen_random_uuid(),
+  doctor_id       uuid not null references doctors(id) on delete cascade,
+  name            text not null,
+  name_normalized text not null,
+  is_primary      boolean not null default false,
+  sort_order      int    not null default 0,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
 create table audit_logs (
   id                uuid primary key default gen_random_uuid(),
   actor_doctor_id   uuid references doctors(id) on delete set null,
@@ -384,6 +397,13 @@ create index pending_signups_phone on pending_signups (phone_e164);
 create index audit_logs_actor on audit_logs (actor_doctor_id, created_at desc);
 create index moh_practitioners_norm
   on moh_practitioners (hebrew_first_norm, hebrew_family_norm);
+
+create unique index doctor_workplaces_one_primary
+  on doctor_workplaces (doctor_id) where is_primary;
+create index doctor_workplaces_doctor
+  on doctor_workplaces (doctor_id, sort_order);
+create index doctor_workplaces_name_norm_trgm
+  on doctor_workplaces using gin (name_normalized gin_trgm_ops);
 ```
 
 ### RLS strategy
@@ -404,6 +424,7 @@ create index moh_practitioners_norm
 3. `0003_seed_specialties.sql` — seed 28 specialties.
 4. `0004_admin_flag.sql` (Phase 4) — `is_admin` column + admin policies (or fold into 0002 if we know admins from day one).
 5. `0005_license_verification.sql` (Phase 2) — `doctors.license_verified_at`, `doctors.license_verification_status`. Folded into 0001 if we lock §13 in before the first migration apply.
+6. `0004_workplaces.sql` (mid-Phase-2 add) — `doctor_workplaces` table + RLS. Required field `main_workplace` on signup, optional unbounded list of others. Searchable via trigram-indexed normalized column; surfaced in Phase 3 dashboard cards and Phase 4 profile editor.
 
 ---
 
@@ -578,7 +599,7 @@ Why the change from the earlier "Twilio first" plan:
 - [ ] Search box on `/dashboard` finds doctors by Arabic name with hamza variants normalized: searching "احمد" returns "أحمد", "احمد", and "إحمد".
 - [ ] Search filters by specialty.
 - [ ] Search results show only `is_active && is_visible && is_phone_verified && is_admin_approved && consent_directory_use` doctors.
-- [ ] Doctor card shows Arabic name, Hebrew name, license, specialties, subspecialty, phone (display format), email, WhatsApp button.
+- [ ] Doctor card shows Arabic name, Hebrew name, license, specialties, subspecialty, **main workplace + any other workplaces**, phone (display format), email, WhatsApp button.
 - [ ] WhatsApp button opens `wa.me/<e164-no-plus>?text=<encoded prefilled>` in a new tab.
 - [ ] Guests cannot reach `/dashboard`, `/profile`, or any doctor data via URL or API. Confirmed by RLS smoke test.
 - [ ] Doctors can update their Arabic / Hebrew name, specialties, subspecialty, email, visibility on `/profile`.

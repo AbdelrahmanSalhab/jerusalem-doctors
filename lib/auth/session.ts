@@ -13,13 +13,24 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const isProd = () => process.env.NODE_ENV === "production";
-const useDevUser = () =>
-  process.env.USE_DEV_USER === "1" && !isProd();
 
+// The dev shim only activates when BOTH env vars are set in a non-prod env.
+// This makes toggling friction-free: comment one of them out and the shim
+// disengages without errors.
+const useDevUser = () =>
+  process.env.USE_DEV_USER === "1" &&
+  Boolean(process.env.DEV_DOCTOR_ID) &&
+  !isProd();
+
+// Log loudly if USE_DEV_USER is set in production. We don't *throw* here:
+// Next's `next build` sets NODE_ENV=production but still loads .env.local,
+// so a dev's local-only USE_DEV_USER=1 would block builds. The runtime
+// check in useDevUser() is the actual safety guard — it disables the shim
+// regardless of how USE_DEV_USER is set when NODE_ENV=production.
 if (process.env.USE_DEV_USER === "1" && isProd()) {
-  // Surface the misconfiguration loudly at module load.
-  throw new Error(
-    "USE_DEV_USER=1 is forbidden in production. Unset before deploy.",
+  console.warn(
+    "[auth/session] USE_DEV_USER=1 is set but NODE_ENV=production — " +
+      "the dev shim will be ignored. Unset USE_DEV_USER before deploy.",
   );
 }
 
@@ -29,12 +40,7 @@ if (process.env.USE_DEV_USER === "1" && isProd()) {
  */
 export async function getCurrentDoctor(): Promise<Doctor | null> {
   if (useDevUser()) {
-    const id = process.env.DEV_DOCTOR_ID;
-    if (!id) {
-      throw new Error(
-        "USE_DEV_USER=1 requires DEV_DOCTOR_ID. Run scripts/seed-dev-doctor.sql.",
-      );
-    }
+    const id = process.env.DEV_DOCTOR_ID!; // checked in useDevUser()
     const service = createSupabaseServiceClient();
     const { data, error } = await service
       .from("doctors")

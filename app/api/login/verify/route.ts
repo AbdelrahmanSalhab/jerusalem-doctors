@@ -43,6 +43,29 @@ export async function POST(req: Request) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
+  // Dev-only short-circuit. Accept any 6-digit code if it matches the dev
+  // doctor's phone. The dev shim handles "session" via env vars; no real
+  // auth.users row is created. Hard-blocked in production.
+  if (
+    process.env.USE_DEV_USER === "1" &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    const service = createSupabaseServiceClient();
+    const dev = await service
+      .from("doctors")
+      .select("id, is_active, is_admin_approved")
+      .eq("phone_e164", phoneE164)
+      .maybeSingle();
+    if (!dev.data) {
+      return jsonError(404, { error: "not_found", code: "not_found" });
+    }
+    return jsonOk({
+      ok: true,
+      is_admin_approved: dev.data.is_admin_approved,
+      dev_bypass: true,
+    });
+  }
+
   const ssr = await createSupabaseServerClient();
   const verify = await ssr.auth.verifyOtp({
     phone: phoneE164,

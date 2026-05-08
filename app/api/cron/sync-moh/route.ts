@@ -38,11 +38,21 @@ export async function GET(req: Request) {
   let batch: NonNullable<ReturnType<typeof toRow>>[] = [];
   const flush = async () => {
     if (batch.length === 0) return;
+    // Registry has multiple rows per license (one per specialty cert).
+    // Dedupe within the batch so ON CONFLICT doesn't see the same key twice
+    // in a single statement. Cross-batch duplicates are fine — successive
+    // upserts just overwrite via ON CONFLICT.
+    const seen = new Set<number>();
+    const deduped = batch.filter((r) => {
+      if (seen.has(r.license_number)) return false;
+      seen.add(r.license_number);
+      return true;
+    });
     const { error } = await supabase
       .from("moh_practitioners")
-      .upsert(batch, { onConflict: "license_number" });
+      .upsert(deduped, { onConflict: "license_number" });
     if (error) throw new Error(`moh upsert failed: ${error.message}`);
-    upserted += batch.length;
+    upserted += deduped.length;
     batch = [];
   };
 

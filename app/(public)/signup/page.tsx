@@ -33,7 +33,7 @@ export default async function SignupPage() {
     <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="mb-2 text-3xl font-bold">إنشاء حساب جديد</h1>
       <p className="mb-6 text-foreground/70">
-        دليل أطباء القدس — منصة مهنية مغلقة
+        تجمّع أطباء العائلة المقدسي — منصة مهنية مغلقة
       </p>
 
       {isPhoneAuthDisabled() && (
@@ -44,24 +44,6 @@ export default async function SignupPage() {
           </p>
         </section>
       )}
-
-      <section className="mb-8 rounded border border-foreground/15 bg-foreground/5 p-5 text-sm leading-relaxed">
-        <h2 className="mb-2 font-semibold">تنبيه مهم قبل التسجيل</h2>
-        <p className="mb-2">
-          المعلومات التي ستدخلها في هذا النموذج، بما في ذلك الاسم، رقم الهاتف،
-          رقم الترخيص، والتخصص، ستُستخدم لمساعدة الأطباء الآخرين في القدس على
-          العثور عليك والتواصل معك بسهولة لأغراض مهنية.
-        </p>
-        <p className="mb-2">
-          لن يتم عرض هذه المعلومات للعامة، بل فقط للأطباء المسجلين والمتحقق من
-          رقم هاتفهم داخل النظام.
-        </p>
-        <p>
-          بالضغط على &quot;أوافق&quot;، أنت تؤكد أنك طبيب/ة، وأن المعلومات
-          المدخلة صحيحة، وأنك توافق على استخدامها داخل دليل أطباء القدس لهذا
-          الغرض المهني.
-        </p>
-      </section>
 
       <SignupForm specialties={specialties} />
     </main>
