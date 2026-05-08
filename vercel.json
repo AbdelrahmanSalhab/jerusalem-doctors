@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-moh",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

@@ -409,35 +409,34 @@ create index moh_practitioners_norm
 
 ## 7. Authentication & OTP Strategy
 
-### Recommended approach (production)
-**Twilio Verify with WhatsApp channel, hooked into Supabase Phone Auth.**
+### Recommended approach (revised — May 2026)
+**Skip Twilio entirely. Build the rest of the site behind a dev-user shim, then plug in the direct Meta WhatsApp Cloud API as the last build step before pilot.**
 
-- Supabase Phone Auth supports Twilio as a provider — configure via Supabase dashboard → Authentication → Phone.
-- For **WhatsApp delivery**, set Twilio Verify's default channel to `whatsapp`. Twilio handles template approval (one-time setup) and falls back to SMS automatically if WA delivery fails (Verify's "Channel Failover").
-- Supabase issues the JWT and session; Twilio is just the delivery layer.
-- Per-message cost: ~$0.005–$0.05 depending on country (Israel: ~$0.04 / WA authentication conversation as of recent pricing). Budget assumption: 1000 verifications / month ≈ $40.
+Why the change from the earlier "Twilio first" plan:
+- Twilio's all-in cost (number rental + Verify per-attempt + per-message) burns money during development for delivery we don't need yet.
+- Twilio's WhatsApp Verify requires bringing your own WhatsApp Business sender (Meta verification, ~1–2 weeks). Same upstream Meta dependency we'd hit for direct Meta — no delivery-time saving.
+- Direct Meta has no number rental, no Verify markup; only per-message delivery (~$0.005–$0.03 / Israel auth). Cheapest at any scale.
+- The OTP layer is one swappable file (`lib/otp/*` interface), so deferring is risk-free.
 
-### Backup approach
-1. **Direct Meta WhatsApp Cloud API** — **deferred, not abandoned.** Twilio Verify ships first because the OTP delivery layer is the only piece we'd own differently; the rest of our auth stack (code storage, brute-force, expiry, `admin.createUser`) is already provider-agnostic. Migration plan (post-launch, when verification volume justifies the ~60% per-message savings):
-   - Set up Meta Business + WABA + System User token + Arabic auth-template approval (~1 week wall-clock, mostly Meta's review queue).
-   - Add `lib/otp/whatsapp_meta.ts` implementing the existing `OTPProvider` interface (~80 LoC: `POST graph.facebook.com/v21.0/{phone-number-id}/messages` with `type=template`, plus our own code-hash storage in `pending_signups`).
-   - Flip `OTP_PROVIDER=whatsapp_meta` in Vercel.
-   - Optional: `app/api/webhooks/whatsapp/route.ts` for delivery-status callbacks (with `x-hub-signature-256` verification).
-   - No DB, route, or UI changes needed.
-2. **SMS fallback** — If WA template approval is delayed, ship Phase 2 with SMS-only OTP. Same Twilio Verify, channel `sms`. Update Arabic copy: "رمز التحقق عبر رسالة نصية" until WA is live.
-
-### Dev vs production setup
-| Env | OTP_PROVIDER | What happens |
+### Build-time strategy
+| Stage | OTP path | Notes |
 |---|---|---|
-| Local dev | `mock` | Code = `123456`, logged to terminal |
-| Preview / staging | `twilio` (test creds) | Real Twilio test credentials; uses sandbox WA number; only allowed phones |
-| Production | `twilio` | Real Twilio + Supabase phone auth |
+| **Phase 2 → Phase 4 (development)** | `OTP_PROVIDER=mock` + dev-user shim | No real OTP. `lib/auth/session.ts → getCurrentDoctor()` returns the dev doctor when `USE_DEV_USER=1`. Production deploys keep auth pages but disable submit until Meta is wired (banner). |
+| **Last week before pilot** | Add `lib/otp/whatsapp_meta.ts`, flip `OTP_PROVIDER=whatsapp_meta` | Meta Business verification, WABA, sender registration, Arabic auth-template approval. Switch flag, smoke-test, ship. |
+| **Production fallback if Meta stalls** | Twilio with SMS channel | Reactivate Supabase Phone Auth → Twilio (creds left in place but disabled). Update Arabic copy from "واتساب" to "رسالة نصية". |
 
-### Risks
-- **Cost runaway under abuse**: a single attacker hitting `/api/signup/start` with random phones ≈ $0.04 each. Mitigations: Cloudflare Turnstile on signup/login; per-IP rate limit (10 / hour); per-phone rate limit (3 / hour); temporary phone blocklist after N abusive attempts.
-- **Twilio account suspension**: have SMS as a fallback channel and document a manual workaround in the runbook.
-- **Template rejection**: WA authentication templates require approval per language. Submit Arabic + Hebrew templates early in Phase 2.
-- **Phone number recycling**: someone gets a second-hand number and tries to log into a doctor's account. Mitigation: any login from a new device should send a notification (out-of-scope for MVP, document as known gap).
+### Direct Meta integration spec (built last)
+- Required env: `META_WABA_ID`, `META_PHONE_NUMBER_ID`, `META_ACCESS_TOKEN` (System User long-lived), `META_VERIFY_TOKEN` (webhook verification), `META_AUTH_TEMPLATE_NAME`.
+- Send: `POST https://graph.facebook.com/v21.0/{phone-number-id}/messages` with `type=template`, language `ar`, body parameter = generated code.
+- Verify: code stored hashed in `pending_signups.payload.otp_hash` (we own the lifecycle, not Meta).
+- Optional: `app/api/webhooks/whatsapp/route.ts` for delivery-status callbacks with `x-hub-signature-256` verification.
+- No DB, route, or UI changes — the `OtpProvider` interface (`lib/otp/provider.ts`) already covers it.
+
+### Risks (current strategy)
+- **Late integration surfaces bugs.** Mitigation: dev-user shim exercises every auth-protected page through real RLS by issuing a session JWT for the dev doctor (Phase 3 work). Bugs surface at dev time, not pilot time.
+- **Meta verification stalls.** Mitigation: Twilio account stays open; SMS fallback is one env-var flip + four `channel: "sms"` lines.
+- **Cost runaway under abuse** (any provider). Mitigations: Cloudflare Turnstile on signup/login; per-IP and per-phone rate limits already in place.
+- **Phone number recycling.** Out of scope for MVP, documented as known gap.
 
 ---
 
