@@ -33,7 +33,7 @@ export default async function SignupPage() {
     <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="mb-2 text-3xl font-bold">إنشاء حساب جديد</h1>
       <p className="mb-6 text-foreground/70">
-        تجمّع أطباء العائلة المقدسي — منصة مهنية مغلقة
+        دليل أطبّاء القدس — منصة مهنية مغلقة
       </p>
 
       {isPhoneAuthDisabled() && (
