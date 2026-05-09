@@ -78,6 +78,20 @@ export async function requireDoctor(): Promise<Doctor> {
 }
 
 /**
+ * Like requireDoctor, but additionally requires `is_admin`. Used by the
+ * admin panel layout. Returns 404 (notFound) for non-admins so the panel's
+ * existence isn't leaked to regular users.
+ */
+export async function requireAdmin(): Promise<Doctor> {
+  const doctor = await getCurrentDoctor();
+  if (!doctor || !doctor.is_admin) {
+    const { notFound } = await import("next/navigation");
+    notFound(); // throws — control never returns here
+  }
+  return doctor as Doctor;
+}
+
+/**
  * True when phone-OTP-based signup/login is intentionally disabled in this
  * environment (e.g. production while we're still building). Surface a banner
  * in /signup and /login pages to set expectations.

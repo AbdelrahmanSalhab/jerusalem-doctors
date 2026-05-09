@@ -42,6 +42,20 @@ export async function SiteHeader() {
               >
                 لوحة البحث
               </Link>
+              <Link
+                href="/profile"
+                className="rounded-md px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
+              >
+                ملفي
+              </Link>
+              {doctor.is_admin && (
+                <Link
+                  href="/admin"
+                  className="rounded-md px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
+                >
+                  الإدارة
+                </Link>
+              )}
               <form action="/api/auth/logout" method="post">
                 <button className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3">
                   تسجيل الخروج

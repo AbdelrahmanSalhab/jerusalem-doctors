@@ -148,215 +148,224 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
   const fieldError = (k: string) => fieldErrors[k];
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <Field label="رقم الهاتف" error={fieldError("phone")}>
-        <input
-          type="tel"
-          required
-          dir="ltr"
-          autoComplete="tel"
-          className="input"
-          value={form.phone}
-          onChange={(e) => update("phone", e.target.value)}
-          placeholder="0501234567"
-        />
-      </Field>
-
-      <Field label="رقم الترخيص (المعرف الطبي)" error={fieldError("license_number")}>
-        <input
-          required
-          dir="ltr"
-          inputMode="numeric"
-          className="input"
-          value={form.license_number}
-          onChange={(e) => update("license_number", e.target.value)}
-        />
-      </Field>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="الاسم بالعربية" error={fieldError("arabic_first_name")}>
+    <form onSubmit={submit} className="flex flex-col gap-8 sm:gap-6">
+      <Section title="معلومات الاتصال والترخيص">
+        <Field label="رقم الهاتف" error={fieldError("phone")}>
           <input
+            type="tel"
             required
+            dir="ltr"
+            autoComplete="tel"
             className="input"
-            value={form.arabic_first_name}
-            onChange={(e) => update("arabic_first_name", e.target.value)}
+            value={form.phone}
+            onChange={(e) => update("phone", e.target.value)}
+            placeholder="0501234567"
           />
         </Field>
-        <Field label="اسم العائلة بالعربية" error={fieldError("arabic_family_name")}>
+
+        <Field label="رقم الترخيص (المعرف الطبي)" error={fieldError("license_number")}>
           <input
             required
+            dir="ltr"
+            inputMode="numeric"
             className="input"
-            value={form.arabic_family_name}
-            onChange={(e) => update("arabic_family_name", e.target.value)}
+            value={form.license_number}
+            onChange={(e) => update("license_number", e.target.value)}
           />
         </Field>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="الاسم بالعبرية" error={fieldError("hebrew_first_name")}>
+        <Field label="البريد الإلكتروني" error={fieldError("email")}>
           <input
+            type="email"
             required
-            dir="auto"
+            dir="ltr"
+            autoComplete="email"
             className="input"
-            value={form.hebrew_first_name}
-            onChange={(e) => update("hebrew_first_name", e.target.value)}
+            value={form.email}
+            onChange={(e) => update("email", e.target.value)}
           />
         </Field>
-        <Field label="اسم العائلة بالعبرية" error={fieldError("hebrew_family_name")}>
-          <input
-            required
-            dir="auto"
-            className="input"
-            value={form.hebrew_family_name}
-            onChange={(e) => update("hebrew_family_name", e.target.value)}
-          />
-        </Field>
-      </div>
+      </Section>
 
-      {fieldError("hebrew_full_name") && (
-        <p className="text-sm text-red-600">{fieldError("hebrew_full_name")}</p>
-      )}
-
-      {registryName && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-base">
-          <p className="mb-2">
-            الاسم في سجل وزارة الصحة لرقم الترخيص هذا هو:{" "}
-            <strong dir="auto">
-              {registryName.first} {registryName.family}
-            </strong>
-            .
-          </p>
-          <p className="mb-2">
-            إذا كنت متأكدًا أنك أنت، يمكنك المتابعة وسيتم مراجعة طلبك من قبل
-            الإدارة قبل تفعيل الحساب.
-          </p>
-          <label className="flex items-center gap-2">
+      <Section title="الاسم">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="الاسم بالعربية" error={fieldError("arabic_first_name")}>
             <input
-              type="checkbox"
-              checked={overrideMismatch}
-              onChange={(e) => setOverrideMismatch(e.target.checked)}
+              required
+              className="input"
+              value={form.arabic_first_name}
+              onChange={(e) => update("arabic_first_name", e.target.value)}
             />
-            <span>أؤكد أن هذا حسابي وأطلب المراجعة اليدوية</span>
-          </label>
+          </Field>
+          <Field label="اسم العائلة بالعربية" error={fieldError("arabic_family_name")}>
+            <input
+              required
+              className="input"
+              value={form.arabic_family_name}
+              onChange={(e) => update("arabic_family_name", e.target.value)}
+            />
+          </Field>
         </div>
-      )}
 
-      <Field label="التخصص (اختر واحدًا أو أكثر)" error={fieldError("specialty_ids")}>
-        <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
-          {specialties.map((s) => (
-            <label
-              key={s.id}
-              className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
-            >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="الاسم بالعبرية" error={fieldError("hebrew_first_name")}>
+            <input
+              required
+              dir="auto"
+              className="input"
+              value={form.hebrew_first_name}
+              onChange={(e) => update("hebrew_first_name", e.target.value)}
+            />
+          </Field>
+          <Field label="اسم العائلة بالعبرية" error={fieldError("hebrew_family_name")}>
+            <input
+              required
+              dir="auto"
+              className="input"
+              value={form.hebrew_family_name}
+              onChange={(e) => update("hebrew_family_name", e.target.value)}
+            />
+          </Field>
+        </div>
+
+        {fieldError("hebrew_full_name") && (
+          <p className="text-sm text-red-600">{fieldError("hebrew_full_name")}</p>
+        )}
+
+        {registryName && (
+          <div className="rounded border border-amber-300 bg-amber-50 p-4 text-base">
+            <p className="mb-2">
+              الاسم في سجل وزارة الصحة لرقم الترخيص هذا هو:{" "}
+              <strong dir="auto">
+                {registryName.first} {registryName.family}
+              </strong>
+              .
+            </p>
+            <p className="mb-2">
+              إذا كنت متأكدًا أنك أنت، يمكنك المتابعة وسيتم مراجعة طلبك من قبل
+              الإدارة قبل تفعيل الحساب.
+            </p>
+            <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={form.specialty_ids.includes(s.id)}
-                onChange={() => toggleSpecialty(s.id)}
-                disabled={
-                  !form.specialty_ids.includes(s.id) &&
-                  form.specialty_ids.length >= 5
-                }
+                checked={overrideMismatch}
+                onChange={(e) => setOverrideMismatch(e.target.checked)}
               />
-              <span>{s.name_ar}</span>
+              <span>أؤكد أن هذا حسابي وأطلب المراجعة اليدوية</span>
             </label>
-          ))}
-        </div>
-      </Field>
+          </div>
+        )}
+      </Section>
 
-      <Field label="التخصص الفرعي (اختياري)">
-        <input
-          className="input"
-          value={form.subspecialty}
-          onChange={(e) => update("subspecialty", e.target.value)}
-        />
-      </Field>
-
-      <Field label="مكان العمل الرئيسي" error={fieldError("main_workplace")}>
-        <input
-          required
-          className="input"
-          value={form.main_workplace}
-          onChange={(e) => update("main_workplace", e.target.value)}
-          placeholder="مثلاً: مستشفى هداسا عين كارم"
-        />
-      </Field>
-
-      <Field label="أماكن عمل أخرى (اختياري)">
-        <div className="space-y-2">
-          {form.other_workplaces.map((wp, i) => (
-            <div key={i} className="flex gap-2">
-              <input
-                className="input flex-1"
-                value={wp}
-                onChange={(e) => {
-                  const next = [...form.other_workplaces];
-                  next[i] = e.target.value;
-                  update("other_workplaces", next);
-                }}
-                placeholder="اسم العيادة أو المستشفى"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  update(
-                    "other_workplaces",
-                    form.other_workplaces.filter((_, x) => x !== i),
-                  )
-                }
-                className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
-                aria-label="حذف مكان العمل"
+      <Section title="التخصص">
+        <Field label="التخصص (اختر واحدًا أو أكثر)" error={fieldError("specialty_ids")}>
+          <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
+            {specialties.map((s) => (
+              <label
+                key={s.id}
+                className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
               >
-                حذف
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() =>
-              update("other_workplaces", [...form.other_workplaces, ""])
-            }
-            className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
-          >
-            + إضافة مكان عمل آخر
-          </button>
+                <input
+                  type="checkbox"
+                  checked={form.specialty_ids.includes(s.id)}
+                  onChange={() => toggleSpecialty(s.id)}
+                  disabled={
+                    !form.specialty_ids.includes(s.id) &&
+                    form.specialty_ids.length >= 5
+                  }
+                />
+                <span>{s.name_ar}</span>
+              </label>
+            ))}
+          </div>
+        </Field>
+
+        <Field label="التخصص الفرعي (اختياري)">
+          <input
+            className="input"
+            value={form.subspecialty}
+            onChange={(e) => update("subspecialty", e.target.value)}
+          />
+        </Field>
+      </Section>
+
+      <Section title="مكان العمل">
+        <Field label="مكان العمل الرئيسي" error={fieldError("main_workplace")}>
+          <input
+            required
+            className="input"
+            value={form.main_workplace}
+            onChange={(e) => update("main_workplace", e.target.value)}
+            placeholder="مثلاً: مستشفى هداسا عين كارم"
+          />
+        </Field>
+
+        <Field label="أماكن عمل أخرى (اختياري)">
+          <div className="space-y-2">
+            {form.other_workplaces.map((wp, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  className="input flex-1"
+                  value={wp}
+                  onChange={(e) => {
+                    const next = [...form.other_workplaces];
+                    next[i] = e.target.value;
+                    update("other_workplaces", next);
+                  }}
+                  placeholder="اسم العيادة أو المستشفى"
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    update(
+                      "other_workplaces",
+                      form.other_workplaces.filter((_, x) => x !== i),
+                    )
+                  }
+                  className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
+                  aria-label="حذف مكان العمل"
+                >
+                  حذف
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                update("other_workplaces", [...form.other_workplaces, ""])
+              }
+              className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
+            >
+              + إضافة مكان عمل آخر
+            </button>
+          </div>
+        </Field>
+      </Section>
+
+      <Section title="الموافقة">
+        <div className="rounded border border-foreground/15 bg-foreground/5 p-4 text-base leading-relaxed">
+          <p>
+            المعلومات التي أدخلتها — الاسم، رقم الهاتف، رقم الترخيص،
+            التخصصات، وأماكن العمل — ستُستخدم داخل المنصة لمساعدة زملائك من
+            الأطباء المسجلين على إيجادك والتواصل معك مهنيًا، ولأي استخدامات
+            تخدم تطوير المنصة أو توسيع شبكة التواصل.
+          </p>
         </div>
-      </Field>
 
-      <Field label="البريد الإلكتروني" error={fieldError("email")}>
-        <input
-          type="email"
-          required
-          dir="ltr"
-          autoComplete="email"
-          className="input"
-          value={form.email}
-          onChange={(e) => update("email", e.target.value)}
-        />
-      </Field>
-
-      <section className="rounded border border-foreground/15 bg-foreground/5 p-4 text-base leading-relaxed">
-        <h2 className="mb-1.5 font-bold">قبل الموافقة</h2>
-        <p className="mb-2">
-          المعلومات التي أدخلتها — الاسم، رقم الهاتف، رقم الترخيص، التخصصات،
-          وأماكن العمل — ستُستخدم داخل المنصة لمساعدة زملائك من الأطباء
-          المسجلين على إيجادك والتواصل معك مهنيًا، ولأي استخدامات تخدم تطوير
-          المنصة أو توسيع شبكة التواصل.
-        </p>
-      </section>
-
-      <label className="flex items-start gap-3 rounded border border-foreground/15 p-3 text-base">
-        <input
-          type="checkbox"
-          required
-          checked={form.consent}
-          onChange={(e) => update("consent", e.target.checked)}
-          className="mt-1"
-        />
-        <span>
-          أوافق على ما ورد أعلاه، وأؤكد أنني طبيب وأن المعلومات المدخلة
-          صحيحة، وأوافق على استخدامها.
-        </span>
-      </label>
+        <label className="flex items-start gap-3 rounded border border-foreground/15 p-3 text-base">
+          <input
+            type="checkbox"
+            required
+            checked={form.consent}
+            onChange={(e) => update("consent", e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            أوافق على ما ورد أعلاه، وأؤكد أنني طبيب وأن المعلومات المدخلة
+            صحيحة، وأوافق على استخدامها.
+          </span>
+        </label>
+      </Section>
 
       {error && (
         <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
@@ -402,6 +411,23 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         }
       `}</style>
     </form>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-foreground/15 p-5 space-y-4">
+      <h2 className="border-b border-foreground/10 pb-2 text-lg font-bold">
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }
 

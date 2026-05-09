@@ -37,6 +37,9 @@ export interface Doctor {
   is_visible: boolean;
   is_admin_approved: boolean;
   is_admin: boolean;
+  phone_is_visible: boolean;
+  workplaces_is_visible: boolean;
+  profile_picture_url: string | null;
   created_at: string;
   updated_at: string;
 }

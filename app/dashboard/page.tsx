@@ -1,28 +1,31 @@
-// Stub dashboard — Phase 3 builds the real search UI here.
+import { DashboardSearch } from "./DashboardSearch";
 import { requireDoctor } from "@/lib/auth/session";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const doctor = await requireDoctor();
+  const me = await requireDoctor();
+
+  const service = createSupabaseServiceClient();
+  const { data: specialties } = await service
+    .from("specialties")
+    .select("id, name_ar")
+    .eq("is_active", true)
+    .order("sort_order");
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16 text-center">
-      <h1 className="mb-2 text-3xl font-bold">دليل أطباء القدس</h1>
-      <p className="mb-2 text-foreground/70">
-        مرحبًا د. {doctor.arabic_first_name} {doctor.arabic_family_name}
-      </p>
-      <p className="mb-6 text-foreground/70">
-        ابحث عن طبيب بالاسم، التخصص، أو التخصص الفرعي
-      </p>
-      <p className="rounded border border-foreground/15 bg-foreground/5 p-6 text-sm text-foreground/80">
-        تم تأكيد دخولك. شاشة البحث تُبنى في المرحلة الثالثة.
-      </p>
-      <form action="/api/auth/logout" method="post" className="mt-6">
-        <button className="rounded-md border border-foreground px-6 py-2 text-sm">
-          تسجيل الخروج
-        </button>
-      </form>
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
+      <header className="text-center">
+        <h1 className="text-2xl font-bold sm:text-3xl">
+          مرحبًا د. {me.arabic_first_name}
+        </h1>
+        <p className="mt-1 text-foreground/70">
+          ابحث عن طبيب بالاسم، التخصص، أو التخصص الفرعي
+        </p>
+      </header>
+
+      <DashboardSearch specialties={specialties ?? []} />
     </main>
   );
 }

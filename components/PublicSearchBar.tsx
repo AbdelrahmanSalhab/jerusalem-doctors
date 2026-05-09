@@ -54,9 +54,9 @@ export function PublicSearchBar() {
           >
             <h2 className="mb-2 text-xl font-bold">البحث متاح للأطباء فقط</h2>
             <p className="mb-5 text-sm text-foreground/80">
-              دليل أطباء القدس منصة مهنية مغلقة. الرجاء تسجيل الدخول إذا كان
-              لديك حساب، أو إنشاء حساب جديد للوصول إلى البحث والتواصل مع
-              زملائك.
+              للوصول إلى البحث والتواصل مع
+              زملائك, <br></br>الرجاء تسجيل الدخول،
+              أو إنشاء حساب جديد 
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Link

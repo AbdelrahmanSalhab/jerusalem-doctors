@@ -26,6 +26,10 @@ export function SiteFooter() {
           >
             WhatsApp
           </a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy" className="hover:underline">
+            الخصوصية
+          </a>
         </p>
       </div>
     </footer>
