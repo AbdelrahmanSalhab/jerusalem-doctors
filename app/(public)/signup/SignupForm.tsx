@@ -322,10 +322,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </div>
       </Field>
 
-      <Field label="البريد الإلكتروني (اختياري)" error={fieldError("email")}>
+      <Field label="البريد الإلكتروني" error={fieldError("email")}>
         <input
           type="email"
+          required
           dir="ltr"
+          autoComplete="email"
           className="input"
           value={form.email}
           onChange={(e) => update("email", e.target.value)}
@@ -368,6 +370,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           submitting ||
           form.specialty_ids.length === 0 ||
           !form.main_workplace.trim() ||
+          !form.email.trim() ||
           !form.consent
         }
         className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"

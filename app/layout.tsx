@@ -26,7 +26,7 @@ export default function RootLayout({
       dir="rtl"
       className={`${naskh.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-arabic">
+      <body className="min-h-full flex flex-col font-arabic overflow-x-hidden">
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <SiteFooter />

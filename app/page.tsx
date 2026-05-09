@@ -12,10 +12,10 @@ export default async function HomePage() {
   return (
     <main className="mx-auto flex max-w-3xl flex-col items-center gap-8 px-6 py-20 text-center">
       <div>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
- دليل أطبّاء القدس
-         </h1>
-        <p className="mt-3 text-lg text-foreground/75">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+          دليل أطبّاء القدس
+        </h1>
+        <p className="mt-4 text-lg text-foreground/75 md:text-xl">
           ابحث عن زملائك من الأطباء في القدس
         </p>
       </div>

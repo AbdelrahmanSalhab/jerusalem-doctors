@@ -26,7 +26,7 @@ const Body = z.object({
   hebrew_family_name: z.string().min(2),
   specialty_ids: z.array(z.uuid()).min(1).max(5),
   subspecialty: z.string().trim().optional().nullable(),
-  email: z.email().optional().nullable(),
+  email: z.email(),
   // Workplaces. main_workplace is required (primary). other_workplaces is
   // an unbounded list; we filter empties + dedupe server-side.
   main_workplace: z.string().trim().min(2).max(120),

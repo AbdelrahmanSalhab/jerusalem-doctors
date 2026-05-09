@@ -20,7 +20,7 @@ export function PublicSearchBar() {
     <>
       <form
         onSubmit={block}
-        className="mx-auto flex max-w-xl items-center gap-2"
+        className="mx-auto flex max-w-2xl flex-col items-stretch gap-2 sm:flex-row sm:items-center"
       >
         <input
           type="text"
@@ -28,14 +28,14 @@ export function PublicSearchBar() {
           onFocus={block}
           onClick={block}
           onKeyDown={block}
-          placeholder="ابحث عن طبيب بالاسم، التخصص، أو التخصص الفرعي..."
-          className="flex-1 rounded-md border border-foreground/20 bg-transparent px-4 py-3 text-base outline-none focus:border-foreground"
+          placeholder="ابحث بالاسم، التخصص، أو التخصص الفرعي..."
+          className="min-w-0 flex-1 rounded-md border border-foreground/20 bg-transparent px-4 py-3 text-base outline-none focus:border-foreground md:px-5 md:py-4 md:text-lg"
           aria-label="بحث"
         />
         <button
           type="button"
           onClick={block}
-          className="rounded-md bg-foreground px-5 py-3 text-background hover:opacity-90"
+          className="rounded-md bg-foreground px-5 py-3 text-background hover:opacity-90 md:px-7 md:py-4 md:text-lg"
         >
           بحث
         </button>
