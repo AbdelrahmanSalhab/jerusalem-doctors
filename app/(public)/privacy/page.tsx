@@ -5,8 +5,7 @@ export default function PrivacyPage() {
     <main className="mx-auto max-w-3xl px-6 py-12 leading-relaxed">
       <h1 className="mb-2 text-3xl font-bold">سياسة الخصوصية</h1>
       <p className="mb-6 text-foreground/70">
-        تجمّع أطباء العائلة المقدسي — منصة مهنية مغلقة للأطباء المسجلين في
-        القدس
+        دليل أطبّاء القدس
       </p>
 
       <article className="space-y-4 text-base">
@@ -26,16 +25,6 @@ export default function PrivacyPage() {
             تُستخدم البيانات داخل المنصة لمساعدة الأطباء المسجلين على إيجاد
             زملائهم والتواصل معهم لأغراض مهنية، ولأي استخدامات تخدم تطوير
             المنصة وتوسيع شبكة التواصل بين الأطباء.
-          </p>
-        </section>
-
-        <section>
-          <h2 className="mb-1.5 text-lg font-bold">من يرى بياناتك</h2>
-          <p>
-            بياناتك تُعرض فقط للأطباء المسجلين والمتحقق من أرقام هواتفهم داخل
-            النظام، ولن تُنشر للعامة، ولن تُباع لأي جهة تجارية أو إعلانية.
-            لديك صلاحية التحكم في إظهار رقم هاتفك وأماكن عملك بشكل مستقل من
-            خلال صفحة "ملفي".
           </p>
         </section>
 

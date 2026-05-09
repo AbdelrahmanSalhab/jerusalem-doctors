@@ -57,22 +57,20 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         </div>
       )}
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+      <dl className="flex flex-col gap-1 text-sm">
         {doctor.phone_display && (
-          <>
+          <div className="flex items-baseline gap-2">
             <dt className="text-foreground/65">الهاتف:</dt>
-            <dd dir="ltr" className="text-start">
-              {doctor.phone_display}
-            </dd>
-          </>
+            <dd dir="ltr">{doctor.phone_display}</dd>
+          </div>
         )}
         {doctor.email && (
-          <>
+          <div className="flex items-baseline gap-2">
             <dt className="text-foreground/65">البريد:</dt>
-            <dd dir="ltr" className="break-all text-start">
+            <dd dir="ltr" className="break-all">
               {doctor.email}
             </dd>
-          </>
+          </div>
         )}
       </dl>
 

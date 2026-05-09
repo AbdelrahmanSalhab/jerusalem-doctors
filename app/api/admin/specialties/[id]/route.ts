@@ -47,11 +47,5 @@ export async function PATCH(
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
 
-  await service.from("audit_logs").insert({
-    actor_doctor_id: admin.id,
-    action: "specialty_updated",
-    metadata: { specialty_id: id, ...body },
-  });
-
   return jsonOk({ ok: true });
 }

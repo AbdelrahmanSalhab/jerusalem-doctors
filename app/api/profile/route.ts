@@ -4,7 +4,7 @@
 // as a single replace-all set per request — simpler than diffing.
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
@@ -36,7 +36,6 @@ export async function PATCH(req: Request) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
 
-  const ip = ipFromHeaders(req);
   const rl = await rateLimit("profilePatch", `doctor:${me.id}`);
   if (!rl.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
@@ -152,18 +151,6 @@ export async function PATCH(req: Request) {
       });
     }
   }
-
-  await service.from("audit_logs").insert({
-    actor_doctor_id: me.id,
-    action: "profile_updated",
-    target_doctor_id: me.id,
-    metadata: {
-      ip,
-      changed_fields: Object.keys(updates),
-      changed_specialties: Boolean(parsed.specialty_ids),
-      changed_workplaces: Boolean(parsed.workplaces),
-    },
-  });
 
   return jsonOk({ ok: true });
 }

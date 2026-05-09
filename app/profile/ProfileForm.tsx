@@ -44,6 +44,9 @@ export function ProfileForm({
     doctor.profile_picture_url,
   );
 
+  const [editingSpecialties, setEditingSpecialties] = useState(false);
+  const [editingWorkplaces, setEditingWorkplaces] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -169,104 +172,173 @@ export function ProfileForm({
       </Section>
 
       <Section title="الاسم بالعربية والبريد">
+        <p className="text-sm text-foreground/65">
+          هذه الحقول مقفلة افتراضيًا لتقليل الأخطاء. اضغط &quot;تعديل&quot;
+          لإلغاء القفل.
+        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="الاسم">
-            <input
-              required
-              className="input"
-              value={arabicFirst}
-              onChange={(e) => setArabicFirst(e.target.value)}
-            />
-          </Field>
-          <Field label="اسم العائلة">
-            <input
-              required
-              className="input"
-              value={arabicFamily}
-              onChange={(e) => setArabicFamily(e.target.value)}
-            />
-          </Field>
+          <LockableField
+            label="الاسم"
+            value={arabicFirst}
+            onChange={setArabicFirst}
+          />
+          <LockableField
+            label="اسم العائلة"
+            value={arabicFamily}
+            onChange={setArabicFamily}
+          />
         </div>
-        <Field label="البريد الإلكتروني">
-          <input
-            type="email"
-            required
-            dir="ltr"
-            className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </Field>
+        <LockableField
+          label="البريد الإلكتروني"
+          value={email}
+          onChange={setEmail}
+          type="email"
+          dir="ltr"
+        />
       </Section>
 
-      <Section title="التخصص">
-        <Field label="التخصصات (اختر واحدًا أو أكثر)">
-          <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
-            {specialties.map((s) => (
-              <label
-                key={s.id}
-                className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
-              >
-                <input
-                  type="checkbox"
-                  checked={specialtyIds.includes(s.id)}
-                  onChange={() => toggleSpecialty(s.id)}
-                  disabled={
-                    !specialtyIds.includes(s.id) && specialtyIds.length >= 5
-                  }
-                />
-                <span>{s.name_ar}</span>
-              </label>
-            ))}
-          </div>
-        </Field>
-        <Field label="التخصص الفرعي">
-          <input
-            className="input"
-            value={subspecialty}
-            onChange={(e) => setSubspecialty(e.target.value)}
-            placeholder="اختياري"
-          />
-        </Field>
-      </Section>
-
-      <Section title="مكان العمل">
-        <div className="space-y-2">
-          {workplaces.map((wp, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2">
+      <Section
+        title="التخصص"
+        action={
+          editingSpecialties ? null : (
+            <EditButton onClick={() => setEditingSpecialties(true)} />
+          )
+        }
+      >
+        {editingSpecialties ? (
+          <>
+            <Field label="التخصصات (اختر واحدًا أو أكثر)">
+              <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
+                {specialties.map((s) => (
+                  <label
+                    key={s.id}
+                    className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={specialtyIds.includes(s.id)}
+                      onChange={() => toggleSpecialty(s.id)}
+                      disabled={
+                        !specialtyIds.includes(s.id) &&
+                        specialtyIds.length >= 5
+                      }
+                    />
+                    <span>{s.name_ar}</span>
+                  </label>
+                ))}
+              </div>
+            </Field>
+            <Field label="التخصص الفرعي">
               <input
-                className="input min-w-0 flex-1"
-                value={wp.name}
-                onChange={(e) => updateWorkplaceName(i, e.target.value)}
-                placeholder="اسم العيادة أو المستشفى"
+                className="input"
+                value={subspecialty}
+                onChange={(e) => setSubspecialty(e.target.value)}
+                placeholder="اختياري"
               />
-              <label className="flex items-center gap-1.5 text-sm">
-                <input
-                  type="radio"
-                  name="primary_workplace"
-                  checked={wp.is_primary}
-                  onChange={() => setPrimary(i)}
-                />
-                رئيسي
-              </label>
-              <button
-                type="button"
-                onClick={() => removeWorkplace(i)}
-                className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
-                aria-label="حذف"
-              >
-                حذف
-              </button>
+            </Field>
+          </>
+        ) : (
+          <ReadOnlyView>
+            <div>
+              <div className="mb-1 text-sm text-foreground/65">التخصصات</div>
+              {specialtyIds.length === 0 ? (
+                <span className="text-foreground/40">— لا يوجد —</span>
+              ) : (
+                <ul className="flex flex-wrap gap-1.5">
+                  {specialties
+                    .filter((s) => specialtyIds.includes(s.id))
+                    .map((s) => (
+                      <li
+                        key={s.id}
+                        className="rounded-full border border-foreground/20 bg-foreground/5 px-2.5 py-0.5 text-sm"
+                      >
+                        {s.name_ar}
+                      </li>
+                    ))}
+                </ul>
+              )}
             </div>
-          ))}
-          <button
-            type="button"
-            onClick={addWorkplace}
-            className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
-          >
-            + إضافة مكان عمل
-          </button>
-        </div>
+            <div>
+              <div className="mb-1 text-sm text-foreground/65">
+                التخصص الفرعي
+              </div>
+              <span>
+                {subspecialty || (
+                  <span className="text-foreground/40">— غير محدد —</span>
+                )}
+              </span>
+            </div>
+          </ReadOnlyView>
+        )}
+      </Section>
+
+      <Section
+        title="مكان العمل"
+        action={
+          editingWorkplaces ? null : (
+            <EditButton onClick={() => setEditingWorkplaces(true)} />
+          )
+        }
+      >
+        {editingWorkplaces ? (
+          <div className="space-y-2">
+            {workplaces.map((wp, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <input
+                  className="input min-w-0 flex-1"
+                  value={wp.name}
+                  onChange={(e) => updateWorkplaceName(i, e.target.value)}
+                  placeholder="اسم العيادة أو المستشفى"
+                />
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="radio"
+                    name="primary_workplace"
+                    checked={wp.is_primary}
+                    onChange={() => setPrimary(i)}
+                  />
+                  رئيسي
+                </label>
+                <button
+                  type="button"
+                  onClick={() => removeWorkplace(i)}
+                  className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
+                  aria-label="حذف"
+                >
+                  حذف
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addWorkplace}
+              className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
+            >
+              + إضافة مكان عمل
+            </button>
+          </div>
+        ) : (
+          <ReadOnlyView>
+            {workplaces.filter((w) => w.name.trim().length > 0).length === 0 ? (
+              <span className="text-foreground/40">— لا يوجد —</span>
+            ) : (
+              <ul className="space-y-1">
+                {workplaces
+                  .filter((w) => w.name.trim().length > 0)
+                  .map((w, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      {w.is_primary && (
+                        <span className="rounded-full border border-foreground/20 bg-foreground/5 px-2 py-0.5 text-xs">
+                          رئيسي
+                        </span>
+                      )}
+                      <span>{w.name}</span>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </ReadOnlyView>
+        )}
       </Section>
 
       <Section title="الخصوصية">
@@ -361,17 +433,40 @@ export function ProfileForm({
 function Section({
   title,
   children,
+  action,
 }: {
   title: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
     <section className="space-y-4 rounded-lg border border-foreground/15 p-5">
-      <h2 className="border-b border-foreground/10 pb-2 text-lg font-bold">
-        {title}
-      </h2>
+      <div className="flex items-center justify-between gap-2 border-b border-foreground/10 pb-2">
+        <h2 className="text-lg font-bold">{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
+  );
+}
+
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-md border border-foreground/20 px-3 py-1 text-sm hover:bg-foreground/5"
+    >
+      تعديل
+    </button>
+  );
+}
+
+function ReadOnlyView({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="space-y-3 rounded-md border border-foreground/15 bg-foreground/5 p-4">
+      {children}
+    </div>
   );
 }
 
@@ -405,6 +500,56 @@ function Locked({
       <div className="rounded-md border border-dashed border-foreground/20 bg-foreground/5 px-3 py-2 text-foreground/80">
         {children}
       </div>
+    </div>
+  );
+}
+
+function LockableField({
+  label,
+  value,
+  onChange,
+  type = "text",
+  dir,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  dir?: "ltr" | "rtl" | "auto";
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <div>
+      <label className="mb-1.5 block text-base font-medium">{label}</label>
+      {editing ? (
+        <input
+          type={type}
+          dir={dir}
+          required
+          autoFocus
+          className="input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <div className="flex items-stretch gap-2">
+          <div
+            className="flex flex-1 items-center rounded-md border border-foreground/15 bg-foreground/5 px-3 py-2.5 text-foreground/85"
+            dir={dir}
+          >
+            {value || (
+              <span className="text-foreground/40">— غير محدد —</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="rounded-md border border-foreground/20 px-3 text-sm hover:bg-foreground/5"
+          >
+            تعديل
+          </button>
+        </div>
+      )}
     </div>
   );
 }

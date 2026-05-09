@@ -65,12 +65,5 @@ export async function POST(req: Request) {
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
 
-  await service.from("audit_logs").insert({
-    actor_doctor_id: me.id,
-    action: "profile_photo_uploaded",
-    target_doctor_id: me.id,
-    metadata: { size: file.size, content_type: file.type },
-  });
-
   return jsonOk({ ok: true, url });
 }

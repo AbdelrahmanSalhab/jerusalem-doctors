@@ -30,63 +30,57 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
       <NewSpecialtyRow />
 
       <div className="overflow-x-auto rounded-lg border border-foreground/15">
-        <table className="w-full text-sm">
+        <table className="w-full text-base">
           <thead className="bg-foreground/5">
             <tr>
-              <th className="p-3 text-start">الترتيب</th>
-              <th className="p-3 text-start">العربية</th>
-              <th className="p-3 text-start">العبرية</th>
-              <th className="p-3 text-start">الإنجليزية</th>
-              <th className="p-3 text-start">حالة</th>
+              <th className="p-3 text-center">الترتيب</th>
+              <th className="p-3 text-center">العربية</th>
+              <th className="p-3 text-center">العبرية</th>
+              <th className="p-3 text-center">الإنجليزية</th>
+              <th className="p-3 text-center">حالة</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-foreground/10">
-                <td className="p-3" dir="ltr">
+                <td className="p-3 text-center" dir="ltr">
                   <input
                     type="number"
                     defaultValue={r.sort_order ?? 0}
                     onBlur={(e) =>
                       update(r.id, { sort_order: Number(e.target.value) })
                     }
-                    className="w-16 rounded border border-foreground/15 bg-transparent px-2 py-1"
+                    className="w-16 rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
                   />
                 </td>
-                <td className="p-3">
+                <td className="p-3 text-center">
                   <input
                     defaultValue={r.name_ar}
-                    onBlur={(e) =>
-                      update(r.id, { name_ar: e.target.value })
-                    }
-                    className="rounded border border-foreground/15 bg-transparent px-2 py-1"
+                    onBlur={(e) => update(r.id, { name_ar: e.target.value })}
+                    className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
                   />
                 </td>
-                <td className="p-3" dir="auto">
+                <td className="p-3 text-center" dir="auto">
                   <input
                     defaultValue={r.name_he ?? ""}
-                    onBlur={(e) =>
-                      update(r.id, { name_he: e.target.value })
-                    }
-                    className="rounded border border-foreground/15 bg-transparent px-2 py-1"
+                    onBlur={(e) => update(r.id, { name_he: e.target.value })}
+                    className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
                   />
                 </td>
-                <td className="p-3" dir="ltr">
+                <td className="p-3 text-center" dir="ltr">
                   <input
                     defaultValue={r.name_en ?? ""}
-                    onBlur={(e) =>
-                      update(r.id, { name_en: e.target.value })
-                    }
-                    className="rounded border border-foreground/15 bg-transparent px-2 py-1"
+                    onBlur={(e) => update(r.id, { name_en: e.target.value })}
+                    className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
                   />
                 </td>
-                <td className="p-3">
+                <td className="p-3 text-center">
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() => update(r.id, { is_active: !r.is_active })}
                     className={
-                      "rounded border px-2 py-1 text-xs " +
+                      "rounded border px-2.5 py-1 text-sm " +
                       (r.is_active
                         ? "border-foreground/20 hover:bg-foreground/5"
                         : "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100")

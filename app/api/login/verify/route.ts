@@ -83,15 +83,6 @@ export async function POST(req: Request) {
     .eq("auth_user_id", verify.data.user.id)
     .maybeSingle();
 
-  if (doctor.data) {
-    await service.from("audit_logs").insert({
-      actor_doctor_id: doctor.data.id,
-      action: "login_success",
-      target_doctor_id: doctor.data.id,
-      metadata: { ip },
-    });
-  }
-
   return jsonOk({
     ok: true,
     is_admin_approved: doctor.data?.is_admin_approved ?? false,

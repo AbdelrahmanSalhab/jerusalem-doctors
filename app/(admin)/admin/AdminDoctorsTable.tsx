@@ -7,8 +7,6 @@ interface Row {
   id: string;
   arabic_first_name: string;
   arabic_family_name: string;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
   phone_e164: string;
   license_number: string;
   license_verification_status: string | null;
@@ -103,14 +101,14 @@ export function AdminDoctorsTable({
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-foreground/15">
-        <table className="w-full text-sm">
-          <thead className="bg-foreground/5 text-start">
+        <table className="w-full text-base">
+          <thead className="bg-foreground/5">
             <tr>
               <th className="p-3 text-start">الاسم</th>
-              <th className="p-3 text-start">الهاتف</th>
-              <th className="p-3 text-start">الترخيص</th>
-              <th className="p-3 text-start">حالة التحقق</th>
-              <th className="p-3 text-start">إجراءات</th>
+              <th className="p-3 text-center">الهاتف</th>
+              <th className="p-3 text-center">الترخيص</th>
+              <th className="p-3 text-center">حالة التحقق</th>
+              <th className="p-3 text-center">إجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -127,20 +125,17 @@ export function AdminDoctorsTable({
                   <div className="font-medium">
                     {r.arabic_first_name} {r.arabic_family_name}
                   </div>
-                  <div className="text-xs text-foreground/65" dir="auto">
-                    {r.hebrew_first_name} {r.hebrew_family_name}
-                  </div>
                 </td>
-                <td className="p-3" dir="ltr">
+                <td className="p-3 text-center" dir="ltr">
                   {r.phone_e164}
                 </td>
-                <td className="p-3" dir="ltr">
+                <td className="p-3 text-center" dir="ltr">
                   {r.license_number}
                 </td>
-                <td className="p-3">
+                <td className="p-3 text-center">
                   <span
                     className={
-                      "rounded-full px-2 py-0.5 text-xs " +
+                      "inline-block rounded-full px-2.5 py-0.5 text-sm " +
                       (r.license_verification_status === "verified"
                         ? "bg-green-100 text-green-800"
                         : "bg-amber-100 text-amber-800")
@@ -150,8 +145,8 @@ export function AdminDoctorsTable({
                       "غير محدد"}
                   </span>
                 </td>
-                <td className="p-3">
-                  <div className="flex flex-wrap gap-1.5">
+                <td className="p-3 text-center">
+                  <div className="flex flex-wrap justify-center gap-1.5">
                     <button
                       type="button"
                       disabled={pending}
@@ -159,7 +154,7 @@ export function AdminDoctorsTable({
                         toggle(r.id, "is_admin_approved", !r.is_admin_approved)
                       }
                       className={
-                        "rounded border px-2 py-1 text-xs " +
+                        "rounded border px-2.5 py-1 text-sm " +
                         (r.is_admin_approved
                           ? "border-foreground/20 hover:bg-foreground/5"
                           : "border-green-500 bg-green-50 text-green-800 hover:bg-green-100")
@@ -172,7 +167,7 @@ export function AdminDoctorsTable({
                       disabled={pending}
                       onClick={() => toggle(r.id, "is_active", !r.is_active)}
                       className={
-                        "rounded border px-2 py-1 text-xs " +
+                        "rounded border px-2.5 py-1 text-sm " +
                         (r.is_active
                           ? "border-red-400 text-red-700 hover:bg-red-50"
                           : "border-foreground/20 hover:bg-foreground/5")

@@ -22,30 +22,33 @@ export default async function AdminAuditPage() {
       )}
 
       <div className="overflow-x-auto rounded-lg border border-foreground/15">
-        <table className="w-full text-sm">
+        <table className="w-full text-base">
           <thead className="bg-foreground/5">
             <tr>
-              <th className="p-3 text-start">الوقت</th>
-              <th className="p-3 text-start">الإجراء</th>
-              <th className="p-3 text-start">المنفّذ</th>
-              <th className="p-3 text-start">الهدف</th>
-              <th className="p-3 text-start">تفاصيل</th>
+              <th className="p-3 text-center">الوقت</th>
+              <th className="p-3 text-center">الإجراء</th>
+              <th className="p-3 text-center">المنفّذ</th>
+              <th className="p-3 text-center">الهدف</th>
+              <th className="p-3 text-center">تفاصيل</th>
             </tr>
           </thead>
           <tbody>
             {(rows ?? []).map((r) => (
               <tr key={r.id} className="border-t border-foreground/10">
-                <td className="p-3 text-xs" dir="ltr">
-                  {new Date(r.created_at).toISOString().slice(0, 19).replace("T", " ")}
+                <td className="p-3 text-center text-sm" dir="ltr">
+                  {new Date(r.created_at)
+                    .toISOString()
+                    .slice(0, 19)
+                    .replace("T", " ")}
                 </td>
-                <td className="p-3 font-medium">{r.action}</td>
-                <td className="p-3 font-mono text-xs" dir="ltr">
+                <td className="p-3 text-center font-medium">{r.action}</td>
+                <td className="p-3 text-center font-mono text-sm" dir="ltr">
                   {r.actor_doctor_id?.slice(0, 8) ?? "—"}
                 </td>
-                <td className="p-3 font-mono text-xs" dir="ltr">
+                <td className="p-3 text-center font-mono text-sm" dir="ltr">
                   {r.target_doctor_id?.slice(0, 8) ?? "—"}
                 </td>
-                <td className="p-3 max-w-md break-words font-mono text-xs">
+                <td className="p-3 max-w-md break-words text-center font-mono text-sm">
                   {r.metadata ? JSON.stringify(r.metadata) : ""}
                 </td>
               </tr>

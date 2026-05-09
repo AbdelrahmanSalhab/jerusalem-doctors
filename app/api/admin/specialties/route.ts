@@ -49,11 +49,5 @@ export async function POST(req: Request) {
     return jsonError(500, { error: "create_failed", code: "create_failed" });
   }
 
-  await service.from("audit_logs").insert({
-    actor_doctor_id: admin.id,
-    action: "specialty_created",
-    metadata: { name_ar: body.name_ar },
-  });
-
   return jsonOk({ ok: true });
 }

@@ -1,13 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 
 export function LoginForm() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const handleTurnstileToken = useCallback(
+    (t: string) => setTurnstileToken(t),
+    [],
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +24,7 @@ export function LoginForm() {
       const res = await fetch("/api/login/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone, turnstile_token: turnstileToken }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -61,6 +67,8 @@ export function LoginForm() {
           placeholder="0501234567"
         />
       </div>
+
+      <TurnstileWidget onToken={handleTurnstileToken} action="login" />
 
       {error && (
         <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">

@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 
 type Specialty = { id: string; name_ar: string };
 
@@ -46,6 +47,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     first?: string;
     family?: string;
   } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const handleTurnstileToken = useCallback(
+    (t: string) => setTurnstileToken(t),
+    [],
+  );
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((s) => ({ ...s, [k]: v }));
@@ -97,6 +103,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           license_number: form.license_number,
           hebrew_first_name: form.hebrew_first_name,
           hebrew_family_name: form.hebrew_family_name,
+          turnstile_token: turnstileToken,
         }),
       }).then((r) => r.json());
 
@@ -123,6 +130,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         body: JSON.stringify({
           ...form,
           override_name_mismatch: overrideMismatch,
+          turnstile_token: turnstileToken,
         }),
       });
       const startBody = await start.json();
@@ -366,6 +374,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           </span>
         </label>
       </Section>
+
+      <TurnstileWidget onToken={handleTurnstileToken} action="signup" />
 
       {error && (
         <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">

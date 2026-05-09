@@ -10,7 +10,7 @@
 // we filter explicitly so the user-scoped client doesn't have to.
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
@@ -47,7 +47,6 @@ export async function GET(req: Request) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
 
-  const ip = ipFromHeaders(req);
   const rl = await rateLimit("search", `doctor:${me.id}`);
   if (!rl.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
@@ -213,18 +212,6 @@ export async function GET(req: Request) {
       workplaces,
       profile_picture_url: d.profile_picture_url ?? null,
     };
-  });
-
-  // Privacy: only the actor + a length bucket are recorded; never the query.
-  await service.from("audit_logs").insert({
-    actor_doctor_id: me.id,
-    action: "search_submitted",
-    metadata: {
-      q_length: qRaw.length,
-      has_specialty_filter: Boolean(parsed.data.specialty_id),
-      result_count: results.length,
-      ip,
-    },
   });
 
   return jsonOk({ results, count: results.length });
