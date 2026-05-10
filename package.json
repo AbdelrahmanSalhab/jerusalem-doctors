@@ -12,6 +12,7 @@
     "test:rls": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/rls-smoke-test.ts"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.52.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
     "@upstash/ratelimit": "^2.0.8",
