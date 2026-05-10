@@ -7,6 +7,11 @@ import {
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
 
+// Allow only digits, +, -, space, parens — common phone-number characters.
+// Server-side `normalizePhone` is the source of truth; this is just a UX
+// nudge to keep junk out of the input as the user types.
+const PHONE_ALLOWED = /^[0-9+\-\s()]*$/;
+
 export function LoginForm() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
@@ -19,11 +24,23 @@ export function LoginForm() {
     [],
   );
 
+  const onPhoneChange = (next: string) => {
+    if (PHONE_ALLOWED.test(next)) setPhone(next);
+    // Always clear stale errors when the user edits the field — they're
+    // trying again, the previous error is no longer relevant.
+    if (error) setError(null);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSubmitting(true);
 
+    if (!phone.trim()) {
+      setError("الرجاء إدخال رقم الهاتف.");
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const res = await fetch("/api/login/start", {
         method: "POST",
@@ -52,8 +69,11 @@ export function LoginForm() {
         return;
       }
 
-      const params = new URLSearchParams({ mode: "login", phone });
-      router.push(`/verify?${params.toString()}`);
+      // Stash phone in sessionStorage instead of the URL — keeps PII out of
+      // browser history, server logs, and Referer headers.
+      sessionStorage.setItem("verify:phone", phone);
+      sessionStorage.removeItem("verify:signup_session");
+      router.push("/verify?mode=login");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ في الاتصال بالخادم.");
@@ -70,9 +90,11 @@ export function LoginForm() {
           required
           dir="ltr"
           autoComplete="tel"
+          inputMode="tel"
+          pattern="[0-9+\-\s()]*"
           className="w-full rounded-md border border-foreground/20 px-3 py-2.5"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => onPhoneChange(e.target.value)}
           placeholder="0501234567"
         />
       </div>

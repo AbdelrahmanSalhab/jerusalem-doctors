@@ -5,12 +5,23 @@ import { useEffect, useState } from "react";
 
 type Mode = "signup" | "login";
 
+const SS_PHONE = "verify:phone";
+const SS_SESSION = "verify:signup_session";
+
 export function VerifyForm() {
   const router = useRouter();
   const params = useSearchParams();
   const mode: Mode = params.get("mode") === "login" ? "login" : "signup";
-  const phone = params.get("phone") ?? "";
-  const sessionId = params.get("session") ?? "";
+
+  // Phone + signup session id are passed via sessionStorage instead of URL
+  // to keep PII out of browser history, server logs, and Referer headers.
+  const [phone, setPhone] = useState("");
+  const [sessionId, setSessionId] = useState("");
+
+  useEffect(() => {
+    setPhone(sessionStorage.getItem(SS_PHONE) ?? "");
+    setSessionId(sessionStorage.getItem(SS_SESSION) ?? "");
+  }, []);
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +67,12 @@ export function VerifyForm() {
         setSubmitting(false);
         return;
       }
-      router.push("/dashboard");
+      // Drop sensitive state and force a layout refresh so the SiteHeader
+      // re-renders with the new session cookie before we navigate.
+      sessionStorage.removeItem(SS_PHONE);
+      sessionStorage.removeItem(SS_SESSION);
+      router.refresh();
+      router.replace("/dashboard");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ في الاتصال بالخادم.");

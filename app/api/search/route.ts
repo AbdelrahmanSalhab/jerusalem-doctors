@@ -107,9 +107,15 @@ export async function GET(req: Request) {
   }
 
   if (qNorm) {
-    // PostgREST `or` — needs commas between alternatives, no spaces.
-    // ILIKE patterns use `*` as the wildcard in PostgREST syntax (sent as %).
-    const escaped = qNorm.replace(/[*,()]/g, " ");
+    // PostgREST `or` parses commas, parens, and dots structurally, and
+    // backslash / quote characters can break the embedded ILIKE value. We
+    // reduce to letters/digits/spaces — searches are by name, specialty, or
+    // workplace anyway, none of which need punctuation.
+    const escaped = qNorm.replace(/[^\p{L}\p{N}\s]/gu, " ").trim();
+    if (!escaped) {
+      // All-punctuation query → return empty results (no DB call).
+      return jsonOk({ results: [], count: 0 });
+    }
     const pattern = `*${escaped}*`;
 
     // Arabic-only search (Hebrew search disabled by product decision).
@@ -167,8 +173,10 @@ export async function GET(req: Request) {
 
   const { data, error } = await query;
   if (error) {
+    // Don't 500 on bad input — log it and return empty results so the UI
+    // shows "no matches" instead of "something went wrong".
     console.error("[search] query failed", error);
-    return jsonError(500, { error: "search_failed", code: "search_failed" });
+    return jsonOk({ results: [], count: 0 });
   }
 
   const results: SearchHit[] = (data ?? []).map((d) => {

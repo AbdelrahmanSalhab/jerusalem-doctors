@@ -147,11 +147,13 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         return;
       }
 
-      const params = new URLSearchParams({
-        session: startBody.signup_session_id,
-        phone: form.phone,
-      });
-      router.push(`/verify?${params.toString()}`);
+      // PII out of URL: stash on the client between /signup and /verify.
+      sessionStorage.setItem("verify:phone", form.phone);
+      sessionStorage.setItem(
+        "verify:signup_session",
+        startBody.signup_session_id,
+      );
+      router.push("/verify?mode=signup");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ أثناء الاتصال بالخادم.");
