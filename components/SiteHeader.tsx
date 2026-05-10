@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LogoutButton } from "@/components/LogoutButton";
 import { getCurrentDoctor } from "@/lib/auth/session";
 
 export const ORG_NAME_AR = "تجمّع أطباء العائلة المقدسي";
@@ -56,11 +57,7 @@ export async function SiteHeader() {
                   الإدارة
                 </Link>
               )}
-              <form action="/api/auth/logout" method="post">
-                <button className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3">
-                  تسجيل الخروج
-                </button>
-              </form>
+              <LogoutButton className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3" />
             </>
           ) : (
             <>

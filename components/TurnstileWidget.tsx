@@ -85,5 +85,9 @@ export function TurnstileWidget({
   }, [scriptReady, siteKey, onToken, action]);
 
   if (!siteKey) return null;
-  return <div ref={ref} className="cf-turnstile" />;
+  return (
+    <div className="flex justify-center py-1">
+      <div ref={ref} className="cf-turnstile" />
+    </div>
+  );
 }
