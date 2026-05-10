@@ -76,15 +76,36 @@ export async function POST(req: Request) {
     return jsonError(400, { error: "invalid_otp", code: "invalid_otp" });
   }
 
+  const userId = verify.data.user.id;
   const service = createSupabaseServiceClient();
+
+  // Look up the doctor by phone (not auth_user_id) — older doctor rows may
+  // exist without an auth.users link (e.g. the dev seed, or rows created
+  // before login was wired up). Stitch the link so future page renders find
+  // them via getCurrentDoctor().
   const doctor = await service
     .from("doctors")
-    .select("id, is_active, is_admin_approved")
-    .eq("auth_user_id", verify.data.user.id)
+    .select("id, is_active, is_admin_approved, auth_user_id")
+    .eq("phone_e164", phoneE164)
     .maybeSingle();
+
+  if (!doctor.data) {
+    return jsonError(404, { error: "not_found", code: "not_found" });
+  }
+
+  if (doctor.data.auth_user_id !== userId) {
+    const link = await service
+      .from("doctors")
+      .update({ auth_user_id: userId })
+      .eq("id", doctor.data.id);
+    if (link.error) {
+      console.error("[login/verify] auth_user_id link failed", link.error);
+      return jsonError(500, { error: "link_failed", code: "link_failed" });
+    }
+  }
 
   return jsonOk({
     ok: true,
-    is_admin_approved: doctor.data?.is_admin_approved ?? false,
+    is_admin_approved: doctor.data.is_admin_approved,
   });
 }
