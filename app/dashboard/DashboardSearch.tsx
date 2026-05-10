@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
+import { SpecialtyFilter } from "@/components/SpecialtyFilter";
 import type { SearchHit } from "@/app/api/search/route";
 
 type Specialty = { id: string; name_ar: string };
@@ -99,19 +100,13 @@ export function DashboardSearch({ specialties }: { specialties: Specialty[] }) {
           aria-label="بحث"
           autoFocus
         />
-        <select
-          value={specialtyId}
-          onChange={(e) => setSpecialtyId(e.target.value)}
-          className="rounded-md border border-foreground/20 bg-transparent px-3 py-3 text-base"
-          aria-label="فلترة حسب التخصص"
-        >
-          <option value="">كل التخصصات</option>
-          {specialties.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name_ar}
-            </option>
-          ))}
-        </select>
+        <div className="sm:w-56">
+          <SpecialtyFilter
+            options={specialties}
+            value={specialtyId}
+            onChange={setSpecialtyId}
+          />
+        </div>
       </div>
 
       <ResultsRegion

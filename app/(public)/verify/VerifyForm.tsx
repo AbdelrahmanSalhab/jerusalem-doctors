@@ -19,9 +19,18 @@ export function VerifyForm() {
   const [sessionId, setSessionId] = useState("");
 
   useEffect(() => {
-    setPhone(sessionStorage.getItem(SS_PHONE) ?? "");
-    setSessionId(sessionStorage.getItem(SS_SESSION) ?? "");
-  }, []);
+    const p = sessionStorage.getItem(SS_PHONE) ?? "";
+    const s = sessionStorage.getItem(SS_SESSION) ?? "";
+    setPhone(p);
+    setSessionId(s);
+
+    // Direct hit on /verify with no prior /login or /signup → bounce home.
+    if (mode === "login" && !p) {
+      router.replace("/login");
+    } else if (mode === "signup" && (!p || !s)) {
+      router.replace("/signup");
+    }
+  }, [mode, router]);
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -67,12 +76,14 @@ export function VerifyForm() {
         setSubmitting(false);
         return;
       }
-      // Drop sensitive state and force a layout refresh so the SiteHeader
-      // re-renders with the new session cookie before we navigate.
+      // Drop sensitive state and hard-navigate so the server renders the
+      // layout from scratch with the new session cookie. router.refresh()
+      // only invalidates the current route's RSC cache and races with the
+      // router.replace() — full-page load is the only reliable way to
+      // guarantee the SiteHeader picks up the authenticated session.
       sessionStorage.removeItem(SS_PHONE);
       sessionStorage.removeItem(SS_SESSION);
-      router.refresh();
-      router.replace("/dashboard");
+      window.location.replace("/dashboard");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ في الاتصال بالخادم.");

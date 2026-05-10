@@ -25,6 +25,7 @@ interface TurnstileApi {
       "error-callback"?: () => void;
       theme?: "auto" | "light" | "dark";
       action?: string;
+      appearance?: "always" | "execute" | "interaction-only";
     },
   ) => string;
   remove: (id: string) => void;
@@ -106,6 +107,11 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
         "error-callback": () => onToken(""),
         action,
         theme: "auto",
+        // Stay invisible while passive checks run — only render the
+        // challenge UI if a user interaction is actually required. Prevents
+        // the "Verifying..." overlay from briefly capturing page focus on
+        // privacy-strict browsers (Brave etc.).
+        appearance: "interaction-only",
       });
       widgetIdRef.current = id;
       return () => {

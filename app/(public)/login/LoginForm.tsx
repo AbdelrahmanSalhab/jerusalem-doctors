@@ -8,9 +8,9 @@ import {
 } from "@/components/TurnstileWidget";
 
 // Allow only digits, +, -, space, parens — common phone-number characters.
-// Server-side `normalizePhone` is the source of truth; this is just a UX
-// nudge to keep junk out of the input as the user types.
-const PHONE_ALLOWED = /^[0-9+\-\s()]*$/;
+// Server-side `normalizePhone` is the source of truth; this just keeps
+// junk out of the input as the user types or pastes.
+const PHONE_DISALLOWED = /[^0-9+\-\s()]/g;
 
 export function LoginForm() {
   const router = useRouter();
@@ -25,9 +25,11 @@ export function LoginForm() {
   );
 
   const onPhoneChange = (next: string) => {
-    if (PHONE_ALLOWED.test(next)) setPhone(next);
-    // Always clear stale errors when the user edits the field — they're
-    // trying again, the previous error is no longer relevant.
+    // Strip disallowed chars instead of rejecting the whole input — this
+    // makes paste-from-WhatsApp ("Phone: 050-...") work seamlessly.
+    setPhone(next.replace(PHONE_DISALLOWED, ""));
+    // Clear stale errors as the user edits — previous error no longer
+    // applies to the new input.
     if (error) setError(null);
   };
 

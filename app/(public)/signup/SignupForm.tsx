@@ -163,6 +163,16 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
   const fieldError = (k: string) => fieldErrors[k];
 
+  // Strip disallowed chars from phone + license inputs so a paste of
+  // "Phone: 050-1234567" still produces a clean digit string. Server-side
+  // normalization is the actual source of truth.
+  const onPhoneChange = (next: string) => {
+    update("phone", next.replace(/[^0-9+\-\s()]/g, ""));
+  };
+  const onLicenseChange = (next: string) => {
+    update("license_number", next.replace(/\D/g, ""));
+  };
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 sm:gap-6">
       <Section title="معلومات الاتصال والترخيص">
@@ -172,9 +182,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             required
             dir="ltr"
             autoComplete="tel"
+            inputMode="tel"
+            pattern="[0-9+\-\s()]*"
             className="input"
             value={form.phone}
-            onChange={(e) => update("phone", e.target.value)}
+            onChange={(e) => onPhoneChange(e.target.value)}
             placeholder="0501234567"
           />
         </Field>
@@ -184,9 +196,10 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             required
             dir="ltr"
             inputMode="numeric"
+            pattern="\d*"
             className="input"
             value={form.license_number}
-            onChange={(e) => update("license_number", e.target.value)}
+            onChange={(e) => onLicenseChange(e.target.value)}
           />
         </Field>
 
