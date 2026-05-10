@@ -1,11 +1,19 @@
 "use client";
 
 // Lightweight Cloudflare Turnstile renderer. No npm package — loads the
-// official script once and uses the explicit-render API. Renders nothing
-// when NEXT_PUBLIC_TURNSTILE_SITE_KEY isn't set, so dev keeps working
-// without any Cloudflare account.
+// official script once and uses the explicit-render API.
+//
+// Tokens are single-use; once the server has verified one, the widget needs
+// to be reset to issue a fresh token. The parent calls
+// `turnstileRef.current?.reset()` after each form submission to do this.
 
-import { useEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 
 interface TurnstileApi {
   render: (
@@ -29,65 +37,92 @@ declare global {
   }
 }
 
-const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+const SCRIPT_SRC =
+  "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
-export function TurnstileWidget({
-  onToken,
-  action,
-}: {
+export interface TurnstileHandle {
+  reset: () => void;
+}
+
+interface Props {
   onToken: (token: string) => void;
   action?: string;
-}) {
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const ref = useRef<HTMLDivElement>(null);
-  const [scriptReady, setScriptReady] = useState(
-    typeof window !== "undefined" && Boolean(window.turnstile),
-  );
-
-  useEffect(() => {
-    if (!siteKey) return;
-    if (window.turnstile) {
-      setScriptReady(true);
-      return;
-    }
-    const existing = document.querySelector(
-      `script[src="${SCRIPT_SRC}"]`,
-    ) as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener("load", () => setScriptReady(true));
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setScriptReady(true);
-    document.head.appendChild(script);
-  }, [siteKey]);
-
-  useEffect(() => {
-    if (!scriptReady || !ref.current || !siteKey || !window.turnstile) return;
-    const widgetId = window.turnstile.render(ref.current, {
-      sitekey: siteKey,
-      callback: onToken,
-      "expired-callback": () => onToken(""),
-      "error-callback": () => onToken(""),
-      action,
-      theme: "auto",
-    });
-    return () => {
-      try {
-        window.turnstile?.remove(widgetId);
-      } catch {
-        // widget already gone — ignore
-      }
-    };
-  }, [scriptReady, siteKey, onToken, action]);
-
-  if (!siteKey) return null;
-  return (
-    <div className="flex justify-center py-1">
-      <div ref={ref} className="cf-turnstile" />
-    </div>
-  );
 }
+
+export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
+  function TurnstileWidget({ onToken, action }, ref) {
+    const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    const containerRef = useRef<HTMLDivElement>(null);
+    const widgetIdRef = useRef<string | null>(null);
+    const [scriptReady, setScriptReady] = useState(
+      typeof window !== "undefined" && Boolean(window.turnstile),
+    );
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        reset: () => {
+          onToken("");
+          if (widgetIdRef.current && window.turnstile) {
+            try {
+              window.turnstile.reset(widgetIdRef.current);
+            } catch {
+              // widget gone — ignore
+            }
+          }
+        },
+      }),
+      [onToken],
+    );
+
+    useEffect(() => {
+      if (!siteKey) return;
+      if (window.turnstile) {
+        setScriptReady(true);
+        return;
+      }
+      const existing = document.querySelector(
+        `script[src="${SCRIPT_SRC}"]`,
+      ) as HTMLScriptElement | null;
+      if (existing) {
+        existing.addEventListener("load", () => setScriptReady(true));
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = SCRIPT_SRC;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => setScriptReady(true);
+      document.head.appendChild(script);
+    }, [siteKey]);
+
+    useEffect(() => {
+      if (!scriptReady || !containerRef.current || !siteKey || !window.turnstile)
+        return;
+      const id = window.turnstile.render(containerRef.current, {
+        sitekey: siteKey,
+        callback: onToken,
+        "expired-callback": () => onToken(""),
+        "error-callback": () => onToken(""),
+        action,
+        theme: "auto",
+      });
+      widgetIdRef.current = id;
+      return () => {
+        try {
+          window.turnstile?.remove(id);
+        } catch {
+          // already gone
+        }
+        widgetIdRef.current = null;
+      };
+    }, [scriptReady, siteKey, onToken, action]);
+
+    if (!siteKey) return null;
+    return (
+      <div className="flex justify-center py-1">
+        <div ref={containerRef} className="cf-turnstile" />
+      </div>
+    );
+  },
+);

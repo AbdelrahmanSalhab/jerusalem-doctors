@@ -1,8 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { useCallback, useRef, useState } from "react";
+import {
+  TurnstileWidget,
+  type TurnstileHandle,
+} from "@/components/TurnstileWidget";
 
 export function LoginForm() {
   const router = useRouter();
@@ -10,6 +13,7 @@ export function LoginForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<TurnstileHandle>(null);
   const handleTurnstileToken = useCallback(
     (t: string) => setTurnstileToken(t),
     [],
@@ -28,6 +32,9 @@ export function LoginForm() {
       });
       const data = await res.json();
       if (!res.ok) {
+        // Turnstile tokens are single-use — reset the widget after every
+        // submit so a retry gets a fresh token.
+        turnstileRef.current?.reset();
         if (data?.code === "not_found") {
           setError("رقم الهاتف غير موجود في النظام. الرجاء إنشاء حساب جديد.");
         } else if (data?.code === "invalid_phone") {
@@ -36,6 +43,8 @@ export function LoginForm() {
           setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "rate_limited") {
           setError("عدد كبير من المحاولات. حاول لاحقًا.");
+        } else if (data?.code === "turnstile_failed") {
+          setError("لم يكتمل التحقق من المتصفح. الرجاء المحاولة مرة أخرى.");
         } else {
           setError("حدث خطأ. الرجاء المحاولة لاحقًا.");
         }
@@ -68,7 +77,11 @@ export function LoginForm() {
         />
       </div>
 
-      <TurnstileWidget onToken={handleTurnstileToken} action="login" />
+      <TurnstileWidget
+        ref={turnstileRef}
+        onToken={handleTurnstileToken}
+        action="login"
+      />
 
       {error && (
         <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">

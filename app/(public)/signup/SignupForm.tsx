@@ -1,8 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { useCallback, useRef, useState } from "react";
+import {
+  TurnstileWidget,
+  type TurnstileHandle,
+} from "@/components/TurnstileWidget";
 
 type Specialty = { id: string; name_ar: string };
 
@@ -48,6 +51,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     family?: string;
   } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState("");
+  const turnstileRef = useRef<TurnstileHandle>(null);
   const handleTurnstileToken = useCallback(
     (t: string) => setTurnstileToken(t),
     [],
@@ -135,6 +139,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       });
       const startBody = await start.json();
       if (!start.ok) {
+        // Reset Turnstile so the next retry has a fresh single-use token.
+        turnstileRef.current?.reset();
         if (startBody?.fields) setFieldErrors(startBody.fields);
         setError(startBody?.error ?? "حدث خطأ. الرجاء المحاولة مجددًا.");
         setSubmitting(false);
@@ -375,7 +381,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </label>
       </Section>
 
-      <TurnstileWidget onToken={handleTurnstileToken} action="signup" />
+      <TurnstileWidget
+        ref={turnstileRef}
+        onToken={handleTurnstileToken}
+        action="signup"
+      />
 
       {error && (
         <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
