@@ -103,10 +103,14 @@ export async function POST(req: Request) {
   if (dupe.data) {
     const field =
       dupe.data.phone_e164 === phoneE164 ? "phone" : "license_number";
+    const message =
+      field === "phone"
+        ? "رقم الهاتف مُسجّل مسبقًا. الرجاء تسجيل الدخول."
+        : "رقم الترخيص مُسجّل مسبقًا. تواصل مع الإدارة إذا كنت تعتقد أن هذا خطأ.";
     return jsonError(409, {
       error: "duplicate",
       code: "duplicate",
-      fields: { [field]: "مسجل مسبقًا" },
+      fields: { [field]: message },
     });
   }
 

@@ -1,16 +1,23 @@
 // POST /api/signup/check-unique
 // Pre-OTP guard: tells the form whether { phone, license_number } is free.
 // No PII written; only counts (read).
+//
+// Gated by Turnstile. Without the gate this endpoint becomes a phone/license
+// enumeration oracle for anyone who can hit it at scale (pentest finding M1).
+// The matching duplicate_field is still returned so the UI can highlight the
+// specific input — the Turnstile gate makes that disclosure safe.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 const Body = z.object({
   phone: z.string().min(1),
   license_number: z.string().min(1),
+  turnstile_token: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -25,6 +32,14 @@ export async function POST(req: Request) {
     parsed = Body.parse(await req.json());
   } catch {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
+  }
+
+  const ts = await verifyTurnstile(parsed.turnstile_token, ip);
+  if (!ts.ok) {
+    return jsonError(403, {
+      error: "turnstile_failed",
+      code: "turnstile_failed",
+    });
   }
 
   let phoneE164: string;

@@ -43,6 +43,13 @@ const SCRIPT_SRC =
 
 export interface TurnstileHandle {
   reset: () => void;
+  /**
+   * Resolves with a fresh Turnstile token. If a token is already cached,
+   * resolves immediately. Otherwise waits for the next `callback` from the
+   * widget — when `appearance: "interaction-only"` + passive checks pass,
+   * this is usually milliseconds.
+   */
+  getToken: (timeoutMs?: number) => Promise<string>;
 }
 
 interface Props {
@@ -50,20 +57,44 @@ interface Props {
   action?: string;
 }
 
+interface InternalState {
+  currentToken: string;
+  pendingResolvers: Array<(t: string) => void>;
+}
+
 export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
   function TurnstileWidget({ onToken, action }, ref) {
     const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
+    // Wraps onToken with a resolver queue so callers can `await getToken()`.
+    const stateRef = useRef<InternalState>({
+      currentToken: "",
+      pendingResolvers: [],
+    });
     const [scriptReady, setScriptReady] = useState(
       typeof window !== "undefined" && Boolean(window.turnstile),
     );
+
+    const internalOnToken = useRef(onToken);
+    internalOnToken.current = onToken;
+
+    const handleToken = useRef((t: string) => {
+      stateRef.current.currentToken = t;
+      if (t) {
+        const queued = stateRef.current.pendingResolvers;
+        stateRef.current.pendingResolvers = [];
+        for (const r of queued) r(t);
+      }
+      internalOnToken.current(t);
+    });
 
     useImperativeHandle(
       ref,
       () => ({
         reset: () => {
-          onToken("");
+          stateRef.current.currentToken = "";
+          internalOnToken.current("");
           if (widgetIdRef.current && window.turnstile) {
             try {
               window.turnstile.reset(widgetIdRef.current);
@@ -72,8 +103,26 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
             }
           }
         },
+        getToken: (timeoutMs = 5000) => {
+          if (stateRef.current.currentToken) {
+            return Promise.resolve(stateRef.current.currentToken);
+          }
+          return new Promise<string>((resolve, reject) => {
+            const wrapped = (t: string) => {
+              clearTimeout(timer);
+              resolve(t);
+            };
+            const timer = setTimeout(() => {
+              const idx =
+                stateRef.current.pendingResolvers.indexOf(wrapped);
+              if (idx >= 0) stateRef.current.pendingResolvers.splice(idx, 1);
+              reject(new Error("turnstile timeout"));
+            }, timeoutMs);
+            stateRef.current.pendingResolvers.push(wrapped);
+          });
+        },
       }),
-      [onToken],
+      [],
     );
 
     useEffect(() => {
@@ -102,9 +151,9 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
         return;
       const id = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
-        callback: onToken,
-        "expired-callback": () => onToken(""),
-        "error-callback": () => onToken(""),
+        callback: (t) => handleToken.current(t),
+        "expired-callback": () => handleToken.current(""),
+        "error-callback": () => handleToken.current(""),
         action,
         theme: "auto",
         // Stay invisible while passive checks run — only render the
@@ -122,7 +171,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
         }
         widgetIdRef.current = null;
       };
-    }, [scriptReady, siteKey, onToken, action]);
+    }, [scriptReady, siteKey, action]);
 
     if (!siteKey) return null;
     return (

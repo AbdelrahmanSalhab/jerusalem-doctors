@@ -76,30 +76,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     setSubmitting(true);
 
     try {
-      // Step 1: uniqueness
-      const uniq = await fetch("/api/signup/check-unique", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          phone: form.phone,
-          license_number: form.license_number,
-        }),
-      }).then((r) => r.json());
-      if (uniq?.duplicate_field === "phone") {
-        setFieldErrors({ phone: "رقم الهاتف مُسجّل مسبقًا. الرجاء تسجيل الدخول." });
-        setSubmitting(false);
-        return;
-      }
-      if (uniq?.duplicate_field === "license_number") {
-        setFieldErrors({
-          license_number:
-            "رقم الترخيص مُسجّل مسبقًا. تواصل مع الإدارة إذا كنت تعتقد أن هذا خطأ.",
-        });
-        setSubmitting(false);
-        return;
-      }
+      // Uniqueness is re-checked server-side in /signup/start, so we don't
+      // need a separate /check-unique call here. Cuts one Turnstile-gated
+      // round-trip and avoids the single-use token problem (each verified
+      // token is consumed by Cloudflare; multiple calls per submit fail).
 
-      // Step 2: license cross-check (skip silently on transient failures)
+      // Step 1: license cross-check (skip silently on transient failures)
       const lic = await fetch("/api/signup/check-license", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,14 +109,27 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         return;
       }
 
-      // Step 3: full submit
+      // Step 2: full submit. The Turnstile token was consumed by step 1, so
+      // reset and wait for a fresh one before calling /start. With
+      // appearance: "interaction-only" + passive checks, the new token
+      // arrives in milliseconds without user interaction.
+      turnstileRef.current?.reset();
+      let freshToken = "";
+      try {
+        freshToken = (await turnstileRef.current?.getToken()) ?? "";
+      } catch {
+        setError("لم يكتمل التحقق من المتصفح. الرجاء إعادة المحاولة.");
+        setSubmitting(false);
+        return;
+      }
+
       const start = await fetch("/api/signup/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
           override_name_mismatch: overrideMismatch,
-          turnstile_token: turnstileToken,
+          turnstile_token: freshToken,
         }),
       });
       const startBody = await start.json();
