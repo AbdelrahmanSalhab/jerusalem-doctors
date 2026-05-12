@@ -43,7 +43,7 @@ The executor must read existing files before editing. Do not re-read unchanged f
 |---|---|---|
 | 1 | **One cutover, not phased.** Phase 1 stopgap (`isAutoApproved=false`) is folded into the same migration set as Phase 2 (institutional email verification). | The user asked for #16 + #17 + #18 + #19 + #20 implemented together. A "ship Phase 1, then Phase 2 next week" rollout fragments the database state, requires throwaway code, and leaves an awkward window where the admin queue grows with no email signal to sort by. The clean steady-state is "admin always approves; admin always sees email + MoH signal." |
 | 2 | **Resend over SDK or SMTP.** Direct `fetch` to `https://api.resend.com/emails` — no SDK, matches the rest of the repo (no Twilio SDK either; Supabase Auth dispatches OTP). | Smallest dependency footprint; Resend's HTTP API is one POST and is trivially mockable through a `RESEND_BASE_URL` env override (we add this for tests). Avoids pulling in `@react-email` or `react-email`; the email template is one short HTML/plaintext literal in `lib/email/templates/signup-verify.ts`. |
-| 3 | **Stateless HMAC tokens, no new `email_tokens` table. Tokens always target the doctor row, never the pending row.** Token payload = `{target: "doctor", id: doctor_id, exp: <unix-ms>}`, base64url-encoded JSON, HMAC-SHA256 signed with `SIGNUP_TOKEN_SECRET`. | Persistence buys nothing here: replay is blocked by the fact that `email_verified_at` on the doctor row goes from null to non-null on first use (the verify endpoint refuses to flip it twice). The "pending-target" alternative (sending an email during the OTP window so the user can verify both in parallel) was considered and dropped: it forces the verify endpoint to copy `email_verified_at` from `pending_signups.payload` into the doctors insert at OTP-completion, which adds a coupling between two routes for trivial UX gain (the email arrives within seconds of OTP completion anyway). One target kind = one code path. |
+| 3 | **Stateless HMAC tokens, no new `email_tokens` table. Tokens always target the doctor row, never the pending row.** Token payload = `{id: doctor_id, exp: <unix-ms>}`, base64url-encoded JSON, HMAC-SHA256 signed with `SIGNUP_TOKEN_SECRET`. | Persistence buys nothing here: replay is blocked by the fact that `email_verified_at` on the doctor row goes from null to non-null on first use (the verify endpoint refuses to flip it twice). The "pending-target" alternative (sending an email during the OTP window so the user can verify both in parallel) was considered and dropped: it forces the verify endpoint to copy `email_verified_at` from `pending_signups.payload` into the doctors insert at OTP-completion, which adds a coupling between two routes for trivial UX gain (the email arrives within seconds of OTP completion anyway). One target kind = one code path. |
 | 4 | **Email allowlist as TypeScript constant**, not a DB table. | The list is short (5 seeds plus a TODO marker for the maintainer), changes through PRs, and applies to write-time logic that runs before there is any session. Putting it in code means the allowlist diff is reviewable in git and tests can import it directly. The user explicitly approved the seed list and asked for a TODO. |
 | 5 | **`is_visible` rename + view (#20 option 1)**, not approval-time-flip. | Pairs cleanly with #17 (RLS as source of truth). The rename forces every existing reference to be updated, which surfaces every read site that previously trusted the boolean — a one-time grep produces a complete migration list. The view is read-only by construction; the underlying column toggle is a no-op for visibility unless approval has also happened. |
 | 6 | **Revocation sweep stores its grace counter on `doctors`**, not in a side table. | A `missing_sync_count int not null default 0` and `last_seen_in_moh_at timestamptz` column pair is enough. Sweep increments-or-resets in one `UPDATE` per cron run. The threshold (3) is a constant in the cron route. Avoids cross-table joins on the hot path of the sweep. |
@@ -85,19 +85,17 @@ POST /api/signup/verify
   └─ returns { ok:true, auto_approved:false, email_verification_sent:bool }
 
 POST /api/signup/email-start (also called from /verify above; idempotent)
-  ├─ Either body has signup_session_id (called during signup before auth)
-  │   OR caller has a session and we resolve target via getCurrentDoctor()
-  ├─ Generates HMAC-signed token bound to (pending_signup_id|doctor_id, expiry)
-  ├─ Calls Resend with idempotency-key = sha256(target_id + email)
-  ├─ Records email_verification_sent_at on the pending row or doctor row
+  ├─ Caller must have a session (authenticated; called post-OTP after doctor row exists)
+  ├─ Resolves doctor row via getCurrentDoctor() — tokens always target the doctor row
+  ├─ Generates HMAC-signed token bound to (doctor_id, expiry=24h)
+  ├─ Calls Resend with idempotency-key = sha256(doctor_id + email)
   └─ returns { ok:true, sent_to_masked: "h***@hadassah.org.il" }
 
 GET /api/signup/email-verify?token=...
   ├─ Verifies HMAC, expiry
-  ├─ Resolves target (pending row or doctor row)
-  ├─ Sets email_verified_at = now() if null; idempotent (returns 200 either way)
-  ├─ If target is a pending row, just updates payload field; doctor row created later
-  ├─ If target is a doctor row, writes audit_log email_verified
+  ├─ Resolves doctor row by token.id (single target kind: doctor)
+  ├─ Sets email_verified_at = now() if null; idempotent (second click is no-op)
+  ├─ Writes audit_log row (action: email_verified)
   └─ Returns a small HTML page (single template literal) confirming success
 
 GET /api/search (now SSR-client)
@@ -410,22 +408,18 @@ Run: `npm test -- email-token`. Expected: missing module.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type TokenTarget = "pending" | "doctor";
-
 export interface IssueOptions {
-  target: TokenTarget;
   id: string;
   ttlMs: number;
 }
 
 export interface TokenPayload {
-  target: TokenTarget;
   id: string;
   exp: number; // unix ms
 }
 
 export type VerifyResult =
-  | { ok: true; target: TokenTarget; id: string }
+  | { ok: true; id: string }
   | { ok: false; reason: "malformed" | "invalid_signature" | "expired" };
 
 function getSecret(): string {
@@ -463,7 +457,6 @@ function sign(payloadB64url: string): string {
 
 export function issueEmailToken(opts: IssueOptions): string {
   const payload: TokenPayload = {
-    target: opts.target,
     id: opts.id,
     exp: Date.now() + opts.ttlMs,
   };
@@ -501,7 +494,6 @@ export function verifyEmailToken(token: string): VerifyResult {
   }
   if (
     !payload ||
-    (payload.target !== "pending" && payload.target !== "doctor") ||
     typeof payload.id !== "string" ||
     typeof payload.exp !== "number"
   ) {
@@ -510,7 +502,7 @@ export function verifyEmailToken(token: string): VerifyResult {
   if (payload.exp < Date.now()) {
     return { ok: false, reason: "expired" };
   }
-  return { ok: true, target: payload.target, id: payload.id };
+  return { ok: true, id: payload.id };
 }
 ```
 
@@ -1545,7 +1537,6 @@ describe("dispatchSignupVerifyEmail", () => {
     const r = verifyEmailToken(match![1]!);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.target).toBe("doctor");
       expect(r.id).toBe("00000000-0000-0000-0000-000000000001");
     }
   });
@@ -1567,30 +1558,24 @@ Run: `npm test -- email-dispatch`.
 import { createHash } from "node:crypto";
 import { ResendClient } from "@/lib/email/resend";
 import { renderSignupVerifyEmail } from "@/lib/email/templates/signup-verify";
-import { issueEmailToken, type TokenTarget } from "./email-token";
+import { issueEmailToken } from "./email-token";
 
-const PENDING_TTL_MS = 15 * 60_000;          // matches pending_signups TTL
-const DOCTOR_TTL_MS = 24 * 60 * 60_000;      // generous post-signup window
+// 24h window: generous enough for emails that land in spam.
+const DOCTOR_TTL_MS = 24 * 60 * 60_000;
 
 export interface DispatchInput {
-  /**
-   * For pending-signup tokens, pass `{ pendingId }`. For doctor-row tokens
-   * (post-signup), pass `{ doctorId }`. Exactly one of the two is required.
-   */
-  pendingId?: string;
-  doctorId?: string;
+  /** The doctor row id whose email we are verifying. */
+  doctorId: string;
   email: string;
   arabicFirstName: string;
   resend?: ResendClient;
 }
 
 export async function dispatchSignupVerifyEmail(input: DispatchInput): Promise<void> {
-  const target: TokenTarget = input.pendingId ? "pending" : "doctor";
-  const id = input.pendingId ?? input.doctorId;
-  if (!id) throw new Error("dispatchSignupVerifyEmail: pendingId or doctorId required");
+  const id = input.doctorId;
 
-  const ttlMs = target === "pending" ? PENDING_TTL_MS : DOCTOR_TTL_MS;
-  const token = issueEmailToken({ target, id, ttlMs });
+  const ttlMs = DOCTOR_TTL_MS;
+  const token = issueEmailToken({ id, ttlMs });
 
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -1606,7 +1591,7 @@ export async function dispatchSignupVerifyEmail(input: DispatchInput): Promise<v
   });
 
   const idempotencyKey = createHash("sha256")
-    .update(`${target}:${id}:${input.email}`)
+    .update(`doctor:${id}:${input.email}`)
     .digest("hex");
 
   const client = input.resend ?? new ResendClient();
@@ -1784,13 +1769,11 @@ git commit -m "feat(signup): reject not_found licenses, gate via pre_approved ex
 `app/api/signup/email-start/route.ts`:
 ```ts
 // POST /api/signup/email-start
-// Re-sends the verification email. Two modes:
-//   1) Caller sends `{ signup_session_id }` — used when the doctor wants to
-//      re-trigger an email during the pending-signup window.
-//   2) Caller is authenticated — uses the current doctor's id and email.
-//
+// (Re-)sends the verification email to the authenticated doctor.
+// Called automatically by signup/verify (initial send) and by the VerifyForm
+// "resend" button (subsequent sends). Tokens always target the doctor row.
 // Idempotent at the Resend layer via deterministic Idempotency-Key.
-// Rate-limited so it isn't used as a spam vector.
+// Rate-limited to prevent use as a spam vector.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
@@ -1799,55 +1782,18 @@ import { rateLimit } from "@/lib/ratelimit";
 import { dispatchSignupVerifyEmail } from "@/lib/signup/email-dispatch";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
-const Body = z.object({
-  signup_session_id: z.uuid().optional(),
-});
+// No body needed — the authenticated session identifies the doctor.
 
 export async function POST(req: Request) {
   const ip = ipFromHeaders(req);
-  const rl = await rateLimit("signupCheckUnique", `ip:${ip}`); // share the cheap unauth bucket
+  const rl = await rateLimit("signupCheckUnique", `ip:${ip}`);
   if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
-
-  let parsed: z.infer<typeof Body>;
-  try {
-    parsed = Body.parse(await req.json().catch(() => ({})));
-  } catch {
-    return jsonError(400, { error: "invalid_body", code: "invalid_body" });
-  }
-
-  const service = createSupabaseServiceClient();
-
-  if (parsed.signup_session_id) {
-    const pending = await service
-      .from("pending_signups")
-      .select("id, payload, expires_at")
-      .eq("id", parsed.signup_session_id)
-      .maybeSingle();
-    if (pending.error && pending.error.code !== "PGRST116") throw pending.error;
-    if (!pending.data || new Date(pending.data.expires_at).getTime() < Date.now()) {
-      return jsonError(410, { error: "session_expired", code: "session_expired" });
-    }
-    const payload = pending.data.payload as {
-      email: string;
-      arabic_first_name: string;
-    };
-    try {
-      await dispatchSignupVerifyEmail({
-        pendingId: pending.data.id,
-        email: payload.email,
-        arabicFirstName: payload.arabic_first_name,
-      });
-    } catch (err) {
-      console.error("[email-start] dispatch failed", err);
-      return jsonError(502, { error: "email_send_failed", code: "email_send_failed" });
-    }
-    return jsonOk({ ok: true, sent: true });
-  }
 
   const me = await getCurrentDoctor().catch(() => null);
   if (!me) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   if (!me.email) return jsonError(400, { error: "no_email_on_file", code: "no_email_on_file" });
 
+  const service = createSupabaseServiceClient();
   try {
     await dispatchSignupVerifyEmail({
       doctorId: me.id,
@@ -1903,34 +1849,7 @@ export async function GET(req: Request) {
 
   const service = createSupabaseServiceClient();
 
-  if (result.target === "pending") {
-    const pending = await service
-      .from("pending_signups")
-      .select("id, payload, expires_at")
-      .eq("id", result.id)
-      .maybeSingle();
-    if (pending.error && pending.error.code !== "PGRST116") throw pending.error;
-    if (!pending.data || new Date(pending.data.expires_at).getTime() < Date.now()) {
-      return htmlPage(410, {
-        title: "انتهت الجلسة",
-        message: "أكمل العملية وسجّل من جديد.",
-      });
-    }
-    const payload = pending.data.payload as Record<string, unknown>;
-    if (!payload.email_verified_at) {
-      payload.email_verified_at = new Date().toISOString();
-      await service
-        .from("pending_signups")
-        .update({ payload })
-        .eq("id", pending.data.id);
-    }
-    return htmlPage(200, {
-      title: "تم التحقق من بريدك",
-      message: "أكمل خطوة رمز SMS لإنشاء حسابك.",
-    });
-  }
-
-  // target === "doctor" — mark on the row.
+  // Token always targets a doctor row (no pending-row path; tokens are issued post-OTP).
   const doctor = await service
     .from("doctors")
     .select("id, email_verified_at")
