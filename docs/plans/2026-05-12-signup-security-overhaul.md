@@ -991,8 +991,26 @@ alter table public.doctors
   add column if not exists last_seen_in_moh_at  timestamptz;
 
 -- Extend license_verification_status check constraint to allow 'revoked'.
-alter table public.doctors
-  drop constraint if exists doctors_license_verification_status_check;
+-- The constraint was defined inline in CREATE TABLE (0001_init.sql) with a
+-- system-generated name. We cannot reliably name it; instead we drop all
+-- check constraints on this column dynamically and re-add a named one.
+-- Using a DO block because ALTER TABLE ... DROP CONSTRAINT requires the
+-- exact name, and Postgres does not support DROP CONSTRAINT IF EXISTS on
+-- system-named constraints by pattern.
+do $$
+declare
+  v_name text;
+begin
+  for v_name in
+    select conname
+    from pg_constraint
+    where conrelid = 'public.doctors'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) like '%license_verification_status%'
+  loop
+    execute format('alter table public.doctors drop constraint %I', v_name);
+  end loop;
+end $$;
 
 alter table public.doctors
   add constraint doctors_license_verification_status_check
@@ -1232,10 +1250,23 @@ Expected: green.
 
 **Step 6.3: Commit**
 
+Stage the specific files that were modified (enumerate them rather than using `git add -A` to avoid accidentally including unrelated changes). Do NOT stage `app/api/signup/verify/route.ts` here — Task 7 does a full rewrite and will stage it there.
+
 ```bash
-git add -A
+git add \
+  app/api/profile/delete-request/route.ts \
+  "app/api/admin/doctors/[id]/route.ts" \
+  "app/(admin)/admin/page.tsx" \
+  "app/(admin)/admin/AdminDoctorsTable.tsx" \
+  app/api/search/route.ts \
+  scripts/seed-dev-doctor.sql \
+  scripts/seed-test-doctors.sql \
+  scripts/seed-more-test-doctors.sql \
+  lib/db/types.ts
 git commit -m "refactor: rename is_visible to user_chose_visible across app and seed scripts"
 ```
+
+`app/api/signup/verify/route.ts` will be fully rewritten in Task 7 and committed as part of the Task 7+8 commit in Task 8 step 8.4.
 
 ---
 
@@ -2741,7 +2772,9 @@ All green.
 
 ```bash
 git status --short
-git add -A   # if anything pending
+# Stage only changed files explicitly; inspect git status --short output and
+# add each file by path. Do not use git add -A. Example:
+#   git add path/to/file1 path/to/file2
 git commit -m "chore: final cleanup pass"
 ```
 
