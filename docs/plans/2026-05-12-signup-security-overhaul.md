@@ -1209,7 +1209,7 @@ Scope discovered by `rg "\bis_visible\b" --type ts --type tsx --type sql`. Requi
 - Modify: `app/api/admin/doctors/[id]/route.ts` — Zod field `is_visible` → `user_chose_visible`.
 - Modify: `app/(admin)/admin/page.tsx` — select column `is_visible` → `user_chose_visible`.
 - Modify: `app/(admin)/admin/AdminDoctorsTable.tsx` — interface `is_visible` → `user_chose_visible`.
-- Modify: `app/api/search/route.ts` — see Task 8 for full route rewrite.
+- Modify: `app/api/search/route.ts` — see Task 11 for full route rewrite. (Task 6 only renames any `is_visible` references; the service-client-to-SSR-client switch and `doctor_visible` view migration happen in Task 11.)
 - Modify: `scripts/seed-dev-doctor.sql`, `scripts/seed-test-doctors.sql`, `scripts/seed-more-test-doctors.sql` — replace every `is_visible,` with `user_chose_visible,`.
 
 **Step 6.1: Run the rename**
@@ -1270,6 +1270,7 @@ The new file. Key changes versus current:
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { extractDomain, isInstitutionalEmail } from "@/lib/signup/email-allowlist";
 import { dispatchSignupVerifyEmail } from "@/lib/signup/email-dispatch";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -1303,8 +1304,11 @@ interface PendingPayload {
   subspecialty: string | null;
   subspecialty_normalized: string | null;
   email: string;                 // required as of #16
-  email_domain: string;          // required as of #16
-  email_is_institutional: boolean;
+  // email_domain and email_is_institutional were added by Task 9 to new
+  // pending sessions. Old sessions created before this migration will not
+  // have these fields. Defensive defaults are applied in the insert below.
+  email_domain?: string | null;
+  email_is_institutional?: boolean;
   specialty_ids: string[];
   workplaces: PendingWorkplace[];
   license_verification_status:
@@ -1395,8 +1399,13 @@ export async function POST(req: Request) {
       subspecialty: payload.subspecialty,
       subspecialty_normalized: payload.subspecialty_normalized,
       email: payload.email,
-      email_domain: payload.email_domain,
-      email_is_institutional: payload.email_is_institutional,
+      // Defensive defaults for pending sessions created before the migration
+      // (they will not have email_domain / email_is_institutional in their
+      // JSON payload). For those sessions, email_domain is derived here and
+      // email_is_institutional defaults to false (goes through admin queue).
+      email_domain: payload.email_domain ?? (extractDomain(payload.email) ?? null),
+      email_is_institutional: payload.email_is_institutional ??
+        isInstitutionalEmail(payload.email),
 
       consent_directory_use: true,
       consent_timestamp: new Date().toISOString(),
@@ -1448,8 +1457,9 @@ export async function POST(req: Request) {
     metadata: {
       license_status: payload.license_verification_status,
       auto_approved: false,
-      email_is_institutional: payload.email_is_institutional,
-      email_domain: payload.email_domain,
+      // Use the same defensive defaults as the insert above for old sessions.
+      email_is_institutional: payload.email_is_institutional ?? isInstitutionalEmail(payload.email),
+      email_domain: payload.email_domain ?? (extractDomain(payload.email) ?? null),
     },
   });
 
