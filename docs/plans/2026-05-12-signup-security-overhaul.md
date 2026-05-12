@@ -43,7 +43,7 @@ The executor must read existing files before editing. Do not re-read unchanged f
 |---|---|---|
 | 1 | **One cutover, not phased.** Phase 1 stopgap (`isAutoApproved=false`) is folded into the same migration set as Phase 2 (institutional email verification). | The user asked for #16 + #17 + #18 + #19 + #20 implemented together. A "ship Phase 1, then Phase 2 next week" rollout fragments the database state, requires throwaway code, and leaves an awkward window where the admin queue grows with no email signal to sort by. The clean steady-state is "admin always approves; admin always sees email + MoH signal." |
 | 2 | **Resend over SDK or SMTP.** Direct `fetch` to `https://api.resend.com/emails` — no SDK, matches the rest of the repo (no Twilio SDK either; Supabase Auth dispatches OTP). | Smallest dependency footprint; Resend's HTTP API is one POST and is trivially mockable through a `RESEND_BASE_URL` env override (we add this for tests). Avoids pulling in `@react-email` or `react-email`; the email template is one short HTML/plaintext literal in `lib/email/templates/signup-verify.ts`. |
-| 3 | **Stateless HMAC tokens, no new `email_tokens` table.** Token payload = `{pid: pending_signup_id, exp: <unix-ms>}`, base64url-encoded JSON, HMAC-SHA256 signed with `SIGNUP_TOKEN_SECRET`. | Persistence buys nothing here: the `pending_signups` row already has a TTL, the token's expiry must be at-or-before the pending TTL anyway, and replay is blocked by the fact that `email_verified_at` on the pending row goes from null to non-null on first use (the verify endpoint refuses to flip it twice). One-table, one-secret design. The same secret is also used to verify a doctor-row token after signup completes, for late-arriving email clicks (see Task 5). |
+| 3 | **Stateless HMAC tokens, no new `email_tokens` table. Tokens always target the doctor row, never the pending row.** Token payload = `{target: "doctor", id: doctor_id, exp: <unix-ms>}`, base64url-encoded JSON, HMAC-SHA256 signed with `SIGNUP_TOKEN_SECRET`. | Persistence buys nothing here: replay is blocked by the fact that `email_verified_at` on the doctor row goes from null to non-null on first use (the verify endpoint refuses to flip it twice). The "pending-target" alternative (sending an email during the OTP window so the user can verify both in parallel) was considered and dropped: it forces the verify endpoint to copy `email_verified_at` from `pending_signups.payload` into the doctors insert at OTP-completion, which adds a coupling between two routes for trivial UX gain (the email arrives within seconds of OTP completion anyway). One target kind = one code path. |
 | 4 | **Email allowlist as TypeScript constant**, not a DB table. | The list is short (5 seeds plus a TODO marker for the maintainer), changes through PRs, and applies to write-time logic that runs before there is any session. Putting it in code means the allowlist diff is reviewable in git and tests can import it directly. The user explicitly approved the seed list and asked for a TODO. |
 | 5 | **`is_visible` rename + view (#20 option 1)**, not approval-time-flip. | Pairs cleanly with #17 (RLS as source of truth). The rename forces every existing reference to be updated, which surfaces every read site that previously trusted the boolean — a one-time grep produces a complete migration list. The view is read-only by construction; the underlying column toggle is a no-op for visibility unless approval has also happened. |
 | 6 | **Revocation sweep stores its grace counter on `doctors`**, not in a side table. | A `missing_sync_count int not null default 0` and `last_seen_in_moh_at timestamptz` column pair is enough. Sweep increments-or-resets in one `UPDATE` per cron run. The threshold (3) is a constant in the cron route. Avoids cross-table joins on the hot path of the sweep. |
@@ -326,44 +326,23 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { issueEmailToken, verifyEmailToken } from "./email-token";
 
 const SECRET = "test-secret-not-real";
+const ID_A = "00000000-0000-0000-0000-000000000001";
+const ID_B = "00000000-0000-0000-0000-000000000002";
 
 describe("email token", () => {
   beforeEach(() => {
     process.env.SIGNUP_TOKEN_SECRET = SECRET;
   });
 
-  it("round-trips a pending-signup token", () => {
-    const token = issueEmailToken({
-      target: "pending",
-      id: "00000000-0000-0000-0000-000000000001",
-      ttlMs: 60_000,
-    });
-    const r = verifyEmailToken(token);
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(r.target).toBe("pending");
-      expect(r.id).toBe("00000000-0000-0000-0000-000000000001");
-    }
-  });
-
   it("round-trips a doctor token", () => {
-    const token = issueEmailToken({
-      target: "doctor",
-      id: "00000000-0000-0000-0000-000000000002",
-      ttlMs: 60_000,
-    });
+    const token = issueEmailToken({ id: ID_B, ttlMs: 60_000 });
     const r = verifyEmailToken(token);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.target).toBe("doctor");
+    if (r.ok) expect(r.id).toBe(ID_B);
   });
 
   it("rejects a tampered payload", () => {
-    const token = issueEmailToken({
-      target: "pending",
-      id: "00000000-0000-0000-0000-000000000001",
-      ttlMs: 60_000,
-    });
-    // Flip a byte in the payload portion.
+    const token = issueEmailToken({ id: ID_A, ttlMs: 60_000 });
     const [payload, sig] = token.split(".");
     const bad = `${payload}AA.${sig}`;
     const r = verifyEmailToken(bad);
@@ -372,11 +351,7 @@ describe("email token", () => {
   });
 
   it("rejects a tampered signature", () => {
-    const token = issueEmailToken({
-      target: "pending",
-      id: "00000000-0000-0000-0000-000000000001",
-      ttlMs: 60_000,
-    });
+    const token = issueEmailToken({ id: ID_A, ttlMs: 60_000 });
     const [payload, sig] = token.split(".");
     const flipped = sig.replace(/.$/, sig.slice(-1) === "A" ? "B" : "A");
     const r = verifyEmailToken(`${payload}.${flipped}`);
@@ -385,11 +360,7 @@ describe("email token", () => {
   });
 
   it("rejects an expired token", () => {
-    const token = issueEmailToken({
-      target: "pending",
-      id: "00000000-0000-0000-0000-000000000001",
-      ttlMs: -1,
-    });
+    const token = issueEmailToken({ id: ID_A, ttlMs: -1 });
     const r = verifyEmailToken(token);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe("expired");
@@ -410,11 +381,7 @@ describe("email token", () => {
     delete process.env.SIGNUP_TOKEN_SECRET;
     process.env.NODE_ENV = "production";
     expect(() =>
-      issueEmailToken({
-        target: "pending",
-        id: "00000000-0000-0000-0000-000000000001",
-        ttlMs: 60_000,
-      }),
+      issueEmailToken({ id: ID_A, ttlMs: 60_000 }),
     ).toThrow(/SIGNUP_TOKEN_SECRET/);
     process.env.NODE_ENV = "test";
   });
