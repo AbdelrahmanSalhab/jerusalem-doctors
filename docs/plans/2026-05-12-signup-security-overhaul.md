@@ -1674,9 +1674,11 @@ git commit -m "feat(signup): drop auto-approve, dispatch verification email on O
 
 Edit `lib/ratelimit.ts`. In the `RATE_LIMITS` constant, add:
 ```ts
-  signupStartNotFound: { limit: 1, window: "1 h" },
+  signupStartNotFound: { limit: 3, window: "1 h" },
 ```
 Adjacent to `signupStart`.
+
+Rationale for `limit: 3, window: "1 h"`: the bucket is only consumed inside the `not_found` rejection branch (see Step 9.2 below). A legitimate user who mistypes their license a couple of times still gets through; an attacker iterating license-number ranges burns the budget after 3 misses per IP per hour, which makes enumeration uneconomical. We deliberately do NOT consume this bucket on every signup attempt — that would 429 a second legitimate signup from the same IP and is a regression vs. current behavior.
 
 **Step 9.2: Modify `app/api/signup/start/route.ts`**
 
@@ -1688,20 +1690,34 @@ The diff (specific edits, not a full rewrite):
    import { isPreApproved } from "@/lib/signup/pre-approved";
    ```
 
-2. After the `verified = await verifyLicense(...)` block (currently at line ~118), insert a new branch that fires before the `name_mismatch` check:
+2. After the `verified = await verifyLicense(...)` block (currently at line ~118), insert a new branch that fires before the `name_mismatch` check. The branch first consults the dedicated `signupStartNotFound` bucket; if the bucket is exhausted, the caller has already hit the not_found path repeatedly and should be rate-limited regardless of whether this specific license is on the pre-approved list.
 
    ```ts
    if (verified.status === "not_found") {
      const allowed = await isPreApproved(service, license);
-     if (!allowed) {
-       // Tighten rate limit on the not_found path so an attacker probing
-       // license ranges burns through their quota fast.
-       await rateLimit("signupStartNotFound", `ip:${ip}`);
+     if (allowed) {
+       // Pre-approved exception: skip the not_found rejection, fall through
+       // to the rest of the flow. Do not consume the not_found bucket.
+     } else {
+       // Consume the dedicated bucket only on the rejection path. This
+       // means legitimate signups (verified / soft_match) never touch this
+       // bucket, so a developer or shared-IP user is not penalised.
+       const rlNotFound = await rateLimit("signupStartNotFound", `ip:${ip}`);
        await service.from("audit_logs").insert({
          action: "signup_not_found_rejected",
-         metadata: { ip }, // license number deliberately omitted to avoid
-                            // logging the attacker's probe payload
+         metadata: {
+           ip,
+           rate_limited: !rlNotFound.success,
+           // license number deliberately omitted to avoid persisting the
+           // attacker's probe payload.
+         },
        });
+       if (!rlNotFound.success) {
+         // After the bucket runs out, return 429 instead of 409 so the
+         // attacker cannot tell whether further licenses would also be
+         // not_found — they only learn "you have hit a rate limit".
+         return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+       }
        return jsonError(409, {
          error: "license_not_in_registry",
          code: "license_not_in_registry",
@@ -1714,17 +1730,7 @@ The diff (specific edits, not a full rewrite):
    }
    ```
 
-   Also add an early gate: before doing the heavy work, check the `signupStartNotFound` budget:
-
-   Insert near the top of `POST`, immediately after the `signupStart` IP rate limit check:
-   ```ts
-   const rlNotFound = await rateLimit("signupStartNotFound", `ip:${ip}`);
-   if (!rlNotFound.success) {
-     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
-   }
-   ```
-
-   This consumes a budget unit for *every* attempt; that is intentional. A legitimate attempt costs nothing extra (the limit is 1/h, but the window is per-IP and 99% of users sign up once). The point of the bucket is that the *second* attempt after a `not_found` rejection within the same hour is denied — making enumeration via repeated `not_found`s impossibly slow per IP.
+   Do NOT add a separate early-gate consumption at the top of POST; consuming the bucket on every signup would 429 legitimate users sharing an IP. The bucket is only touched on the `not_found` rejection path above. After 3 misses per IP per hour, further `not_found` outcomes flip from 409 to 429 and the audit row records `rate_limited: true`.
 
 3. In the `pending_signups` insert (existing, search for `payload: {`), extend the payload object with three new fields just before `license_verification_status:`:
 
@@ -2044,10 +2050,9 @@ git commit -m "feat(signup): add email-start (resend) and email-verify (consume 
 
 Two structural changes:
 
-1. Replace `createSupabaseServiceClient()` with `createSupabaseServerClient()` for the *main* doctor query. The user-scoped client carries the doctor's JWT, so RLS applies. The pre-resolution of specialty + workplace IDs may stay on the service client for performance (RLS would deny those joined-table reads from the user side, but the application layer still owns the OR composition and does not leak anything because the main `doctor_visible` query enforces visibility).
-   - Actually, a cleaner design: do the entire search through the SSR client against the `doctor_visible` view. Joined tables (`specialties`, `doctor_workplaces`) have RLS policies that already grant authenticated reads of *visible* doctors' specialties/workplaces. Reading via the SSR client is therefore safe and self-consistent. Keep the service client out of `search` entirely.
+1. Use `createSupabaseServerClient()` (SSR) for every read in this route; the service client must NOT be used here. The SSR client carries the caller's JWT, so the RLS policies introduced in Task 5 do the visibility enforcement. The `specialties` table has its own `for select to authenticated using (is_active)` policy (see `0002_rls.sql:76-80`) so the SSR client can read it; `doctor_workplaces` and `doctor_specialties` use the same visible-doctor join policies that Task 5 rewrites against the renamed column. The pre-resolution of specialty IDs and workplace doctor IDs is therefore safe via the SSR client. Removing the service client also removes the application-level filter contract entirely: even a future contributor who forgets every `.eq()` cannot leak unapproved rows.
 
-2. Read from `public.doctor_visible` instead of `public.doctors`. Drop the manual `.eq("is_active", true).eq(...)`-quintet entirely; the view bakes it in.
+2. Read from `public.doctor_visible` instead of `public.doctors`. Drop the manual `.eq("is_active", true).eq(...)`-quintet entirely; the view bakes it in. The view is `security_invoker = true`, so RLS on the underlying `doctors` table also runs as the caller — this is the defense-in-depth that makes a single forgotten predicate non-fatal.
 
 The new file body (replacing lines 44-225 of current; preserving the imports and the `SearchHit` interface):
 
@@ -2523,23 +2528,42 @@ if (lic?.error === "license_not_in_registry") {
 }
 ```
 
-**Step 14.2: After successful signup, redirect to verify with a flag that the email is also pending**
+**Step 14.2: After successful signup, surface "check your email + awaiting review" copy**
 
-The current code redirects to `/verify?mode=signup` after the OTP request succeeds. The downstream `/verify` step is unchanged — OTP first, then the doctor row is inserted in `signup/verify`. After signup/verify returns `email_verification_sent: true`, the user lands on the dashboard (existing flow); we need to surface "check your email" there.
+Pre-step: Read `app/(public)/verify/VerifyForm.tsx` and `app/(public)/verify/page.tsx` in full before editing. The current behavior post-OTP-success depends on the `mode` query param: `mode=signup` posts to `/api/signup/verify`, `mode=login` to `/api/login/verify`. The signup branch is what we touch; do not change the login branch.
 
-Modify `app/(public)/verify/VerifyForm.tsx` (only the success branch — find the line that calls `router.push("/dashboard")` or similar after a successful `/api/signup/verify` POST). Right after the POST:
+After the `/api/signup/verify` POST, three behaviors must hold:
 
-```ts
-const verifyJson = await verifyRes.json();
-if (verifyRes.ok && verifyJson?.email_verification_sent) {
-  // Stash a flag so the holding page can show "check your inbox".
-  sessionStorage.setItem("verify:email_sent", "1");
-}
+1. The success state must show two pieces of copy in Arabic, regardless of `email_verification_sent`:
+   - `تم التسجيل بنجاح. حسابك قيد المراجعة من قبل الإدارة وسيتم تفعيله بعد المراجعة.` (always)
+   - `أرسلنا رسالة تأكيد إلى بريدك الإلكتروني. افتح الرابط داخل الرسالة لتأكيد بريدك.` (only when `verifyJson.email_verification_sent === true`)
+2. The redirect to `/dashboard` must NOT happen automatically for the signup branch any more; the doctor cannot use the dashboard until admin approval. Replace the redirect with the success state above. (The login branch keeps its redirect.)
+3. A "أعد إرسال رسالة التحقق" button is shown next to the email-sent copy. Clicking it POSTs to `/api/signup/email-start` with no body (the route resolves the target via the just-established session via `getCurrentDoctor()`).
+
+The executor implements these three behaviors by editing `VerifyForm.tsx` directly — preserve the file's existing structure (state setters, error handling, RTL classes). Do NOT add `sessionStorage`; the response shape is already in scope when the success copy renders.
+
+Sketch (executor adapts to the current state shape after reading the file):
+```tsx
+// inside the POST handler for mode === 'signup':
+const json = await res.json();
+if (!res.ok) { /* existing error handling */ return; }
+setSignupSuccess({
+  emailSent: Boolean(json.email_verification_sent),
+});
+// Render block conditional on signupSuccess:
+//   <h2>{ARABIC_SIGNUP_PENDING_TITLE}</h2>
+//   <p>{ARABIC_PENDING_REVIEW}</p>
+//   {signupSuccess.emailSent && (
+//     <>
+//       <p>{ARABIC_EMAIL_SENT}</p>
+//       <button onClick={resendEmail} disabled={resending}>
+//         {ARABIC_RESEND_EMAIL}
+//       </button>
+//     </>
+//   )}
 ```
 
-If the existing `/verify` page does not yet have a "holding" state for unapproved-but-OTP'd users, add a tiny notice on the existing thank-you page that reads (in Arabic): "تم التسجيل. أرسلنا رسالة تأكيد إلى بريدك الإلكتروني، الرجاء فتحها للمتابعة. حسابك قيد المراجعة من قبل الإدارة." — read `sessionStorage.getItem("verify:email_sent")` to show it.
-
-(Executor: the exact phrasing of the existing post-OTP screen depends on what the file currently does; preserve its structure and only add the email-sent notice.)
+The `resendEmail` handler is a small async function that POSTs to `/api/signup/email-start` with `{}` body, sets a transient "تم الإرسال" toast on success or shows the route's error code on failure, and toggles `resending`.
 
 **Step 14.3: Lint**
 
