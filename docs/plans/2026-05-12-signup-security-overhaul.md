@@ -24,7 +24,7 @@ The executor must skim these files before writing any code. They are short and t
 - `lib/auth/session.ts` — `getCurrentDoctor()` is the SSR-friendly entry point; `requireAdmin()` is the admin gate.
 - `lib/supabase/{server,service,browser}.ts` — three clients; this plan reserves the service client for writes and admin reads.
 - `lib/moh/match.ts` — `verifyLicense()` returns one of four statuses; not modified here, but the `not_found` path is treated differently downstream.
-- `lib/ratelimit.ts` — `RATE_LIMITS` map; we add `signupStartNotFound`.
+- `lib/ratelimit.ts` — `RATE_LIMITS` map; we add `signupStartNotFound`, `signupEmailStart`, and `signupEmailVerify`.
 - `lib/turnstile.ts` — bypassed in dev; production fail-closed.
 - `supabase/migrations/0001_init.sql`, `0002_rls.sql`, `0004_workplaces.sql`, `0006_profile_features.sql` — schema and RLS that this plan extends.
 - `scripts/rls-smoke-test.ts` — extended; same pattern (anon Supabase client probes).
@@ -1204,8 +1204,8 @@ git commit -m "feat(db): rename is_visible→user_chose_visible, add email + rev
 Scope discovered by `rg "\bis_visible\b" --type ts --type tsx --type sql`. Required edits, file by file:
 
 **Files:**
-- Modify: `app/api/signup/verify/route.ts` — see Task 7 for full edit.
-- Modify: `app/api/profile/delete-request/route.ts` — change `is_visible: false` to `user_chose_visible: false`.
+- Modify: `app/api/signup/verify/route.ts` — see Task 7 for full edit (do not commit `is_visible` rename in this task; Task 7 rewrites the file entirely).
+- Modify: `app/api/profile/delete-request/route.ts` — change `.update({ is_visible: false, is_active: false })` to `.update({ user_chose_visible: false, is_active: false })`.
 - Modify: `app/api/admin/doctors/[id]/route.ts` — Zod field `is_visible` → `user_chose_visible`.
 - Modify: `app/(admin)/admin/page.tsx` — select column `is_visible` → `user_chose_visible`.
 - Modify: `app/(admin)/admin/AdminDoctorsTable.tsx` — interface `is_visible` → `user_chose_visible`.
@@ -1485,13 +1485,15 @@ export async function POST(req: Request) {
 }
 ```
 
-**Step 7.2: Lint**
+**Step 7.2: Stage only (do not lint or commit yet)**
 
-Run: `npm run lint`. Expected: passes (`dispatchSignupVerifyEmail` is provided in Task 8).
+`signup/verify/route.ts` imports `dispatchSignupVerifyEmail` from `lib/signup/email-dispatch.ts`, which does not exist until Task 8. TypeScript resolution will fail at lint/build until that file is created. Stage the file now but do NOT run lint or commit:
 
-**Step 7.3: Commit (deferred until Task 8 — code does not compile alone)**
+```bash
+git -C /home/khaleds/projects/salhab/jerusalem-doctors/.worktrees/signup-security-overhaul add app/api/signup/verify/route.ts
+```
 
-This file references `lib/signup/email-dispatch.ts`, created in the next task. Stage but do not commit yet.
+Do not commit. Continue to Task 8 immediately.
 
 ---
 
@@ -1615,10 +1617,17 @@ export async function dispatchSignupVerifyEmail(input: DispatchInput): Promise<v
 }
 ```
 
-**Step 8.4: Run test → passes; commit Task 7 + 8 together**
+**Step 8.4: Run test → passes; run lint; commit Task 7 + 8 together**
+
+`email-dispatch.ts` is now in place so `signup/verify/route.ts` can resolve its import. Run lint for the first time covering both files:
 
 ```bash
-npm test -- email-dispatch
+cd /home/khaleds/projects/salhab/jerusalem-doctors/.worktrees/signup-security-overhaul && npm test -- email-dispatch && npm run lint
+```
+
+Expected: test passes, lint clean. Then commit:
+
+```bash
 git add app/api/signup/verify/route.ts lib/signup/email-dispatch.ts lib/signup/email-dispatch.test.ts
 git commit -m "feat(signup): drop auto-approve, dispatch verification email on OTP verify"
 ```
@@ -1632,15 +1641,21 @@ git commit -m "feat(signup): drop auto-approve, dispatch verification email on O
 - Modify: `app/api/signup/start/route.ts`
 - Modify: `app/api/signup/check-license/route.ts` (consistent UI message)
 
-**Step 9.1: Add the rate-limit key**
+**Step 9.1: Add the rate-limit keys**
 
-Edit `lib/ratelimit.ts`. In the `RATE_LIMITS` constant, add:
+Edit `lib/ratelimit.ts`. In the `RATE_LIMITS` constant, add all three new keys adjacent to `signupStart`:
 ```ts
   signupStartNotFound: { limit: 3, window: "1 h" },
+  signupEmailStart:    { limit: 5, window: "1 h" },
+  signupEmailVerify:   { limit: 10, window: "1 h" },
 ```
-Adjacent to `signupStart`.
 
-Rationale for `limit: 3, window: "1 h"`: the bucket is only consumed inside the `not_found` rejection branch (see Step 9.2 below). A legitimate user who mistypes their license a couple of times still gets through; an attacker iterating license-number ranges burns the budget after 3 misses per IP per hour, which makes enumeration uneconomical. We deliberately do NOT consume this bucket on every signup attempt — that would 429 a second legitimate signup from the same IP and is a regression vs. current behavior.
+Rationale:
+- `signupStartNotFound` (3/IP/hr): consumed only inside the `not_found` rejection branch (see Step 9.2). Legitimate signups (verified/soft_match) never touch this bucket. An attacker iterating license-number ranges burns the budget after 3 misses per IP per hour.
+- `signupEmailStart` (5/doctor/hr): per-doctor limit on the email resend endpoint (Task 10). Doctor-scoped (by `me.id`) so one doctor cannot exhaust another doctor's limit. 5 sends per hour is generous for any legitimate resend use and tight enough to prevent spam abuse.
+- `signupEmailVerify` (10/IP/hr): per-IP limit on the email verification link click endpoint (Task 10). Token-click links are shared publicly (pasted in chat, etc.), so IP-scoped is more appropriate than session-scoped. 10/hr/IP is adequate for any number of legitimate clicks and prevents brute-force of short tokens.
+
+We deliberately do NOT consume `signupStartNotFound` on every signup attempt — that would 429 a second legitimate signup from the same IP and is a regression vs. current behavior.
 
 **Step 9.2: Modify `app/api/signup/start/route.ts`**
 
@@ -1795,12 +1810,14 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 // No body needed — the authenticated session identifies the doctor.
 
 export async function POST(req: Request) {
-  const ip = ipFromHeaders(req);
-  const rl = await rateLimit("signupCheckUnique", `ip:${ip}`);
-  if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
-
+  // Rate limit per doctor (not per IP) to prevent one doctor from sending
+  // spam to their own email address and to avoid shared-IP false positives.
   const me = await getCurrentDoctor().catch(() => null);
   if (!me) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
+
+  const rl = await rateLimit("signupEmailStart", `doctor:${me.id}`);
+  if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+
   if (!me.email) return jsonError(400, { error: "no_email_on_file", code: "no_email_on_file" });
 
   const service = createSupabaseServiceClient();
@@ -1840,7 +1857,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const ip = ipFromHeaders(req);
-  const rl = await rateLimit("signupCheckUnique", `ip:${ip}`);
+  // Per-IP rate limit: verification links are sent via email and may be
+  // forwarded or pasted, so doctor-session gating is not appropriate here.
+  const rl = await rateLimit("signupEmailVerify", `ip:${ip}`);
   if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
 
   const url = new URL(req.url);
@@ -2203,7 +2222,13 @@ Continuing in `cron/sync-moh/route.ts`, after the RPC call:
 
 ```ts
 type SweepResult = { missed: number; reset: number; revoked: string[] };
+// If the sweep RPC fails (e.g. DB connectivity issue), log and continue —
+// the sync itself succeeded; revocation is best-effort for a single run.
+if (sweep.error) {
+  console.error("[cron/sync-moh] revocation_sweep RPC failed", sweep.error);
+}
 const sweepResult: SweepResult =
+  sweep.error ? { missed: 0, reset: 0, revoked: [] } :
   (sweep.data as SweepResult | null) ?? { missed: 0, reset: 0, revoked: [] };
 
 if (sweepResult.revoked.length > 0) {
