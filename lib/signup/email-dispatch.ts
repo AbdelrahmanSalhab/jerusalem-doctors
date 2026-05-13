@@ -37,8 +37,13 @@ export async function dispatchSignupVerifyEmail(input: DispatchInput): Promise<v
     expiryHours: Math.floor(ttlMs / 3_600_000),
   });
 
+  // Include a timestamp so each dispatch attempt has a unique key. A static
+  // key (doctor+email only) would hit Resend's 24-hour idempotency window
+  // and silently deduplicate "Resend email" requests, leaving the user with
+  // no new email. A per-send timestamp makes every dispatch unique while
+  // still allowing safe client-side retry if the connection drops mid-request.
   const idempotencyKey = createHash("sha256")
-    .update(`doctor:${id}:${input.email}`)
+    .update(`doctor:${id}:${input.email}:${Date.now()}`)
     .digest("hex");
 
   const client = input.resend ?? new ResendClient();

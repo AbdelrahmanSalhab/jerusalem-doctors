@@ -102,6 +102,9 @@ export async function GET(req: Request) {
       : ((sweep.data as SweepResult | null) ?? { missed: 0, reset: 0, revoked: [] });
 
   if (sweepResult.revoked.length > 0) {
+    // actor_doctor_id is omitted (null) intentionally: these revocations are
+    // system-initiated by the cron job, not by a human admin. Null actor in
+    // the audit log means "system cron" for this action type.
     const rows = sweepResult.revoked.map((id) => ({
       action: "license_revoked_sync",
       target_doctor_id: id,

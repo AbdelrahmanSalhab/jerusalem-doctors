@@ -6,6 +6,9 @@
 // which exercises dispatchSignupVerifyEmail end-to-end (token issuance, Resend POST,
 // verify-URL in email body). Test 1 in this file verifies the verify-route inserts
 // email_is_institutional:true for the same scenario. Together they fulfil Test 2.
+//
+// Tests 11 and 12 from the test plan (cron/sync-moh revocation sweep) are in
+// lib/moh/cron.test.ts — they mock the Supabase service client and MohClient.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

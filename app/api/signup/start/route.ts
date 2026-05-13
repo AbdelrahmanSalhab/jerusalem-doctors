@@ -132,23 +132,24 @@ export async function POST(req: Request) {
   if (verified.status === "not_found") {
     const allowed = await isPreApproved(service, license);
     if (!allowed) {
-      // Consume the dedicated not_found bucket only on the rejection path.
-      // Legitimate signups (verified / soft_match) never touch this bucket.
+      // Consume the dedicated not_found bucket BEFORE writing the audit row so
+      // that rate-limited probes do not produce unbounded DB writes. Once the
+      // bucket is exhausted, we return 429 immediately without any audit insert
+      // (the Upstash counter is the authoritative record of abuse volume).
       const rlNotFound = await rateLimit("signupStartNotFound", `ip:${ip}`);
-      await service.from("audit_logs").insert({
-        action: "signup_not_found_rejected",
-        metadata: {
-          ip,
-          rate_limited: !rlNotFound.success,
-          // license number deliberately omitted to avoid persisting the
-          // attacker's probe payload.
-        },
-      });
       if (!rlNotFound.success) {
         // After the bucket runs out, return 429 so the attacker cannot tell
         // whether further licenses would also be not_found.
         return jsonError(429, { error: "rate_limited", code: "rate_limited" });
       }
+      await service.from("audit_logs").insert({
+        action: "signup_not_found_rejected",
+        metadata: {
+          ip,
+          // license number deliberately omitted to avoid persisting the
+          // attacker's probe payload.
+        },
+      });
       return jsonError(409, {
         error: "license_not_in_registry",
         code: "license_not_in_registry",

@@ -100,6 +100,11 @@ export async function POST(req: Request) {
     return jsonError(429, { error: "too_many_attempts", code: "too_many_attempts" });
   }
 
+  // SECURITY INVARIANT: Increment attempts BEFORE calling Supabase verifyOtp
+  // so a flood of bad codes cannot bypass the counter via abandoned races. If
+  // the increment happened after verifyOtp, a race where the request is
+  // abandoned after the OTP check but before the write would let an attacker
+  // reset the counter by repeatedly sending concurrent requests.
   await service
     .from("pending_signups")
     .update({ attempts: pending.data.attempts + 1 })
