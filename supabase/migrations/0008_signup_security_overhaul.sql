@@ -184,6 +184,8 @@ create policy "doctor_workplaces readable for visible doctors"
 --   missing_sync_count, last_seen_in_moh_at, revocation columns.
 -- license_number IS intentionally included: it has always been exposed via
 -- the public search API for directory display purposes.
+-- email is intentionally excluded: direct Supabase queries must not expose
+-- another doctor's email address. The search API route omits it as well.
 create or replace view public.doctor_visible
   with (security_invoker = true)
   as
@@ -201,7 +203,6 @@ create or replace view public.doctor_visible
       license_number,
       subspecialty,
       subspecialty_normalized,
-      email,
       phone_display,
       phone_e164,
       phone_is_visible,

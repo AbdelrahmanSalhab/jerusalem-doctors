@@ -18,9 +18,10 @@ export async function POST(req: Request) {
   const ip = ipFromHeaders(req);
 
   // IP-level gate before touching the session so unauthenticated floods do
-  // not drain a Supabase Auth read on every request. Reuse the signupEmailVerify
-  // bucket (same surface: low-volume, user-triggered email actions).
-  const rlIp = await rateLimit("signupEmailVerify", `ip:${ip}`);
+  // not drain a Supabase Auth read on every request. Use the signupEmailStart
+  // bucket so this endpoint's IP gate does not share quota with email-verify
+  // link clicks (which use signupEmailVerify).
+  const rlIp = await rateLimit("signupEmailStart", `ip:${ip}`);
   if (!rlIp.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
 
   // Per-doctor limit after auth: prevents one doctor from spamming their own

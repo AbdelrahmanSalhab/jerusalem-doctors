@@ -50,15 +50,13 @@ export class ResendClient {
       if (process.env.NODE_ENV === "production") {
         throw new Error("RESEND_API_KEY is required in production");
       }
-      // Log to stdout in all non-production environments (dev, test, staging,
-      // preview, unset) so engineers can see the email without a real key.
-      process.stdout.write(
-        "[email:dev] " + JSON.stringify({
-          to: input.to,
-          subject: input.subject,
-          textPreview: input.text.slice(0, 200),
-        }) + "\n",
-      );
+      // Log in all non-production environments (dev, test, staging, preview,
+      // unset) so engineers can see the email without a real key.
+      console.log("[email:dev]", {
+        to: input.to,
+        subject: input.subject,
+        textPreview: input.text.slice(0, 200),
+      });
       return { id: `dev-${Date.now()}` };
     }
 

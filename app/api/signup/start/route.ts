@@ -140,7 +140,12 @@ export async function POST(req: Request) {
   // Issue #19: not_found 409s without OTP unless the license is on the
   // admin pre-approved allowlist.
   if (verified.status === "not_found") {
-    const allowed = await isPreApproved(service, license);
+    let allowed: boolean;
+    try {
+      allowed = await isPreApproved(service, license);
+    } catch {
+      return jsonError(503, { error: "service_unavailable", code: "service_unavailable" });
+    }
     if (!allowed) {
       // Consume the dedicated not_found bucket BEFORE writing the audit row so
       // that rate-limited probes do not produce unbounded DB writes. Once the

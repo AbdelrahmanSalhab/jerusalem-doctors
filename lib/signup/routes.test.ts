@@ -811,10 +811,12 @@ describe("Test 4b — isPreApproved DB error returns 500 with sanitized message"
     vi.mocked(createSupabaseServerClient).mockResolvedValue(ssrStub);
 
     const req = makeRequest(START_BODY);
-    // The route should bubble the DB error as an unhandled 500. This test
-    // documents the current contract so a future change that sanitizes the
-    // error is caught explicitly.
-    await expect(startPOST(req)).rejects.toThrow("DB connection refused");
+    // The route now catches isPreApproved errors and returns 503 instead of
+    // bubbling the raw DB error, so the caller gets a safe response.
+    const res = await startPOST(req);
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error).toBe("service_unavailable");
   });
 });
 

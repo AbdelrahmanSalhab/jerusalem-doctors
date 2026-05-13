@@ -113,19 +113,23 @@ const checks: Check[] = [
       if (signInErr) {
         return { leaked: false, detail: `skipped (sign-in failed: ${signInErr.message})` };
       }
+      // doctor_visible only returns approved+active rows (view WHERE clause).
+      // Any row returned for this non-admin account = leak (should see zero,
+      // because our test account's own doctor row has is_admin_approved=false).
+      // We select only id; is_admin_approved is not exposed in the view.
       const { data, error } = await authClient
         .from("doctor_visible")
-        .select("id, is_admin_approved")
-        .limit(10);
+        .select("id")
+        .limit(1);
       if (error) {
         return { leaked: false, detail: `denied (${error.code ?? error.message})` };
       }
-      const unapproved = (data ?? []).filter((r: Record<string, unknown>) => !r.is_admin_approved);
+      const count = (data ?? []).length;
       return {
-        leaked: unapproved.length > 0,
-        detail: unapproved.length > 0
-          ? `LEAK — ${unapproved.length} unapproved row(s) visible`
-          : "ok (no unapproved rows visible)",
+        leaked: count > 0,
+        detail: count > 0
+          ? `LEAK — ${count} row(s) visible to unapproved doctor`
+          : "ok (no rows visible to unapproved doctor)",
       };
     },
   },

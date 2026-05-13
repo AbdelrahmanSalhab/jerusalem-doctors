@@ -30,7 +30,6 @@ export interface SearchHit {
   phone_display: string | null;
   /** Null when phone is hidden — disables the WhatsApp button on the card. */
   whatsapp_url: string | null;
-  email: string | null;
   subspecialty: string | null;
   specialties: string[];
   /** Empty array when the doctor opted to hide their workplaces. */
@@ -82,7 +81,6 @@ export async function GET(req: Request) {
       phone_is_visible,
       workplaces_is_visible,
       profile_picture_url,
-      email,
       subspecialty,
       doctor_specialties${parsed.data.specialty_id ? "!inner" : ""}(
         specialty:specialties(id, name_ar)
@@ -208,7 +206,6 @@ export async function GET(req: Request) {
       license_number: d.license_number,
       phone_display: d.phone_is_visible ? d.phone_display : null,
       whatsapp_url: d.phone_is_visible ? buildWhatsAppLink(d.phone_e164) : null,
-      email: d.email,
       subspecialty: d.subspecialty,
       specialties,
       workplaces,
