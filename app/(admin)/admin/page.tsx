@@ -4,7 +4,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 export const dynamic = "force-dynamic";
 
 interface SearchParams {
-  status?: "pending" | "approved" | "all";
+  status?: "pending" | "approved" | "all" | "revoked";
   q?: string;
 }
 
@@ -28,6 +28,7 @@ export default async function AdminDoctorsPage({
 
   if (status === "pending") query = query.eq("is_admin_approved", false);
   if (status === "approved") query = query.eq("is_admin_approved", true);
+  if (status === "revoked") query = query.eq("license_verification_status", "revoked");
   if (q) {
     query = query.or(
       [
