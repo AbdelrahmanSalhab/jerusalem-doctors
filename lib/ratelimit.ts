@@ -13,6 +13,9 @@ type LimitDef = { limit: number; window: WindowSpec };
 
 export const RATE_LIMITS = {
   signupStart: { limit: 3, window: "1 h" },
+  signupStartNotFound: { limit: 3, window: "1 h" },
+  signupEmailStart:    { limit: 5, window: "1 h" },
+  signupEmailVerify:   { limit: 10, window: "1 h" },
   signupVerify: { limit: 5, window: "10 m" },
   signupCheckLicense: { limit: 10, window: "1 h" },
   signupCheckUnique: { limit: 30, window: "1 h" },
