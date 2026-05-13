@@ -76,6 +76,35 @@ const checks: Check[] = [
     name: "anon cannot read doctor_workplaces",
     run: async () => testEmpty("doctor_workplaces"),
   },
+  {
+    name: "anon cannot read doctor_visible view",
+    run: async () => testEmpty("doctor_visible"),
+  },
+  {
+    name: "anon cannot read pre_approved_licenses",
+    run: async () => testEmpty("pre_approved_licenses"),
+  },
+  {
+    name: "doctor_visible returns zero rows for anon (post-migration reset)",
+    // This is a soft check — if the test database happens to have an
+    // approved + visible doctor seeded, we skip rather than fail. The
+    // important invariant (anon-deny) is already covered above.
+    run: async () => {
+      const { data, error } = await anon
+        .from("doctor_visible")
+        .select("id")
+        .limit(1);
+      if (error) {
+        return { leaked: false, detail: `denied (${error.code ?? error.message})` };
+      }
+      // anon should never get rows from doctor_visible regardless of DB content.
+      const count = data?.length ?? 0;
+      return {
+        leaked: count > 0,
+        detail: count > 0 ? `LEAK — anon read ${count} row(s) of view` : "ok (empty)",
+      };
+    },
+  },
 ];
 
 async function testEmpty(table: string): Promise<{
