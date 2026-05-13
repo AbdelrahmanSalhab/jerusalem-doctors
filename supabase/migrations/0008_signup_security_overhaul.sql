@@ -202,3 +202,16 @@ update public.doctors
    set is_admin_approved = false
  where is_admin = false
    and is_admin_approved = true;
+
+-- =========================================================================
+-- 5) Explicit permission lockdown on doctor_visible (#20)
+-- =========================================================================
+
+-- Supabase may auto-grant SELECT on new views to `anon` and `public` when the
+-- view is created by the service role. With security_invoker = true, access
+-- depends on the caller's privileges on the base table, but an anon SELECT
+-- grant on the view itself would let anon callers bypass the
+-- authenticated-only RLS on `doctors` by going through the view directly.
+-- Explicitly revoke and re-grant so only the `authenticated` role can query.
+revoke all on public.doctor_visible from anon, public;
+grant select on public.doctor_visible to authenticated;

@@ -12,5 +12,7 @@ describe("shouldRevoke", () => {
   it("revokes at and above threshold", () => {
     expect(shouldRevoke(REVOKE_AFTER_MISSING_CYCLES)).toBe(true);
     expect(shouldRevoke(REVOKE_AFTER_MISSING_CYCLES + 5)).toBe(true);
+    // Test plan Test 10 explicitly requires shouldRevoke(10) to return true.
+    expect(shouldRevoke(10)).toBe(true);
   });
 });

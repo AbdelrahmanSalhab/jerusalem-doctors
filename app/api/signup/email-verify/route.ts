@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     .select("id, email_verified_at")
     .eq("id", result.id)
     .maybeSingle();
-  if (doctor.error && doctor.error.code !== "PGRST116") throw doctor.error;
+  if (doctor.error) throw doctor.error;
   if (!doctor.data) {
     return htmlPage(410, {
       title: "حساب غير موجود",

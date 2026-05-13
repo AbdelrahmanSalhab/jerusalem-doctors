@@ -12,6 +12,6 @@ export async function isPreApproved(
     .select("license_number")
     .eq("license_number", licenseNumber)
     .maybeSingle();
-  if (error && error.code !== "PGRST116") throw error;
+  if (error) throw error;
   return Boolean(data);
 }

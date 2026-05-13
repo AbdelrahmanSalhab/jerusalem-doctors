@@ -57,7 +57,21 @@ export async function PATCH(
     }
   }
 
-  const r = await service.from("doctors").update(body).eq("id", id);
+  // Re-approval invariant: when a doctor transitions from is_admin_approved=false
+  // to is_admin_approved=true, their missing_sync_count may have accumulated stale
+  // bumps from revocation_sweep() cycles that ran while they were unapproved (step 1
+  // of the sweep skips unapproved doctors, but the counter is not automatically reset
+  // on re-approval). Without this reset, a freshly re-approved doctor immediately
+  // becomes a revocation candidate on the next sweep even if they have not missed any
+  // cycles since re-approval. Resetting to 0 and refreshing last_seen_in_moh_at to
+  // now() gives the doctor a clean slate consistent with the sweep's semantics.
+  const updatePayload: Record<string, unknown> = { ...body };
+  if (body.is_admin_approved === true) {
+    updatePayload.missing_sync_count = 0;
+    updatePayload.last_seen_in_moh_at = new Date().toISOString();
+  }
+
+  const r = await service.from("doctors").update(updatePayload).eq("id", id);
   if (r.error) {
     console.error("[admin.doctors.patch] update failed", r.error);
     return jsonError(500, { error: "update_failed", code: "update_failed" });

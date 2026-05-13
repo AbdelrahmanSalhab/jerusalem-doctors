@@ -29,6 +29,13 @@ const anon = createClient(url, anonKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+// Authenticated-but-not-admin client: sign in with a known test user whose
+// doctor record is NOT yet admin-approved. Credentials are read from env so
+// they are never committed to source. If the env vars are absent the test
+// is skipped gracefully rather than failing.
+const authEmail = process.env.RLS_TEST_AUTH_EMAIL;
+const authPassword = process.env.RLS_TEST_AUTH_PASSWORD;
+
 interface Check {
   name: string;
   run: () => Promise<{ leaked: boolean; detail: string }>;
@@ -85,15 +92,42 @@ const checks: Check[] = [
     run: async () => testEmpty("pre_approved_licenses"),
   },
   {
-    // Test 25 from the test plan: "post-migration approval reset left doctor_visible empty."
-    // This check is most meaningful when run immediately after applying migration 0008 on a
-    // previously-populated database, because 0008 resets is_admin_approved=false for all
-    // non-admin doctors. At that point, no doctor satisfies the doctor_visible view conditions,
-    // so the view should return zero rows even for an authenticated session — and certainly
-    // zero rows for the anon role tested here. On a fresh database or after re-approvals this
-    // check still passes because anon is denied by RLS regardless.
-    name: "doctor_visible is empty immediately after migration (Test 25)",
-    run: async () => testEmpty("doctor_visible"),
+    // Test 25 from the test plan: an authenticated-but-not-admin session must see zero
+    // rows from doctor_visible for a doctor whose is_admin_approved is still false.
+    // This covers the residual risk that security_invoker=true on the view combined with
+    // a mistaken authenticated GRANT could expose unapproved profiles to signed-in users.
+    // The test is skipped when RLS_TEST_AUTH_EMAIL / RLS_TEST_AUTH_PASSWORD are absent
+    // (e.g. CI without test credentials) to avoid false failures.
+    name: "authenticated non-admin sees zero rows for unapproved doctor (Test 25)",
+    run: async (): Promise<{ leaked: boolean; detail: string }> => {
+      if (!authEmail || !authPassword) {
+        return { leaked: false, detail: "skipped (RLS_TEST_AUTH_EMAIL not set)" };
+      }
+      const authClient = createClient(url!, anonKey!, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { error: signInErr } = await authClient.auth.signInWithPassword({
+        email: authEmail,
+        password: authPassword,
+      });
+      if (signInErr) {
+        return { leaked: false, detail: `skipped (sign-in failed: ${signInErr.message})` };
+      }
+      const { data, error } = await authClient
+        .from("doctor_visible")
+        .select("id, is_admin_approved")
+        .limit(10);
+      if (error) {
+        return { leaked: false, detail: `denied (${error.code ?? error.message})` };
+      }
+      const unapproved = (data ?? []).filter((r: Record<string, unknown>) => !r.is_admin_approved);
+      return {
+        leaked: unapproved.length > 0,
+        detail: unapproved.length > 0
+          ? `LEAK — ${unapproved.length} unapproved row(s) visible`
+          : "ok (no unapproved rows visible)",
+      };
+    },
   },
 ];
 

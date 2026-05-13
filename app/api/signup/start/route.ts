@@ -95,6 +95,16 @@ export async function POST(req: Request) {
   // and the uniqueness check match the same representation that check-license
   // uses. An admin pre-approving "00123" sees it stored as "123".
   const license = String(Number(licenseRaw));
+  // "0" survives the digit regex above (^\d{1,12}$) but is not a valid MoH
+  // license number. Passing it to verifyLicense would produce a misleading
+  // not_found audit entry. Reject it explicitly.
+  if (license === "0") {
+    return jsonError(400, {
+      error: "invalid_license",
+      code: "invalid_license",
+      fields: { license_number: "رقم الترخيص يجب أن يحتوي على أرقام فقط" },
+    });
+  }
 
   const service = createSupabaseServiceClient();
 
