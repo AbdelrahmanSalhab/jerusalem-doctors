@@ -79,5 +79,11 @@ begin
 end;
 $$;
 
+-- SECURITY NOTE: revocation_sweep is SECURITY DEFINER, meaning it executes
+-- with the privileges of the owner (postgres/service role), not the caller.
+-- This is required so the cron route (which runs as service_role) can update
+-- doctor rows that are normally gated by RLS. Grant must remain restricted to
+-- service_role only: granting to authenticated or anon would allow any logged-in
+-- user to trigger the sweep and force-revoke doctors.
 revoke all on function public.revocation_sweep(int) from public, anon, authenticated;
 grant execute on function public.revocation_sweep(int) to service_role;

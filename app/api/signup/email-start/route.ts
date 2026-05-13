@@ -6,7 +6,7 @@
 // attempt produces a real send; safe to retry if the connection drops.
 // Rate-limited to prevent use as a spam vector.
 
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/ratelimit";
 import { dispatchSignupVerifyEmail } from "@/lib/signup/email-dispatch";
@@ -14,9 +14,17 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 // No body needed — the authenticated session identifies the doctor.
 
-export async function POST() {
-  // Rate limit per doctor (not per IP) to prevent one doctor from sending
-  // spam to their own email address and to avoid shared-IP false positives.
+export async function POST(req: Request) {
+  const ip = ipFromHeaders(req);
+
+  // IP-level gate before touching the session so unauthenticated floods do
+  // not drain a Supabase Auth read on every request. Reuse the signupEmailVerify
+  // bucket (same surface: low-volume, user-triggered email actions).
+  const rlIp = await rateLimit("signupEmailVerify", `ip:${ip}`);
+  if (!rlIp.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+
+  // Per-doctor limit after auth: prevents one doctor from spamming their own
+  // inbox and avoids shared-IP false positives.
   const me = await getCurrentDoctor().catch(() => null);
   if (!me) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
 

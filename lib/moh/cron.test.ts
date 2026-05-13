@@ -61,7 +61,6 @@ describe("Test 11 — cron/sync-moh calls revocation_sweep and writes audit rows
 
   it("calls rpc revocation_sweep and inserts per-revoked-doctor audit rows", async () => {
     const auditInserts: unknown[] = [];
-    let rpcCalled = false;
 
     const serviceMock = {
       from: vi.fn((table: string) => ({
@@ -78,7 +77,6 @@ describe("Test 11 — cron/sync-moh calls revocation_sweep and writes audit rows
       })),
       rpc: vi.fn(async (fn: string) => {
         if (fn === "revocation_sweep") {
-          rpcCalled = true;
           return {
             data: {
               missed: 2,
@@ -101,7 +99,8 @@ describe("Test 11 — cron/sync-moh calls revocation_sweep and writes audit rows
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(rpcCalled).toBe(true);
+    expect(serviceMock.rpc).toHaveBeenCalledOnce();
+    expect(serviceMock.rpc).toHaveBeenCalledWith("revocation_sweep", { threshold_cycles: 3 });
     expect(json.sweep_revoked_count).toBe(2);
 
     // Find audit inserts for revoked doctors

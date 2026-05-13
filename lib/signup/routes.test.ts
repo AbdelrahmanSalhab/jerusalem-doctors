@@ -601,6 +601,99 @@ describe("Test 3 — Gmail address results in email_is_institutional: false", ()
 });
 
 // ---------------------------------------------------------------------------
+// Test 3b — Old pending payload without email_domain/email_is_institutional
+// ---------------------------------------------------------------------------
+
+describe("Test 3b — verify route handles old pending payload missing email_domain/email_is_institutional", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SIGNUP_TOKEN_SECRET = "test-secret";
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM = "noreply@example.com";
+    process.env.RESEND_BASE_URL = "https://example.test";
+    process.env.NEXT_PUBLIC_APP_URL = "https://app.example";
+  });
+
+  it("computes email_domain and email_is_institutional from email when fields are absent", async () => {
+    const capturedRows: Record<string, unknown>[] = [];
+    // Old pending payload without email_domain or email_is_institutional
+    const oldPayload = {
+      phone_e164: "+972501234567",
+      phone_display: "050-1234567",
+      license_number: "9417",
+      arabic_first_name: "نور",
+      arabic_family_name: "الأمين",
+      arabic_first_name_normalized: "نور",
+      arabic_family_name_normalized: "الامين",
+      arabic_full_name_normalized: "نور الامين",
+      hebrew_first_name: "נור",
+      hebrew_family_name: "אל-אמין",
+      subspecialty: null,
+      subspecialty_normalized: null,
+      email: "dr@hadassah.org.il",
+      // email_domain and email_is_institutional intentionally absent
+      specialty_ids: [UUID],
+      workplaces: [{ name: "Hadassah", name_normalized: "hadassah", is_primary: true, sort_order: 0 }],
+      license_verification_status: "verified" as const,
+    };
+    const insertResult = Object.assign(Promise.resolve({ data: { id: UUID }, error: null }), {
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({ data: { id: UUID }, error: null })),
+      })),
+    });
+
+    const { client: service } = buildChainableStub({
+      pending_signups: () => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn(async () => ({
+              data: {
+                id: UUID2,
+                phone_e164: "+972501234567",
+                payload: oldPayload,
+                expires_at: new Date(Date.now() + 900_000).toISOString(),
+                attempts: 0,
+              },
+              error: null,
+            })),
+          }),
+        }),
+        update: vi.fn().mockReturnValue({ eq: vi.fn(async () => ({ data: null, error: null })) }),
+        delete: vi.fn().mockReturnValue({ eq: vi.fn(async () => ({ data: null, error: null })) }),
+      }),
+      doctors: () => ({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          }),
+        }),
+        insert: vi.fn((row: unknown) => {
+          capturedRows.push(row as Record<string, unknown>);
+          return insertResult;
+        }),
+        update: vi.fn().mockReturnValue({
+          eq: vi.fn(async () => ({ data: null, error: null })),
+        }),
+      }),
+    });
+
+    const ssr = buildSsrStub();
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(service);
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(ssr);
+
+    const req = makeRequest({ signup_session_id: UUID2, otp_code: "123456" });
+    const res = await verifyPOST(req);
+
+    expect(res.status).toBe(200);
+    const row = capturedRows[0];
+    // Route must compute email_domain from the email field
+    expect(row?.["email_domain"]).toBe("hadassah.org.il");
+    // Route must compute email_is_institutional from the email field
+    expect(row?.["email_is_institutional"]).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test 4 — not_found license at signup/start returns 409 without OTP
 // ---------------------------------------------------------------------------
 
@@ -666,6 +759,62 @@ describe("Test 4 — not_found license at signup/start returns 409 without sendi
     expect(insertsByTable["audit_logs"] ?? []).toHaveLength(1);
     const auditRow = insertsByTable["audit_logs"]?.[0] as Record<string, unknown> | undefined;
     expect(auditRow?.["action"]).toBe("signup_not_found_rejected");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 4b — isPreApproved DB error in not_found branch returns 500
+// ---------------------------------------------------------------------------
+
+describe("Test 4b — isPreApproved DB error returns 500 with sanitized message", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 500 when isPreApproved throws a DB error", async () => {
+    vi.mocked(verifyLicense).mockResolvedValue({ status: "not_found", source: "none" });
+    vi.mocked(isPreApproved).mockRejectedValue(new Error("DB connection refused"));
+
+    const noRow = { data: null, error: null };
+    const selectStub = () => {
+      const chain: Record<string, unknown> = {};
+      function attachAll() {
+        chain.eq = vi.fn(() => chain);
+        chain.or = vi.fn(() => chain);
+        chain.limit = vi.fn(() => chain);
+        chain.not = vi.fn(() => chain);
+        chain.maybeSingle = vi.fn(async () => noRow);
+        chain.single = vi.fn(async () => noRow);
+        return chain;
+      }
+      return attachAll();
+    };
+
+    const serviceMock = {
+      from: vi.fn((_table: string) => ({
+        select: vi.fn(() => selectStub()),
+        insert: vi.fn(() =>
+          Object.assign(Promise.resolve({ data: { id: UUID }, error: null }), {
+            select: vi.fn(() => ({ single: vi.fn(async () => ({ data: { id: UUID }, error: null })) })),
+          }),
+        ),
+        update: vi.fn(() => ({ eq: vi.fn(async () => noRow) })),
+        delete: vi.fn(() => ({ eq: vi.fn(async () => noRow) })),
+        upsert: vi.fn(async () => ({ error: null })),
+      })),
+    };
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceMock as unknown as ReturnType<typeof createSupabaseServiceClient>,
+    );
+
+    const ssrStub = buildSsrStub();
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(ssrStub);
+
+    const req = makeRequest(START_BODY);
+    // The route should bubble the DB error as an unhandled 500. This test
+    // documents the current contract so a future change that sanitizes the
+    // error is caught explicitly.
+    await expect(startPOST(req)).rejects.toThrow("DB connection refused");
   });
 });
 
@@ -1002,7 +1151,7 @@ describe("Test 8 — email-start dispatches email to authenticated doctor", () =
     );
     vi.mocked(dispatchSignupVerifyEmail).mockResolvedValue(undefined);
 
-    const res = await emailStartPOST();
+    const res = await emailStartPOST(new Request("http://localhost/api/signup/email-start", { method: "POST" }));
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -1030,7 +1179,7 @@ describe("Test 9 — email-start returns 401 for unauthenticated caller", () => 
   it("returns 401 when no session exists", async () => {
     vi.mocked(getCurrentDoctor).mockResolvedValue(null);
 
-    const res = await emailStartPOST();
+    const res = await emailStartPOST(new Request("http://localhost/api/signup/email-start", { method: "POST" }));
     const json = await res.json();
 
     expect(res.status).toBe(401);

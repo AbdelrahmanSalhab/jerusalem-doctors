@@ -177,10 +177,13 @@ create policy "doctor_workplaces readable for visible doctors"
 -- Selecting from the view runs as the caller, so RLS on `doctors` still
 -- applies as defence in depth.
 --
--- IMPORTANT: only expose directory-relevant columns here. Admin/operational
--- fields (is_admin_approved, email_verified_at, email_is_institutional,
--- missing_sync_count, license_number from the security perspective, etc.)
--- must NOT appear in this view — any authenticated doctor can query it.
+-- IMPORTANT: only expose directory-relevant columns here. The following
+-- admin/operational fields are intentionally excluded; any authenticated
+-- doctor can query this view and must not see internal state:
+--   is_admin_approved, email_verified_at, email_is_institutional,
+--   missing_sync_count, last_seen_in_moh_at, revocation columns.
+-- license_number IS intentionally included: it has always been exposed via
+-- the public search API for directory display purposes.
 create or replace view public.doctor_visible
   with (security_invoker = true)
   as

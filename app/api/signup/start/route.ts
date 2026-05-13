@@ -156,6 +156,7 @@ export async function POST(req: Request) {
         action: "signup_not_found_rejected",
         metadata: {
           ip,
+          reason: "not_found",
           // license number deliberately omitted to avoid persisting the
           // attacker's probe payload.
         },

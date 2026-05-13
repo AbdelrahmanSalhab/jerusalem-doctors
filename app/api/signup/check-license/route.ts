@@ -82,11 +82,13 @@ export async function POST(req: Request) {
         }
         // Write a forensic audit row so probing via check-license is recorded
         // consistently with probing via /start.
+        // license number deliberately omitted to avoid persisting the
+        // attacker's probe payload (mirrors the policy in signup/start).
         await supabase.from("audit_logs").insert({
           actor_doctor_id: null,
           action: "signup_not_found_rejected",
           target_doctor_id: null,
-          metadata: { license_number: licenseStr, route: "check-license" },
+          metadata: { ip, reason: "not_found", route: "check-license" },
         });
         return jsonError(409, {
           error: "license_not_in_registry",
