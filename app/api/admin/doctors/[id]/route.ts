@@ -38,22 +38,38 @@ export async function PATCH(
 
   const service = createSupabaseServiceClient();
 
-  // When approving a doctor whose email has not been verified yet, record the
-  // override so it's auditable. This does not block the approval — admin
-  // override is intentional.
+  // Fetch the current doctor row when approving, so we can:
+  //   a) detect unverified email and log an override audit row, and
+  //   b) detect revoked status and restore visibility on re-approval.
   if (body.is_admin_approved === true) {
     const target = await service
       .from("doctors")
-      .select("id, email_verified_at")
+      .select("id, email_verified_at, license_verification_status")
       .eq("id", id)
       .maybeSingle();
-    if (target.data && !target.data.email_verified_at) {
-      await service.from("audit_logs").insert({
-        actor_doctor_id: admin.id,
-        action: "admin_approved_without_email_verification",
-        target_doctor_id: id,
-        metadata: { override: true },
-      });
+
+    if (target.data) {
+      if (!target.data.email_verified_at) {
+        await service.from("audit_logs").insert({
+          actor_doctor_id: admin.id,
+          action: "admin_approved_without_email_verification",
+          target_doctor_id: id,
+          metadata: { override: true },
+        });
+      }
+
+      // Re-approval invariant: if the doctor was revoked by the sweep,
+      // restore is_active and license_verification_status so they become
+      // visible again. Without this, the doctor_visible view still hides
+      // them because is_active=false was set at revocation time.
+      if (target.data.license_verification_status === "revoked") {
+        await service.from("audit_logs").insert({
+          actor_doctor_id: admin.id,
+          action: "admin_restored_revoked_doctor",
+          target_doctor_id: id,
+          metadata: { previous_status: "revoked" },
+        });
+      }
     }
   }
 
@@ -65,10 +81,26 @@ export async function PATCH(
   // becomes a revocation candidate on the next sweep even if they have not missed any
   // cycles since re-approval. Resetting to 0 and refreshing last_seen_in_moh_at to
   // now() gives the doctor a clean slate consistent with the sweep's semantics.
+  //
+  // When the doctor was previously revoked, also restore is_active and
+  // license_verification_status so they appear in the directory view again.
   const updatePayload: Record<string, unknown> = { ...body };
   if (body.is_admin_approved === true) {
     updatePayload.missing_sync_count = 0;
     updatePayload.last_seen_in_moh_at = new Date().toISOString();
+
+    // Re-check the current row (already fetched above in the audit block).
+    // We re-fetch here to keep the logic self-contained and avoid depending on
+    // the order of the two blocks above.
+    const current = await service
+      .from("doctors")
+      .select("license_verification_status")
+      .eq("id", id)
+      .maybeSingle();
+    if (current.data?.license_verification_status === "revoked") {
+      updatePayload.is_active = true;
+      updatePayload.license_verification_status = "not_found";
+    }
   }
 
   const r = await service.from("doctors").update(updatePayload).eq("id", id);

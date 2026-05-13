@@ -63,15 +63,7 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
               {doctor.phone_display}
             </span>
           )}
-          {doctor.email && (
-            <span
-              className="inline-flex items-center gap-1 break-all"
-              dir="ltr"
-            >
-              <span aria-hidden="true">✉️</span>
-              {doctor.email}
-            </span>
-          )}
+
         </div>
       </div>
 

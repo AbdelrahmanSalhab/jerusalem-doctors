@@ -31,7 +31,7 @@ describe("ResendClient", () => {
 
     expect(result.id).toBe("msg_123");
     expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0]!;
+    const [url, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
     expect(url).toBe("https://example.test/emails");
     const headers = init!.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer re_test_key");
@@ -57,7 +57,7 @@ describe("ResendClient", () => {
 
   it("dev-bypasses with no API key (logs to console, returns synthetic id)", async () => {
     delete process.env.RESEND_API_KEY;
-    process.env.NODE_ENV = "test";
+    (process.env as Record<string, string>).NODE_ENV = "test";
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const client = new ResendClient();
@@ -68,11 +68,11 @@ describe("ResendClient", () => {
 
   it("throws if RESEND_API_KEY missing in production", async () => {
     delete process.env.RESEND_API_KEY;
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string>).NODE_ENV = "production";
     const client = new ResendClient();
     await expect(
       client.send({ to: "x@y.com", subject: "s", html: "h", text: "t" }),
     ).rejects.toThrow(/RESEND_API_KEY/);
-    process.env.NODE_ENV = "test";
+    (process.env as Record<string, string>).NODE_ENV = "test";
   });
 });

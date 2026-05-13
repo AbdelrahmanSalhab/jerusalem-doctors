@@ -45,7 +45,7 @@ function makeRequest(secret = "test-cron-secret"): Request {
 
 function setupMohClientMock(records = CKAN_RECORDS) {
   vi.mocked(MohClient).mockImplementation(function (this: { iterateAll: () => AsyncGenerator<unknown> }) {
-    this.iterateAll = vi.fn((_batchSize: number) => asyncRecords(records));
+    this.iterateAll = vi.fn(() => asyncRecords(records));
   } as unknown as new () => InstanceType<typeof MohClient>);
 }
 
@@ -181,5 +181,81 @@ describe("Test 12 — Revocation sweep failure does not abort the sync", () => {
     expect(completedInsert).toBeDefined();
     const completedRow = (Array.isArray(completedInsert) ? completedInsert[0] : completedInsert) as Record<string, unknown>;
     expect((completedRow["metadata"] as Record<string, number>)["sweep_revoked_count"]).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 13 — Pre-approved doctor is NOT bumped by the sweep
+// ---------------------------------------------------------------------------
+
+describe("Test 13 — pre-approved doctor is exempt from revocation sweep", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.CRON_SECRET = "test-cron-secret";
+  });
+
+  it("does not bump missing_sync_count for a doctor on pre_approved_licenses", async () => {
+    // The pre-approved doctor UUID is absent from moh_practitioners (not present
+    // in CKAN_RECORDS) but the sweep RPC must exempt them because their license
+    // appears in pre_approved_licenses. We simulate this by having the RPC return
+    // missed=0 for that doctor (the SQL exemption does the real work in prod).
+    const UUID_PRE_APPROVED = "00000000-0000-0000-0000-bbb000000001";
+
+    const auditInserts: unknown[] = [];
+
+    const serviceMock = {
+      from: vi.fn((table: string) => ({
+        upsert: vi.fn(async () => ({ error: null })),
+        insert: vi.fn(async (rows: unknown) => {
+          auditInserts.push(rows);
+          return { data: null, error: null };
+        }),
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          }),
+        }),
+      })),
+      rpc: vi.fn(async (fn: string) => {
+        if (fn === "revocation_sweep") {
+          // The pre-approved doctor is NOT in the revoked list and missed=0
+          // because the SQL exemption skips them in step 1.
+          return {
+            data: {
+              missed: 0,
+              reset: 1,
+              revoked: [],
+            },
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      }),
+    };
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceMock as unknown as ReturnType<typeof createSupabaseServiceClient>,
+    );
+    setupMohClientMock();
+
+    const req = makeRequest();
+    const res = await syncMohGET(req);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.sweep_revoked_count).toBe(0);
+
+    // The pre-approved doctor UUID must not appear in any revocation audit row.
+    const revocationAudit = auditInserts.find((r) => {
+      const rows = (Array.isArray(r) ? r : [r]) as Array<Record<string, unknown>>;
+      return rows.some((row) => row["action"] === "license_revoked_sync");
+    });
+    expect(revocationAudit).toBeUndefined();
+
+    // Also assert the UUID is not mentioned in any audit row at all.
+    const allRows = auditInserts.flatMap((r) => (Array.isArray(r) ? r : [r])) as Array<Record<string, unknown>>;
+    const mentionsPreApproved = allRows.some(
+      (row) => row["target_doctor_id"] === UUID_PRE_APPROVED,
+    );
+    expect(mentionsPreApproved).toBe(false);
   });
 });

@@ -4,6 +4,10 @@
 
 export const REVOKE_AFTER_MISSING_CYCLES = 3;
 
+// Returns true when the doctor has missed more than REVOKE_AFTER_MISSING_CYCLES
+// consecutive sync cycles. Using strict greater-than gives the doctor
+// REVOKE_AFTER_MISSING_CYCLES full missed cycles before revocation (a true
+// grace window), rather than revoking on the cycle that hits the threshold.
 export function shouldRevoke(missingCount: number): boolean {
-  return missingCount >= REVOKE_AFTER_MISSING_CYCLES;
+  return missingCount > REVOKE_AFTER_MISSING_CYCLES;
 }

@@ -82,10 +82,29 @@ export async function POST(req: Request) {
   const service = createSupabaseServiceClient();
   const ssr = await createSupabaseServerClient();
 
+  // SECURITY INVARIANT: Atomically increment the attempt counter BEFORE reading
+  // the pending row payload or calling Supabase verifyOtp. A single UPDATE
+  // RETURNING is immune to the read-modify-write race that would let concurrent
+  // requests share a stale counter value and collectively exceed MAX_ATTEMPTS.
+  const sessionId = parsed.signup_session_id;
+  const { data: newAttempts, error: incErr } = await service.rpc(
+    "increment_pending_attempts",
+    { p_session_id: sessionId },
+  );
+  if (incErr || newAttempts === null) {
+    // RPC failed (row missing or DB error). Treat as session-not-found to
+    // avoid leaking existence; 503 signals a transient backend problem.
+    return jsonError(503, { error: "service_unavailable", code: "service_unavailable" });
+  }
+  if (newAttempts > MAX_ATTEMPTS) {
+    await service.from("pending_signups").delete().eq("id", sessionId);
+    return jsonError(429, { error: "too_many_attempts", code: "too_many_attempts" });
+  }
+
   const pending = await service
     .from("pending_signups")
     .select("id, phone_e164, payload, expires_at, attempts")
-    .eq("id", parsed.signup_session_id)
+    .eq("id", sessionId)
     .maybeSingle();
   if (pending.error && pending.error.code !== "PGRST116") throw pending.error;
   if (!pending.data) {
@@ -95,20 +114,6 @@ export async function POST(req: Request) {
     await service.from("pending_signups").delete().eq("id", pending.data.id);
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
-  if (pending.data.attempts >= MAX_ATTEMPTS) {
-    await service.from("pending_signups").delete().eq("id", pending.data.id);
-    return jsonError(429, { error: "too_many_attempts", code: "too_many_attempts" });
-  }
-
-  // SECURITY INVARIANT: Increment attempts BEFORE calling Supabase verifyOtp
-  // so a flood of bad codes cannot bypass the counter via abandoned races. If
-  // the increment happened after verifyOtp, a race where the request is
-  // abandoned after the OTP check but before the write would let an attacker
-  // reset the counter by repeatedly sending concurrent requests.
-  await service
-    .from("pending_signups")
-    .update({ attempts: pending.data.attempts + 1 })
-    .eq("id", pending.data.id);
 
   const verify = await ssr.auth.verifyOtp({
     phone: pending.data.phone_e164,

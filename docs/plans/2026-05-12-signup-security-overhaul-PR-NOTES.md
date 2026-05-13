@@ -11,6 +11,7 @@ Closes #16, #17, #18, #19, #20.
 | `SIGNUP_TOKEN_SECRET` | Vercel project | 32+ random bytes (`openssl rand -hex 32`). Rotating invalidates pending email-verify links — set once, do not rotate without comms. |
 | `NEXT_PUBLIC_APP_URL` | Vercel project | e.g. `https://jerusalem-doctors.vercel.app`. Used to build the email verification URL. Without it the dispatcher falls back to `VERCEL_URL` then `localhost:3000`. |
 | `RESEND_BASE_URL` | optional | Override for tests; do not set in prod. |
+| `CRON_SECRET` | Vercel project | Must match the Vercel cron secret configured for this project. Without it, the revocation sweep endpoint is publicly callable. |
 
 ## Required Supabase actions (before merge)
 

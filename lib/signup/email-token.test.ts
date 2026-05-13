@@ -55,10 +55,10 @@ describe("email token", () => {
 
   it("throws on issue when the secret is missing in production", () => {
     delete process.env.SIGNUP_TOKEN_SECRET;
-    process.env.NODE_ENV = "production";
+    (process.env as Record<string, string>).NODE_ENV = "production";
     expect(() =>
       issueEmailToken({ id: ID_A, ttlMs: 60_000 }),
     ).toThrow(/SIGNUP_TOKEN_SECRET/);
-    process.env.NODE_ENV = "test";
+    (process.env as Record<string, string>).NODE_ENV = "test";
   });
 });

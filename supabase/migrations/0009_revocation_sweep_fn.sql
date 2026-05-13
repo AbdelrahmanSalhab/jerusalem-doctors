@@ -15,6 +15,8 @@ declare
   v_revoked uuid[];
 begin
   -- 1) Bump miss counter for approved doctors not present in the mirror.
+  --    Pre-approved licenses are deliberately absent from MoH; exempting them
+  --    here prevents the sweep from revoking doctors whose absence is expected.
   with bumped as (
     update public.doctors d
        set missing_sync_count = d.missing_sync_count + 1
@@ -24,6 +26,10 @@ begin
        and not exists (
          select 1 from public.moh_practitioners mp
           where mp.license_number::text = d.license_number
+       )
+       and not exists (
+         select 1 from public.pre_approved_licenses pal
+          where pal.license_number = d.license_number
        )
     returning d.id
   )
@@ -49,11 +55,15 @@ begin
   )
   select count(*) into v_reset from refreshed;
 
-  -- 3) Revoke at threshold. Guard is_admin_approved and is_active so that a
-  --    doctor who was manually un-approved after their counter was already
-  --    bumped is not swept into revoked state here (step 1 stopped
-  --    incrementing them). Matches the plan pseudocode:
-  --    WHERE is_admin_approved AND license_verification_status <> 'revoked'.
+  -- 3) Revoke when missing_sync_count strictly exceeds threshold_cycles.
+  --    Using > instead of >= gives the doctor threshold_cycles full missed cycles
+  --    before revocation (true grace window). A doctor with count=threshold_cycles
+  --    gets one more cycle before being revoked.
+  --    Pre-approved licenses are exempted as a belt-and-suspenders guard even
+  --    though step 1 should prevent them from ever reaching the threshold.
+  --    Guard is_admin_approved and is_active so that a doctor who was manually
+  --    un-approved after their counter was already bumped is not swept into
+  --    revoked state here (step 1 stopped incrementing them).
   with revoked as (
     update public.doctors d
        set is_active = false,
@@ -65,8 +75,12 @@ begin
            missing_sync_count = 0
      where d.is_admin_approved
        and d.is_active
-       and d.missing_sync_count >= threshold_cycles
+       and d.missing_sync_count > threshold_cycles
        and coalesce(d.license_verification_status, '') <> 'revoked'
+       and not exists (
+         select 1 from public.pre_approved_licenses pal
+          where pal.license_number = d.license_number
+       )
     returning d.id
   )
   select coalesce(array_agg(id), '{}') into v_revoked from revoked;

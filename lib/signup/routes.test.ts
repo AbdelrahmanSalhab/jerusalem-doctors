@@ -222,7 +222,7 @@ function buildChainableStub(overrides: Record<string, () => unknown> = {}) {
   const fromSpy = vi.fn((table: string) => tableChain(table));
 
   return {
-    client: { from: fromSpy } as unknown as ReturnType<typeof createSupabaseServiceClient>,
+    client: { from: fromSpy, rpc: vi.fn(async () => ({ data: 1, error: null })) } as unknown as ReturnType<typeof createSupabaseServiceClient>,
     inserts: insertCapture,
     fromSpy,
   };
@@ -239,7 +239,7 @@ function buildSsrStub(userId = "auth-uid-1", otpError: Error | null = null) {
       ),
       signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
     },
-  } as unknown as ReturnType<typeof createSupabaseServerClient>;
+  } as unknown as Awaited<ReturnType<typeof createSupabaseServerClient>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -515,7 +515,7 @@ describe("Test 1 — New doctor signup cannot appear in search until admin appro
       }),
     };
     vi.mocked(createSupabaseServerClient).mockResolvedValue(
-      searchSsrStub as unknown as ReturnType<typeof createSupabaseServerClient>,
+      searchSsrStub as unknown as Awaited<ReturnType<typeof createSupabaseServerClient>>,
     );
 
     const searchReq = new Request("http://localhost/api/search", { method: "GET" });

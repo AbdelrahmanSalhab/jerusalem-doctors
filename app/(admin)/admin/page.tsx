@@ -26,7 +26,7 @@ export default async function AdminDoctorsPage({
     .order("created_at", { ascending: false })
     .limit(200);
 
-  if (status === "pending") query = query.eq("is_admin_approved", false);
+  if (status === "pending") query = query.eq("is_admin_approved", false).neq("license_verification_status", "revoked");
   if (status === "approved") query = query.eq("is_admin_approved", true);
   if (status === "revoked") query = query.eq("license_verification_status", "revoked");
   if (q) {

@@ -108,7 +108,7 @@ export async function GET(req: Request) {
     const rows = sweepResult.revoked.map((id) => ({
       action: "license_revoked_sync",
       target_doctor_id: id,
-      metadata: { reason: "license missing from MoH for >=3 sync cycles" },
+      metadata: { reason: "license missing from MoH for more than 3 consecutive sync cycles" },
     }));
     await supabase.from("audit_logs").insert(rows);
   }
