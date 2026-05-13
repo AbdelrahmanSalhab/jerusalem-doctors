@@ -1,6 +1,8 @@
 // PATCH /api/admin/doctors/[id]
 // Admin-only moderation toggles for is_admin_approved + is_active.
-// Audit-logs every state change.
+// Audit-logs every state change. When approving a doctor whose email has not
+// been verified yet, writes an additional audit row so the override is on
+// record.
 
 import { z } from "zod";
 import { jsonError, jsonOk } from "@/lib/api/respond";
@@ -35,6 +37,26 @@ export async function PATCH(
   }
 
   const service = createSupabaseServiceClient();
+
+  // When approving a doctor whose email has not been verified yet, record the
+  // override so it's auditable. This does not block the approval — admin
+  // override is intentional.
+  if (body.is_admin_approved === true) {
+    const target = await service
+      .from("doctors")
+      .select("id, email_verified_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (target.data && !target.data.email_verified_at) {
+      await service.from("audit_logs").insert({
+        actor_doctor_id: admin.id,
+        action: "admin_approved_without_email_verification",
+        target_doctor_id: id,
+        metadata: { override: true },
+      });
+    }
+  }
+
   const r = await service.from("doctors").update(body).eq("id", id);
   if (r.error) {
     console.error("[admin.doctors.patch] update failed", r.error);
