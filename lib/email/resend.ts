@@ -1,8 +1,9 @@
 // Minimal Resend client. One call: POST /emails. Tokens, batching, replies,
 // and attachments are out of scope.
 //
-// Dev convenience: when RESEND_API_KEY is unset and NODE_ENV !== production,
+// Dev convenience: when RESEND_API_KEY is unset and NODE_ENV is not "production",
 // the client logs the email to stdout and returns a synthetic message id.
+// This covers development, test, staging, preview, and any unset NODE_ENV.
 // Production fail-closed: throws if key is missing.
 
 const DEFAULT_BASE_URL = "https://api.resend.com";
@@ -49,16 +50,15 @@ export class ResendClient {
       if (process.env.NODE_ENV === "production") {
         throw new Error("RESEND_API_KEY is required in production");
       }
-      if (process.env.NODE_ENV === "development") {
-        // Log to stdout in dev so engineers can see the email without a real key.
-        process.stdout.write(
-          "[email:dev] " + JSON.stringify({
-            to: input.to,
-            subject: input.subject,
-            textPreview: input.text.slice(0, 200),
-          }) + "\n",
-        );
-      }
+      // Log to stdout in all non-production environments (dev, test, staging,
+      // preview, unset) so engineers can see the email without a real key.
+      process.stdout.write(
+        "[email:dev] " + JSON.stringify({
+          to: input.to,
+          subject: input.subject,
+          textPreview: input.text.slice(0, 200),
+        }) + "\n",
+      );
       return { id: `dev-${Date.now()}` };
     }
 

@@ -58,7 +58,11 @@ begin
     update public.doctors d
        set is_active = false,
            is_admin_approved = false,
-           license_verification_status = 'revoked'
+           license_verification_status = 'revoked',
+           -- Reset counter to 0 so revoked rows are self-consistent and do not
+           -- appear to have a stale accumulation that could confuse debugging or
+           -- future sweep logic.
+           missing_sync_count = 0
      where d.is_admin_approved
        and d.is_active
        and d.missing_sync_count >= threshold_cycles

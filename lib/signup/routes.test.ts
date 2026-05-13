@@ -661,6 +661,11 @@ describe("Test 4 — not_found license at signup/start returns 409 without sendi
     expect(ssrStub.auth.signInWithOtp).not.toHaveBeenCalled();
     // Assert no pending_signups row was inserted by checking the table-scoped tracker.
     expect(insertsByTable["pending_signups"] ?? []).toHaveLength(0);
+    // Assert forensic audit row was inserted — a future regression that removes
+    // the audit insert would not be caught otherwise.
+    expect(insertsByTable["audit_logs"] ?? []).toHaveLength(1);
+    const auditRow = insertsByTable["audit_logs"]?.[0] as Record<string, unknown> | undefined;
+    expect(auditRow?.["action"]).toBe("signup_not_found_rejected");
   });
 });
 
@@ -914,9 +919,57 @@ describe("Test 7 — email-verify returns HTML for invalid tokens", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Test 7b — email-verify returns 410 when doctor deleted after token issued
+// ---------------------------------------------------------------------------
+
+describe("Test 7b — email-verify returns 410 when doctor row is gone", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SIGNUP_TOKEN_SECRET = "test-secret";
+  });
+
+  it("returns 410 HTML when valid token but doctor does not exist", async () => {
+    const { issueEmailToken } = await import("@/lib/signup/email-token");
+    const token = issueEmailToken({ id: UUID, ttlMs: 60_000 });
+
+    const serviceMock = {
+      from: vi.fn((table: string) => {
+        if (table === "doctors") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+              }),
+            }),
+          };
+        }
+        return {};
+      }),
+    };
+    vi.mocked(createSupabaseServiceClient).mockReturnValue(
+      serviceMock as unknown as ReturnType<typeof createSupabaseServiceClient>,
+    );
+
+    const req = makeGetRequest(
+      `http://localhost/api/signup/email-verify?token=${encodeURIComponent(token)}`,
+    );
+    const res = await emailVerifyGET(req);
+    expect(res.status).toBe(410);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain("حساب غير موجود");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test 8 — email-start resend dispatches email and updates sent_at
 // ---------------------------------------------------------------------------
 
+// NOTE: Test 8 mocks dispatchSignupVerifyEmail entirely — it verifies that the
+// route calls dispatch with the correct arguments and updates email_verification_sent_at.
+// The Resend HTTP boundary (POST /emails) is tested separately in
+// lib/signup/email-dispatch.test.ts via Harness 2. This split is intentional:
+// route tests verify orchestration; dispatch tests verify the HTTP boundary.
 describe("Test 8 — email-start dispatches email to authenticated doctor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -995,16 +1048,21 @@ describe("Test 13 — check-license returns 409 for not_found when not pre-appro
     vi.clearAllMocks();
   });
 
-  it("returns 409 with license_not_in_registry", async () => {
+  it("returns 409 with license_not_in_registry and writes audit_logs row", async () => {
     vi.mocked(verifyLicense).mockResolvedValue({ status: "not_found", source: "none" });
     vi.mocked(isPreApproved).mockResolvedValue(false);
 
+    const insertsByTable: Record<string, unknown[]> = {};
     const serviceMock = {
-      from: vi.fn(() => ({
+      from: vi.fn((table: string) => ({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn(async () => ({ data: null, error: null })),
           }),
+        }),
+        insert: vi.fn((rows: unknown) => {
+          insertsByTable[table] = [...(insertsByTable[table] ?? []), rows];
+          return Promise.resolve({ data: null, error: null });
         }),
       })),
     };
@@ -1023,6 +1081,9 @@ describe("Test 13 — check-license returns 409 for not_found when not pre-appro
     expect(res.status).toBe(409);
     expect(json.error).toBe("license_not_in_registry");
     expect(json.fields?.license_number).toBeTruthy();
+    // Verify forensic audit row was written for the probe.
+    const auditRow = insertsByTable["audit_logs"]?.[0] as Record<string, unknown> | undefined;
+    expect(auditRow?.["action"]).toBe("signup_not_found_rejected");
   });
 });
 

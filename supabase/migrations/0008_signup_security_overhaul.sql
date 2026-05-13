@@ -176,10 +176,36 @@ create policy "doctor_workplaces readable for visible doctors"
 -- doctors for the search UI must read from this view, not the base table.
 -- Selecting from the view runs as the caller, so RLS on `doctors` still
 -- applies as defence in depth.
+--
+-- IMPORTANT: only expose directory-relevant columns here. Admin/operational
+-- fields (is_admin_approved, email_verified_at, email_is_institutional,
+-- missing_sync_count, license_number from the security perspective, etc.)
+-- must NOT appear in this view — any authenticated doctor can query it.
 create or replace view public.doctor_visible
   with (security_invoker = true)
   as
-    select *
+    select
+      id,
+      arabic_first_name,
+      arabic_family_name,
+      arabic_full_name,
+      arabic_first_name_normalized,
+      arabic_family_name_normalized,
+      arabic_full_name_normalized,
+      hebrew_first_name,
+      hebrew_family_name,
+      hebrew_full_name,
+      license_number,
+      subspecialty,
+      subspecialty_normalized,
+      email,
+      phone_display,
+      phone_e164,
+      phone_is_visible,
+      workplaces_is_visible,
+      profile_picture_url,
+      created_at,
+      updated_at
     from public.doctors
     where is_active
       and user_chose_visible

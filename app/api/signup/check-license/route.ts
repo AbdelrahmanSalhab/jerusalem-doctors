@@ -74,6 +74,20 @@ export async function POST(req: Request) {
     if (result.status === "not_found") {
       const licenseStr = String(license);
       if (!(await isPreApproved(supabase, licenseStr))) {
+        // Apply the same tight per-IP bucket used in /start for not_found probes
+        // so that check-license cannot be used as a cheaper enumeration oracle.
+        const rlNotFound = await rateLimit("signupStartNotFound", `ip:${ip}`);
+        if (!rlNotFound.success) {
+          return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+        }
+        // Write a forensic audit row so probing via check-license is recorded
+        // consistently with probing via /start.
+        await supabase.from("audit_logs").insert({
+          actor_doctor_id: null,
+          action: "signup_not_found_rejected",
+          target_doctor_id: null,
+          metadata: { license_number: licenseStr, route: "check-license" },
+        });
         return jsonError(409, {
           error: "license_not_in_registry",
           code: "license_not_in_registry",
