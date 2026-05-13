@@ -34,7 +34,7 @@ export async function dispatchSignupVerifyEmail(input: DispatchInput): Promise<v
   const { subject, html, text } = renderSignupVerifyEmail({
     arabicFirstName: input.arabicFirstName,
     verifyUrl,
-    expiryMinutes: Math.floor(ttlMs / 60_000),
+    expiryHours: Math.floor(ttlMs / 3_600_000),
   });
 
   const idempotencyKey = createHash("sha256")

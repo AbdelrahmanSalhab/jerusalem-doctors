@@ -7,7 +7,7 @@
 interface TemplateInput {
   arabicFirstName: string;
   verifyUrl: string;
-  expiryMinutes: number;
+  expiryHours: number;
 }
 
 export function renderSignupVerifyEmail(input: TemplateInput): {
@@ -28,7 +28,7 @@ export function renderSignupVerifyEmail(input: TemplateInput): {
     <p style="text-align: center; margin: 32px 0;">
       <a href="${safeUrl}" dir="ltr" style="display: inline-block; padding: 12px 24px; background: #1a1a1a; color: #fff; text-decoration: none; border-radius: 6px;">تأكيد البريد</a>
     </p>
-    <p style="color: #555; font-size: 14px;">صالح لمدة ${input.expiryMinutes} دقيقة. إذا لم تطلب التسجيل، تجاهل هذه الرسالة.</p>
+    <p style="color: #555; font-size: 14px;">صالح لمدة ${input.expiryHours} ساعة. إذا لم تطلب التسجيل، تجاهل هذه الرسالة.</p>
     <p style="color: #888; font-size: 12px; word-break: break-all;" dir="ltr">${safeUrl}</p>
   </body>
 </html>`;
@@ -41,7 +41,7 @@ export function renderSignupVerifyEmail(input: TemplateInput): {
     "للتحقق من بريدك الإلكتروني، افتح الرابط التالي:",
     input.verifyUrl,
     "",
-    `صالح لمدة ${input.expiryMinutes} دقيقة.`,
+    `صالح لمدة ${input.expiryHours} ساعة.`,
   ].join("\n");
 
   return { subject, html, text };

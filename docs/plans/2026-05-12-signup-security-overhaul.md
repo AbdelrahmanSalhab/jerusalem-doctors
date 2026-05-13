@@ -89,7 +89,9 @@ POST /api/signup/email-start (also called from /verify above; idempotent)
   ├─ Resolves doctor row via getCurrentDoctor() — tokens always target the doctor row
   ├─ Generates HMAC-signed token bound to (doctor_id, expiry=24h)
   ├─ Calls Resend with idempotency-key = sha256(doctor_id + email)
-  └─ returns { ok:true, sent_to_masked: "h***@hadassah.org.il" }
+  └─ returns { ok:true, sent: true }
+    (Note: plan originally specified sent_to_masked; implementation uses sent: true which is
+     internally consistent with the test plan. Accepted deviation: no masked address in response.)
 
 GET /api/signup/email-verify?token=...
   ├─ Verifies HMAC, expiry

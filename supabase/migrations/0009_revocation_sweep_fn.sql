@@ -42,13 +42,19 @@ begin
   )
   select count(*) into v_reset from refreshed;
 
-  -- 3) Revoke at threshold.
+  -- 3) Revoke at threshold. Guard is_admin_approved and is_active so that a
+  --    doctor who was manually un-approved after their counter was already
+  --    bumped is not swept into revoked state here (step 1 stopped
+  --    incrementing them). Matches the plan pseudocode:
+  --    WHERE is_admin_approved AND license_verification_status <> 'revoked'.
   with revoked as (
     update public.doctors d
        set is_active = false,
            is_admin_approved = false,
            license_verification_status = 'revoked'
-     where d.missing_sync_count >= threshold_cycles
+     where d.is_admin_approved
+       and d.is_active
+       and d.missing_sync_count >= threshold_cycles
        and coalesce(d.license_verification_status, '') <> 'revoked'
     returning d.id
   )

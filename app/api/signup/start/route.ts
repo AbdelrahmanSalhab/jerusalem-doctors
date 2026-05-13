@@ -83,14 +83,18 @@ export async function POST(req: Request) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
-  const license = parsed.license_number.trim();
-  if (!/^\d{1,12}$/.test(license)) {
+  const licenseRaw = parsed.license_number.trim();
+  if (!/^\d{1,12}$/.test(licenseRaw)) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
       fields: { license_number: "رقم الترخيص يجب أن يحتوي على أرقام فقط" },
     });
   }
+  // Normalise to canonical form (strip leading zeros) so that isPreApproved
+  // and the uniqueness check match the same representation that check-license
+  // uses. An admin pre-approving "00123" sees it stored as "123".
+  const license = String(Number(licenseRaw));
 
   const service = createSupabaseServiceClient();
 

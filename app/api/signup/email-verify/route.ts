@@ -3,7 +3,7 @@
 // Returns a small RTL HTML confirmation page rather than JSON, since the
 // caller is a click from the user's email client.
 
-import { ipFromHeaders, jsonError } from "@/lib/api/respond";
+import { ipFromHeaders } from "@/lib/api/respond";
 import { rateLimit } from "@/lib/ratelimit";
 import { verifyEmailToken } from "@/lib/signup/email-token";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -15,7 +15,12 @@ export async function GET(req: Request) {
   // Per-IP rate limit: verification links are sent via email and may be
   // forwarded or pasted, so doctor-session gating is not appropriate here.
   const rl = await rateLimit("signupEmailVerify", `ip:${ip}`);
-  if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+  if (!rl.success) {
+    return htmlPage(429, {
+      title: "طلبات كثيرة",
+      message: "لقد تجاوزت الحد المسموح به من المحاولات. يرجى الانتظار قبل المحاولة مجددًا.",
+    });
+  }
 
   const url = new URL(req.url);
   const token = url.searchParams.get("token") ?? "";
@@ -47,15 +52,24 @@ export async function GET(req: Request) {
     });
   }
   if (!doctor.data.email_verified_at) {
-    await service
+    // Conditional update: only set email_verified_at if it is still null in
+    // the DB. Two rapid clicks could both pass the in-memory check above; the
+    // .is() filter makes the update itself atomic — only one of the two
+    // concurrent requests will match a row and write the audit entry.
+    const updated = await service
       .from("doctors")
       .update({ email_verified_at: new Date().toISOString() })
-      .eq("id", doctor.data.id);
-    await service.from("audit_logs").insert({
-      actor_doctor_id: doctor.data.id,
-      action: "email_verified",
-      target_doctor_id: doctor.data.id,
-    });
+      .eq("id", doctor.data.id)
+      .is("email_verified_at", null)
+      .select("id")
+      .maybeSingle();
+    if (updated.data) {
+      await service.from("audit_logs").insert({
+        actor_doctor_id: doctor.data.id,
+        action: "email_verified",
+        target_doctor_id: doctor.data.id,
+      });
+    }
   }
   return htmlPage(200, {
     title: "تم التحقق من بريدك",
