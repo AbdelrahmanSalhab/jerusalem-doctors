@@ -26,15 +26,22 @@ export interface Doctor {
     | "soft_match"
     | "not_found"
     | "name_mismatch_overridden"
+    | "revoked"
     | null;
   subspecialty: string | null;
   subspecialty_normalized: string | null;
   email: string | null;
+  email_verified_at: string | null;
+  email_domain: string | null;
+  email_is_institutional: boolean;
+  email_verification_sent_at: string | null;
+  missing_sync_count: number;
+  last_seen_in_moh_at: string | null;
   consent_directory_use: boolean;
   consent_timestamp: string;
   is_phone_verified: boolean;
   is_active: boolean;
-  is_visible: boolean;
+  user_chose_visible: boolean;
   is_admin_approved: boolean;
   is_admin: boolean;
   phone_is_visible: boolean;
@@ -42,6 +49,13 @@ export interface Doctor {
   profile_picture_url: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PreApprovedLicense {
+  license_number: string;
+  reason: string;
+  added_by: string | null;
+  added_at: string;
 }
 
 export interface Specialty {
