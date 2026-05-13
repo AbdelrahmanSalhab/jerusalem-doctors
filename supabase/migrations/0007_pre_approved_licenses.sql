@@ -8,7 +8,11 @@
 -- still goes through admin review per #16).
 
 create table public.pre_approved_licenses (
-  license_number   text primary key,
+  -- license_number must be normalized: no leading zeros, digits only.
+  -- The app normalizes via String(Number(raw)) before lookup; this constraint
+  -- ensures admin-inserted rows are also normalized so they reliably match.
+  -- Example: "09417" is rejected; "9417" is accepted.
+  license_number   text primary key check (license_number ~ '^[1-9][0-9]*$'),
   reason           text not null,
   added_by         uuid references public.doctors(id) on delete set null,
   added_at         timestamptz not null default now()

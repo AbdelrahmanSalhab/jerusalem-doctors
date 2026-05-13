@@ -125,8 +125,9 @@ export function VerifyForm() {
     }
   };
 
-  const resend = async () => {
-    if (resendIn > 0) return;
+  // Resends the SMS OTP code. Only active for login mode; the button is
+  // disabled for signup mode via the disabled prop.
+  const resendOtp = async () => {
     setError(null);
     if (mode === "login") {
       await fetch("/api/login/start", {
@@ -134,12 +135,11 @@ export function VerifyForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
       });
+      setResendIn(60);
     } else {
-      // For signup we'd need the full form; tell the user to restart.
+      // For signup mode this button is disabled; this branch should not fire.
       setError("الرجاء إعادة التسجيل لطلب رمز جديد.");
-      return;
     }
-    setResendIn(60);
   };
 
   // Signup success state: awaiting admin review.
@@ -203,7 +203,7 @@ export function VerifyForm() {
 
       <button
         type="button"
-        onClick={resend}
+        onClick={resendOtp}
         disabled={resendIn > 0 || mode === "signup"}
         className="w-full rounded-md border border-foreground px-6 py-2 text-sm disabled:opacity-50"
       >

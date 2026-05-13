@@ -5,10 +5,10 @@
 // sub-units share the institutional mail boundary.
 //
 // TODO(maintainer): Confirm this seed list with the Jerusalem-doctors
-// pilot cohort before launch. Add Augusta Victoria, St Joseph, and any
-// other Jerusalem-area medical institutions whose doctors are expected
-// to participate. Each entry must be a domain you trust to gate
-// institutional identity.
+// pilot cohort before launch. Verify that all five seeded domains below
+// are correct and add any other Jerusalem-area medical institutions whose
+// doctors are expected to participate. Each entry must be a domain you
+// trust to gate institutional identity.
 
 export const JERUSALEM_INSTITUTION_DOMAINS: readonly string[] = [
   "hadassah.org.il",

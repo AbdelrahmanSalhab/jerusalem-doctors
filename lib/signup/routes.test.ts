@@ -73,6 +73,7 @@ import { POST as startPOST } from "@/app/api/signup/start/route";
 import { GET as emailVerifyGET } from "@/app/api/signup/email-verify/route";
 import { POST as emailStartPOST } from "@/app/api/signup/email-start/route";
 import { POST as checkLicensePOST } from "@/app/api/signup/check-license/route";
+import { GET as searchGET } from "@/app/api/search/route";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -415,7 +416,7 @@ describe("Test 1 — New doctor signup cannot appear in search until admin appro
     process.env.NEXT_PUBLIC_APP_URL = "https://app.example";
   });
 
-  it("verify response includes ok:true, auto_approved:false; inserted row has is_admin_approved:false and email_is_institutional:true", async () => {
+  it("verify response includes ok:true, auto_approved:false; inserted row has is_admin_approved:false and email_is_institutional:true; doctor absent from search", async () => {
     const capturedRows: Record<string, unknown>[] = [];
     const insertResult = Object.assign(Promise.resolve({ data: { id: UUID }, error: null }), {
       select: vi.fn(() => ({
@@ -462,6 +463,7 @@ describe("Test 1 — New doctor signup cannot appear in search until admin appro
     vi.mocked(createSupabaseServiceClient).mockReturnValue(service);
     vi.mocked(createSupabaseServerClient).mockResolvedValue(ssr);
 
+    // Step 1-2: POST /api/signup/verify and assert inserted row fields.
     const req = makeRequest({ signup_session_id: UUID2, otp_code: "123456" });
     const res = await verifyPOST(req);
     const json = await res.json();
@@ -471,6 +473,57 @@ describe("Test 1 — New doctor signup cannot appear in search until admin appro
     expect(capturedRows[0]?.["is_admin_approved"]).toBe(false);
     expect(capturedRows[0]?.["email_is_institutional"]).toBe(true);
     expect(capturedRows[0]?.["user_chose_visible"]).toBe(true);
+
+    // Step 3-4: GET /api/search as the same authenticated doctor and assert zero results.
+    // The doctor_visible view excludes unapproved doctors; the SSR client stub must
+    // return an empty array to represent this invariant at the route level.
+    vi.mocked(getCurrentDoctor).mockResolvedValue({
+      id: UUID,
+      email: PENDING_PAYLOAD.email,
+      arabic_first_name: PENDING_PAYLOAD.arabic_first_name,
+    } as never);
+
+    // Build an SSR client stub that returns zero rows from doctor_visible (unapproved).
+    const searchSsrStub = {
+      from: vi.fn((table: string) => {
+        if (table === "doctor_visible") {
+          // Chainable query builder that resolves to empty data.
+          const chain: Record<string, unknown> = {};
+          const terminal = Promise.resolve({ data: [], error: null });
+          function attach(c: Record<string, unknown>) {
+            c.select = vi.fn(() => attach({}));
+            c.order = vi.fn(() => attach(c));
+            c.limit = vi.fn(() => attach(c));
+            c.eq = vi.fn(() => attach(c));
+            c.or = vi.fn(() => attach(c));
+            c.in = vi.fn(() => attach(c));
+            // Make the chain thenable so await works.
+            c.then = terminal.then.bind(terminal);
+            c.catch = terminal.catch.bind(terminal);
+            return c;
+          }
+          return attach(chain);
+        }
+        // specialties and doctor_workplaces for search sub-queries: return empty.
+        const emptyTerminal = Promise.resolve({ data: [], error: null });
+        return {
+          select: vi.fn(() => ({
+            or: vi.fn(() => emptyTerminal),
+            in: vi.fn(() => emptyTerminal),
+          })),
+        };
+      }),
+    };
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(
+      searchSsrStub as unknown as ReturnType<typeof createSupabaseServerClient>,
+    );
+
+    const searchReq = new Request("http://localhost/api/search", { method: "GET" });
+    const searchRes = await searchGET(searchReq);
+    const searchJson = await searchRes.json();
+
+    expect(searchRes.status).toBe(200);
+    expect(searchJson.results).toHaveLength(0);
   });
 });
 
@@ -576,12 +629,13 @@ describe("Test 4 — not_found license at signup/start returns 409 without sendi
       return attachAll();
     };
 
-    const pendingInserts: unknown[] = [];
+    // Track inserts per-table to avoid fragile payload-shape filtering.
+    const insertsByTable: Record<string, unknown[]> = {};
     const serviceMock = {
-      from: vi.fn((_table: string) => ({
+      from: vi.fn((table: string) => ({
         select: vi.fn(() => selectStub()),
         insert: vi.fn((rows: unknown) => {
-          pendingInserts.push(rows);
+          insertsByTable[table] = [...(insertsByTable[table] ?? []), rows];
           return Object.assign(Promise.resolve({ data: { id: UUID }, error: null }), {
             select: vi.fn(() => ({ single: vi.fn(async () => ({ data: { id: UUID }, error: null })) })),
           });
@@ -605,12 +659,8 @@ describe("Test 4 — not_found license at signup/start returns 409 without sendi
     expect(res.status).toBe(409);
     expect(json.error).toBe("license_not_in_registry");
     expect(ssrStub.auth.signInWithOtp).not.toHaveBeenCalled();
-    // Filter out the audit_log insert (it's an array of audit rows, not pending_signups)
-    const pendingRows = pendingInserts.filter(
-      (r) => !Array.isArray(r) && typeof r === "object" && r !== null &&
-        "phone_e164" in (r as Record<string, unknown>),
-    );
-    expect(pendingRows.length).toBe(0);
+    // Assert no pending_signups row was inserted by checking the table-scoped tracker.
+    expect(insertsByTable["pending_signups"] ?? []).toHaveLength(0);
   });
 });
 

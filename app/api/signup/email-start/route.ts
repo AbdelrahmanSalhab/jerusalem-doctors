@@ -2,7 +2,8 @@
 // (Re-)sends the verification email to the authenticated doctor.
 // Called automatically by signup/verify (initial send) and by the VerifyForm
 // "resend" button (subsequent sends). Tokens always target the doctor row.
-// Idempotent at the Resend layer via deterministic Idempotency-Key.
+// Per-send unique Idempotency-Key (includes Date.now()) so each dispatch
+// attempt produces a real send; safe to retry if the connection drops.
 // Rate-limited to prevent use as a spam vector.
 
 import { jsonError, jsonOk } from "@/lib/api/respond";
@@ -29,7 +30,9 @@ export async function POST() {
     await dispatchSignupVerifyEmail({
       doctorId: me.id,
       email: me.email,
-      arabicFirstName: me.arabic_first_name,
+      // Guard against empty string from DB text column: fall back to generic
+      // Arabic salutation so the email copy does not read "مرحبًا د. ،".
+      arabicFirstName: me.arabic_first_name || "الطبيب",
     });
     await service
       .from("doctors")

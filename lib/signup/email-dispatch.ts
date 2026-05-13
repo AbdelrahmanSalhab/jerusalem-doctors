@@ -1,6 +1,11 @@
 // Cross-cutting helper: build the verify URL, render the email, send it.
 // Used by signup/verify (initial dispatch), signup/email-start (resend),
 // and an admin "resend email" action.
+//
+// Idempotency: each call issues a unique Resend Idempotency-Key that includes
+// Date.now(), so every dispatch attempt triggers a real send rather than being
+// deduplicated by Resend's 24-hour idempotency window. This is intentional:
+// "Resend email" requests must reliably produce a new message.
 
 import { createHash } from "node:crypto";
 import { ResendClient } from "@/lib/email/resend";
