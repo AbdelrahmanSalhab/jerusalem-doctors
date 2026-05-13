@@ -29,15 +29,22 @@ begin
   )
   select count(*) into v_missed from bumped;
 
-  -- 2) Reset for doctors that did appear (also stamps last_seen_in_moh_at).
+  -- 2) Reset for approved, active doctors that did appear in the mirror.
+  --    The is_admin_approved AND is_active guard is intentional: resetting
+  --    missing_sync_count and last_seen_in_moh_at for a previously-revoked
+  --    doctor (is_admin_approved=false, is_active=false) would be misleading
+  --    and could interfere with future sweep logic. Only doctors that step 1
+  --    could have bumped should be eligible for reset here.
   with refreshed as (
     update public.doctors d
        set missing_sync_count = 0,
            last_seen_in_moh_at = now()
-     where exists (
-       select 1 from public.moh_practitioners mp
-        where mp.license_number::text = d.license_number
-     )
+     where d.is_admin_approved
+       and d.is_active
+       and exists (
+         select 1 from public.moh_practitioners mp
+          where mp.license_number::text = d.license_number
+       )
     returning d.id
   )
   select count(*) into v_reset from refreshed;

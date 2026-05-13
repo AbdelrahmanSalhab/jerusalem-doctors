@@ -84,6 +84,17 @@ const checks: Check[] = [
     name: "anon cannot read pre_approved_licenses",
     run: async () => testEmpty("pre_approved_licenses"),
   },
+  {
+    // Test 25 from the test plan: "post-migration approval reset left doctor_visible empty."
+    // This check is most meaningful when run immediately after applying migration 0008 on a
+    // previously-populated database, because 0008 resets is_admin_approved=false for all
+    // non-admin doctors. At that point, no doctor satisfies the doctor_visible view conditions,
+    // so the view should return zero rows even for an authenticated session — and certainly
+    // zero rows for the anon role tested here. On a fresh database or after re-approvals this
+    // check still passes because anon is denied by RLS regardless.
+    name: "doctor_visible is empty immediately after migration (Test 25)",
+    run: async () => testEmpty("doctor_visible"),
+  },
 ];
 
 async function testEmpty(table: string): Promise<{

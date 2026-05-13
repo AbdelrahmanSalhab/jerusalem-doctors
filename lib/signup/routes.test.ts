@@ -1,5 +1,11 @@
 // Tests 1, 3-9, 13, 14, 16, 17 — route-level unit tests with stubbed Supabase.
 // Harness 1: vitest node environment, vi.mock for all I/O boundaries.
+//
+// Test 2 from the test plan ("Signup with MoH-verified license and institutional
+// email dispatches verification email") is covered by lib/signup/email-dispatch.test.ts,
+// which exercises dispatchSignupVerifyEmail end-to-end (token issuance, Resend POST,
+// verify-URL in email body). Test 1 in this file verifies the verify-route inserts
+// email_is_institutional:true for the same scenario. Together they fulfil Test 2.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -875,11 +881,14 @@ describe("Test 8 — email-start dispatches email to authenticated doctor", () =
       arabic_first_name: "نور",
     } as never);
 
+    // Capture update calls so we can assert email_verification_sent_at is set
+    // (test plan Test 8, action 4: assert Supabase update set email_verification_sent_at).
+    const updateFn = vi.fn().mockReturnValue({
+      eq: vi.fn(async () => ({ data: null, error: null })),
+    });
     const serviceMock = {
       from: vi.fn((_table: string) => ({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn(async () => ({ data: null, error: null })),
-        }),
+        update: updateFn,
       })),
     };
     vi.mocked(createSupabaseServiceClient).mockReturnValue(
@@ -895,6 +904,10 @@ describe("Test 8 — email-start dispatches email to authenticated doctor", () =
     expect(json.sent).toBe(true);
     expect(dispatchSignupVerifyEmail).toHaveBeenCalledWith(
       expect.objectContaining({ doctorId: UUID, email: "dr@hadassah.org.il" }),
+    );
+    // Assert that the route updated email_verification_sent_at on the doctors table.
+    expect(updateFn).toHaveBeenCalledWith(
+      expect.objectContaining({ email_verification_sent_at: expect.any(String) }),
     );
   });
 });

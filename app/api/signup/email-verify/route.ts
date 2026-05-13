@@ -98,7 +98,13 @@ function htmlPage(
 </html>`;
   return new Response(html, {
     status,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      // Prevent CDN or shared-cache caching. force-dynamic stops Next.js route
+      // caching, but a CDN (e.g. Cloudflare) could still cache the 200 HTML
+      // response because this endpoint issues no Set-Cookie headers.
+      "cache-control": "no-store",
+    },
   });
 }
 

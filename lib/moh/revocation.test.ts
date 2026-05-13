@@ -5,6 +5,8 @@ describe("shouldRevoke", () => {
   it("does not revoke under threshold", () => {
     expect(shouldRevoke(0)).toBe(false);
     expect(shouldRevoke(1)).toBe(false);
+    // REVOKE_AFTER_MISSING_CYCLES - 1 (i.e. 2) is the explicit boundary case from
+    // test plan Test 10: one below threshold must NOT revoke.
     expect(shouldRevoke(REVOKE_AFTER_MISSING_CYCLES - 1)).toBe(false);
   });
   it("revokes at and above threshold", () => {

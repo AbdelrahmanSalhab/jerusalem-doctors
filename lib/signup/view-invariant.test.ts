@@ -56,6 +56,14 @@ describe("Test 15 — doctor_visible view SQL definition", () => {
  * Extracts the CREATE OR REPLACE VIEW doctor_visible ... block from the
  * migration SQL. Returns the text from the CREATE VIEW statement to the
  * first semicolon that terminates it.
+ *
+ * NOTE: This extraction is fragile — it stops at the FIRST semicolon after
+ * the CREATE VIEW keyword. It works correctly for the current view body
+ * (which contains no semicolons), but would truncate prematurely if a
+ * future change added one (e.g. a nested DO block or a function call with
+ * a semicolon-terminated subexpression). If the view SQL ever gains
+ * internal semicolons, switch to a proper SQL parser or delimit the view
+ * block with a comment sentinel.
  */
 function extractViewBlock(sql: string): string {
   const start = sql.search(/create\s+or\s+replace\s+view\s+public\.doctor_visible/i);
