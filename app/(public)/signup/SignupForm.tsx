@@ -109,6 +109,17 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         return;
       }
 
+      // New: check-license now 409s for not_found unless the license is on the
+      // admin allowlist (issue #19). Surface the field error directly.
+      if (lic?.error === "license_not_in_registry") {
+        setFieldErrors({
+          license_number: lic.fields?.license_number ??
+            "رقم الترخيص غير موجود في سجل وزارة الصحة.",
+        });
+        setSubmitting(false);
+        return;
+      }
+
       // Step 2: full submit. The Turnstile token was consumed by step 1, so
       // reset and wait for a fresh one before calling /start. With
       // appearance: "interaction-only" + passive checks, the new token

@@ -36,12 +36,38 @@ export function VerifyForm() {
   const [submitting, setSubmitting] = useState(false);
   const [resendIn, setResendIn] = useState(60);
   const [error, setError] = useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = useState<{
+    emailSent: boolean;
+  } | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (resendIn <= 0) return;
     const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(t);
   }, [resendIn]);
+
+  const resendEmail = async () => {
+    setResending(true);
+    setResendMsg(null);
+    try {
+      const res = await fetch("/api/signup/email-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        setResendMsg("تم إرسال رسالة التحقق مجددًا.");
+      } else {
+        setResendMsg("تعذّر إرسال الرسالة. حاول لاحقًا.");
+      }
+    } catch {
+      setResendMsg("تعذّر إرسال الرسالة. حاول لاحقًا.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,13 +102,21 @@ export function VerifyForm() {
         setSubmitting(false);
         return;
       }
-      // Drop sensitive state and hard-navigate so the server renders the
-      // layout from scratch with the new session cookie. router.refresh()
-      // only invalidates the current route's RSC cache and races with the
-      // router.replace() — full-page load is the only reliable way to
-      // guarantee the SiteHeader picks up the authenticated session.
+
+      // Drop sensitive state.
       sessionStorage.removeItem(SS_PHONE);
       sessionStorage.removeItem(SS_SESSION);
+
+      if (mode === "signup") {
+        // Signup path: doctor awaits admin review. Do NOT redirect to
+        // /dashboard — the doctor cannot use it until approved. Show a
+        // success state with pending-review notice and email verification copy.
+        setSignupSuccess({ emailSent: Boolean(data.email_verification_sent) });
+        setSubmitting(false);
+        return;
+      }
+
+      // Login path: redirect to dashboard.
       window.location.replace("/dashboard");
     } catch (err) {
       console.error(err);
@@ -107,6 +141,36 @@ export function VerifyForm() {
     }
     setResendIn(60);
   };
+
+  // Signup success state: awaiting admin review.
+  if (signupSuccess) {
+    return (
+      <div className="space-y-4 rounded-lg border border-green-200 bg-green-50 p-6 text-center">
+        <h2 className="text-xl font-bold text-green-800">تم التسجيل بنجاح</h2>
+        <p className="text-green-900">
+          حسابك قيد المراجعة من قبل الإدارة وسيتم تفعيله بعد المراجعة.
+        </p>
+        {signupSuccess.emailSent && (
+          <div className="space-y-3">
+            <p className="text-green-900">
+              أرسلنا رسالة تأكيد إلى بريدك الإلكتروني. افتح الرابط داخل الرسالة لتأكيد بريدك.
+            </p>
+            <button
+              type="button"
+              onClick={resendEmail}
+              disabled={resending}
+              className="rounded-md border border-green-600 px-4 py-2 text-sm text-green-800 hover:bg-green-100 disabled:opacity-50"
+            >
+              {resending ? "جارٍ الإرسال..." : "أعد إرسال رسالة التحقق"}
+            </button>
+            {resendMsg && (
+              <p className="text-sm text-green-700">{resendMsg}</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={submit} className="space-y-4">
