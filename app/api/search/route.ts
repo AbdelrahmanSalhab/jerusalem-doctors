@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     `,
     )
     .eq("is_active", true)
-    .eq("is_visible", true)
+    .eq("user_chose_visible", true)
     .eq("is_phone_verified", true)
     .eq("is_admin_approved", true)
     .eq("consent_directory_use", true)

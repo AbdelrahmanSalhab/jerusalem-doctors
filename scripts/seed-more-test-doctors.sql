@@ -18,7 +18,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000001', '050-700-0001', '100007',
@@ -45,7 +45,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000002', '050-700-0002', '100008',
@@ -72,7 +72,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000003', '050-700-0003', '100009',
@@ -99,7 +99,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000004', '050-700-0004', '100010',
@@ -126,7 +126,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000005', '050-700-0005', '100011',
@@ -154,7 +154,7 @@ begin
     hebrew_first_name, hebrew_family_name,
     subspecialty, subspecialty_normalized,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000006', '050-700-0006', '100012',
@@ -183,7 +183,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000007', '050-700-0007', '100013',
@@ -211,7 +211,7 @@ begin
     hebrew_first_name, hebrew_family_name,
     subspecialty, subspecialty_normalized,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000008', '050-700-0008', '100014',
@@ -239,7 +239,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000009', '050-700-0009', '100015',
@@ -267,7 +267,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000010', '050-700-0010', '100016',
@@ -294,7 +294,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000011', '050-700-0011', '100017',
@@ -323,7 +323,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972507000012', '050-700-0012', '100018',

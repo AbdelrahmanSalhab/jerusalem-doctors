@@ -12,7 +12,7 @@ interface Row {
   license_verification_status: string | null;
   is_admin_approved: boolean;
   is_active: boolean;
-  is_visible: boolean;
+  user_chose_visible: boolean;
   created_at: string;
 }
 

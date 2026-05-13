@@ -10,7 +10,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 const Body = z.object({
   is_admin_approved: z.boolean().optional(),
   is_active: z.boolean().optional(),
-  is_visible: z.boolean().optional(),
+  user_chose_visible: z.boolean().optional(),
 });
 
 export async function PATCH(
