@@ -1,20 +1,17 @@
 // GET /api/search?q=...&specialty_id=...
 // Authenticated-doctor search across the directory.
 //
-// MVP search (plan §8): ILIKE on the doctor's normalized Arabic name fields,
-// Hebrew full name, normalized subspecialty, and normalized workplace names.
-// Optional specialty filter via doctor_specialties join.
-//
 // Visibility: only active, visible, phone-verified, admin-approved, consented
-// doctors are returned. RLS would enforce this even if the query didn't, but
-// we filter explicitly so the user-scoped client doesn't have to.
+// doctors are returned. The `doctor_visible` view enforces these conditions at
+// the relation level; RLS on the underlying `doctors` table provides
+// defence-in-depth via the SSR (caller-scoped) client.
 
 import { z } from "zod";
 import { jsonError, jsonOk } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 const Query = z.object({
@@ -33,7 +30,6 @@ export interface SearchHit {
   phone_display: string | null;
   /** Null when phone is hidden — disables the WhatsApp button on the card. */
   whatsapp_url: string | null;
-  email: string | null;
   subspecialty: string | null;
   specialties: string[];
   /** Empty array when the doctor opted to hide their workplaces. */
@@ -63,13 +59,15 @@ export async function GET(req: Request) {
 
   const qRaw = parsed.data.q;
   const qNorm = normalizeArabic(qRaw);
-  const service = createSupabaseServiceClient();
 
-  // Use service-role + manual visibility filter — simpler than threading the
-  // user-scoped client through nested selects, and the RLS contract is
-  // duplicated here for defense-in-depth.
-  let query = service
-    .from("doctors")
+  // Read from the doctor_visible view via the SSR (RLS-enforced) client.
+  // Visibility contract is enforced at the relation level, so a missed .eq()
+  // here cannot leak unapproved rows. The SSR client carries the caller's JWT
+  // so RLS on the underlying table also applies as defence in depth.
+  const ssr = await createSupabaseServerClient();
+
+  let query = ssr
+    .from("doctor_visible")
     .select(
       `
       id,
@@ -83,7 +81,6 @@ export async function GET(req: Request) {
       phone_is_visible,
       workplaces_is_visible,
       profile_picture_url,
-      email,
       subspecialty,
       doctor_specialties${parsed.data.specialty_id ? "!inner" : ""}(
         specialty:specialties(id, name_ar)
@@ -91,11 +88,6 @@ export async function GET(req: Request) {
       doctor_workplaces(name, is_primary, sort_order)
     `,
     )
-    .eq("is_active", true)
-    .eq("is_visible", true)
-    .eq("is_phone_verified", true)
-    .eq("is_admin_approved", true)
-    .eq("consent_directory_use", true)
     .order("arabic_full_name", { ascending: true })
     .limit(50);
 
@@ -122,7 +114,7 @@ export async function GET(req: Request) {
     // Specialty + workplace matches live in joined tables, so we pre-resolve
     // their doctor IDs and OR them into the main filter.
     const [specialtyMatches, workplaceMatches] = await Promise.all([
-      service
+      ssr
         .from("specialties")
         .select("id")
         .or(
@@ -131,7 +123,7 @@ export async function GET(req: Request) {
             `name_ar.ilike.${pattern}`,
           ].join(","),
         ),
-      service
+      ssr
         .from("doctor_workplaces")
         .select("doctor_id")
         .or(
@@ -145,7 +137,7 @@ export async function GET(req: Request) {
     const specialtyIds = (specialtyMatches.data ?? []).map((r) => r.id);
     const doctorIdsViaSpecialty = specialtyIds.length
       ? (
-          await service
+          await ssr
             .from("doctor_specialties")
             .select("doctor_id")
             .in("specialty_id", specialtyIds)
@@ -214,7 +206,6 @@ export async function GET(req: Request) {
       license_number: d.license_number,
       phone_display: d.phone_is_visible ? d.phone_display : null,
       whatsapp_url: d.phone_is_visible ? buildWhatsAppLink(d.phone_e164) : null,
-      email: d.email,
       subspecialty: d.subspecialty,
       specialties,
       workplaces,

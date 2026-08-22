@@ -1,10 +1,21 @@
 // POST /api/signup/verify
 // Validates the OTP via Supabase Auth, then materialises the doctor row from
-// the pending_signups payload, links specialties, and lets the SSR cookie
-// helper persist the session.
+// the pending_signups payload, links specialties + workplaces, dispatches a
+// verification email, and lets the SSR cookie helper persist the session.
+//
+// As of issue #16, no signup is auto-approved. Every new doctor row has
+// is_admin_approved=false. Visibility in the directory requires:
+//   1. admin approval (sets is_admin_approved=true), and
+//   2. user_chose_visible=true (default), and
+//   3. all the existing gates (is_active, is_phone_verified, consent).
+//
+// The directory view `doctor_visible` enforces the conjunction at the
+// relation level; RLS enforces it at the row level.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { extractDomain, isInstitutionalEmail } from "@/lib/signup/email-allowlist";
+import { dispatchSignupVerifyEmail } from "@/lib/signup/email-dispatch";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -36,7 +47,12 @@ interface PendingPayload {
   hebrew_family_name: string;
   subspecialty: string | null;
   subspecialty_normalized: string | null;
-  email: string | null;
+  email: string;                 // required as of #16
+  // email_domain and email_is_institutional were added by Task 9 to new
+  // pending sessions. Old sessions created before this migration will not
+  // have these fields. Defensive defaults are applied in the insert below.
+  email_domain?: string | null;
+  email_is_institutional?: boolean;
   specialty_ids: string[];
   workplaces: PendingWorkplace[];
   license_verification_status:
@@ -57,10 +73,7 @@ export async function POST(req: Request) {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
   }
 
-  const rl = await rateLimit(
-    "signupVerify",
-    `session:${parsed.signup_session_id}`,
-  );
+  const rl = await rateLimit("signupVerify", `session:${parsed.signup_session_id}`);
   const rlIp = await rateLimit("signupVerify", `ip:${ip}`);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
@@ -69,35 +82,38 @@ export async function POST(req: Request) {
   const service = createSupabaseServiceClient();
   const ssr = await createSupabaseServerClient();
 
+  // SECURITY INVARIANT: Atomically increment the attempt counter BEFORE reading
+  // the pending row payload or calling Supabase verifyOtp. A single UPDATE
+  // RETURNING is immune to the read-modify-write race that would let concurrent
+  // requests share a stale counter value and collectively exceed MAX_ATTEMPTS.
+  const sessionId = parsed.signup_session_id;
+  const { data: newAttempts, error: incErr } = await service.rpc(
+    "increment_pending_attempts",
+    { p_session_id: sessionId },
+  );
+  if (incErr || newAttempts === null) {
+    // RPC failed (row missing or DB error). Treat as session-not-found to
+    // avoid leaking existence; 503 signals a transient backend problem.
+    return jsonError(503, { error: "service_unavailable", code: "service_unavailable" });
+  }
+  if (newAttempts > MAX_ATTEMPTS) {
+    await service.from("pending_signups").delete().eq("id", sessionId);
+    return jsonError(429, { error: "too_many_attempts", code: "too_many_attempts" });
+  }
+
   const pending = await service
     .from("pending_signups")
     .select("id, phone_e164, payload, expires_at, attempts")
-    .eq("id", parsed.signup_session_id)
+    .eq("id", sessionId)
     .maybeSingle();
   if (pending.error && pending.error.code !== "PGRST116") throw pending.error;
   if (!pending.data) {
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
-
   if (new Date(pending.data.expires_at).getTime() < Date.now()) {
     await service.from("pending_signups").delete().eq("id", pending.data.id);
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
-
-  if (pending.data.attempts >= MAX_ATTEMPTS) {
-    await service.from("pending_signups").delete().eq("id", pending.data.id);
-    return jsonError(429, {
-      error: "too_many_attempts",
-      code: "too_many_attempts",
-    });
-  }
-
-  // Increment attempts BEFORE calling Supabase verifyOtp so a flood of bad
-  // codes can't bypass the counter via abandoned races.
-  await service
-    .from("pending_signups")
-    .update({ attempts: pending.data.attempts + 1 })
-    .eq("id", pending.data.id);
 
   const verify = await ssr.auth.verifyOtp({
     phone: pending.data.phone_e164,
@@ -110,8 +126,6 @@ export async function POST(req: Request) {
 
   const userId = verify.data.user.id;
   const payload = pending.data.payload as PendingPayload;
-
-  const isAutoApproved = payload.license_verification_status === "verified";
 
   const insert = await service
     .from("doctors")
@@ -139,13 +153,23 @@ export async function POST(req: Request) {
       subspecialty: payload.subspecialty,
       subspecialty_normalized: payload.subspecialty_normalized,
       email: payload.email,
+      // Defensive defaults for pending sessions created before the migration
+      // (they will not have email_domain / email_is_institutional in their
+      // JSON payload). For those sessions, email_domain is derived here and
+      // email_is_institutional defaults to false (goes through admin queue).
+      email_domain: payload.email_domain ?? (extractDomain(payload.email) ?? null),
+      email_is_institutional: payload.email_is_institutional ??
+        isInstitutionalEmail(payload.email),
 
       consent_directory_use: true,
       consent_timestamp: new Date().toISOString(),
 
       is_phone_verified: true,
-      is_admin_approved: isAutoApproved,
-      is_visible: true,
+      // No auto-approval — every new doctor row awaits admin review (#16).
+      is_admin_approved: false,
+      // Default visibility preference; visibility in the directory still
+      // requires admin approval via the doctor_visible view (#20).
+      user_chose_visible: true,
       is_active: true,
     })
     .select("id")
@@ -162,10 +186,7 @@ export async function POST(req: Request) {
         specialty_id: sid,
       })),
     );
-    if (links.error) {
-      console.error("[signup/verify] specialty link failed", links.error);
-      // Continue — admin can fix specialty links later.
-    }
+    if (links.error) console.error("[signup/verify] specialty link failed", links.error);
   }
 
   if (payload.workplaces?.length) {
@@ -178,10 +199,7 @@ export async function POST(req: Request) {
         sort_order: w.sort_order,
       })),
     );
-    if (wp.error) {
-      console.error("[signup/verify] workplace insert failed", wp.error);
-      // Non-fatal: doctor can add workplaces later from /profile.
-    }
+    if (wp.error) console.error("[signup/verify] workplace insert failed", wp.error);
   }
 
   await service.from("pending_signups").delete().eq("id", pending.data.id);
@@ -192,9 +210,30 @@ export async function POST(req: Request) {
     target_doctor_id: insert.data.id,
     metadata: {
       license_status: payload.license_verification_status,
-      auto_approved: isAutoApproved,
+      auto_approved: false,
+      // Use the same defensive defaults as the insert above for old sessions.
+      email_is_institutional: payload.email_is_institutional ?? isInstitutionalEmail(payload.email),
+      email_domain: payload.email_domain ?? (extractDomain(payload.email) ?? null),
     },
   });
 
-  return jsonOk({ ok: true, auto_approved: isAutoApproved });
+  // Fire the verification email best-effort. Doctor row exists either way;
+  // the admin review surface shows whether the email was confirmed.
+  let emailSent = false;
+  try {
+    await dispatchSignupVerifyEmail({
+      doctorId: insert.data.id,
+      email: payload.email,
+      arabicFirstName: payload.arabic_first_name,
+    });
+    emailSent = true;
+    await service
+      .from("doctors")
+      .update({ email_verification_sent_at: new Date().toISOString() })
+      .eq("id", insert.data.id);
+  } catch (err) {
+    console.error("[signup/verify] email dispatch failed", err);
+  }
+
+  return jsonOk({ ok: true, auto_approved: false, email_verification_sent: emailSent });
 }

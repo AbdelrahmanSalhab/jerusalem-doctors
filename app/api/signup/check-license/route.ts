@@ -3,15 +3,16 @@
 // (data.gov.il, see plan §13). Called after check-unique, before /start.
 //
 // Outcomes:
-//   { status: "verified" }                            — proceed to /start, auto-approve later
+//   { status: "verified" }                            — proceed to /start
 //   { status: "soft_match", registry_first/family }   — confirm-then-proceed (admin queue)
 //   { status: "name_mismatch", registry_first/family} — block; ask user to retype
-//   { status: "not_found" }                           — proceed to /start; admin queue
+//   { status: "not_found" }                           — 409 unless pre-approved (#19)
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { verifyLicense } from "@/lib/moh/match";
 import { rateLimit } from "@/lib/ratelimit";
+import { isPreApproved } from "@/lib/signup/pre-approved";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
 
@@ -66,6 +67,39 @@ export async function POST(req: Request) {
       hebrewFirstName: parsed.hebrew_first_name,
       hebrewFamilyName: parsed.hebrew_family_name,
     });
+
+    // Issue #19: not_found 409s at this step too so the UI gives the same
+    // message early (rather than waiting until /start). Exception: the
+    // license is on the admin pre-approved list.
+    if (result.status === "not_found") {
+      const licenseStr = String(license);
+      if (!(await isPreApproved(supabase, licenseStr))) {
+        // Apply the same tight per-IP bucket used in /start for not_found probes
+        // so that check-license cannot be used as a cheaper enumeration oracle.
+        const rlNotFound = await rateLimit("signupStartNotFound", `ip:${ip}`);
+        if (!rlNotFound.success) {
+          return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+        }
+        // Write a forensic audit row so probing via check-license is recorded
+        // consistently with probing via /start.
+        // license number deliberately omitted to avoid persisting the
+        // attacker's probe payload (mirrors the policy in signup/start).
+        await supabase.from("audit_logs").insert({
+          actor_doctor_id: null,
+          action: "signup_not_found_rejected",
+          target_doctor_id: null,
+          metadata: { ip, reason: "not_found", route: "check-license" },
+        });
+        return jsonError(409, {
+          error: "license_not_in_registry",
+          code: "license_not_in_registry",
+          fields: {
+            license_number:
+              "رقم الترخيص غير موجود في سجل وزارة الصحة. تواصل مع الإدارة إذا كنت تعتقد أن هذا خطأ.",
+          },
+        });
+      }
+    }
 
     return jsonOk({
       status: result.status,

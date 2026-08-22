@@ -9,10 +9,14 @@ interface Row {
   arabic_family_name: string;
   phone_e164: string;
   license_number: string;
+  email: string | null;
+  email_domain: string | null;
+  email_is_institutional: boolean;
+  email_verified_at: string | null;
   license_verification_status: string | null;
   is_admin_approved: boolean;
   is_active: boolean;
-  is_visible: boolean;
+  user_chose_visible: boolean;
   created_at: string;
 }
 
@@ -21,6 +25,7 @@ const statusLabels: Record<string, string> = {
   soft_match: "تطابق جزئي",
   not_found: "غير موجود في السجل",
   name_mismatch_overridden: "تم التغاضي يدويًا",
+  revoked: "مُلغى",
 };
 
 export function AdminDoctorsTable({
@@ -60,7 +65,7 @@ export function AdminDoctorsTable({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="inline-flex overflow-hidden rounded-md border border-foreground/20">
-          {(["pending", "approved", "all"] as const).map((s) => (
+          {(["pending", "approved", "revoked", "all"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -72,7 +77,13 @@ export function AdminDoctorsTable({
                   : "hover:bg-foreground/5")
               }
             >
-              {s === "pending" ? "قيد المراجعة" : s === "approved" ? "مفعّلون" : "الكل"}
+              {s === "pending"
+                ? "قيد المراجعة"
+                : s === "approved"
+                  ? "مفعّلون"
+                  : s === "revoked"
+                    ? "مُلغى"
+                    : "الكل"}
             </button>
           ))}
         </div>
@@ -107,6 +118,8 @@ export function AdminDoctorsTable({
               <th className="p-3 text-start">الاسم</th>
               <th className="p-3 text-center">الهاتف</th>
               <th className="p-3 text-center">الترخيص</th>
+              <th className="p-3 text-center">البريد</th>
+              <th className="p-3 text-center">المؤسسة</th>
               <th className="p-3 text-center">حالة التحقق</th>
               <th className="p-3 text-center">إجراءات</th>
             </tr>
@@ -114,7 +127,7 @@ export function AdminDoctorsTable({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-foreground/65">
+                <td colSpan={7} className="p-6 text-center text-foreground/65">
                   لا توجد نتائج.
                 </td>
               </tr>
@@ -133,12 +146,50 @@ export function AdminDoctorsTable({
                   {r.license_number}
                 </td>
                 <td className="p-3 text-center">
+                  {r.email ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <span dir="ltr" className="text-xs">{r.email}</span>
+                      <span
+                        className={
+                          "inline-block rounded-full px-2 py-0.5 text-xs " +
+                          (r.email_verified_at
+                            ? "bg-green-100 text-green-800"
+                            : "bg-foreground/10 text-foreground/70")
+                        }
+                      >
+                        {r.email_verified_at ? "موثّق" : "بانتظار التحقق"}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-foreground/50">—</span>
+                  )}
+                </td>
+                <td className="p-3 text-center">
+                  <span
+                    className={
+                      "inline-block rounded-full px-2 py-0.5 text-xs " +
+                      (r.email_is_institutional
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-amber-100 text-amber-800")
+                    }
+                  >
+                    {r.email_is_institutional ? "مؤسسي" : "غير مؤسسي"}
+                  </span>
+                  {r.email_domain && (
+                    <div dir="ltr" className="mt-1 text-xs text-foreground/60">
+                      {r.email_domain}
+                    </div>
+                  )}
+                </td>
+                <td className="p-3 text-center">
                   <span
                     className={
                       "inline-block rounded-full px-2.5 py-0.5 text-sm " +
                       (r.license_verification_status === "verified"
                         ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800")
+                        : r.license_verification_status === "revoked"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-amber-100 text-amber-800")
                     }
                   >
                     {statusLabels[r.license_verification_status ?? ""] ??

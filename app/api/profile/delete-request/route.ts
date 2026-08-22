@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   // protected route hit will redirect via requireDoctor's is_active check.
   const r = await service
     .from("doctors")
-    .update({ is_visible: false, is_active: false })
+    .update({ user_chose_visible: false, is_active: false })
     .eq("id", me.id);
   if (r.error) {
     console.error("[profile.delete-request] update failed", r.error);

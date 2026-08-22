@@ -26,7 +26,7 @@ with new_doctor as (
     is_phone_verified,
     is_admin_approved,
     is_active,
-    is_visible,
+    user_chose_visible,
     is_admin
   ) values (
     null,

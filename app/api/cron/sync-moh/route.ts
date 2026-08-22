@@ -4,12 +4,13 @@
 // this automatically when configured in vercel.json.
 //
 // Behavior: paginate CKAN datastore_search in 1000-row chunks; upsert into
-// `moh_practitioners`; record stats in `audit_logs`. Idempotent — safe to
-// re-run on failure.
+// `moh_practitioners`; run revocation sweep; record stats in `audit_logs`.
+// Idempotent — safe to re-run on failure.
 
 import { NextResponse } from "next/server";
 import { jsonError, jsonOk } from "@/lib/api/respond";
 import { MohClient } from "@/lib/moh/client";
+import { REVOKE_AFTER_MISSING_CYCLES } from "@/lib/moh/revocation";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -80,11 +81,46 @@ export async function GET(req: Request) {
     );
   }
 
+  // Revocation sweep (#18). After the mirror has been refreshed, find
+  // approved doctors whose license is no longer in the registry and bump
+  // their missing_sync_count. After REVOKE_AFTER_MISSING_CYCLES consecutive
+  // misses, mark them revoked + inactive.
+  type SweepResult = { missed: number; reset: number; revoked: string[] };
+
+  const sweep = await supabase.rpc("revocation_sweep", {
+    threshold_cycles: REVOKE_AFTER_MISSING_CYCLES,
+  });
+
+  // If the sweep RPC fails (e.g. DB connectivity issue), log and continue —
+  // the sync itself succeeded; revocation is best-effort for a single run.
+  if (sweep.error) {
+    console.error("[cron/sync-moh] revocation_sweep RPC failed", sweep.error);
+  }
+  const sweepResult: SweepResult =
+    sweep.error
+      ? { missed: 0, reset: 0, revoked: [] }
+      : ((sweep.data as SweepResult | null) ?? { missed: 0, reset: 0, revoked: [] });
+
+  if (sweepResult.revoked.length > 0) {
+    // actor_doctor_id is omitted (null) intentionally: these revocations are
+    // system-initiated by the cron job, not by a human admin. Null actor in
+    // the audit log means "system cron" for this action type.
+    const rows = sweepResult.revoked.map((id) => ({
+      action: "license_revoked_sync",
+      target_doctor_id: id,
+      metadata: { reason: "license missing from MoH for more than 3 consecutive sync cycles" },
+    }));
+    await supabase.from("audit_logs").insert(rows);
+  }
+
   await supabase.from("audit_logs").insert({
     action: "moh_sync_completed",
     metadata: {
       rows_upserted: upserted,
       duration_ms: Date.now() - startedAt,
+      sweep_missed: sweepResult.missed,
+      sweep_reset: sweepResult.reset,
+      sweep_revoked_count: sweepResult.revoked.length,
     },
   });
 
@@ -92,6 +128,7 @@ export async function GET(req: Request) {
     ok: true,
     rows_upserted: upserted,
     duration_ms: Date.now() - startedAt,
+    sweep_revoked_count: sweepResult.revoked.length,
   });
 }
 

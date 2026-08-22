@@ -21,7 +21,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972501111111', '050-111-1111', '100001',
@@ -51,7 +51,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972502222222', '050-222-2222', '100002',
@@ -83,7 +83,7 @@ begin
     hebrew_first_name, hebrew_family_name,
     subspecialty, subspecialty_normalized,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972503333333', '050-333-3333', '100003',
@@ -115,7 +115,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972504444444', '050-444-4444', '100004',
@@ -147,7 +147,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972505555555', '050-555-5555', '100005',
@@ -177,7 +177,7 @@ begin
     arabic_first_name_normalized, arabic_family_name_normalized, arabic_full_name_normalized,
     hebrew_first_name, hebrew_family_name,
     email, consent_directory_use,
-    is_phone_verified, is_active, is_visible, is_admin_approved,
+    is_phone_verified, is_active, user_chose_visible, is_admin_approved,
     license_verified_at, license_verification_status
   ) values (
     '+972506666666', '050-666-6666', '100006',

@@ -11,6 +11,8 @@ import { normalizeArabic } from "@/lib/normalize/arabic";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
+import { extractDomain, isInstitutionalEmail } from "@/lib/signup/email-allowlist";
+import { isPreApproved } from "@/lib/signup/pre-approved";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -81,8 +83,22 @@ export async function POST(req: Request) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
-  const license = parsed.license_number.trim();
-  if (!/^\d{1,12}$/.test(license)) {
+  const licenseRaw = parsed.license_number.trim();
+  if (!/^\d{1,12}$/.test(licenseRaw)) {
+    return jsonError(400, {
+      error: "invalid_license",
+      code: "invalid_license",
+      fields: { license_number: "رقم الترخيص يجب أن يحتوي على أرقام فقط" },
+    });
+  }
+  // Normalise to canonical form (strip leading zeros) so that isPreApproved
+  // and the uniqueness check match the same representation that check-license
+  // uses. An admin pre-approving "00123" sees it stored as "123".
+  const license = String(Number(licenseRaw));
+  // "0" survives the digit regex above (^\d{1,12}$) but is not a valid MoH
+  // license number. Passing it to verifyLicense would produce a misleading
+  // not_found audit entry. Reject it explicitly.
+  if (license === "0") {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
@@ -120,6 +136,48 @@ export async function POST(req: Request) {
     hebrewFirstName: parsed.hebrew_first_name,
     hebrewFamilyName: parsed.hebrew_family_name,
   });
+
+  // Issue #19: not_found 409s without OTP unless the license is on the
+  // admin pre-approved allowlist.
+  if (verified.status === "not_found") {
+    let allowed: boolean;
+    try {
+      allowed = await isPreApproved(service, license);
+    } catch {
+      return jsonError(503, { error: "service_unavailable", code: "service_unavailable" });
+    }
+    if (!allowed) {
+      // Consume the dedicated not_found bucket BEFORE writing the audit row so
+      // that rate-limited probes do not produce unbounded DB writes. Once the
+      // bucket is exhausted, we return 429 immediately without any audit insert
+      // (the Upstash counter is the authoritative record of abuse volume).
+      const rlNotFound = await rateLimit("signupStartNotFound", `ip:${ip}`);
+      if (!rlNotFound.success) {
+        // After the bucket runs out, return 429 so the attacker cannot tell
+        // whether further licenses would also be not_found.
+        return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+      }
+      await service.from("audit_logs").insert({
+        action: "signup_not_found_rejected",
+        metadata: {
+          ip,
+          reason: "not_found",
+          // license number deliberately omitted to avoid persisting the
+          // attacker's probe payload.
+        },
+      });
+      return jsonError(409, {
+        error: "license_not_in_registry",
+        code: "license_not_in_registry",
+        fields: {
+          license_number:
+            "رقم الترخيص غير موجود في سجل وزارة الصحة. تواصل مع الإدارة إذا كنت تعتقد أن هذا خطأ.",
+        },
+      });
+    }
+    // Pre-approved exception: fall through to the rest of the flow.
+  }
+
   if (verified.status === "name_mismatch" && !parsed.override_name_mismatch) {
     return jsonError(409, {
       error: "license_name_mismatch",
@@ -167,6 +225,11 @@ export async function POST(req: Request) {
   const now = Date.now();
   const expiresAt = new Date(now + PENDING_TTL_MS).toISOString();
 
+  // Pre-compute email signals for the pending payload so /verify can
+  // insert them into the doctors row without re-deriving them.
+  const emailDomain = extractDomain(parsed.email) ?? "";
+  const emailIsInstitutional = isInstitutionalEmail(parsed.email);
+
   const insert = await service
     .from("pending_signups")
     .insert({
@@ -187,7 +250,9 @@ export async function POST(req: Request) {
 
         subspecialty: parsed.subspecialty?.trim() || null,
         subspecialty_normalized: subspecialtyNorm,
-        email: parsed.email?.trim() || null,
+        email: parsed.email.trim(),
+        email_domain: emailDomain,
+        email_is_institutional: emailIsInstitutional,
 
         specialty_ids: parsed.specialty_ids,
         workplaces,
@@ -222,6 +287,7 @@ export async function POST(req: Request) {
     signup_session_id: insert.data.id,
     expires_at: expiresAt,
     license_status: verified.status,
+    email_is_institutional: emailIsInstitutional,
   });
 }
 

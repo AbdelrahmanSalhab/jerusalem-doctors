@@ -64,14 +64,7 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
             <dd dir="ltr">{doctor.phone_display}</dd>
           </div>
         )}
-        {doctor.email && (
-          <div className="flex items-baseline gap-2">
-            <dt className="text-foreground/65">البريد:</dt>
-            <dd dir="ltr" className="break-all">
-              {doctor.email}
-            </dd>
-          </div>
-        )}
+
       </dl>
 
       {doctor.whatsapp_url && (
