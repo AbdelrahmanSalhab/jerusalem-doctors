@@ -1,11 +1,8 @@
 import { Avatar } from "@/components/Avatar";
 import type { SearchHit } from "@/app/api/search/route";
+import { CAREER_STAGE_LABEL } from "@/lib/careerStage";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
-const CAREER_STAGE_LABEL: Record<string, string> = {
-  resident: "طبيب مقيم",
-  specialist: "طبيب أخصائي",
-};
 
 export function DoctorCard({ doctor }: { doctor: SearchHit }) {
   const name = `${doctor.arabic_first_name} ${doctor.arabic_family_name}`;

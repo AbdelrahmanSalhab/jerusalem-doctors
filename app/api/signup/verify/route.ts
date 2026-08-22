@@ -171,6 +171,14 @@ export const POST = withJsonErrors(async (req: Request) => {
     .select("id")
     .single();
   if (insert.error) {
+    // 23505 = unique_violation. This is the legitimate outcome of a genuine
+    // race — two signups for the same phone/license slipping past the
+    // pre-checks in signup/start at the same moment — not a server bug, so
+    // it gets its own code rather than a generic 500.
+    if (insert.error.code === "23505") {
+      console.warn("[signup/verify] doctor insert race (duplicate)", insert.error);
+      return jsonError(409, { error: "duplicate", code: "duplicate" });
+    }
     console.error("[signup/verify] doctor insert failed", insert.error);
     return jsonError(500, { error: "create_failed", code: "create_failed" });
   }

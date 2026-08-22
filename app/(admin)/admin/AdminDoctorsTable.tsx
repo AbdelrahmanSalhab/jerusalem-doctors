@@ -12,6 +12,7 @@ interface Row {
   license_region: "IL" | "PS";
   secondary_license_number: string | null;
   secondary_license_region: "IL" | "PS" | null;
+  secondary_license_verification_status: string | null;
   license_verification_status: string | null;
   career_stage: "resident" | "specialist" | null;
   is_admin_approved: boolean;
@@ -146,7 +147,11 @@ export function AdminDoctorsTable({
                   </span>
                   {r.secondary_license_number && (
                     <div className="text-foreground/50">
-                      +{r.secondary_license_number} ({r.secondary_license_region})
+                      +{r.secondary_license_number} ({r.secondary_license_region}
+                      {" — "}
+                      {statusLabels[r.secondary_license_verification_status ?? ""] ??
+                        "غير محدد"}
+                      )
                     </div>
                   )}
                 </td>

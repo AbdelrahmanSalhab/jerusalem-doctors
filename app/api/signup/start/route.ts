@@ -225,16 +225,29 @@ export const POST = withJsonErrors(async (req: Request) => {
   // still a resident / general practitioner. No equivalent signal exists for
   // PS, so a PS-only doctor stays unset (admin can set it manually later). A
   // dual-licensed doctor takes the more specific answer from either match.
+  //
+  // `allowMismatch` lets the primary license count a `name_mismatch` result:
+  // by the time we reach this point a primary mismatch can only mean the
+  // doctor clicked through the override-confirm flow above (an unconfirmed
+  // mismatch already returned 409 earlier), so the license-number match is
+  // just as trustworthy as `verified` — only the name-spelling confidence
+  // differs, which the override already resolved. The secondary license has
+  // no override flow, so its mismatches never count.
   const stageFrom = (
     result: { status: string; registrySpecialtyHe?: string | null } | null,
+    allowMismatch: boolean,
   ): "resident" | "specialist" | null => {
-    if (!result || (result.status !== "verified" && result.status !== "soft_match")) {
-      return null;
-    }
+    if (!result) return null;
+    const usable =
+      result.status === "verified" ||
+      result.status === "soft_match" ||
+      (allowMismatch && result.status === "name_mismatch");
+    if (!usable) return null;
     return result.registrySpecialtyHe ? "specialist" : "resident";
   };
-  const primaryStage = region === "IL" ? stageFrom(verified) : null;
-  const secondaryStage = secondaryRegion === "IL" ? stageFrom(secondaryVerified) : null;
+  const primaryStage = region === "IL" ? stageFrom(verified, true) : null;
+  const secondaryStage =
+    secondaryRegion === "IL" ? stageFrom(secondaryVerified, false) : null;
   const careerStage =
     primaryStage === "specialist" || secondaryStage === "specialist"
       ? "specialist"

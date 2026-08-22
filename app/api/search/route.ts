@@ -26,8 +26,8 @@ export interface SearchHit {
   id: string;
   arabic_first_name: string;
   arabic_family_name: string;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
+  hebrew_first_name: string | null;
+  hebrew_family_name: string | null;
   license_number: string;
   /** Null when the doctor opted to hide their phone via /profile. */
   phone_display: string | null;

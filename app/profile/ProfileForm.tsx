@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoUploader } from "./PhotoUploader";
+import { CAREER_STAGE_LABEL } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
@@ -14,11 +15,6 @@ type WorkplaceInput = {
   workplace_type: "hospital" | "clinic";
   details: string;
   is_primary: boolean;
-};
-
-const CAREER_STAGE_LABEL: Record<string, string> = {
-  resident: "طبيب مقيم",
-  specialist: "طبيب أخصائي",
 };
 
 export function ProfileForm({

@@ -534,7 +534,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
                 <label className="flex items-center gap-1.5">
                   <input
                     type="radio"
-                    name="workplace_type"
+                    name={`workplace_type_${i}`}
                     checked={wp.workplace_type === "hospital"}
                     onChange={() =>
                       updateWorkplace(i, { workplace_type: "hospital" })
@@ -545,7 +545,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
                 <label className="flex items-center gap-1.5">
                   <input
                     type="radio"
-                    name="workplace_type"
+                    name={`workplace_type_${i}`}
                     checked={wp.workplace_type === "clinic"}
                     onChange={() =>
                       updateWorkplace(i, { workplace_type: "clinic" })
