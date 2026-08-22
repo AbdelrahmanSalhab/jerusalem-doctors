@@ -9,7 +9,7 @@
 //   { status: "not_found" }                           — proceed to /start; admin queue
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { verifyLicense } from "@/lib/moh/match";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -22,7 +22,7 @@ const Body = z.object({
   turnstile_token: z.string().optional(),
 });
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
 
   const rl = await rateLimit("signupCheckLicense", `ip:${ip}`);
@@ -80,4 +80,4 @@ export async function POST(req: Request) {
     // still let the user proceed (and land in admin queue).
     return jsonError(503, { error: "moh_unavailable", code: "moh_unavailable" });
   }
-}
+});

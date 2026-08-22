@@ -8,7 +8,7 @@
 // re-run on failure.
 
 import { NextResponse } from "next/server";
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { MohClient } from "@/lib/moh/client";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -16,7 +16,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes — full snapshot is ~3MB / 63k rows
 
-export async function GET(req: Request) {
+export const GET = withJsonErrors(async (req: Request) => {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
@@ -93,7 +93,7 @@ export async function GET(req: Request) {
     rows_upserted: upserted,
     duration_ms: Date.now() - startedAt,
   });
-}
+});
 
 function toRow(rec: {
   "מספר רישיון רופא": number;

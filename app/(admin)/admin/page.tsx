@@ -21,7 +21,7 @@ export default async function AdminDoctorsPage({
   let query = service
     .from("doctors")
     .select(
-      "id, arabic_first_name, arabic_family_name, phone_e164, license_number, license_verification_status, is_admin_approved, is_active, is_visible, created_at",
+      "id, arabic_first_name, arabic_family_name, phone_e164, license_number, license_region, secondary_license_number, secondary_license_region, license_verification_status, career_stage, is_admin_approved, is_active, is_visible, created_at",
     )
     .order("created_at", { ascending: false })
     .limit(200);

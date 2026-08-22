@@ -1,5 +1,6 @@
 import { LoginForm } from "./LoginForm";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
+import { SupportContact } from "@/components/SupportContact";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default function LoginPage() {
         </section>
       )}
       <LoginForm />
+      <SupportContact />
     </main>
   );
 }

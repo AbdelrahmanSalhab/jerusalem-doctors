@@ -2,7 +2,7 @@
 // Validates the OTP via Supabase Auth and lets SSR cookies persist the session.
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -13,7 +13,7 @@ const Body = z.object({
   otp_code: z.string().regex(/^\d{4,8}$/),
 });
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
 
   let parsed: z.infer<typeof Body>;
@@ -108,4 +108,4 @@ export async function POST(req: Request) {
     ok: true,
     is_admin_approved: doctor.data.is_admin_approved,
   });
-}
+});

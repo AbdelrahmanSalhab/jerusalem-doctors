@@ -9,7 +9,17 @@ const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
 const WHATSAPP_URL = "https://wa.me/972524209156";
 
 type Specialty = { id: string; name_ar: string };
-type WorkplaceInput = { name: string; is_primary: boolean };
+type WorkplaceInput = {
+  name: string;
+  workplace_type: "hospital" | "clinic";
+  details: string;
+  is_primary: boolean;
+};
+
+const CAREER_STAGE_LABEL: Record<string, string> = {
+  resident: "طبيب مقيم",
+  specialist: "طبيب أخصائي",
+};
 
 export function ProfileForm({
   doctor,
@@ -20,20 +30,32 @@ export function ProfileForm({
   doctor: Doctor;
   specialties: Specialty[];
   currentSpecialtyIds: string[];
-  currentWorkplaces: { name: string; is_primary: boolean; sort_order: number }[];
+  currentWorkplaces: {
+    name: string;
+    workplace_type: "hospital" | "clinic";
+    details: string | null;
+    is_primary: boolean;
+    sort_order: number;
+  }[];
 }) {
   const router = useRouter();
   const [arabicFirst, setArabicFirst] = useState(doctor.arabic_first_name);
   const [arabicFamily, setArabicFamily] = useState(doctor.arabic_family_name);
   const [email, setEmail] = useState(doctor.email ?? "");
   const [subspecialty, setSubspecialty] = useState(doctor.subspecialty ?? "");
+  const [bio, setBio] = useState(doctor.bio ?? "");
   const [specialtyIds, setSpecialtyIds] = useState<string[]>(
     currentSpecialtyIds,
   );
   const initialWorkplaces: WorkplaceInput[] =
     currentWorkplaces.length > 0
-      ? currentWorkplaces.map((w) => ({ name: w.name, is_primary: w.is_primary }))
-      : [{ name: "", is_primary: true }];
+      ? currentWorkplaces.map((w) => ({
+          name: w.name,
+          workplace_type: w.workplace_type,
+          details: w.details ?? "",
+          is_primary: w.is_primary,
+        }))
+      : [{ name: "", workplace_type: "hospital", details: "", is_primary: true }];
   const [workplaces, setWorkplaces] =
     useState<WorkplaceInput[]>(initialWorkplaces);
   const [phoneVisible, setPhoneVisible] = useState(doctor.phone_is_visible);
@@ -59,16 +81,20 @@ export function ProfileForm({
   const setPrimary = (i: number) =>
     setWorkplaces((ws) => ws.map((w, j) => ({ ...w, is_primary: j === i })));
 
-  const updateWorkplaceName = (i: number, name: string) =>
+  const updateWorkplace = (i: number, patch: Partial<WorkplaceInput>) =>
     setWorkplaces((ws) =>
-      ws.map((w, j) => (j === i ? { ...w, name } : w)),
+      ws.map((w, j) => (j === i ? { ...w, ...patch } : w)),
     );
 
   const removeWorkplace = (i: number) =>
     setWorkplaces((ws) => {
       const next = ws.filter((_, j) => j !== i);
       // Ensure at least one entry exists and exactly one is primary.
-      if (next.length === 0) return [{ name: "", is_primary: true }];
+      if (next.length === 0) {
+        return [
+          { name: "", workplace_type: "hospital", details: "", is_primary: true },
+        ];
+      }
       if (!next.some((w) => w.is_primary)) {
         next[0] = { ...next[0]!, is_primary: true };
       }
@@ -76,7 +102,10 @@ export function ProfileForm({
     });
 
   const addWorkplace = () =>
-    setWorkplaces((ws) => [...ws, { name: "", is_primary: false }]);
+    setWorkplaces((ws) => [
+      ...ws,
+      { name: "", workplace_type: "hospital", details: "", is_primary: false },
+    ]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +114,12 @@ export function ProfileForm({
     setSaved(false);
 
     const cleanedWorkplaces = workplaces
-      .map((w) => ({ name: w.name.trim(), is_primary: w.is_primary }))
+      .map((w) => ({
+        name: w.name.trim(),
+        workplace_type: w.workplace_type,
+        details: w.details.trim() || null,
+        is_primary: w.is_primary,
+      }))
       .filter((w) => w.name.length > 0);
 
     if (cleanedWorkplaces.length === 0) {
@@ -114,6 +148,7 @@ export function ProfileForm({
           arabic_family_name: arabicFamily,
           email,
           subspecialty: subspecialty.trim() || null,
+          bio: bio.trim() || null,
           specialty_ids: specialtyIds,
           workplaces: cleanedWorkplaces,
           phone_is_visible: phoneVisible,
@@ -165,10 +200,33 @@ export function ProfileForm({
           المطوّر من زر الأسفل.
         </p>
         <Locked label="رقم الهاتف">{doctor.phone_e164}</Locked>
-        <Locked label="رقم الترخيص">{doctor.license_number}</Locked>
-        <Locked label="الاسم بالعبرية">
-          {doctor.hebrew_first_name} {doctor.hebrew_family_name}
+        <Locked label="رقم الترخيص">
+          {doctor.license_number}{" "}
+          <span className="text-foreground/50">
+            ({doctor.license_region === "IL" ? "إسرائيلي" : "فلسطيني"})
+          </span>
         </Locked>
+        {doctor.secondary_license_number && (
+          <Locked label="ترخيص إضافي">
+            {doctor.secondary_license_number}{" "}
+            <span className="text-foreground/50">
+              ({doctor.secondary_license_region === "IL" ? "إسرائيلي" : "فلسطيني"})
+            </span>
+          </Locked>
+        )}
+        {(doctor.hebrew_first_name || doctor.hebrew_family_name) && (
+          <Locked label="الاسم بالعبرية">
+            {doctor.hebrew_first_name} {doctor.hebrew_family_name}
+          </Locked>
+        )}
+        {doctor.career_stage && (
+          <Locked label="المرحلة المهنية">
+            {CAREER_STAGE_LABEL[doctor.career_stage]}{" "}
+            <span className="text-foreground/50">
+              (مستمدة تلقائيًا من سجل وزارة الصحة)
+            </span>
+          </Locked>
+        )}
       </Section>
 
       <Section title="الاسم بالعربية والبريد">
@@ -236,6 +294,16 @@ export function ProfileForm({
                 placeholder="اختياري"
               />
             </Field>
+            <Field label="نبذة عني">
+              <textarea
+                className="input"
+                rows={3}
+                maxLength={500}
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="اختياري — خبرة، اهتمامات مهنية، أو أي شيء تريد زملاءك أن يعرفوه"
+              />
+            </Field>
           </>
         ) : (
           <ReadOnlyView>
@@ -268,6 +336,12 @@ export function ProfileForm({
                 )}
               </span>
             </div>
+            <div>
+              <div className="mb-1 text-sm text-foreground/65">نبذة عني</div>
+              <span className="whitespace-pre-line">
+                {bio || <span className="text-foreground/40">— غير محدد —</span>}
+              </span>
+            </div>
           </ReadOnlyView>
         )}
       </Section>
@@ -281,32 +355,62 @@ export function ProfileForm({
         }
       >
         {editingWorkplaces ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {workplaces.map((wp, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2">
-                <input
-                  className="input min-w-0 flex-1"
-                  value={wp.name}
-                  onChange={(e) => updateWorkplaceName(i, e.target.value)}
-                  placeholder="اسم العيادة أو المستشفى"
-                />
-                <label className="flex items-center gap-1.5 text-sm">
+              <div key={i} className="space-y-2 rounded border border-foreground/15 p-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <input
-                    type="radio"
-                    name="primary_workplace"
-                    checked={wp.is_primary}
-                    onChange={() => setPrimary(i)}
+                    className="input min-w-0 flex-1"
+                    value={wp.name}
+                    onChange={(e) => updateWorkplace(i, { name: e.target.value })}
+                    placeholder="اسم العيادة أو المستشفى"
                   />
-                  رئيسي
-                </label>
-                <button
-                  type="button"
-                  onClick={() => removeWorkplace(i)}
-                  className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
-                  aria-label="حذف"
-                >
-                  حذف
-                </button>
+                  <label className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="radio"
+                      name="primary_workplace"
+                      checked={wp.is_primary}
+                      onChange={() => setPrimary(i)}
+                    />
+                    رئيسي
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeWorkplace(i)}
+                    className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
+                    aria-label="حذف"
+                  >
+                    حذف
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name={`workplace_type_${i}`}
+                      checked={wp.workplace_type === "hospital"}
+                      onChange={() => updateWorkplace(i, { workplace_type: "hospital" })}
+                    />
+                    مستشفى
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name={`workplace_type_${i}`}
+                      checked={wp.workplace_type === "clinic"}
+                      onChange={() => updateWorkplace(i, { workplace_type: "clinic" })}
+                    />
+                    عيادة خاصة
+                  </label>
+                </div>
+                {wp.workplace_type === "clinic" && (
+                  <input
+                    className="input"
+                    value={wp.details}
+                    onChange={(e) => updateWorkplace(i, { details: e.target.value })}
+                    placeholder="عنوان العيادة / أوقات الدوام / رقم الهاتف (اختياري)"
+                  />
+                )}
               </div>
             ))}
             <button
@@ -326,13 +430,21 @@ export function ProfileForm({
                 {workplaces
                   .filter((w) => w.name.trim().length > 0)
                   .map((w, i) => (
-                    <li key={i} className="flex items-center gap-2">
+                    <li key={i} className="flex flex-wrap items-center gap-2">
                       {w.is_primary && (
                         <span className="rounded-full border border-foreground/20 bg-foreground/5 px-2 py-0.5 text-xs">
                           رئيسي
                         </span>
                       )}
+                      <span className="rounded-full border border-foreground/15 px-2 py-0.5 text-xs text-foreground/65">
+                        {w.workplace_type === "clinic" ? "عيادة خاصة" : "مستشفى"}
+                      </span>
                       <span>{w.name}</span>
+                      {w.details && (
+                        <span className="text-foreground/60">
+                          ({w.details})
+                        </span>
+                      )}
                     </li>
                   ))}
               </ul>

@@ -3,11 +3,11 @@
 // admin. The doctor row remains for audit purposes; admin actions the
 // final state via /admin (also soft-only — no hard delete in MVP).
 
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
@@ -36,4 +36,4 @@ export async function POST(req: Request) {
   });
 
   return jsonOk({ ok: true });
-}
+});

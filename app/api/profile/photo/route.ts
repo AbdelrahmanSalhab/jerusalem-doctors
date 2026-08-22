@@ -4,7 +4,7 @@
 //
 // Body: multipart/form-data with field "file" (≤ 2MB, image/jpeg|png|webp).
 
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -12,7 +12,7 @@ const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 const ACCEPTED = new Set(["image/jpeg", "image/png", "image/webp"]);
 const BUCKET = "doctor-photos";
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
@@ -66,4 +66,4 @@ export async function POST(req: Request) {
   }
 
   return jsonOk({ ok: true, url });
-}
+});

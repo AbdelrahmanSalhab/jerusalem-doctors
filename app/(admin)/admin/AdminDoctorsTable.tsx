@@ -9,7 +9,11 @@ interface Row {
   arabic_family_name: string;
   phone_e164: string;
   license_number: string;
+  license_region: "IL" | "PS";
+  secondary_license_number: string | null;
+  secondary_license_region: "IL" | "PS" | null;
   license_verification_status: string | null;
+  career_stage: "resident" | "specialist" | null;
   is_admin_approved: boolean;
   is_active: boolean;
   is_visible: boolean;
@@ -21,6 +25,11 @@ const statusLabels: Record<string, string> = {
   soft_match: "تطابق جزئي",
   not_found: "غير موجود في السجل",
   name_mismatch_overridden: "تم التغاضي يدويًا",
+};
+
+const careerStageLabels: Record<string, string> = {
+  resident: "مقيم",
+  specialist: "أخصائي",
 };
 
 export function AdminDoctorsTable({
@@ -108,13 +117,14 @@ export function AdminDoctorsTable({
               <th className="p-3 text-center">الهاتف</th>
               <th className="p-3 text-center">الترخيص</th>
               <th className="p-3 text-center">حالة التحقق</th>
+              <th className="p-3 text-center">المرحلة</th>
               <th className="p-3 text-center">إجراءات</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-foreground/65">
+                <td colSpan={6} className="p-6 text-center text-foreground/65">
                   لا توجد نتائج.
                 </td>
               </tr>
@@ -130,7 +140,15 @@ export function AdminDoctorsTable({
                   {r.phone_e164}
                 </td>
                 <td className="p-3 text-center" dir="ltr">
-                  {r.license_number}
+                  {r.license_number}{" "}
+                  <span className="text-foreground/50">
+                    ({r.license_region === "IL" ? "IL" : "PS"})
+                  </span>
+                  {r.secondary_license_number && (
+                    <div className="text-foreground/50">
+                      +{r.secondary_license_number} ({r.secondary_license_region})
+                    </div>
+                  )}
                 </td>
                 <td className="p-3 text-center">
                   <span
@@ -144,6 +162,9 @@ export function AdminDoctorsTable({
                     {statusLabels[r.license_verification_status ?? ""] ??
                       "غير محدد"}
                   </span>
+                </td>
+                <td className="p-3 text-center text-foreground/75">
+                  {r.career_stage ? careerStageLabels[r.career_stage] : "—"}
                 </td>
                 <td className="p-3 text-center">
                   <div className="flex flex-wrap justify-center gap-1.5">

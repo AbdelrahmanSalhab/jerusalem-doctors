@@ -5,10 +5,11 @@
 // signup session id which the client must echo back to /verify.
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { verifyLicense } from "@/lib/moh/match";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
+import { isValidLicenseFormat, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -17,27 +18,50 @@ import { verifyTurnstile } from "@/lib/turnstile";
 
 const PENDING_TTL_MS = 15 * 60_000;
 
-const Body = z.object({
-  phone: z.string().min(1),
-  license_number: z.string().min(1),
-  arabic_first_name: z.string().min(2),
-  arabic_family_name: z.string().min(2),
-  hebrew_first_name: z.string().min(2),
-  hebrew_family_name: z.string().min(2),
-  specialty_ids: z.array(z.uuid()).min(1).max(5),
-  subspecialty: z.string().trim().optional().nullable(),
-  email: z.email(),
-  // Workplaces. main_workplace is required (primary). other_workplaces is
-  // an unbounded list; we filter empties + dedupe server-side.
-  main_workplace: z.string().trim().min(2).max(120),
-  other_workplaces: z.array(z.string().trim().min(1).max(120)).default([]),
-  consent: z.literal(true),
-  turnstile_token: z.string().optional(),
-  // Soft-match override flow: client confirms registry name; we record it.
-  override_name_mismatch: z.boolean().optional(),
+const WorkplaceInput = z.object({
+  name: z.string().trim().min(2).max(120),
+  workplace_type: z.enum(["hospital", "clinic"]).default("hospital"),
+  details: z.string().trim().max(300).optional().nullable(),
+  is_primary: z.boolean(),
 });
 
-export async function POST(req: Request) {
+const Body = z
+  .object({
+    phone: z.string().min(1),
+    license_region: z.enum(["IL", "PS"]),
+    license_number: z.string().min(1),
+    // A doctor can be dually licensed (e.g. IL-licensed but also PS
+    // certified, or vice versa). Both fields are set together or not at all
+    // — enforced below.
+    secondary_license_region: z.enum(["IL", "PS"]).optional().nullable(),
+    secondary_license_number: z.string().trim().max(20).optional().nullable(),
+    arabic_first_name: z.string().min(2),
+    arabic_family_name: z.string().min(2),
+    // Only meaningful when either license is IL — used solely to cross-check
+    // the Israeli MoH registry. PS doctors have no registry to match against.
+    hebrew_first_name: z.string().trim().max(80).optional().nullable(),
+    hebrew_family_name: z.string().trim().max(80).optional().nullable(),
+    specialty_ids: z.array(z.uuid()).min(1).max(5),
+    subspecialty: z.string().trim().optional().nullable(),
+    email: z.email(),
+    bio: z.string().trim().max(500).optional().nullable(),
+    // Exactly one entry must be is_primary:true — validated below.
+    workplaces: z.array(WorkplaceInput).min(1).max(20),
+    consent: z.literal(true),
+    turnstile_token: z.string().optional(),
+    // Soft-match override flow: client confirms registry name; we record it.
+    override_name_mismatch: z.boolean().optional(),
+  })
+  .refine(
+    (b) => Boolean(b.secondary_license_region) === Boolean(b.secondary_license_number),
+    { message: "أدخل رقم الترخيص الإضافي وجهته معًا", path: ["secondary_license_number"] },
+  )
+  .refine((b) => b.secondary_license_region !== b.license_region, {
+    message: "الترخيص الإضافي يجب أن يكون من الجهة الأخرى",
+    path: ["secondary_license_region"],
+  });
+
+export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
 
   // Per-IP gate first; per-phone limit after we normalize.
@@ -82,21 +106,67 @@ export async function POST(req: Request) {
   }
 
   const license = parsed.license_number.trim();
-  if (!/^\d{1,12}$/.test(license)) {
+  const region = parsed.license_region;
+  const secondaryRegion = parsed.secondary_license_region ?? null;
+  const secondaryLicense = parsed.secondary_license_number?.trim() || null;
+  const hasSecondary = Boolean(secondaryRegion && secondaryLicense);
+
+  if (!isValidLicenseFormat(region, license)) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
-      fields: { license_number: "رقم الترخيص يجب أن يحتوي على أرقام فقط" },
+      fields: { license_number: licenseFormatErrorMessage(region) },
     });
+  }
+  if (hasSecondary && !isValidLicenseFormat(secondaryRegion!, secondaryLicense!)) {
+    return jsonError(400, {
+      error: "invalid_license",
+      code: "invalid_license",
+      fields: {
+        secondary_license_number: licenseFormatErrorMessage(secondaryRegion!),
+      },
+    });
+  }
+
+  // Hebrew name is only meaningful for cross-checking the Israeli MoH
+  // registry — required whenever either license slot is IL.
+  const needsHebrewName = region === "IL" || secondaryRegion === "IL";
+  if (needsHebrewName) {
+    if (
+      !parsed.hebrew_first_name ||
+      parsed.hebrew_first_name.trim().length < 2 ||
+      !parsed.hebrew_family_name ||
+      parsed.hebrew_family_name.trim().length < 2
+    ) {
+      return jsonError(400, {
+        error: "invalid_body",
+        code: "invalid_body",
+        fields: {
+          hebrew_full_name:
+            "الاسم بالعبرية مطلوب لمطابقة سجل وزارة الصحة الإسرائيلية",
+        },
+      });
+    }
   }
 
   const service = createSupabaseServiceClient();
 
-  // Defensive uniqueness re-check against race with check-unique.
+  // Defensive uniqueness re-check against race with check-unique. License
+  // numbers are only unique within their own issuing region, and a license
+  // number can't be reused across doctors regardless of which slot
+  // (primary/secondary) it's registered in.
+  const licensePairs = [{ region, license }];
+  if (hasSecondary) licensePairs.push({ region: secondaryRegion!, license: secondaryLicense! });
+  const licenseOr = licensePairs
+    .flatMap((p) => [
+      `and(license_region.eq.${p.region},license_number.eq.${p.license})`,
+      `and(secondary_license_region.eq.${p.region},secondary_license_number.eq.${p.license})`,
+    ])
+    .join(",");
   const dupe = await service
     .from("doctors")
-    .select("id, phone_e164, license_number")
-    .or(`phone_e164.eq.${phoneE164},license_number.eq.${license}`)
+    .select("id, phone_e164, license_number, secondary_license_number")
+    .or(`phone_e164.eq.${phoneE164},${licenseOr}`)
     .limit(1)
     .maybeSingle();
   if (dupe.error && dupe.error.code !== "PGRST116") throw dupe.error;
@@ -114,12 +184,17 @@ export async function POST(req: Request) {
     });
   }
 
-  // Defensive MoH re-check. Cheap and the result is cached on the client.
-  const verified = await verifyLicense(service, {
-    licenseNumber: Number(license),
-    hebrewFirstName: parsed.hebrew_first_name,
-    hebrewFamilyName: parsed.hebrew_family_name,
-  });
+  // MoH cross-check only applies to the Israeli registry. PS-track signups
+  // have nothing to check against, so they always fall through to manual
+  // admin review — same outcome as an IL license we can't find.
+  const verified =
+    region === "IL"
+      ? await verifyLicense(service, {
+          licenseNumber: Number(license),
+          hebrewFirstName: parsed.hebrew_first_name!,
+          hebrewFamilyName: parsed.hebrew_family_name!,
+        })
+      : ({ status: "not_found", source: "none" } as const);
   if (verified.status === "name_mismatch" && !parsed.override_name_mismatch) {
     return jsonError(409, {
       error: "license_name_mismatch",
@@ -130,39 +205,95 @@ export async function POST(req: Request) {
     });
   }
 
+  // The secondary license is supplementary — we opportunistically cross-check
+  // it against the IL registry when applicable, but it never blocks signup
+  // or requires the override flow (only the primary license gates access).
+  const secondaryVerified =
+    hasSecondary && secondaryRegion === "IL"
+      ? await verifyLicense(service, {
+          licenseNumber: Number(secondaryLicense),
+          hebrewFirstName: parsed.hebrew_first_name!,
+          hebrewFamilyName: parsed.hebrew_family_name!,
+        })
+      : hasSecondary
+        ? ({ status: "not_found", source: "none" } as const)
+        : null;
+
+  // Career stage is only auto-derivable from an IL match: the registry row
+  // carries `שם התמחות` (specialty certificate name) when the doctor holds a
+  // specialization certificate, and omits it when they don't yet — i.e.
+  // still a resident / general practitioner. No equivalent signal exists for
+  // PS, so a PS-only doctor stays unset (admin can set it manually later). A
+  // dual-licensed doctor takes the more specific answer from either match.
+  const stageFrom = (
+    result: { status: string; registrySpecialtyHe?: string | null } | null,
+  ): "resident" | "specialist" | null => {
+    if (!result || (result.status !== "verified" && result.status !== "soft_match")) {
+      return null;
+    }
+    return result.registrySpecialtyHe ? "specialist" : "resident";
+  };
+  const primaryStage = region === "IL" ? stageFrom(verified) : null;
+  const secondaryStage = secondaryRegion === "IL" ? stageFrom(secondaryVerified) : null;
+  const careerStage =
+    primaryStage === "specialist" || secondaryStage === "specialist"
+      ? "specialist"
+      : primaryStage === "resident" || secondaryStage === "resident"
+        ? "resident"
+        : null;
+
   // Pre-compute normalized columns for the doctors row we'll insert on /verify.
   const arabicFirstNorm = normalizeArabic(parsed.arabic_first_name);
   const arabicFamilyNorm = normalizeArabic(parsed.arabic_family_name);
   const arabicFullNorm = normalizeArabic(
     `${parsed.arabic_first_name} ${parsed.arabic_family_name}`,
   );
-  const hebrewFirstStored = normalizeHebrew(parsed.hebrew_first_name);
-  const hebrewFamilyStored = normalizeHebrew(parsed.hebrew_family_name);
+  const hebrewFirstStored = parsed.hebrew_first_name
+    ? normalizeHebrew(parsed.hebrew_first_name)
+    : null;
+  const hebrewFamilyStored = parsed.hebrew_family_name
+    ? normalizeHebrew(parsed.hebrew_family_name)
+    : null;
   const subspecialtyNorm = parsed.subspecialty
     ? normalizeArabic(parsed.subspecialty)
     : null;
 
-  // Build the workplace list: primary first, then deduped + non-empty others.
-  const seenWp = new Set<string>();
-  const mainWp = parsed.main_workplace.trim();
-  seenWp.add(normalizeArabic(mainWp));
-  const workplaces: { name: string; name_normalized: string; is_primary: boolean; sort_order: number }[] = [
-    { name: mainWp, name_normalized: normalizeArabic(mainWp), is_primary: true, sort_order: 0 },
-  ];
-  let order = 1;
-  for (const raw of parsed.other_workplaces) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const norm = normalizeArabic(trimmed);
-    if (seenWp.has(norm)) continue;
-    seenWp.add(norm);
-    workplaces.push({
-      name: trimmed,
-      name_normalized: norm,
-      is_primary: false,
-      sort_order: order++,
+  // Exactly one workplace must be primary.
+  const primaryCount = parsed.workplaces.filter((w) => w.is_primary).length;
+  if (primaryCount !== 1) {
+    return jsonError(400, {
+      error: "invalid_body",
+      code: "invalid_body",
+      fields: { workplaces: "يجب أن يكون هناك مكان عمل رئيسي واحد" },
     });
   }
+
+  // Dedupe by normalized name, keep the primary first.
+  const seenWp = new Set<string>();
+  const workplaces: {
+    name: string;
+    name_normalized: string;
+    workplace_type: "hospital" | "clinic";
+    details: string | null;
+    is_primary: boolean;
+    sort_order: number;
+  }[] = [];
+  const ordered = [...parsed.workplaces].sort((a, b) =>
+    a.is_primary === b.is_primary ? 0 : a.is_primary ? -1 : 1,
+  );
+  ordered.forEach((w, i) => {
+    const norm = normalizeArabic(w.name);
+    if (seenWp.has(norm)) return;
+    seenWp.add(norm);
+    workplaces.push({
+      name: w.name,
+      name_normalized: norm,
+      workplace_type: w.workplace_type,
+      details: w.details?.trim() || null,
+      is_primary: w.is_primary,
+      sort_order: i,
+    });
+  });
 
   const now = Date.now();
   const expiresAt = new Date(now + PENDING_TTL_MS).toISOString();
@@ -175,6 +306,9 @@ export async function POST(req: Request) {
         phone_e164: phoneE164,
         phone_display: parsed.phone.trim(),
         license_number: license,
+        license_region: region,
+        secondary_license_region: hasSecondary ? secondaryRegion : null,
+        secondary_license_number: hasSecondary ? secondaryLicense : null,
 
         arabic_first_name: parsed.arabic_first_name.trim(),
         arabic_family_name: parsed.arabic_family_name.trim(),
@@ -188,6 +322,8 @@ export async function POST(req: Request) {
         subspecialty: parsed.subspecialty?.trim() || null,
         subspecialty_normalized: subspecialtyNorm,
         email: parsed.email?.trim() || null,
+        bio: parsed.bio?.trim() || null,
+        career_stage: careerStage,
 
         specialty_ids: parsed.specialty_ids,
         workplaces,
@@ -196,6 +332,9 @@ export async function POST(req: Request) {
           verified.status,
           parsed.override_name_mismatch,
         ),
+        secondary_license_verification_status: secondaryVerified
+          ? licenseStatusToColumn(secondaryVerified.status, false)
+          : null,
       },
       expires_at: expiresAt,
     })
@@ -223,7 +362,7 @@ export async function POST(req: Request) {
     expires_at: expiresAt,
     license_status: verified.status,
   });
-}
+});
 
 function licenseStatusToColumn(
   status: "verified" | "soft_match" | "name_mismatch" | "not_found",

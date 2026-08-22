@@ -1,7 +1,7 @@
 // PATCH /api/admin/specialties/[id] — rename, reorder, or toggle active.
 
 import { z } from "zod";
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdmin } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -14,10 +14,10 @@ const Body = z.object({
   is_active: z.boolean().optional(),
 });
 
-export async function PATCH(
+export const PATCH = withJsonErrors(async (
   req: Request,
   ctx: { params: Promise<{ id: string }> },
-) {
+) => {
   const admin = await requireAdmin().catch(() => null);
   if (!admin) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
@@ -48,4 +48,4 @@ export async function PATCH(
   }
 
   return jsonOk({ ok: true });
-}
+});
