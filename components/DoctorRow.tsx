@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import type { SearchHit } from "@/app/api/search/route";
+import { CAREER_STAGE_LABEL } from "@/lib/careerStage";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
@@ -26,7 +27,9 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
       <div className="min-w-0 flex-1 space-y-1.5">
         <h3 className="text-lg font-bold leading-tight">{name}</h3>
 
-        {(doctor.specialties.length > 0 || doctor.subspecialty) && (
+        {(doctor.specialties.length > 0 ||
+          doctor.subspecialty ||
+          doctor.career_stage) && (
           <ul className="flex flex-wrap gap-1.5">
             {doctor.specialties.map((s) => (
               <li
@@ -41,13 +44,27 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
                 {doctor.subspecialty}
               </li>
             )}
+            {doctor.career_stage && (
+              <li className="rounded-full border border-sky-300/60 bg-sky-50/60 px-2 py-0.5 text-xs text-sky-900 dark:bg-sky-900/20 dark:text-sky-100">
+                {CAREER_STAGE_LABEL[doctor.career_stage]}
+              </li>
+            )}
           </ul>
+        )}
+
+        {doctor.bio && (
+          <p className="whitespace-pre-line text-sm text-foreground/80">
+            {doctor.bio}
+          </p>
         )}
 
         {primaryWp && (
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-foreground/75">
             <span aria-hidden="true">📍</span>
             <span className="font-medium text-foreground">{primaryWp.name}</span>
+            {primaryWp.details && (
+              <span className="text-foreground/60">({primaryWp.details})</span>
+            )}
             {otherWps.length > 0 && (
               <span className="text-foreground/65">
                 · {otherWps.map((w) => w.name).join("، ")}

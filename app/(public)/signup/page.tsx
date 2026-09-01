@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { SignupForm } from "./SignupForm";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { SupportContact } from "@/components/SupportContact";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export default async function SignupPage() {
       )}
 
       <SignupForm specialties={specialties} />
+      <SupportContact />
     </main>
   );
 }

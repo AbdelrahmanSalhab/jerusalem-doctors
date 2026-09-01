@@ -22,7 +22,7 @@ export default async function ProfilePage() {
         .eq("doctor_id", me.id),
       service
         .from("doctor_workplaces")
-        .select("name, is_primary, sort_order")
+        .select("name, workplace_type, details, is_primary, sort_order")
         .eq("doctor_id", me.id)
         .order("is_primary", { ascending: false })
         .order("sort_order", { ascending: true }),
@@ -42,7 +42,10 @@ export default async function ProfilePage() {
           (r) => r.specialty_id,
         )}
         currentWorkplaces={
-          (workplaces as Pick<DoctorWorkplace, "name" | "is_primary" | "sort_order">[]) ?? []
+          (workplaces as Pick<
+            DoctorWorkplace,
+            "name" | "workplace_type" | "details" | "is_primary" | "sort_order"
+          >[]) ?? []
         }
       />
     </main>

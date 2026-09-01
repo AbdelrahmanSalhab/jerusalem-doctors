@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import type { SearchHit } from "@/app/api/search/route";
+import { CAREER_STAGE_LABEL } from "@/lib/careerStage";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
@@ -19,7 +20,7 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         />
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-bold leading-tight">{name}</h3>
-          {doctor.specialties.length > 0 && (
+          {(doctor.specialties.length > 0 || doctor.career_stage) && (
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {doctor.specialties.map((s) => (
                 <li
@@ -29,10 +30,21 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
                   {s}
                 </li>
               ))}
+              {doctor.career_stage && (
+                <li className="rounded-full border border-sky-300/60 bg-sky-50/60 px-2 py-0.5 text-xs text-sky-900 dark:bg-sky-900/20 dark:text-sky-100">
+                  {CAREER_STAGE_LABEL[doctor.career_stage]}
+                </li>
+              )}
             </ul>
           )}
         </div>
       </header>
+
+      {doctor.bio && (
+        <p className="whitespace-pre-line text-sm text-foreground/80">
+          {doctor.bio}
+        </p>
+      )}
 
       {doctor.subspecialty && (
         <p className="text-sm">
@@ -44,13 +56,21 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
       {primaryWp && (
         <div className="text-sm">
           <p>
-            <span className="text-foreground/65">مكان العمل:</span>{" "}
+            <span className="text-foreground/65">
+              {primaryWp.workplace_type === "clinic" ? "العيادة:" : "مكان العمل:"}
+            </span>{" "}
             <span className="font-medium">{primaryWp.name}</span>
           </p>
+          {primaryWp.details && (
+            <p className="mt-0.5 text-foreground/65">{primaryWp.details}</p>
+          )}
           {otherWps.length > 0 && (
             <ul className="mt-1 list-inside list-disc text-foreground/75">
               {otherWps.map((w) => (
-                <li key={w.name}>{w.name}</li>
+                <li key={w.name}>
+                  {w.name}
+                  {w.details ? ` — ${w.details}` : ""}
+                </li>
               ))}
             </ul>
           )}

@@ -51,6 +51,14 @@ function closeEnough(a: string, b: string): boolean {
   return levenshtein(a, b) <= 1;
 }
 
+/** Government CSV exports sometimes use a whitespace-only string for
+ * "no specialty" instead of a real null — treat that the same as null so it
+ * doesn't get misread as "this doctor holds a specialization certificate". */
+function cleanSpecialty(s: string | null | undefined): string | null {
+  const trimmed = s?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function levenshtein(a: string, b: string): number {
   if (a.length === 0) return b.length;
   if (b.length === 0) return a.length;
@@ -124,6 +132,8 @@ function compareNames(
   inputFamilyNorm: string,
   source: "mirror" | "live",
 ): LicenseVerifyResult {
+  const specialty = cleanSpecialty(row.specialty_name_he);
+
   const exact =
     inputFirstNorm === row.hebrew_first_norm &&
     inputFamilyNorm === row.hebrew_family_norm;
@@ -131,7 +141,7 @@ function compareNames(
   if (exact) {
     return {
       status: "verified",
-      registrySpecialtyHe: row.specialty_name_he ?? null,
+      registrySpecialtyHe: specialty,
       source,
     };
   }
@@ -145,15 +155,20 @@ function compareNames(
       status: "soft_match",
       registryFirstName: row.hebrew_first_name,
       registryFamilyName: row.hebrew_family_name,
-      registrySpecialtyHe: row.specialty_name_he ?? null,
+      registrySpecialtyHe: specialty,
       source,
     };
   }
 
+  // Even on a name mismatch, we've still matched the license *number* to a
+  // real row — keep the specialty so a human-confirmed override (see
+  // signup/start's override_name_mismatch flow) doesn't lose the career
+  // stage signal.
   return {
     status: "name_mismatch",
     registryFirstName: row.hebrew_first_name,
     registryFamilyName: row.hebrew_family_name,
+    registrySpecialtyHe: specialty,
     source,
   };
 }

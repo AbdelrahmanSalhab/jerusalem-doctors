@@ -10,7 +10,7 @@
 // we filter explicitly so the user-scoped client doesn't have to.
 
 import { z } from "zod";
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
@@ -26,8 +26,8 @@ export interface SearchHit {
   id: string;
   arabic_first_name: string;
   arabic_family_name: string;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
+  hebrew_first_name: string | null;
+  hebrew_family_name: string | null;
   license_number: string;
   /** Null when the doctor opted to hide their phone via /profile. */
   phone_display: string | null;
@@ -35,13 +35,20 @@ export interface SearchHit {
   whatsapp_url: string | null;
   email: string | null;
   subspecialty: string | null;
+  bio: string | null;
+  career_stage: "resident" | "specialist" | null;
   specialties: string[];
   /** Empty array when the doctor opted to hide their workplaces. */
-  workplaces: { name: string; is_primary: boolean }[];
+  workplaces: {
+    name: string;
+    workplace_type: "hospital" | "clinic";
+    details: string | null;
+    is_primary: boolean;
+  }[];
   profile_picture_url: string | null;
 }
 
-export async function GET(req: Request) {
+export const GET = withJsonErrors(async (req: Request) => {
   const me = await getCurrentDoctor().catch(() => null);
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
@@ -85,10 +92,12 @@ export async function GET(req: Request) {
       profile_picture_url,
       email,
       subspecialty,
+      bio,
+      career_stage,
       doctor_specialties${parsed.data.specialty_id ? "!inner" : ""}(
         specialty:specialties(id, name_ar)
       ),
-      doctor_workplaces(name, is_primary, sort_order)
+      doctor_workplaces(name, workplace_type, details, is_primary, sort_order)
     `,
     )
     .eq("is_active", true)
@@ -194,6 +203,8 @@ export async function GET(req: Request) {
     const workplaces = d.workplaces_is_visible
       ? ((d.doctor_workplaces ?? []) as Array<{
           name: string;
+          workplace_type: "hospital" | "clinic";
+          details: string | null;
           is_primary: boolean;
           sort_order: number;
         }>)
@@ -202,7 +213,12 @@ export async function GET(req: Request) {
             if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
             return a.sort_order - b.sort_order;
           })
-          .map(({ name, is_primary }) => ({ name, is_primary }))
+          .map(({ name, workplace_type, details, is_primary }) => ({
+            name,
+            workplace_type,
+            details,
+            is_primary,
+          }))
       : [];
 
     return {
@@ -216,6 +232,8 @@ export async function GET(req: Request) {
       whatsapp_url: d.phone_is_visible ? buildWhatsAppLink(d.phone_e164) : null,
       email: d.email,
       subspecialty: d.subspecialty,
+      bio: d.bio,
+      career_stage: d.career_stage,
       specialties,
       workplaces,
       profile_picture_url: d.profile_picture_url ?? null,
@@ -223,4 +241,4 @@ export async function GET(req: Request) {
   });
 
   return jsonOk({ results, count: results.length });
-}
+});

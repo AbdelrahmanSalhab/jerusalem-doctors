@@ -24,3 +24,24 @@ export function ipFromHeaders(req: Request): string {
   const real = req.headers.get("x-real-ip");
   return real ?? "unknown";
 }
+
+/**
+ * Wraps a route handler so an unexpected throw (bad env config, a Supabase
+ * client error we didn't anticipate, etc.) always comes back as JSON.
+ * Without this, Next's default error page is HTML — the client's
+ * `res.json()` then throws, and the user sees a generic "server connection
+ * error" with zero information for us to act on. Every route handler should
+ * be wrapped with this.
+ */
+export function withJsonErrors<Args extends unknown[]>(
+  handler: (req: Request, ...args: Args) => Promise<NextResponse>,
+): (req: Request, ...args: Args) => Promise<NextResponse> {
+  return async (req, ...args) => {
+    try {
+      return await handler(req, ...args);
+    } catch (err) {
+      console.error(`[${new URL(req.url).pathname}] unhandled error`, err);
+      return jsonError(500, { error: "internal_error", code: "internal_error" });
+    }
+  };
+}

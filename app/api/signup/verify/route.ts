@@ -4,7 +4,7 @@
 // helper persist the session.
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -19,6 +19,8 @@ const Body = z.object({
 interface PendingWorkplace {
   name: string;
   name_normalized: string;
+  workplace_type: "hospital" | "clinic";
+  details: string | null;
   is_primary: boolean;
   sort_order: number;
 }
@@ -27,16 +29,27 @@ interface PendingPayload {
   phone_e164: string;
   phone_display: string;
   license_number: string;
+  license_region: "IL" | "PS";
+  secondary_license_region: "IL" | "PS" | null;
+  secondary_license_number: string | null;
+  secondary_license_verification_status:
+    | "verified"
+    | "soft_match"
+    | "not_found"
+    | "name_mismatch_overridden"
+    | null;
   arabic_first_name: string;
   arabic_family_name: string;
   arabic_first_name_normalized: string;
   arabic_family_name_normalized: string;
   arabic_full_name_normalized: string;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
+  hebrew_first_name: string | null;
+  hebrew_family_name: string | null;
   subspecialty: string | null;
   subspecialty_normalized: string | null;
   email: string | null;
+  bio: string | null;
+  career_stage: "resident" | "specialist" | null;
   specialty_ids: string[];
   workplaces: PendingWorkplace[];
   license_verification_status:
@@ -47,7 +60,7 @@ interface PendingPayload {
     | null;
 }
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
 
   let parsed: z.infer<typeof Body>;
@@ -120,6 +133,12 @@ export async function POST(req: Request) {
       phone_e164: payload.phone_e164,
       phone_display: payload.phone_display,
       license_number: payload.license_number,
+      license_region: payload.license_region,
+      secondary_license_region: payload.secondary_license_region,
+      secondary_license_number: payload.secondary_license_number,
+      secondary_license_verification_status:
+        payload.secondary_license_verification_status,
+      career_stage: payload.career_stage,
       license_verified_at:
         payload.license_verification_status === "verified" ||
         payload.license_verification_status === "soft_match"
@@ -139,6 +158,7 @@ export async function POST(req: Request) {
       subspecialty: payload.subspecialty,
       subspecialty_normalized: payload.subspecialty_normalized,
       email: payload.email,
+      bio: payload.bio,
 
       consent_directory_use: true,
       consent_timestamp: new Date().toISOString(),
@@ -151,6 +171,14 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (insert.error) {
+    // 23505 = unique_violation. This is the legitimate outcome of a genuine
+    // race — two signups for the same phone/license slipping past the
+    // pre-checks in signup/start at the same moment — not a server bug, so
+    // it gets its own code rather than a generic 500.
+    if (insert.error.code === "23505") {
+      console.warn("[signup/verify] doctor insert race (duplicate)", insert.error);
+      return jsonError(409, { error: "duplicate", code: "duplicate" });
+    }
     console.error("[signup/verify] doctor insert failed", insert.error);
     return jsonError(500, { error: "create_failed", code: "create_failed" });
   }
@@ -174,6 +202,8 @@ export async function POST(req: Request) {
         doctor_id: insert.data.id,
         name: w.name,
         name_normalized: w.name_normalized,
+        workplace_type: w.workplace_type,
+        details: w.details,
         is_primary: w.is_primary,
         sort_order: w.sort_order,
       })),
@@ -197,4 +227,4 @@ export async function POST(req: Request) {
   });
 
   return jsonOk({ ok: true, auto_approved: isAutoApproved });
-}
+});

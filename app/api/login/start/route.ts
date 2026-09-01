@@ -3,7 +3,7 @@
 // kicks off Supabase Auth's OTP flow.
 
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -15,7 +15,7 @@ const Body = z.object({
   turnstile_token: z.string().optional(),
 });
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
 
   let parsed: z.infer<typeof Body>;
@@ -91,4 +91,4 @@ export async function POST(req: Request) {
   }
 
   return jsonOk({ ok: true, phone_e164: phoneE164 });
-}
+});

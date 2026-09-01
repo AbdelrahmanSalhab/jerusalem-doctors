@@ -4,7 +4,7 @@
 // as a single replace-all set per request — simpler than diffing.
 
 import { z } from "zod";
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
@@ -15,11 +15,14 @@ const Body = z.object({
   arabic_family_name: z.string().trim().min(2).max(80).optional(),
   email: z.email().optional(),
   subspecialty: z.string().trim().max(120).nullable().optional(),
+  bio: z.string().trim().max(500).nullable().optional(),
   specialty_ids: z.array(z.uuid()).min(1).max(5).optional(),
   workplaces: z
     .array(
       z.object({
         name: z.string().trim().min(2).max(120),
+        workplace_type: z.enum(["hospital", "clinic"]).default("hospital"),
+        details: z.string().trim().max(300).nullable().optional(),
         is_primary: z.boolean(),
       }),
     )
@@ -30,7 +33,7 @@ const Body = z.object({
   workplaces_is_visible: z.boolean().optional(),
 });
 
-export async function PATCH(req: Request) {
+export const PATCH = withJsonErrors(async (req: Request) => {
   const me = await requireDoctorOrNull();
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
@@ -76,6 +79,9 @@ export async function PATCH(req: Request) {
     updates.subspecialty_normalized = parsed.subspecialty
       ? normalizeArabic(parsed.subspecialty)
       : null;
+  }
+  if (parsed.bio !== undefined) {
+    updates.bio = parsed.bio || null;
   }
   if (parsed.phone_is_visible !== undefined) {
     updates.phone_is_visible = parsed.phone_is_visible;
@@ -132,6 +138,8 @@ export async function PATCH(req: Request) {
         doctor_id: me.id,
         name: w.name,
         name_normalized: normalizeArabic(w.name),
+        workplace_type: w.workplace_type,
+        details: w.details?.trim() || null,
         is_primary: w.is_primary,
         sort_order: w.is_primary ? 0 : i + 1,
       }))
@@ -153,7 +161,7 @@ export async function PATCH(req: Request) {
   }
 
   return jsonOk({ ok: true });
-}
+});
 
 async function requireDoctorOrNull() {
   try {

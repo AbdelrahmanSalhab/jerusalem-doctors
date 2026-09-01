@@ -16,10 +16,11 @@ export interface Doctor {
   arabic_first_name_normalized: string;
   arabic_family_name_normalized: string;
   arabic_full_name_normalized: string;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
-  hebrew_full_name: string;
+  hebrew_first_name: string | null;
+  hebrew_family_name: string | null;
+  hebrew_full_name: string | null;
   license_number: string;
+  license_region: "IL" | "PS";
   license_verified_at: string | null;
   license_verification_status:
     | "verified"
@@ -27,9 +28,19 @@ export interface Doctor {
     | "not_found"
     | "name_mismatch_overridden"
     | null;
+  secondary_license_region: "IL" | "PS" | null;
+  secondary_license_number: string | null;
+  secondary_license_verification_status:
+    | "verified"
+    | "soft_match"
+    | "not_found"
+    | "name_mismatch_overridden"
+    | null;
+  career_stage: "resident" | "specialist" | null;
   subspecialty: string | null;
   subspecialty_normalized: string | null;
   email: string | null;
+  bio: string | null;
   consent_directory_use: boolean;
   consent_timestamp: string;
   is_phone_verified: boolean;
@@ -82,6 +93,8 @@ export interface DoctorWorkplace {
   doctor_id: string;
   name: string;
   name_normalized: string;
+  workplace_type: "hospital" | "clinic";
+  details: string | null;
   is_primary: boolean;
   sort_order: number;
   created_at: string;

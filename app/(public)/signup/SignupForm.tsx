@@ -8,10 +8,22 @@ import {
 } from "@/components/TurnstileWidget";
 
 type Specialty = { id: string; name_ar: string };
+type LicenseRegion = "IL" | "PS";
+type WorkplaceType = "hospital" | "clinic";
+type WorkplaceEntry = {
+  name: string;
+  workplace_type: WorkplaceType;
+  details: string;
+  is_primary: boolean;
+};
 
 type FormState = {
   phone: string;
+  license_region: LicenseRegion;
   license_number: string;
+  has_secondary_license: boolean;
+  secondary_license_region: LicenseRegion;
+  secondary_license_number: string;
   arabic_first_name: string;
   arabic_family_name: string;
   hebrew_first_name: string;
@@ -19,14 +31,27 @@ type FormState = {
   specialty_ids: string[];
   subspecialty: string;
   email: string;
-  main_workplace: string;
-  other_workplaces: string[];
+  bio: string;
+  workplaces: WorkplaceEntry[];
   consent: boolean;
 };
 
+const EMPTY_WORKPLACE = (isPrimary: boolean): WorkplaceEntry => ({
+  name: "",
+  workplace_type: "hospital",
+  details: "",
+  is_primary: isPrimary,
+});
+
+const OTHER_REGION: Record<LicenseRegion, LicenseRegion> = { IL: "PS", PS: "IL" };
+
 const INITIAL: FormState = {
   phone: "",
+  license_region: "IL",
   license_number: "",
+  has_secondary_license: false,
+  secondary_license_region: "PS",
+  secondary_license_number: "",
   arabic_first_name: "",
   arabic_family_name: "",
   hebrew_first_name: "",
@@ -34,8 +59,8 @@ const INITIAL: FormState = {
   specialty_ids: [],
   subspecialty: "",
   email: "",
-  main_workplace: "",
-  other_workplaces: [],
+  bio: "",
+  workplaces: [EMPTY_WORKPLACE(true)],
   consent: false,
 };
 
@@ -75,52 +100,58 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     setRegistryName(null);
     setSubmitting(true);
 
+    const cleanedWorkplaces = form.workplaces
+      .map((w) => ({ ...w, name: w.name.trim(), details: w.details.trim() }))
+      .filter((w) => w.name.length > 0);
+
     try {
       // Uniqueness is re-checked server-side in /signup/start, so we don't
       // need a separate /check-unique call here. Cuts one Turnstile-gated
       // round-trip and avoids the single-use token problem (each verified
       // token is consumed by Cloudflare; multiple calls per submit fail).
 
-      // Step 1: license cross-check (skip silently on transient failures)
-      const lic = await fetch("/api/signup/check-license", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          license_number: form.license_number,
-          hebrew_first_name: form.hebrew_first_name,
-          hebrew_family_name: form.hebrew_family_name,
-          turnstile_token: turnstileToken,
-        }),
-      }).then((r) => r.json());
+      // The MoH cross-check only covers the Israeli registry — PS-track
+      // signups have nothing to check against, so they skip straight to
+      // /start and land in admin review either way.
+      let freshToken = turnstileToken;
+      if (form.license_region === "IL") {
+        // Step 1: license cross-check (skip silently on transient failures)
+        const lic = await fetch("/api/signup/check-license", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            license_number: form.license_number,
+            hebrew_first_name: form.hebrew_first_name,
+            hebrew_family_name: form.hebrew_family_name,
+            turnstile_token: turnstileToken,
+          }),
+        }).then((r) => r.json());
 
-      if (
-        lic?.status === "name_mismatch" &&
-        !overrideMismatch
-      ) {
-        setRegistryName({
-          first: lic.registry_first_name,
-          family: lic.registry_family_name,
-        });
-        setFieldErrors({
-          hebrew_full_name:
-            "الاسم العبري لا يطابق سجل وزارة الصحة. تحقق من الكتابة كما تظهر على رخصتك.",
-        });
-        setSubmitting(false);
-        return;
-      }
+        if (lic?.status === "name_mismatch" && !overrideMismatch) {
+          setRegistryName({
+            first: lic.registry_first_name,
+            family: lic.registry_family_name,
+          });
+          setFieldErrors({
+            hebrew_full_name:
+              "الاسم العبري لا يطابق سجل وزارة الصحة. تحقق من الكتابة كما تظهر على رخصتك.",
+          });
+          setSubmitting(false);
+          return;
+        }
 
-      // Step 2: full submit. The Turnstile token was consumed by step 1, so
-      // reset and wait for a fresh one before calling /start. With
-      // appearance: "interaction-only" + passive checks, the new token
-      // arrives in milliseconds without user interaction.
-      turnstileRef.current?.reset();
-      let freshToken = "";
-      try {
-        freshToken = (await turnstileRef.current?.getToken()) ?? "";
-      } catch {
-        setError("لم يكتمل التحقق من المتصفح. الرجاء إعادة المحاولة.");
-        setSubmitting(false);
-        return;
+        // Step 2: full submit. The Turnstile token was consumed by step 1, so
+        // reset and wait for a fresh one before calling /start. With
+        // appearance: "interaction-only" + passive checks, the new token
+        // arrives in milliseconds without user interaction.
+        turnstileRef.current?.reset();
+        try {
+          freshToken = (await turnstileRef.current?.getToken()) ?? "";
+        } catch {
+          setError("لم يكتمل التحقق من المتصفح. الرجاء إعادة المحاولة.");
+          setSubmitting(false);
+          return;
+        }
       }
 
       const start = await fetch("/api/signup/start", {
@@ -128,6 +159,13 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          workplaces: cleanedWorkplaces,
+          secondary_license_region: form.has_secondary_license
+            ? form.secondary_license_region
+            : null,
+          secondary_license_number: form.has_secondary_license
+            ? form.secondary_license_number.trim()
+            : null,
           override_name_mismatch: overrideMismatch,
           turnstile_token: freshToken,
         }),
@@ -158,15 +196,51 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
   const fieldError = (k: string) => fieldErrors[k];
 
+  const needsHebrewName =
+    form.license_region === "IL" ||
+    (form.has_secondary_license && form.secondary_license_region === "IL");
+
   // Strip disallowed chars from phone + license inputs so a paste of
   // "Phone: 050-1234567" still produces a clean digit string. Server-side
   // normalization is the actual source of truth.
   const onPhoneChange = (next: string) => {
     update("phone", next.replace(/[^0-9+\-\s()]/g, ""));
   };
+  // PS licenses have no confirmed public format, so we only strip characters
+  // that would break the request — IL stays digits-only.
   const onLicenseChange = (next: string) => {
-    update("license_number", next.replace(/\D/g, ""));
+    update(
+      "license_number",
+      form.license_region === "IL"
+        ? next.replace(/\D/g, "")
+        : next.replace(/[,()]/g, ""),
+    );
   };
+
+  const setWorkplacePrimary = (i: number) =>
+    setForm((s) => ({
+      ...s,
+      workplaces: s.workplaces.map((w, j) => ({ ...w, is_primary: j === i })),
+    }));
+  const updateWorkplace = (i: number, patch: Partial<WorkplaceEntry>) =>
+    setForm((s) => ({
+      ...s,
+      workplaces: s.workplaces.map((w, j) =>
+        j === i ? { ...w, ...patch } : w,
+      ),
+    }));
+  const addWorkplace = () =>
+    setForm((s) => ({
+      ...s,
+      workplaces: [...s.workplaces, EMPTY_WORKPLACE(false)],
+    }));
+  const removeWorkplace = (i: number) =>
+    setForm((s) => {
+      const next = s.workplaces.filter((_, j) => j !== i);
+      if (next.length === 0) return { ...s, workplaces: [EMPTY_WORKPLACE(true)] };
+      if (!next.some((w) => w.is_primary)) next[0] = { ...next[0]!, is_primary: true };
+      return { ...s, workplaces: next };
+    });
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 sm:gap-6">
@@ -186,16 +260,101 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           />
         </Field>
 
+        <Field label="جهة الترخيص">
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="license_region"
+                checked={form.license_region === "IL"}
+                onChange={() =>
+                  setForm((s) => ({
+                    ...s,
+                    license_region: "IL",
+                    secondary_license_region: "PS",
+                  }))
+                }
+              />
+              <span>ترخيص إسرائيلي (وزارة الصحة)</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="license_region"
+                checked={form.license_region === "PS"}
+                onChange={() =>
+                  setForm((s) => ({
+                    ...s,
+                    license_region: "PS",
+                    secondary_license_region: "IL",
+                  }))
+                }
+              />
+              <span>ترخيص فلسطيني (نقابة الأطباء / وزارة الصحة)</span>
+            </label>
+          </div>
+          {form.license_region === "PS" && (
+            <p className="mt-2 text-sm text-foreground/65">
+              لا يوجد سجل إلكتروني يمكننا مطابقته آليًا لهذا النوع من
+              التراخيص حاليًا، لذا ستتم مراجعة طلبك يدويًا من قبل الإدارة قبل
+              التفعيل.
+            </p>
+          )}
+        </Field>
+
         <Field label="رقم الترخيص (المعرف الطبي)" error={fieldError("license_number")}>
           <input
             required
             dir="ltr"
-            inputMode="numeric"
-            pattern="\d*"
+            inputMode={form.license_region === "IL" ? "numeric" : "text"}
+            pattern={form.license_region === "IL" ? "\\d*" : undefined}
             className="input"
             value={form.license_number}
             onChange={(e) => onLicenseChange(e.target.value)}
           />
+        </Field>
+
+        <Field label="ترخيص إضافي">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.has_secondary_license}
+              onChange={(e) => update("has_secondary_license", e.target.checked)}
+            />
+            <span>
+              لديّ أيضًا ترخيص من الجهة الأخرى ({" "}
+              {OTHER_REGION[form.license_region] === "IL" ? "إسرائيلي" : "فلسطيني"} )
+            </span>
+          </label>
+          {form.has_secondary_license && (
+            <input
+              required
+              dir="ltr"
+              className="input mt-2"
+              inputMode={
+                form.secondary_license_region === "IL" ? "numeric" : "text"
+              }
+              value={form.secondary_license_number}
+              onChange={(e) =>
+                update(
+                  "secondary_license_number",
+                  form.secondary_license_region === "IL"
+                    ? e.target.value.replace(/\D/g, "")
+                    : e.target.value.replace(/[,()]/g, ""),
+                )
+              }
+              placeholder={
+                form.secondary_license_region === "IL"
+                  ? "رقم الترخيص الإسرائيلي"
+                  : "رقم الترخيص الفلسطيني"
+              }
+            />
+          )}
+          {fieldError("secondary_license_number") && (
+            <p className="mt-1 text-sm text-red-600">
+              {fieldError("secondary_license_number")}
+            </p>
+          )}
         </Field>
 
         <Field label="البريد الإلكتروني" error={fieldError("email")}>
@@ -232,18 +391,30 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="الاسم بالعبرية" error={fieldError("hebrew_first_name")}>
+          <Field
+            label={
+              needsHebrewName ? "الاسم بالعبرية" : "الاسم بالعبرية (اختياري)"
+            }
+            error={fieldError("hebrew_first_name")}
+          >
             <input
-              required
+              required={needsHebrewName}
               dir="auto"
               className="input"
               value={form.hebrew_first_name}
               onChange={(e) => update("hebrew_first_name", e.target.value)}
             />
           </Field>
-          <Field label="اسم العائلة بالعبرية" error={fieldError("hebrew_family_name")}>
+          <Field
+            label={
+              needsHebrewName
+                ? "اسم العائلة بالعبرية"
+                : "اسم العائلة بالعبرية (اختياري)"
+            }
+            error={fieldError("hebrew_family_name")}
+          >
             <input
-              required
+              required={needsHebrewName}
               dir="auto"
               className="input"
               value={form.hebrew_family_name}
@@ -251,6 +422,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             />
           </Field>
         </div>
+        {needsHebrewName && (
+          <p className="text-sm text-foreground/65">
+            نستخدم الاسم بالعبرية فقط لمطابقة رقم الترخيص مع سجل وزارة الصحة
+            الإسرائيلية.
+          </p>
+        )}
 
         {fieldError("hebrew_full_name") && (
           <p className="text-sm text-red-600">{fieldError("hebrew_full_name")}</p>
@@ -313,57 +490,106 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </Field>
       </Section>
 
-      <Section title="مكان العمل">
-        <Field label="مكان العمل الرئيسي" error={fieldError("main_workplace")}>
-          <input
-            required
+      <Section title="نبذة عني (اختياري)">
+        <Field label="اكتب ما تريد زملاءك أن يعرفوه عنك — خبرة، اهتمامات مهنية، أو أي شيء آخر">
+          <textarea
             className="input"
-            value={form.main_workplace}
-            onChange={(e) => update("main_workplace", e.target.value)}
-            placeholder="مثلاً: مستشفى هداسا عين كارم"
+            rows={3}
+            maxLength={500}
+            value={form.bio}
+            onChange={(e) => update("bio", e.target.value)}
+            placeholder="مثلاً: خبرة عملية واسعة في هذا المجال رغم عدم الحصول على شهادة تخصص رسمية بعد"
           />
         </Field>
+      </Section>
 
-        <Field label="أماكن عمل أخرى (اختياري)">
-          <div className="space-y-2">
-            {form.other_workplaces.map((wp, i) => (
-              <div key={i} className="flex gap-2">
-                <input
-                  className="input flex-1"
-                  value={wp}
-                  onChange={(e) => {
-                    const next = [...form.other_workplaces];
-                    next[i] = e.target.value;
-                    update("other_workplaces", next);
-                  }}
-                  placeholder="اسم العيادة أو المستشفى"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    update(
-                      "other_workplaces",
-                      form.other_workplaces.filter((_, x) => x !== i),
-                    )
-                  }
-                  className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
-                  aria-label="حذف مكان العمل"
-                >
-                  حذف
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                update("other_workplaces", [...form.other_workplaces, ""])
-              }
-              className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
+      <Section title="مكان العمل">
+        <div className="space-y-4">
+          {form.workplaces.map((wp, i) => (
+            <div
+              key={i}
+              className="space-y-2 rounded border border-foreground/15 p-3"
             >
-              + إضافة مكان عمل آخر
-            </button>
-          </div>
-        </Field>
+              <div className="flex gap-2">
+                <input
+                  required={i === 0}
+                  className="input flex-1"
+                  value={wp.name}
+                  onChange={(e) => updateWorkplace(i, { name: e.target.value })}
+                  placeholder="مثلاً: مستشفى هداسا عين كارم"
+                />
+                {form.workplaces.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeWorkplace(i)}
+                    className="shrink-0 rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
+                    aria-label="حذف مكان العمل"
+                  >
+                    حذف
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="radio"
+                    name={`workplace_type_${i}`}
+                    checked={wp.workplace_type === "hospital"}
+                    onChange={() =>
+                      updateWorkplace(i, { workplace_type: "hospital" })
+                    }
+                  />
+                  مستشفى
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="radio"
+                    name={`workplace_type_${i}`}
+                    checked={wp.workplace_type === "clinic"}
+                    onChange={() =>
+                      updateWorkplace(i, { workplace_type: "clinic" })
+                    }
+                  />
+                  عيادة خاصة
+                </label>
+                {form.workplaces.length > 1 && (
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name="workplace_primary"
+                      checked={wp.is_primary}
+                      onChange={() => setWorkplacePrimary(i)}
+                    />
+                    مكان العمل الرئيسي
+                  </label>
+                )}
+              </div>
+
+              {wp.workplace_type === "clinic" && (
+                <input
+                  className="input"
+                  value={wp.details}
+                  onChange={(e) =>
+                    updateWorkplace(i, { details: e.target.value })
+                  }
+                  placeholder="عنوان العيادة / أوقات الدوام / رقم الهاتف (اختياري)"
+                />
+              )}
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addWorkplace}
+            className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
+          >
+            + إضافة مكان عمل آخر
+          </button>
+        </div>
+        {fieldError("workplaces") && (
+          <p className="mt-1 text-sm text-red-600">{fieldError("workplaces")}</p>
+        )}
       </Section>
 
       <Section title="الموافقة">
@@ -408,9 +634,10 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         disabled={
           submitting ||
           form.specialty_ids.length === 0 ||
-          !form.main_workplace.trim() ||
+          !form.workplaces.some((w) => w.name.trim()) ||
           !form.email.trim() ||
-          !form.consent
+          !form.consent ||
+          (form.has_secondary_license && !form.secondary_license_number.trim())
         }
         className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
       >

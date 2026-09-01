@@ -1,7 +1,7 @@
 // POST /api/admin/specialties — create a new specialty.
 
 import { z } from "zod";
-import { jsonError, jsonOk } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdmin } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -12,7 +12,7 @@ const Body = z.object({
   name_en: z.string().trim().max(120).nullable().optional(),
 });
 
-export async function POST(req: Request) {
+export const POST = withJsonErrors(async (req: Request) => {
   const admin = await requireAdmin().catch(() => null);
   if (!admin) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
@@ -50,4 +50,4 @@ export async function POST(req: Request) {
   }
 
   return jsonOk({ ok: true });
-}
+});
