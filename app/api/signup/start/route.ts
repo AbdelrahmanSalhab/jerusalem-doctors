@@ -1,8 +1,10 @@
 // POST /api/signup/start
 // Validates the full signup form, re-checks uniqueness + license, persists a
 // `pending_signups` row keyed by phone, and triggers Supabase Auth's OTP
-// flow (Twilio configured at the Supabase project level). Returns the
-// signup session id which the client must echo back to /verify.
+// flow. Returns the signup session id which the client must echo back to
+// /verify. Delivery happens out of band: Supabase generates the code and
+// POSTs its Send SMS Hook to /api/auth/hooks/send-otp, which sends it over
+// WhatsApp via the Meta Cloud API.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
@@ -356,6 +358,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (insert.error) throw insert.error;
 
   const ssr = await createSupabaseServerClient();
+  // channel stays "sms" on purpose: the Send SMS Hook intercepts this channel
+  // and delivers over WhatsApp. Supabase's channel:"whatsapp" is a Twilio-only
+  // path and would bypass the hook entirely.
   const { error: otpErr } = await ssr.auth.signInWithOtp({
     phone: phoneE164,
     options: { channel: "sms" },

@@ -1,6 +1,8 @@
 // POST /api/login/start
 // Single-field login by phone. Verifies the doctor exists + is active, then
-// kicks off Supabase Auth's OTP flow.
+// kicks off Supabase Auth's OTP flow. Delivery is handled by the Send SMS
+// Hook at /api/auth/hooks/send-otp (WhatsApp via the Meta Cloud API).
+// Resends go to /api/login/resend, which is not Turnstile-gated.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
@@ -78,6 +80,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   const ssr = await createSupabaseServerClient();
+  // channel stays "sms" on purpose: the Send SMS Hook intercepts this channel
+  // and delivers over WhatsApp. Supabase's channel:"whatsapp" is a Twilio-only
+  // path and would bypass the hook entirely.
   const { error: otpErr } = await ssr.auth.signInWithOtp({
     phone: phoneE164,
     options: { channel: "sms" },

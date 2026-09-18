@@ -35,6 +35,7 @@ export function VerifyForm() {
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resendIn, setResendIn] = useState(60);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,20 +93,40 @@ export function VerifyForm() {
   };
 
   const resend = async () => {
-    if (resendIn > 0) return;
+    if (resendIn > 0 || resending) return;
     setError(null);
-    if (mode === "login") {
-      await fetch("/api/login/start", {
+    setResending(true);
+
+    // Dedicated resend endpoints rather than re-posting to /*/start: those are
+    // Turnstile-gated and the token is single-use, so a replay 403s in prod.
+    const url = mode === "signup" ? "/api/signup/resend" : "/api/login/resend";
+    const body =
+      mode === "signup" ? { signup_session_id: sessionId } : { phone };
+
+    try {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify(body),
       });
-    } else {
-      // For signup we'd need the full form; tell the user to restart.
-      setError("الرجاء إعادة التسجيل لطلب رمز جديد.");
-      return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.code === "session_expired") {
+          setError("انتهت صلاحية الجلسة. الرجاء البدء من جديد.");
+        } else if (data?.code === "rate_limited") {
+          setError("عدد كبير من المحاولات. حاول لاحقًا.");
+        } else {
+          setError("تعذّر إرسال الرمز. حاول لاحقًا.");
+        }
+        return;
+      }
+      setResendIn(60);
+    } catch (err) {
+      console.error(err);
+      setError("حدث خطأ في الاتصال بالخادم.");
+    } finally {
+      setResending(false);
     }
-    setResendIn(60);
   };
 
   return (
@@ -140,12 +161,14 @@ export function VerifyForm() {
       <button
         type="button"
         onClick={resend}
-        disabled={resendIn > 0 || mode === "signup"}
+        disabled={resendIn > 0 || resending}
         className="w-full rounded-md border border-foreground px-6 py-2 text-sm disabled:opacity-50"
       >
-        {resendIn > 0
-          ? `إعادة إرسال الرمز خلال ${resendIn} ثانية`
-          : "إعادة إرسال الرمز"}
+        {resending
+          ? "جارٍ الإرسال..."
+          : resendIn > 0
+            ? `إعادة إرسال الرمز خلال ${resendIn} ثانية`
+            : "إعادة إرسال الرمز"}
       </button>
     </form>
   );

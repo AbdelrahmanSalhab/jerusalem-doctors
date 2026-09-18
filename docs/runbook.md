@@ -16,17 +16,76 @@ should fit in a single tab.
 
 ### Doctors can't sign up — OTP never arrives
 
-**Symptoms:** `/api/signup/start` returns 502 `otp_send_failed`.
+**How OTP delivery works.** Supabase Auth generates, stores, and verifies the
+code. It does not send it. It POSTs Supabase's **Send SMS Hook** to
+`/api/auth/hooks/send-otp`, which verifies a Standard Webhooks signature and
+then calls the Meta WhatsApp Cloud API with the `otp_login_ar` authentication
+template. So a missing OTP is a failure in one of three places, in this order:
 
-**Why it happens:** Supabase Phone provider is not configured, or the provider (Twilio/etc.) is rejecting the destination.
+```
+signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  Meta Cloud API
+```
+
+**Symptoms and where to look:**
+
+| Symptom | Likely cause |
+|---|---|
+| `/api/signup/start` returns 502 `otp_send_failed` | Supabase rejected the request before the hook ran — Phone provider off, or the hook returned non-2xx |
+| Vercel logs show `[send-otp] delivery failed: Meta send failed (…)` | Meta rejected the send — read the error code below |
+| No `[send-otp]` line in Vercel logs at all | Supabase never reached us — wrong hook URL, or the hook is disabled |
+| Hook route returns 401 | Signature mismatch — `SEND_SMS_HOOK_SECRET` in Vercel does not match the secret in Supabase |
 
 **Fix:**
-1. Supabase Dashboard → Authentication → Sign In / Up → Phone Auth.
-2. Confirm the toggle is ON and creds are filled.
-3. If using Twilio: confirm trial credit isn't exhausted; confirm the recipient phone is on the Twilio Verified-Caller-IDs list (only an issue while Twilio is on trial).
-4. If everything looks fine, try the curl probe from `README.md` to see Supabase's raw error response.
+1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
+   and OTP expiry is **600s** (must match `code_expiration_minutes: 10` in the
+   template, or the message footer lies about when the code dies).
+2. Supabase Dashboard → Authentication → Hooks → **Send SMS hook**: confirm it
+   is enabled, type HTTPS, URL is
+   `https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp`.
+3. Compare the secret shown there against `SEND_SMS_HOOK_SECRET` in Vercel.
+   It has the form `v1,whsec_…`; paste it whole.
+4. Check Vercel → Logs for `[send-otp]`. Meta error codes worth knowing:
+   - **190** — access token invalid or expired. You are probably using the 24h
+     token instead of the permanent System User token. Regenerate (see below).
+   - **131026** — recipient cannot receive the message: the number is not on
+     WhatsApp, or you are still on the Meta **test number**, which only
+     delivers to the ≤5 recipients whitelisted in the Meta console.
+   - **132000 / 132001** — template parameter count wrong, or the template name
+     / language does not exist or is not approved. Check
+     `META_AUTH_TEMPLATE_NAME` and that the template is still **Approved** in
+     WhatsApp Manager.
+   - **131047 / 131049** — quality-rating or per-number rate limiting.
+5. Meta → WhatsApp Manager → Account tools → **Message templates**: confirm
+   `otp_login_ar` status is Approved and its quality rating is not Red. A
+   template can be paused automatically if users report the messages.
+6. Meta → Business Settings → **Billing**: a missing or declined payment method
+   stops sends. Authentication templates are billed per delivered message.
 
-**Quick mitigation if the provider is broken:** flip `NEXT_PUBLIC_PHONE_AUTH_DISABLED=1` in Vercel and redeploy. /signup and /login will show a "coming soon" banner.
+**Rotating the Meta access token:** Business Settings → System users →
+`whatsapp-otp-sender` → Generate new token → app selected, scopes
+`whatsapp_business_messaging`, `whatsapp_business_management`,
+`business_management`, expiry **never**. Paste into `META_ACCESS_TOKEN` in
+Vercel and redeploy. The token is shown once.
+
+**Messaging limits:** an unverified WhatsApp Business Account can reach 250
+unique recipients per rolling 24 hours. That is well above normal traffic here;
+if you ever hit it, complete Meta Business Verification to move to the next tier.
+
+**Quick mitigation if delivery is broken:** flip `NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`
+in Vercel and redeploy. /signup and /login will show a "coming soon" banner.
+
+**Testing the hook without waiting for a doctor.** The signature is the only
+auth on that route, so you can probe it directly. Expect 401 on a bad
+signature and 200 on a good one:
+
+```bash
+curl -i -X POST https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp \
+  -H 'content-type: application/json' \
+  -H 'webhook-id: probe' -H "webhook-timestamp: $(date +%s)" \
+  -H 'webhook-signature: v1,obviously-wrong' \
+  -d '{"user":{"phone":"972500000000"},"sms":{"otp":"000000"}}'
+# → 401
+```
 
 ### MoH license sync stops working
 
