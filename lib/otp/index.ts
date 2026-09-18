@@ -1,40 +1,41 @@
-import { MockOtpProvider } from "./mock";
-import type { OtpProvider } from "./provider";
-import { TwilioOtpProvider } from "./twilio";
+import { MockOtpSender } from "./mock";
+import type { OtpSender } from "./provider";
+import { WhatsAppMetaOtpSender } from "./whatsapp_meta";
 
-let cached: OtpProvider | null = null;
+let cached: OtpSender | null = null;
 
 /**
- * Resolve the OTP provider once per process. `OTP_PROVIDER` env picks the
- * implementation; default is `mock` outside production. Production startup
- * fails loudly if `mock` is set there.
+ * Resolve the OTP sender once per process. `OTP_PROVIDER` picks the
+ * implementation; production defaults to Meta, everything else to mock.
  */
-export function getOtpProvider(): OtpProvider {
+export function getOtpSender(): OtpSender {
   if (cached) return cached;
 
   const isProd = process.env.NODE_ENV === "production";
-  const choice = (process.env.OTP_PROVIDER ?? (isProd ? "twilio" : "mock"))
+  const choice = (
+    process.env.OTP_PROVIDER ?? (isProd ? "whatsapp_meta" : "mock")
+  )
     .trim()
     .toLowerCase();
 
   switch (choice) {
     case "mock":
-      cached = new MockOtpProvider();
+      cached = new MockOtpSender();
       return cached;
-    case "twilio":
-      cached = new TwilioOtpProvider();
+    case "whatsapp_meta":
+      cached = new WhatsAppMetaOtpSender();
       return cached;
     default:
       throw new Error(
-        `Unknown OTP_PROVIDER "${choice}". Expected "mock" or "twilio".`,
+        `Unknown OTP_PROVIDER "${choice}". Expected "mock" or "whatsapp_meta".`,
       );
   }
 }
 
-/** Reset the cached provider — used by tests. */
-export function __resetOtpProviderForTests(): void {
+/** Reset the cached sender — used by tests. */
+export function __resetOtpSenderForTests(): void {
   cached = null;
 }
 
-export type { OtpChannel, OtpProvider, OtpSendResult } from "./provider";
+export type { OtpSendResult, OtpSender } from "./provider";
 export { OtpProviderError } from "./provider";

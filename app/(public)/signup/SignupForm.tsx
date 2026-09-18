@@ -416,7 +416,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       >
         {submitting
           ? "جارٍ الإرسال..."
-          : "تسجيل وإرسال رمز التحقق عبر رسالة نصية"}
+          : "تسجيل وإرسال رمز التحقق عبر واتساب"}
       </button>
 
       <p className="text-center text-base text-foreground/70">

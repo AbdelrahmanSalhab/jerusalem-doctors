@@ -1,32 +1,27 @@
-// OTP provider interface — see plan §7. Twilio for prod, mock for dev,
-// Meta WhatsApp Cloud API later (single new file, no callsite changes).
+// OTP sender interface.
 //
-// Each implementation is responsible for delivering and verifying a code.
-// We intentionally do NOT keep a side-channel store of the code in our DB
-// for the Twilio path — Twilio Verify owns that. The mock path also keeps
-// nothing on our side; it accepts a fixed code.
+// Supabase Auth owns the OTP lifecycle — it generates the code, stores it,
+// enforces expiry, and verifies it on /verify. Our only job is delivery: the
+// Send SMS Hook hands us a phone and a code, and an implementation of this
+// interface puts it in front of the doctor.
 //
-// Channels: WhatsApp by default, SMS as a fallback when WA template is
-// blocked. Implementations decide; callers don't need to know.
-
-export type OtpChannel = "whatsapp" | "sms";
+// That is why there is no verify() here and no code storage on our side.
 
 export interface OtpSendResult {
-  /** Provider-specific reference. Returned to the client opaquely. */
-  sessionRef: string;
-  /** Channel actually used (may differ from requested if failover happened). */
-  channel: OtpChannel;
+  /** Provider-specific message reference, for log correlation. */
+  messageRef: string;
 }
 
-export interface OtpProvider {
+export interface OtpSender {
   readonly name: string;
-  send(phoneE164: string, channel?: OtpChannel): Promise<OtpSendResult>;
-  verify(phoneE164: string, code: string): Promise<boolean>;
+  send(phoneE164: string, code: string): Promise<OtpSendResult>;
 }
 
 export class OtpProviderError extends Error {
   constructor(
     message: string,
+    /** True when the failure is a config/permanent error, not worth retrying. */
+    public readonly permanent: boolean = false,
     public readonly cause?: unknown,
   ) {
     super(message);

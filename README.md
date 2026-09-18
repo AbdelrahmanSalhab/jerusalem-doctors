@@ -33,7 +33,7 @@ This directory closes that gap. It's a **closed, identity-verified, Arabic-first
   cross-checked against the official Israel Ministry of Health doctors
   registry (published as an open dataset on data.gov.il). License number + Hebrew name must match before an OTP is even sent. Mismatches go to a manual admin queue — no fake doctors get in.
 - **Arabic-first UI**, RTL throughout. Hebrew name fields are stored but the interface stays Arabic.
-- **Phone-OTP authentication** — passwordless, no credentials to leak.
+- **Phone-OTP authentication over WhatsApp** — passwordless, no credentials to leak.
 - **Smart Arabic search.** A custom normalization layer treats أحمد / احمد / إحمد / آحمد as the same name. Searches doctors by name, subspecialty, specialty, *and* workplace, all in one box.
 - **Two view modes** — visual cards for browsing, compact rows for scanning.
 - **WhatsApp click-to-chat** straight from any doctor card. Per-doctor
@@ -50,7 +50,7 @@ This directory closes that gap. It's a **closed, identity-verified, Arabic-first
 | External data | **CKAN API** for daily MoH practitioners sync |
 | Rate limiting | **Upstash Redis** sliding window |
 | Bot protection | **Cloudflare Turnstile** |
-| Hashing | **bcryptjs** for OTP hash storage |
+| OTP delivery | **Meta WhatsApp Cloud API** via a Supabase Send SMS Hook |
 | Testing | **Vitest** |
 | Hosting | **Vercel** |
 

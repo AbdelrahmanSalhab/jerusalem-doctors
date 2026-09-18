@@ -14,10 +14,12 @@ type LimitDef = { limit: number; window: WindowSpec };
 export const RATE_LIMITS = {
   signupStart: { limit: 3, window: "1 h" },
   signupVerify: { limit: 5, window: "10 m" },
+  signupResend: { limit: 3, window: "10 m" },
   signupCheckLicense: { limit: 10, window: "1 h" },
   signupCheckUnique: { limit: 30, window: "1 h" },
   loginStart: { limit: 5, window: "1 h" },
   loginVerify: { limit: 5, window: "10 m" },
+  loginResend: { limit: 3, window: "10 m" },
   search: { limit: 30, window: "1 m" },
   profilePatch: { limit: 10, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;
