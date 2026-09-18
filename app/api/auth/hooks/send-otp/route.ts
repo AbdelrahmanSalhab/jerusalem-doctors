@@ -22,6 +22,19 @@ interface SendSmsHookPayload {
   sms?: { otp?: string };
 }
 
+/**
+ * Answer with a JSON body on every path.
+ *
+ * Supabase's hook runner inspects the Content-Type of our response and fails
+ * the whole OTP request with `hook_payload_invalid_content_type` when it is
+ * missing — which `new Response(null, ...)` does not set. The doctor then sees
+ * a generic error on /login and /signup and never gets a code, even though the
+ * SMS itself went out fine. The body content is irrelevant; the header is not.
+ */
+function hookResponse(status: number): Response {
+  return Response.json({}, { status });
+}
+
 /** Supabase stores phones without a leading +; the Meta sender wants E.164. */
 function toE164(phone: string): string {
   return phone.startsWith("+") ? phone : `+${phone}`;
@@ -39,7 +52,7 @@ export async function POST(req: Request) {
       Sentry.captureException(
         new Error("SEND_SMS_HOOK_SECRET is unset in production"),
       );
-      return new Response(null, { status: 500 });
+      return hookResponse(500);
     }
     console.error("[send-otp] SEND_SMS_HOOK_SECRET unset — skipping signature check (dev only)");
   }
@@ -49,14 +62,14 @@ export async function POST(req: Request) {
   const rawBody = await req.text();
 
   if (secret && !verifySendSmsHook(rawBody, req.headers, secret)) {
-    return new Response(null, { status: 401 });
+    return hookResponse(401);
   }
 
   let payload: SendSmsHookPayload;
   try {
     payload = JSON.parse(rawBody) as SendSmsHookPayload;
   } catch {
-    return new Response(null, { status: 400 });
+    return hookResponse(400);
   }
 
   const phone = payload.user?.phone;
@@ -65,13 +78,13 @@ export async function POST(req: Request) {
     Sentry.captureException(
       new Error("Send SMS hook payload missing user.phone or sms.otp"),
     );
-    return new Response(null, { status: 400 });
+    return hookResponse(400);
   }
 
   try {
     const sender = getOtpSender();
     await sender.send(toE164(phone), code);
-    return new Response(null, { status: 200 });
+    return hookResponse(200);
   } catch (err) {
     // OtpProviderError messages carry Meta's error code and message, never
     // the OTP — Meta does not echo it back and we never interpolate it.
@@ -82,6 +95,6 @@ export async function POST(req: Request) {
     const permanent = err instanceof OtpProviderError && err.permanent;
     // 400 tells Supabase not to bother retrying a config error three times;
     // 500 lets its 3x/2s backoff do useful work on a transient failure.
-    return new Response(null, { status: permanent ? 400 : 500 });
+    return hookResponse(permanent ? 400 : 500);
   }
 }
