@@ -2,7 +2,7 @@
 //
 // Supabase Auth's "Send SMS Hook". Supabase generates, stores, and later
 // verifies the OTP itself; it calls this endpoint purely to deliver the code.
-// We deliver over WhatsApp via the Meta Cloud API.
+// We deliver over SMS via the SMS4FREE API.
 //
 // proxy.ts treats all of /api/ as public, so the Standard Webhooks signature
 // is the ONLY authentication on this route. Never relax that check.

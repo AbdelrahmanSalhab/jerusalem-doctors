@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { InvalidPhoneError, formatPhoneDisplay, normalizePhone } from "./phone";
+import {
+  InvalidPhoneError,
+  PhoneNotSmsDeliverableError,
+  assertSmsDeliverable,
+  formatPhoneDisplay,
+  isSmsDeliverable,
+  normalizePhone,
+  toSmsRecipient,
+} from "./phone";
 
 describe("normalizePhone (Israeli default)", () => {
   it("normalizes Israeli local form 0501234567", () => {
@@ -88,5 +96,53 @@ describe("formatPhoneDisplay", () => {
 
   it("falls back to input on unparseable strings", () => {
     expect(formatPhoneDisplay("not-a-number")).toBe("not-a-number");
+  });
+});
+
+describe("SMS deliverability (Israeli mobiles only, for now)", () => {
+  it("accepts Israeli mobiles across prefixes", () => {
+    for (const p of ["+972501234567", "+972521234567", "+972531234567", "+972581234567"]) {
+      expect(isSmsDeliverable(p)).toBe(true);
+    }
+  });
+
+  it("rejects Palestinian +970 numbers", () => {
+    expect(isSmsDeliverable("+970599123456")).toBe(false);
+  });
+
+  it("rejects Israeli landlines", () => {
+    expect(isSmsDeliverable("+97221234567")).toBe(false);
+    expect(isSmsDeliverable("+97231234567")).toBe(false);
+  });
+
+  it("rejects foreign numbers", () => {
+    expect(isSmsDeliverable("+14155552671")).toBe(false);
+  });
+
+  it("distinguishes a foreign region from a landline", () => {
+    expect(() => assertSmsDeliverable("+970599123456")).toThrowError(
+      PhoneNotSmsDeliverableError,
+    );
+    try {
+      assertSmsDeliverable("+970599123456");
+    } catch (e) {
+      expect((e as PhoneNotSmsDeliverableError).reason).toBe("foreign_region");
+    }
+    try {
+      assertSmsDeliverable("+97221234567");
+    } catch (e) {
+      expect((e as PhoneNotSmsDeliverableError).reason).toBe("not_mobile");
+    }
+  });
+
+  it("converts an Israeli mobile to the provider's local form", () => {
+    expect(toSmsRecipient("+972501234567")).toBe("0501234567");
+    expect(toSmsRecipient("+972531234567")).toBe("0531234567");
+  });
+
+  it("refuses to reshape a number it cannot deliver to", () => {
+    expect(() => toSmsRecipient("+970599123456")).toThrowError(
+      PhoneNotSmsDeliverableError,
+    );
   });
 });

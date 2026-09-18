@@ -2,7 +2,8 @@ import type { OtpSendResult, OtpSender } from "./provider";
 
 /**
  * Dev-only sender. Logs the real code to stderr instead of sending it, so
- * local signup/login work with no Meta account. Refuses to run in production.
+ * local signup/login work without spending SMS credit. Refuses to run in
+ * production.
  */
 export class MockOtpSender implements OtpSender {
   readonly name = "mock";
@@ -10,7 +11,7 @@ export class MockOtpSender implements OtpSender {
   constructor() {
     if (process.env.NODE_ENV === "production") {
       throw new Error(
-        "MockOtpSender cannot be used in production. Set OTP_PROVIDER=whatsapp_meta.",
+        "MockOtpSender cannot be used in production. Set OTP_PROVIDER=sms4free.",
       );
     }
   }

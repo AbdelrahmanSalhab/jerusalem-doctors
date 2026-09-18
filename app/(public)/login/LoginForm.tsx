@@ -58,6 +58,13 @@ export function LoginForm() {
           setError("رقم الهاتف غير موجود في النظام. الرجاء إنشاء حساب جديد.");
         } else if (data?.code === "invalid_phone") {
           setError("صيغة رقم الهاتف غير صحيحة.");
+        } else if (data?.code === "phone_unsupported") {
+          // Server-side message: it distinguishes an out-of-region number
+          // from a landline, and this screen has no per-field error slot.
+          setError(
+            data?.fields?.phone ??
+              "الدخول متاح حاليًا للأرقام الإسرائيلية (+972) فقط.",
+          );
         } else if (data?.code === "account_inactive") {
           setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "rate_limited") {

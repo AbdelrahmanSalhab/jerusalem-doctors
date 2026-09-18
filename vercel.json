@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/sync-moh",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/sms-balance",
+      "schedule": "0 6 * * *"
     }
   ]
 }

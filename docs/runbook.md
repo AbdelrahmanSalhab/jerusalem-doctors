@@ -19,11 +19,11 @@ should fit in a single tab.
 **How OTP delivery works.** Supabase Auth generates, stores, and verifies the
 code. It does not send it. It POSTs Supabase's **Send SMS Hook** to
 `/api/auth/hooks/send-otp`, which verifies a Standard Webhooks signature and
-then calls the Meta WhatsApp Cloud API with the `otp_login_ar` authentication
-template. So a missing OTP is a failure in one of three places, in this order:
+then calls the SMS4FREE API. So a missing OTP is a failure in one of three
+places, in this order:
 
 ```
-signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  Meta Cloud API
+signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 ```
 
 **Symptoms and where to look:**
@@ -31,45 +31,71 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  Meta Cloud
 | Symptom | Likely cause |
 |---|---|
 | `/api/signup/start` returns 502 `otp_send_failed` | Supabase rejected the request before the hook ran — Phone provider off, or the hook returned non-2xx |
-| Vercel logs show `[send-otp] delivery failed: Meta send failed (…)` | Meta rejected the send — read the error code below |
+| `/api/login/start` returns 400 `phone_unsupported` | Not an incident: the number is outside +972 or is a landline. See "Which numbers we can reach" below |
+| Vercel logs show `[send-otp] delivery failed: SMS4FREE send failed (status -N)` | The provider rejected the send — read the status table below |
 | No `[send-otp]` line in Vercel logs at all | Supabase never reached us — wrong hook URL, or the hook is disabled |
 | Hook route returns 401 | Signature mismatch — `SEND_SMS_HOOK_SECRET` in Vercel does not match the secret in Supabase |
 
 **Fix:**
 1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
-   and OTP expiry is **600s** (must match `code_expiration_minutes: 10` in the
-   template, or the message footer lies about when the code dies).
+   and that the OTP expiry matches what the UI's resend timer promises.
 2. Supabase Dashboard → Authentication → Hooks → **Send SMS hook**: confirm it
    is enabled, type HTTPS, URL is
    `https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp`.
 3. Compare the secret shown there against `SEND_SMS_HOOK_SECRET` in Vercel.
    It has the form `v1,whsec_…`; paste it whole.
-4. Check Vercel → Logs for `[send-otp]`. Meta error codes worth knowing:
-   - **190** — access token invalid or expired. You are probably using the 24h
-     token instead of the permanent System User token. Regenerate (see below).
-   - **131026** — recipient cannot receive the message: the number is not on
-     WhatsApp, or you are still on the Meta **test number**, which only
-     delivers to the ≤5 recipients whitelisted in the Meta console.
-   - **132000 / 132001** — template parameter count wrong, or the template name
-     / language does not exist or is not approved. Check
-     `META_AUTH_TEMPLATE_NAME` and that the template is still **Approved** in
-     WhatsApp Manager.
-   - **131047 / 131049** — quality-rating or per-number rate limiting.
-5. Meta → WhatsApp Manager → Account tools → **Message templates**: confirm
-   `otp_login_ar` status is Approved and its quality rating is not Red. A
-   template can be paused automatically if users report the messages.
-6. Meta → Business Settings → **Billing**: a missing or declined payment method
-   stops sends. Authentication templates are billed per delivered message.
+4. Check Vercel → Logs for `[send-otp]`. SMS4FREE statuses, all of which
+   arrive inside an HTTP **200** — the body is the real result:
 
-**Rotating the Meta access token:** Business Settings → System users →
-`whatsapp-otp-sender` → Generate new token → app selected, scopes
-`whatsapp_business_messaging`, `whatsapp_business_management`,
-`business_management`, expiry **never**. Paste into `META_ACCESS_TOKEN` in
-Vercel and redeploy. The token is shown once.
+   | status | Meaning | What to do |
+   |---|---|---|
+   | `> 0` | Accepted, for that many recipients | Nothing — delivery is now the carrier's problem |
+   | `0` | General error | Retried automatically. If it persists, contact SMS4FREE support |
+   | `-1` | Bad key / user / password | Check `SMS4FREE_KEY`, `SMS4FREE_USER`, `SMS4FREE_PASS` in Vercel |
+   | `-2` | Invalid sender ID | A custom `SMS4FREE_SENDER` needs a purchased package; otherwise it must be the registration number |
+   | `-3` | No recipients | Our bug — the recipient field was empty. Escalate |
+   | `-4` | **Out of message balance** | Top up the SMS package. This is the most likely cause of a sudden total outage |
+   | `-5` | Message content rejected | Someone edited `lib/otp/message.ts`. Revert |
+   | `-6` | Sender not verified | Send one message by hand from the SMS4FREE site to complete first-use verification |
 
-**Messaging limits:** an unverified WhatsApp Business Account can reach 250
-unique recipients per rolling 24 hours. That is well above normal traffic here;
-if you ever hit it, complete Meta Business Verification to move to the next tier.
+5. `[send-otp] delivery failed: SMS4FREE send failed: network error or timeout`
+   is the **unknown** case: we aborted at 4s and cannot tell whether the
+   provider accepted and billed the message. Do not assume it failed. Supabase
+   will retry, so the doctor may receive two codes; only the most recent one
+   verifies.
+
+**Balance monitoring.** The account is prepaid, so an empty balance is a silent,
+total signup/login outage that looks like "nothing happens". `/api/cron/sms-balance`
+polls `ApiSMS/AvailableSMS` daily at 06:00 UTC and raises a Sentry warning below
+`SMS4FREE_LOW_BALANCE_THRESHOLD` (default 50), escalating to error at zero. To
+check by hand:
+
+```bash
+curl -s -X POST https://api.sms4free.co.il/ApiSMS/AvailableSMS \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"'"$SMS4FREE_KEY"'","user":"'"$SMS4FREE_USER"'","pass":"'"$SMS4FREE_PASS"'"}'
+# -> a bare number: messages remaining
+```
+
+Reference pricing at the time of writing was ~40₪ per 1,000 messages before VAT.
+Each Arabic OTP is one UCS-2 segment (see `lib/otp/message.ts`), so one message
+per login attempt. Top up before any invite wave: a pilot of 40 doctors doing
+signup plus a couple of logins each is ~120 messages.
+
+**Which numbers we can reach.** OTP is restricted to Israeli mobiles
+(`+9725XXXXXXXX`). `+970` numbers and landlines are refused at `/signup/start`
+and `/login/start` with `phone_unsupported`, before Supabase issues a code —
+that is deliberate, not a bug. WhatsApp reached `+970` over data; SMS4FREE has
+no confirmed coverage there. Existing `+970` doctor rows still work for
+directory search and click-to-chat; they just cannot log in. Widening this
+means confirming coverage with the provider and relaxing `isSmsDeliverable`
+in `lib/normalize/phone.ts`.
+
+**WhatsApp (parked).** `lib/otp/whatsapp_meta.ts` still works and is still
+registered. It is unused because Meta Business Verification could not be
+completed. If that ever changes, `OTP_PROVIDER=whatsapp_meta` plus the
+`META_*` variables switches back with no code change — and removes the +972
+restriction, since WhatsApp delivers over data.
 
 **Quick mitigation if delivery is broken:** flip `NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`
 in Vercel and redeploy. /signup and /login will show a "coming soon" banner.

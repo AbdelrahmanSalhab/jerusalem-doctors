@@ -4,7 +4,7 @@
 // flow. Returns the signup session id which the client must echo back to
 // /verify. Delivery happens out of band: Supabase generates the code and
 // POSTs its Send SMS Hook to /api/auth/hooks/send-otp, which sends it over
-// WhatsApp via the Meta Cloud API.
+// SMS via the SMS4FREE API.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
@@ -13,6 +13,7 @@ import { normalizeArabic } from "@/lib/normalize/arabic";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { isValidLicenseFormat, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
+import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -101,6 +102,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     }
     throw e;
   }
+
+  const unsupported = rejectUndeliverablePhone(phoneE164);
+  if (unsupported) return unsupported;
 
   const rlPhone = await rateLimit("signupStart", `phone:${phoneE164}`);
   if (!rlPhone.success) {
@@ -358,9 +362,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (insert.error) throw insert.error;
 
   const ssr = await createSupabaseServerClient();
-  // channel stays "sms" on purpose: the Send SMS Hook intercepts this channel
-  // and delivers over WhatsApp. Supabase's channel:"whatsapp" is a Twilio-only
-  // path and would bypass the hook entirely.
+  // channel "sms" is what routes through the Send SMS Hook, which is where
+  // our SMS4FREE delivery lives. Supabase's channel:"whatsapp" is a
+  // Twilio-only path and would bypass the hook entirely.
   const { error: otpErr } = await ssr.auth.signInWithOtp({
     phone: phoneE164,
     options: { channel: "sms" },

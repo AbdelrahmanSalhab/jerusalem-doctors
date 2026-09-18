@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
+import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -38,6 +39,9 @@ export async function POST(req: Request) {
     }
     throw e;
   }
+
+  const unsupported = rejectUndeliverablePhone(phoneE164);
+  if (unsupported) return unsupported;
 
   const rl = await rateLimit("loginResend", `phone:${phoneE164}`);
   const rlIp = await rateLimit("loginResend", `ip:${ip}`);

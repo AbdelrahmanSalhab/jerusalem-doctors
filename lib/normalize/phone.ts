@@ -56,3 +56,64 @@ export function formatPhoneDisplay(e164: string): string {
   const parsed = parsePhoneNumberFromString(e164);
   return parsed?.formatNational() ?? e164;
 }
+
+// ---------------------------------------------------------------------------
+// SMS deliverability
+// ---------------------------------------------------------------------------
+// OTP delivery moved from WhatsApp (which reached any number over data) to
+// SMS4FREE, an Israeli A2P SMS provider. Its API takes Israeli local numbers
+// (`05XXXXXXXX`) and we have no confirmed coverage for +970, so OTP is
+// restricted to Israeli mobiles for now.
+//
+// This is deliberately NOT enforced inside normalizePhone(): that function is
+// also the source of truth for directory search, profile display and the
+// wa.me click-to-chat links, where existing +970 doctor rows must keep
+// working. Only the auth entry points — the places about to ask Supabase to
+// send a code — call the guards below.
+
+/** Israeli mobile in E.164: +972, then a national number of `5` + 8 digits. */
+const IL_MOBILE_E164 = /^\+9725\d{8}$/;
+
+export type SmsUndeliverableReason = "foreign_region" | "not_mobile";
+
+export class PhoneNotSmsDeliverableError extends Error {
+  constructor(
+    public readonly e164: string,
+    public readonly reason: SmsUndeliverableReason,
+  ) {
+    super(
+      reason === "foreign_region"
+        ? `Phone "${e164}" is outside the +972 SMS region`
+        : `Phone "${e164}" is not an Israeli mobile number`,
+    );
+    this.name = "PhoneNotSmsDeliverableError";
+  }
+}
+
+/** True when we can currently deliver an OTP to this number. */
+export function isSmsDeliverable(e164: string): boolean {
+  return IL_MOBILE_E164.test(e164);
+}
+
+/**
+ * Throws `PhoneNotSmsDeliverableError` when the number is out of scope for
+ * OTP delivery. The `reason` distinguishes "wrong country" from "landline"
+ * so callers can show the doctor the message that actually helps.
+ */
+export function assertSmsDeliverable(e164: string): void {
+  if (isSmsDeliverable(e164)) return;
+  throw new PhoneNotSmsDeliverableError(
+    e164,
+    e164.startsWith("+972") ? "not_mobile" : "foreign_region",
+  );
+}
+
+/**
+ * Convert a stored E.164 number to the local form SMS4FREE expects:
+ * `+972501234567` → `0501234567`. Validates first — a number we cannot
+ * deliver to must never be silently reshaped into one that looks valid.
+ */
+export function toSmsRecipient(e164: string): string {
+  assertSmsDeliverable(e164);
+  return `0${e164.slice("+972".length)}`;
+}
