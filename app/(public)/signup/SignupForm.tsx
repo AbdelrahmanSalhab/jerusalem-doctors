@@ -6,6 +6,11 @@ import {
   TurnstileWidget,
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
+import {
+  SS_PHONE,
+  SS_SESSION,
+  setHandoff,
+} from "@/lib/client/verify_handoff";
 
 type Specialty = { id: string; name_ar: string };
 type LicenseRegion = "IL" | "PS";
@@ -170,7 +175,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           turnstile_token: freshToken,
         }),
       });
-      const startBody = await start.json();
+      // Parse defensively: a platform-level failure answers with an HTML
+      // error page, which would otherwise throw as a connection error.
+      const startBody = await start.json().catch(() => null);
       if (!start.ok) {
         // Reset Turnstile so the next retry has a fresh single-use token.
         turnstileRef.current?.reset();
@@ -180,12 +187,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         return;
       }
 
-      // PII out of URL: stash on the client between /signup and /verify.
-      sessionStorage.setItem("verify:phone", form.phone);
-      sessionStorage.setItem(
-        "verify:signup_session",
-        startBody.signup_session_id,
-      );
+      // PII out of URL: hand off on the client between /signup and /verify.
+      setHandoff(SS_PHONE, form.phone);
+      setHandoff(SS_SESSION, startBody.signup_session_id);
       router.push("/verify?mode=signup");
     } catch (err) {
       console.error(err);

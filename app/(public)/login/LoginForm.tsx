@@ -6,6 +6,12 @@ import {
   TurnstileWidget,
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
+import {
+  SS_PHONE,
+  SS_SESSION,
+  clearHandoff,
+  setHandoff,
+} from "@/lib/client/verify_handoff";
 
 // Allow only digits, +, -, space, parens — common phone-number characters.
 // Server-side `normalizePhone` is the source of truth; this just keeps
@@ -49,11 +55,14 @@ export function LoginForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, turnstile_token: turnstileToken }),
       });
-      const data = await res.json();
       if (!res.ok) {
         // Turnstile tokens are single-use — reset the widget after every
         // submit so a retry gets a fresh token.
         turnstileRef.current?.reset();
+        // Parse defensively: a platform-level failure (a function timeout,
+        // say) answers with an HTML error page, and letting res.json() throw
+        // here would report it as a connection error the request never had.
+        const data = await res.json().catch(() => null);
         if (data?.code === "not_found") {
           setError("رقم الهاتف غير موجود في النظام. الرجاء إنشاء حساب جديد.");
         } else if (data?.code === "invalid_phone") {
@@ -71,6 +80,8 @@ export function LoginForm() {
           setError("عدد كبير من المحاولات. حاول لاحقًا.");
         } else if (data?.code === "turnstile_failed") {
           setError("لم يكتمل التحقق من المتصفح. الرجاء المحاولة مرة أخرى.");
+        } else if (res.status >= 500) {
+          setError("الخادم غير متاح حاليًا. الرجاء المحاولة بعد قليل.");
         } else {
           setError("حدث خطأ. الرجاء المحاولة لاحقًا.");
         }
@@ -78,10 +89,10 @@ export function LoginForm() {
         return;
       }
 
-      // Stash phone in sessionStorage instead of the URL — keeps PII out of
-      // browser history, server logs, and Referer headers.
-      sessionStorage.setItem("verify:phone", phone);
-      sessionStorage.removeItem("verify:signup_session");
+      // Hand the phone to /verify off-URL — keeps PII out of browser history,
+      // server logs, and Referer headers.
+      setHandoff(SS_PHONE, phone);
+      clearHandoff(SS_SESSION);
       router.push("/verify?mode=login");
     } catch (err) {
       console.error(err);

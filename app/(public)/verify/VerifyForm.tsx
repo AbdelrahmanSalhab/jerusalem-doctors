@@ -5,8 +5,12 @@ import { useEffect, useState } from "react";
 
 type Mode = "signup" | "login";
 
-const SS_PHONE = "verify:phone";
-const SS_SESSION = "verify:signup_session";
+import {
+  SS_PHONE,
+  SS_SESSION,
+  clearHandoff,
+  getHandoff,
+} from "@/lib/client/verify_handoff";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -19,8 +23,8 @@ export function VerifyForm() {
   const [sessionId, setSessionId] = useState("");
 
   useEffect(() => {
-    const p = sessionStorage.getItem(SS_PHONE) ?? "";
-    const s = sessionStorage.getItem(SS_SESSION) ?? "";
+    const p = getHandoff(SS_PHONE);
+    const s = getHandoff(SS_SESSION);
     setPhone(p);
     setSessionId(s);
 
@@ -82,8 +86,8 @@ export function VerifyForm() {
       // only invalidates the current route's RSC cache and races with the
       // router.replace() — full-page load is the only reliable way to
       // guarantee the SiteHeader picks up the authenticated session.
-      sessionStorage.removeItem(SS_PHONE);
-      sessionStorage.removeItem(SS_SESSION);
+      clearHandoff(SS_PHONE);
+      clearHandoff(SS_SESSION);
       window.location.replace("/dashboard");
     } catch (err) {
       console.error(err);
