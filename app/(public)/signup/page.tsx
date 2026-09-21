@@ -10,7 +10,7 @@ export default async function SignupPage() {
   const service = createSupabaseServiceClient();
   const { data: specialties, error } = await service
     .from("specialties")
-    .select("id, name_ar")
+    .select("id, name_ar, code")
     .eq("is_active", true)
     .order("sort_order");
 

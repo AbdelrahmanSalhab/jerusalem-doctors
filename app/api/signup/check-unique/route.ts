@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
-import { isValidLicenseFormat, licenseFormatErrorMessage } from "@/lib/normalize/license";
+import { canonicalLicenseNumber, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -58,13 +58,18 @@ export const POST = withJsonErrors(async (req: Request) => {
     throw e;
   }
 
-  const license = parsed.license_number.trim();
   const region = parsed.license_region;
-  if (!isValidLicenseFormat(region, license)) {
+  // Uniqueness has to run on the canonical serial: `1-189371`, `1189371` and
+  // `189371` are one license, and comparing the raw input would let the same
+  // doctor through twice under different spellings.
+  const license = canonicalLicenseNumber(region, parsed.license_number);
+  if (license === null) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
-      fields: { license_number: licenseFormatErrorMessage(region) },
+      fields: {
+        license_number: licenseFormatErrorMessage(region, parsed.license_number),
+      },
     });
   }
 

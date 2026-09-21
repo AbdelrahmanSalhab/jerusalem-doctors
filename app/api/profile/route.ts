@@ -7,8 +7,10 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
+import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { WORKPLACE_TYPES } from "@/lib/workplace";
 
 const Body = z.object({
   arabic_first_name: z.string().trim().min(2).max(80).optional(),
@@ -17,11 +19,22 @@ const Body = z.object({
   subspecialty: z.string().trim().max(120).nullable().optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   specialty_ids: z.array(z.uuid()).min(1).max(5).optional(),
+  // `.nullable().optional()` is load-bearing: absent means "leave the column
+  // alone", explicit null means "write NULL" (طب عام). The form omits both
+  // keys entirely for a doctor who has never declared a stage.
+  career_stage: z.enum(CAREER_STAGES).nullable().optional(),
+  residency_start_year: z
+    .number()
+    .int()
+    .min(RESIDENCY_YEAR_MIN)
+    .max(2100)
+    .nullable()
+    .optional(),
   workplaces: z
     .array(
       z.object({
         name: z.string().trim().min(2).max(120),
-        workplace_type: z.enum(["hospital", "clinic"]).default("hospital"),
+        workplace_type: z.enum(WORKPLACE_TYPES).default("hospital"),
         details: z.string().trim().max(300).nullable().optional(),
         is_primary: z.boolean(),
       }),
@@ -29,8 +42,6 @@ const Body = z.object({
     .min(1)
     .max(20)
     .optional(),
-  phone_is_visible: z.boolean().optional(),
-  workplaces_is_visible: z.boolean().optional(),
 });
 
 export const PATCH = withJsonErrors(async (req: Request) => {
@@ -83,11 +94,11 @@ export const PATCH = withJsonErrors(async (req: Request) => {
   if (parsed.bio !== undefined) {
     updates.bio = parsed.bio || null;
   }
-  if (parsed.phone_is_visible !== undefined) {
-    updates.phone_is_visible = parsed.phone_is_visible;
+  if (parsed.career_stage !== undefined) {
+    updates.career_stage = parsed.career_stage;
   }
-  if (parsed.workplaces_is_visible !== undefined) {
-    updates.workplaces_is_visible = parsed.workplaces_is_visible;
+  if (parsed.residency_start_year !== undefined) {
+    updates.residency_start_year = parsed.residency_start_year;
   }
 
   if (Object.keys(updates).length > 0) {

@@ -13,7 +13,7 @@ export default async function ProfilePage() {
     await Promise.all([
       service
         .from("specialties")
-        .select("id, name_ar")
+        .select("id, name_ar, code")
         .eq("is_active", true)
         .order("sort_order"),
       service
@@ -37,7 +37,7 @@ export default async function ProfilePage() {
 
       <ProfileForm
         doctor={me}
-        specialties={(specialties as Pick<Specialty, "id" | "name_ar">[]) ?? []}
+        specialties={(specialties as Pick<Specialty, "id" | "name_ar" | "code">[]) ?? []}
         currentSpecialtyIds={(doctorSpecialties ?? []).map(
           (r) => r.specialty_id,
         )}

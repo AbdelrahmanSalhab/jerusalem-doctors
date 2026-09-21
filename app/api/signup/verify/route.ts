@@ -8,6 +8,7 @@ import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/resp
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import type { WorkplaceType } from "@/lib/workplace";
 
 const MAX_ATTEMPTS = 5;
 
@@ -19,7 +20,7 @@ const Body = z.object({
 interface PendingWorkplace {
   name: string;
   name_normalized: string;
-  workplace_type: "hospital" | "clinic";
+  workplace_type: WorkplaceType;
   details: string | null;
   is_primary: boolean;
   sort_order: number;
@@ -50,6 +51,7 @@ interface PendingPayload {
   email: string | null;
   bio: string | null;
   career_stage: "resident" | "specialist" | null;
+  residency_start_year: number | null;
   specialty_ids: string[];
   workplaces: PendingWorkplace[];
   license_verification_status:
@@ -139,6 +141,10 @@ export const POST = withJsonErrors(async (req: Request) => {
       secondary_license_verification_status:
         payload.secondary_license_verification_status,
       career_stage: payload.career_stage,
+      // `?? null` rather than a bare read: a pending row written by the
+      // previous deploy has no such key, and supabase-js would silently drop
+      // an undefined from the insert.
+      residency_start_year: payload.residency_start_year ?? null,
       license_verified_at:
         payload.license_verification_status === "verified" ||
         payload.license_verification_status === "soft_match"

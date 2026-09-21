@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { verifyLicense } from "@/lib/moh/match";
+import { canonicalLicenseNumber, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -45,18 +46,19 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   }
 
-  const license = Number(
-    typeof parsed.license_number === "string"
-      ? parsed.license_number.trim()
-      : parsed.license_number,
-  );
-  if (!Number.isInteger(license) || license <= 0) {
+  // The registry mirror is keyed on the bare serial, so a number typed in
+  // the form the MoH site displays (`1-189371`, or `1189371` once the hyphen
+  // is dropped) has to lose its profession prefix before the lookup.
+  const raw = String(parsed.license_number).trim();
+  const canonical = canonicalLicenseNumber("IL", raw);
+  if (canonical === null) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
-      fields: { license_number: "رقم الترخيص يجب أن يكون رقمًا صحيحًا" },
+      fields: { license_number: licenseFormatErrorMessage("IL", raw) },
     });
   }
+  const license = Number(canonical);
 
   const supabase = createSupabaseServiceClient();
 
@@ -69,6 +71,9 @@ export const POST = withJsonErrors(async (req: Request) => {
 
     return jsonOk({
       status: result.status,
+      // Echo the serial we actually looked up so the form can show the
+      // doctor the number as the registry knows it.
+      license_number: canonical,
       registry_first_name: result.registryFirstName,
       registry_family_name: result.registryFamilyName,
       registry_specialty_he: result.registrySpecialtyHe ?? null,

@@ -1,20 +1,30 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   TurnstileWidget,
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
 import {
+  findGeneralSpecialtyId,
+  isValidResidencyYear,
+  RESIDENCY_YEAR_MIN,
+  residencyYearMax,
+  STAGE_BY_KEY,
+  STAGE_OPTIONS,
+  type Stage,
+  workplaceForStage,
+} from "@/lib/careerStage";
+import {
   SS_PHONE,
   SS_SESSION,
   setHandoff,
 } from "@/lib/client/verify_handoff";
+import { WORKPLACE_TYPE_LABEL, type WorkplaceType } from "@/lib/workplace";
 
-type Specialty = { id: string; name_ar: string };
+type Specialty = { id: string; name_ar: string; code: string | null };
 type LicenseRegion = "IL" | "PS";
-type WorkplaceType = "hospital" | "clinic";
 type WorkplaceEntry = {
   name: string;
   workplace_type: WorkplaceType;
@@ -33,6 +43,10 @@ type FormState = {
   arabic_family_name: string;
   hebrew_first_name: string;
   hebrew_family_name: string;
+  /** The 3-way self-declared choice; null until the doctor picks one. */
+  stage: Stage | null;
+  /** Kept as a string so the controlled number input can be empty. */
+  residency_start_year: string;
   specialty_ids: string[];
   subspecialty: string;
   email: string;
@@ -41,9 +55,12 @@ type FormState = {
   consent: boolean;
 };
 
-const EMPTY_WORKPLACE = (isPrimary: boolean): WorkplaceEntry => ({
+const EMPTY_WORKPLACE = (
+  isPrimary: boolean,
+  workplace_type: WorkplaceType = "hospital",
+): WorkplaceEntry => ({
   name: "",
-  workplace_type: "hospital",
+  workplace_type,
   details: "",
   is_primary: isPrimary,
 });
@@ -61,6 +78,8 @@ const INITIAL: FormState = {
   arabic_family_name: "",
   hebrew_first_name: "",
   hebrew_family_name: "",
+  stage: null,
+  residency_start_year: "",
   specialty_ids: [],
   subspecialty: "",
   email: "",
@@ -89,6 +108,58 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
   const update = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((s) => ({ ...s, [k]: v }));
+
+  const generalSpecialtyId = useMemo(
+    () => findGeneralSpecialtyId(specialties),
+    [specialties],
+  );
+  const stageOpt = form.stage ? STAGE_BY_KEY[form.stage] : null;
+  // A طب عام signup posts the الطب العام specialty on the doctor's behalf.
+  // If that row has been deactivated from /admin/specialties there is nothing
+  // to attach, and a silently empty specialty_ids would leave submit disabled
+  // with no explanation — so fall back to showing the normal picker.
+  const showSpecialtyPicker =
+    !!stageOpt &&
+    (stageOpt.showsSpecialtyPicker ||
+      (stageOpt.autoAttachesGeneralSpecialty && !generalSpecialtyId));
+  const visibleSpecialties =
+    stageOpt?.excludesGeneralSpecialty && generalSpecialtyId
+      ? specialties.filter((s) => s.id !== generalSpecialtyId)
+      : specialties;
+
+  /**
+   * Everything the choice implies, applied in one update so the form can
+   * never render a state that contradicts it: the auto-attached specialty,
+   * the residency year, and any workplace whose type the new stage doesn't
+   * offer.
+   */
+  const applyStage = (next: Stage) => {
+    const opt = STAGE_BY_KEY[next];
+    setForm((s) => ({
+      ...s,
+      stage: next,
+      specialty_ids: opt.autoAttachesGeneralSpecialty
+        ? generalSpecialtyId
+          ? [generalSpecialtyId]
+          : []
+        : s.specialty_ids.filter((id) => id !== generalSpecialtyId),
+      subspecialty: opt.showsSpecialtyPicker ? s.subspecialty : "",
+      residency_start_year: opt.requiresResidencyStartYear
+        ? s.residency_start_year
+        : "",
+      // A row the doctor hasn't touched yet adopts the stage's default type
+      // (عيادة for طب عام); a row they've already named only gets corrected
+      // when the new stage doesn't offer its type at all.
+      workplaces: s.workplaces.map((w) =>
+        workplaceForStage(
+          w.name.trim() === ""
+            ? { ...w, workplace_type: opt.defaultWorkplaceType }
+            : w,
+          next,
+        ),
+      ),
+    }));
+  };
 
   const toggleSpecialty = (id: string) =>
     setForm((s) => ({
@@ -164,6 +235,15 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          // `stage` is a UI-only key; the column holds two values with طب عام
+          // as NULL. JSON.stringify drops the undefined.
+          stage: undefined,
+          career_stage: form.stage
+            ? STAGE_BY_KEY[form.stage].careerStage
+            : null,
+          residency_start_year: form.residency_start_year
+            ? Number(form.residency_start_year)
+            : null,
           workplaces: cleanedWorkplaces,
           secondary_license_region: form.has_secondary_license
             ? form.secondary_license_region
@@ -210,13 +290,24 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
   const onPhoneChange = (next: string) => {
     update("phone", next.replace(/[^0-9+\-\s()]/g, ""));
   };
+  // An IL license may be typed the way registries.health.gov.il prints it —
+  // `1-189371`, profession code + serial — so the hyphen has to survive the
+  // input; the server reduces both forms to the serial. Only the first
+  // hyphen is kept, since there is only ever one.
   // PS licenses have no confirmed public format, so we only strip characters
-  // that would break the request — IL stays digits-only.
+  // that would break the request.
+  const sanitizeIlLicense = (next: string) => {
+    const cleaned = next.replace(/[^\d-]/g, "");
+    const cut = cleaned.indexOf("-");
+    return cut === -1
+      ? cleaned
+      : cleaned.slice(0, cut + 1) + cleaned.slice(cut + 1).replace(/-/g, "");
+  };
   const onLicenseChange = (next: string) => {
     update(
       "license_number",
       form.license_region === "IL"
-        ? next.replace(/\D/g, "")
+        ? sanitizeIlLicense(next)
         : next.replace(/[,()]/g, ""),
     );
   };
@@ -233,10 +324,27 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         j === i ? { ...w, ...patch } : w,
       ),
     }));
+  /** Type changes go through workplaceForStage so `details` never survives a
+   *  switch into a cell that hides it. */
+  const setWorkplaceType = (i: number, workplace_type: WorkplaceType) =>
+    setForm((s) => ({
+      ...s,
+      workplaces: s.workplaces.map((w, j) =>
+        j === i && s.stage
+          ? workplaceForStage({ ...w, workplace_type }, s.stage)
+          : w,
+      ),
+    }));
   const addWorkplace = () =>
     setForm((s) => ({
       ...s,
-      workplaces: [...s.workplaces, EMPTY_WORKPLACE(false)],
+      workplaces: [
+        ...s.workplaces,
+        EMPTY_WORKPLACE(
+          false,
+          s.stage ? STAGE_BY_KEY[s.stage].defaultWorkplaceType : "hospital",
+        ),
+      ],
     }));
   const removeWorkplace = (i: number) =>
     setForm((s) => {
@@ -306,13 +414,14 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           )}
         </Field>
 
-        <Field label="رقم الترخيص (المعرف الطبي)" error={fieldError("license_number")}>
+        <Field label="رقم الترخيص" error={fieldError("license_number")}>
           <input
             required
             dir="ltr"
             inputMode={form.license_region === "IL" ? "numeric" : "text"}
-            pattern={form.license_region === "IL" ? "\\d*" : undefined}
+            pattern={form.license_region === "IL" ? "[0-9-]*" : undefined}
             className="input"
+            placeholder={form.license_region === "IL" ? "189371" : undefined}
             value={form.license_number}
             onChange={(e) => onLicenseChange(e.target.value)}
           />
@@ -343,13 +452,13 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
                 update(
                   "secondary_license_number",
                   form.secondary_license_region === "IL"
-                    ? e.target.value.replace(/\D/g, "")
+                    ? sanitizeIlLicense(e.target.value)
                     : e.target.value.replace(/[,()]/g, ""),
                 )
               }
               placeholder={
                 form.secondary_license_region === "IL"
-                  ? "رقم الترخيص الإسرائيلي"
+                  ? "رقم الترخيص الإسرائيلي، مثل 189371"
                   : "رقم الترخيص الفلسطيني"
               }
             />
@@ -462,10 +571,55 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         )}
       </Section>
 
+      <Section title="المرحلة المهنية">
+        <Field label="اختر ما ينطبق عليك" error={fieldError("career_stage")}>
+          <div className="flex flex-col gap-2">
+            {STAGE_OPTIONS.map((o) => (
+              <label key={o.stage} className="flex items-start gap-2">
+                <input
+                  type="radio"
+                  name="stage"
+                  className="mt-1"
+                  checked={form.stage === o.stage}
+                  onChange={() => applyStage(o.stage)}
+                />
+                <span>
+                  {o.label}
+                  <span className="block text-sm text-foreground/60">
+                    {o.hint}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </Field>
+
+        {stageOpt?.requiresResidencyStartYear && (
+          <Field
+            label="سنة بداية التخصص"
+            error={fieldError("residency_start_year")}
+          >
+            <input
+              className="input"
+              type="number"
+              inputMode="numeric"
+              dir="ltr"
+              required
+              min={RESIDENCY_YEAR_MIN}
+              max={residencyYearMax()}
+              value={form.residency_start_year}
+              onChange={(e) => update("residency_start_year", e.target.value)}
+              placeholder={String(residencyYearMax())}
+            />
+          </Field>
+        )}
+      </Section>
+
+      {showSpecialtyPicker && (
       <Section title="التخصص">
         <Field label="التخصص (اختر واحدًا أو أكثر)" error={fieldError("specialty_ids")}>
           <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
-            {specialties.map((s) => (
+            {visibleSpecialties.map((s) => (
               <label
                 key={s.id}
                 className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
@@ -493,6 +647,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           />
         </Field>
       </Section>
+      )}
 
       <Section title="نبذة عني (اختياري)">
         <Field label="اكتب ما تريد زملاءك أن يعرفوه عنك — خبرة، اهتمامات مهنية، أو أي شيء آخر">
@@ -507,6 +662,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </Field>
       </Section>
 
+      {stageOpt && (
       <Section title="مكان العمل">
         <div className="space-y-4">
           {form.workplaces.map((wp, i) => (
@@ -535,28 +691,17 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
               </div>
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="radio"
-                    name={`workplace_type_${i}`}
-                    checked={wp.workplace_type === "hospital"}
-                    onChange={() =>
-                      updateWorkplace(i, { workplace_type: "hospital" })
-                    }
-                  />
-                  مستشفى
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="radio"
-                    name={`workplace_type_${i}`}
-                    checked={wp.workplace_type === "clinic"}
-                    onChange={() =>
-                      updateWorkplace(i, { workplace_type: "clinic" })
-                    }
-                  />
-                  عيادة خاصة
-                </label>
+                {stageOpt.workplaceTypes.map((t) => (
+                  <label key={t} className="flex items-center gap-1.5">
+                    <input
+                      type="radio"
+                      name={`workplace_type_${i}`}
+                      checked={wp.workplace_type === t}
+                      onChange={() => setWorkplaceType(i, t)}
+                    />
+                    {WORKPLACE_TYPE_LABEL[t]}
+                  </label>
+                ))}
                 {form.workplaces.length > 1 && (
                   <label className="flex items-center gap-1.5">
                     <input
@@ -570,7 +715,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
                 )}
               </div>
 
-              {wp.workplace_type === "clinic" && (
+              {stageOpt.showsWorkplaceDetails &&
+                wp.workplace_type === "clinic" && (
                 <input
                   className="input"
                   value={wp.details}
@@ -595,6 +741,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           <p className="mt-1 text-sm text-red-600">{fieldError("workplaces")}</p>
         )}
       </Section>
+      )}
 
       <Section title="الموافقة">
         <div className="rounded border border-foreground/15 bg-foreground/5 p-4 text-base leading-relaxed">
@@ -641,6 +788,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           !form.workplaces.some((w) => w.name.trim()) ||
           !form.email.trim() ||
           !form.consent ||
+          stageOpt === null ||
+          (stageOpt.requiresResidencyStartYear &&
+            !isValidResidencyYear(form.residency_start_year)) ||
           (form.has_secondary_license && !form.secondary_license_number.trim())
         }
         className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"

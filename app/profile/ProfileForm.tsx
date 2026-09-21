@@ -3,16 +3,31 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoUploader } from "./PhotoUploader";
-import { CAREER_STAGE_LABEL } from "@/lib/careerStage";
+import {
+  findGeneralSpecialtyId,
+  isValidResidencyYear,
+  RESIDENCY_YEAR_MIN,
+  residencyYearMax,
+  STAGE_BY_KEY,
+  STAGE_OPTIONS,
+  type Stage,
+  stageFromCareerStage,
+  workplaceForStage,
+} from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
+import {
+  WORKPLACE_TYPE_LABEL,
+  WORKPLACE_TYPES,
+  type WorkplaceType,
+} from "@/lib/workplace";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
 const WHATSAPP_URL = "https://wa.me/972524209156";
 
-type Specialty = { id: string; name_ar: string };
+type Specialty = { id: string; name_ar: string; code: string | null };
 type WorkplaceInput = {
   name: string;
-  workplace_type: "hospital" | "clinic";
+  workplace_type: WorkplaceType;
   details: string;
   is_primary: boolean;
 };
@@ -28,7 +43,7 @@ export function ProfileForm({
   currentSpecialtyIds: string[];
   currentWorkplaces: {
     name: string;
-    workplace_type: "hospital" | "clinic";
+    workplace_type: WorkplaceType;
     details: string | null;
     is_primary: boolean;
     sort_order: number;
@@ -54,16 +69,75 @@ export function ProfileForm({
       : [{ name: "", workplace_type: "hospital", details: "", is_primary: true }];
   const [workplaces, setWorkplaces] =
     useState<WorkplaceInput[]>(initialWorkplaces);
-  const [phoneVisible, setPhoneVisible] = useState(doctor.phone_is_visible);
-  const [workplacesVisible, setWorkplacesVisible] = useState(
-    doctor.workplaces_is_visible,
-  );
   const [photoUrl, setPhotoUrl] = useState<string | null>(
     doctor.profile_picture_url,
   );
 
+  // Deliberately null — not stageFromCareerStage(null) — for a doctor who has
+  // never declared a stage. Pre-selecting طب عام would mean that saving any
+  // unrelated field silently replaces their specialties with الطب العام,
+  // because /api/profile writes specialties replace-all.
+  const [stage, setStage] = useState<Stage | null>(
+    doctor.career_stage === null
+      ? null
+      : stageFromCareerStage(doctor.career_stage),
+  );
+  const [residencyStartYear, setResidencyStartYear] = useState(
+    doctor.residency_start_year ? String(doctor.residency_start_year) : "",
+  );
+  const [stageChanged, setStageChanged] = useState(false);
+
+  const [editingStage, setEditingStage] = useState(false);
   const [editingSpecialties, setEditingSpecialties] = useState(false);
   const [editingWorkplaces, setEditingWorkplaces] = useState(false);
+
+  const generalSpecialtyId = findGeneralSpecialtyId(specialties);
+  const stageOpt = stage ? STAGE_BY_KEY[stage] : null;
+  const showSpecialtyPicker =
+    !stageOpt ||
+    stageOpt.showsSpecialtyPicker ||
+    (stageOpt.autoAttachesGeneralSpecialty && !generalSpecialtyId);
+  const visibleSpecialties =
+    stageOpt?.excludesGeneralSpecialty && generalSpecialtyId
+      ? specialties.filter((s) => s.id !== generalSpecialtyId)
+      : specialties;
+
+  /**
+   * Same cascade as signup. Both affected sections are force-opened so the
+   * doctor sees what the switch did to their specialties and workplaces
+   * before saving, instead of discovering it afterwards.
+   */
+  const applyStage = (next: Stage) => {
+    const opt = STAGE_BY_KEY[next];
+    setStage(next);
+    setStageChanged(true);
+    if (opt.autoAttachesGeneralSpecialty) {
+      // Replace rather than append: a doctor already at the 5-specialty cap
+      // would otherwise produce a 6-element array that fails zod with a bare
+      // invalid_body and no field message.
+      setSpecialtyIds(generalSpecialtyId ? [generalSpecialtyId] : []);
+      setSubspecialty("");
+      setEditingSpecialties(true);
+    } else if (generalSpecialtyId && specialtyIds.includes(generalSpecialtyId)) {
+      setSpecialtyIds((ids) => ids.filter((id) => id !== generalSpecialtyId));
+      setEditingSpecialties(true);
+    }
+    if (!opt.requiresResidencyStartYear) setResidencyStartYear("");
+    // Untouched rows adopt the stage's default type; named ones are only
+    // corrected when the new stage doesn't offer their type.
+    const coerced = workplaces.map((w) =>
+      workplaceForStage(
+        w.name.trim() === ""
+          ? { ...w, workplace_type: opt.defaultWorkplaceType }
+          : w,
+        next,
+      ),
+    );
+    if (coerced.some((w, i) => w !== workplaces[i])) {
+      setWorkplaces(coerced);
+      setEditingWorkplaces(true);
+    }
+  };
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +154,16 @@ export function ProfileForm({
   const updateWorkplace = (i: number, patch: Partial<WorkplaceInput>) =>
     setWorkplaces((ws) =>
       ws.map((w, j) => (j === i ? { ...w, ...patch } : w)),
+    );
+
+  /** Clears `details` when the new type hides that input — see signup. */
+  const setWorkplaceType = (i: number, workplace_type: WorkplaceType) =>
+    setWorkplaces((ws) =>
+      ws.map((w, j) =>
+        j === i && stage
+          ? workplaceForStage({ ...w, workplace_type }, stage)
+          : { ...w, workplace_type },
+      ),
     );
 
   const removeWorkplace = (i: number) =>
@@ -134,6 +218,14 @@ export function ProfileForm({
       setSaving(false);
       return;
     }
+    if (
+      stageOpt?.requiresResidencyStartYear &&
+      !isValidResidencyYear(residencyStartYear)
+    ) {
+      setError("أدخل سنة بداية التخصص.");
+      setSaving(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/profile", {
@@ -146,9 +238,16 @@ export function ProfileForm({
           subspecialty: subspecialty.trim() || null,
           bio: bio.trim() || null,
           specialty_ids: specialtyIds,
+          // Omitted entirely while the doctor has never declared a stage, so
+          // an unrelated save can't write a career_stage they didn't choose.
+          ...(stage !== null && {
+            career_stage: STAGE_BY_KEY[stage].careerStage,
+            residency_start_year:
+              stage === "resident" && residencyStartYear
+                ? Number(residencyStartYear)
+                : null,
+          }),
           workplaces: cleanedWorkplaces,
-          phone_is_visible: phoneVisible,
-          workplaces_is_visible: workplacesVisible,
         }),
       });
       const body = await res.json();
@@ -215,14 +314,6 @@ export function ProfileForm({
             {doctor.hebrew_first_name} {doctor.hebrew_family_name}
           </Locked>
         )}
-        {doctor.career_stage && (
-          <Locked label="المرحلة المهنية">
-            {CAREER_STAGE_LABEL[doctor.career_stage]}{" "}
-            <span className="text-foreground/50">
-              (مستمدة تلقائيًا من سجل وزارة الصحة)
-            </span>
-          </Locked>
-        )}
       </Section>
 
       <Section title="الاسم بالعربية والبريد">
@@ -252,6 +343,73 @@ export function ProfileForm({
       </Section>
 
       <Section
+        title="المرحلة المهنية"
+        action={
+          editingStage ? null : (
+            <EditButton onClick={() => setEditingStage(true)} />
+          )
+        }
+      >
+        {editingStage ? (
+          <>
+            <div className="flex flex-col gap-2">
+              {STAGE_OPTIONS.map((o) => (
+                <label key={o.stage} className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="stage"
+                    className="mt-1"
+                    checked={stage === o.stage}
+                    onChange={() => applyStage(o.stage)}
+                  />
+                  <span>
+                    {o.label}
+                    <span className="block text-sm text-foreground/60">
+                      {o.hint}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {stageOpt?.requiresResidencyStartYear && (
+              <Field label="سنة بداية التخصص">
+                <input
+                  className="input"
+                  type="number"
+                  inputMode="numeric"
+                  dir="ltr"
+                  min={RESIDENCY_YEAR_MIN}
+                  max={residencyYearMax()}
+                  value={residencyStartYear}
+                  onChange={(e) => setResidencyStartYear(e.target.value)}
+                  placeholder={String(residencyYearMax())}
+                />
+              </Field>
+            )}
+            {stageChanged && stageOpt?.autoAttachesGeneralSpecialty && (
+              <p className="rounded border border-amber-300/60 bg-amber-50/60 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+                اختيار «طب عام» يستبدل تخصصاتك المحفوظة بـ«الطب العام» عند
+                الحفظ.
+              </p>
+            )}
+          </>
+        ) : (
+          <ReadOnlyView>
+            {stageOpt ? (
+              <span>
+                {stageOpt.label}
+                {stageOpt.requiresResidencyStartYear && residencyStartYear
+                  ? ` — بداية التخصص ${residencyStartYear}`
+                  : ""}
+              </span>
+            ) : (
+              <span className="text-foreground/40">— غير محدد —</span>
+            )}
+          </ReadOnlyView>
+        )}
+      </Section>
+
+      <Section
         title="التخصص"
         action={
           editingSpecialties ? null : (
@@ -261,9 +419,10 @@ export function ProfileForm({
       >
         {editingSpecialties ? (
           <>
+            {showSpecialtyPicker && (
             <Field label="التخصصات (اختر واحدًا أو أكثر)">
               <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
-                {specialties.map((s) => (
+                {visibleSpecialties.map((s) => (
                   <label
                     key={s.id}
                     className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
@@ -282,6 +441,8 @@ export function ProfileForm({
                 ))}
               </div>
             </Field>
+            )}
+            {showSpecialtyPicker && (
             <Field label="التخصص الفرعي">
               <input
                 className="input"
@@ -290,6 +451,7 @@ export function ProfileForm({
                 placeholder="اختياري"
               />
             </Field>
+            )}
             <Field label="نبذة عني">
               <textarea
                 className="input"
@@ -322,16 +484,18 @@ export function ProfileForm({
                 </ul>
               )}
             </div>
-            <div>
-              <div className="mb-1 text-sm text-foreground/65">
-                التخصص الفرعي
+            {showSpecialtyPicker && (
+              <div>
+                <div className="mb-1 text-sm text-foreground/65">
+                  التخصص الفرعي
+                </div>
+                <span>
+                  {subspecialty || (
+                    <span className="text-foreground/40">— غير محدد —</span>
+                  )}
+                </span>
               </div>
-              <span>
-                {subspecialty || (
-                  <span className="text-foreground/40">— غير محدد —</span>
-                )}
-              </span>
-            </div>
+            )}
             <div>
               <div className="mb-1 text-sm text-foreground/65">نبذة عني</div>
               <span className="whitespace-pre-line">
@@ -380,26 +544,20 @@ export function ProfileForm({
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name={`workplace_type_${i}`}
-                      checked={wp.workplace_type === "hospital"}
-                      onChange={() => updateWorkplace(i, { workplace_type: "hospital" })}
-                    />
-                    مستشفى
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name={`workplace_type_${i}`}
-                      checked={wp.workplace_type === "clinic"}
-                      onChange={() => updateWorkplace(i, { workplace_type: "clinic" })}
-                    />
-                    عيادة خاصة
-                  </label>
+                  {(stageOpt?.workplaceTypes ?? WORKPLACE_TYPES).map((t) => (
+                    <label key={t} className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        name={`workplace_type_${i}`}
+                        checked={wp.workplace_type === t}
+                        onChange={() => setWorkplaceType(i, t)}
+                      />
+                      {WORKPLACE_TYPE_LABEL[t]}
+                    </label>
+                  ))}
                 </div>
-                {wp.workplace_type === "clinic" && (
+                {(stageOpt?.showsWorkplaceDetails ?? true) &&
+                  wp.workplace_type === "clinic" && (
                   <input
                     className="input"
                     value={wp.details}
@@ -433,7 +591,7 @@ export function ProfileForm({
                         </span>
                       )}
                       <span className="rounded-full border border-foreground/15 px-2 py-0.5 text-xs text-foreground/65">
-                        {w.workplace_type === "clinic" ? "عيادة خاصة" : "مستشفى"}
+                        {WORKPLACE_TYPE_LABEL[w.workplace_type]}
                       </span>
                       <span>{w.name}</span>
                       {w.details && (
@@ -447,19 +605,6 @@ export function ProfileForm({
             )}
           </ReadOnlyView>
         )}
-      </Section>
-
-      <Section title="الخصوصية">
-        <Toggle
-          label="إظهار رقم الهاتف وزر واتساب للأطباء الآخرين"
-          checked={phoneVisible}
-          onChange={setPhoneVisible}
-        />
-        <Toggle
-          label="إظهار أماكن العمل في نتائج البحث"
-          checked={workplacesVisible}
-          onChange={setWorkplacesVisible}
-        />
       </Section>
 
       {error && (
@@ -659,27 +804,5 @@ function LockableField({
         </div>
       )}
     </div>
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (b: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between gap-4 rounded border border-foreground/15 px-3 py-2.5">
-      <span className="text-sm">{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-5 w-5"
-      />
-    </label>
   );
 }

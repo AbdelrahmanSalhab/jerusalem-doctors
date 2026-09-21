@@ -2,6 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import {
+  RESIDENCY_YEAR_MIN,
+  residencyYearMax,
+  STAGE_BY_KEY,
+  STAGE_OPTIONS,
+  type Stage,
+  stageFromCareerStage,
+} from "@/lib/careerStage";
 
 interface Row {
   id: string;
@@ -15,6 +23,7 @@ interface Row {
   secondary_license_verification_status: string | null;
   license_verification_status: string | null;
   career_stage: "resident" | "specialist" | null;
+  residency_start_year: number | null;
   is_admin_approved: boolean;
   is_active: boolean;
   is_visible: boolean;
@@ -26,11 +35,6 @@ const statusLabels: Record<string, string> = {
   soft_match: "تطابق جزئي",
   not_found: "غير موجود في السجل",
   name_mismatch_overridden: "تم التغاضي يدويًا",
-};
-
-const careerStageLabels: Record<string, string> = {
-  resident: "مقيم",
-  specialist: "أخصائي",
 };
 
 export function AdminDoctorsTable({
@@ -57,14 +61,29 @@ export function AdminDoctorsTable({
     startTransition(() => router.push(`/admin?${params}`));
   };
 
-  const toggle = async (id: string, field: "is_admin_approved" | "is_active", value: boolean) => {
+  const patchDoctor = async (id: string, body: Record<string, unknown>) => {
     const res = await fetch(`/api/admin/doctors/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [field]: value }),
+      body: JSON.stringify(body),
     });
     if (res.ok) startTransition(() => router.refresh());
   };
+
+  const toggle = (
+    id: string,
+    field: "is_admin_approved" | "is_active",
+    value: boolean,
+  ) => patchDoctor(id, { [field]: value });
+
+  // Setting a row to طب عام writes career_stage = NULL. Unlike signup it does
+  // not attach the الطب العام specialty — the admin table doesn't manage
+  // specialties at all.
+  const setStage = (r: Row, stage: Stage) =>
+    patchDoctor(r.id, {
+      career_stage: STAGE_BY_KEY[stage].careerStage,
+      ...(stage === "resident" ? {} : { residency_start_year: null }),
+    });
 
   return (
     <div className="space-y-4">
@@ -169,7 +188,42 @@ export function AdminDoctorsTable({
                   </span>
                 </td>
                 <td className="p-3 text-center text-foreground/75">
-                  {r.career_stage ? careerStageLabels[r.career_stage] : "—"}
+                  <div className="inline-flex overflow-hidden rounded-md border border-foreground/20">
+                    {STAGE_OPTIONS.map((o) => (
+                      <button
+                        key={o.stage}
+                        type="button"
+                        disabled={pending}
+                        onClick={() => setStage(r, o.stage)}
+                        className={
+                          "border-r border-foreground/20 px-2 py-1 text-sm last:border-r-0 " +
+                          (stageFromCareerStage(r.career_stage) === o.stage
+                            ? "bg-foreground text-background"
+                            : "hover:bg-foreground/5")
+                        }
+                      >
+                        {o.shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  {r.career_stage === "resident" && (
+                    <input
+                      type="number"
+                      dir="ltr"
+                      disabled={pending}
+                      min={RESIDENCY_YEAR_MIN}
+                      max={residencyYearMax()}
+                      defaultValue={r.residency_start_year ?? ""}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        const next = v === "" ? null : Number(v);
+                        if (next === (r.residency_start_year ?? null)) return;
+                        patchDoctor(r.id, { residency_start_year: next });
+                      }}
+                      placeholder="سنة بداية التخصص"
+                      className="mt-1 w-28 rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-sm"
+                    />
+                  )}
                 </td>
                 <td className="p-3 text-center">
                   <div className="flex flex-wrap justify-center gap-1.5">

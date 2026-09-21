@@ -3,6 +3,7 @@
 // Audit-logs every state change.
 
 import { z } from "zod";
+import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdmin } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -11,6 +12,17 @@ const Body = z.object({
   is_admin_approved: z.boolean().optional(),
   is_active: z.boolean().optional(),
   is_visible: z.boolean().optional(),
+  // An explicit null is a present key, so it survives the no_fields guard
+  // below and reaches .update() as a real NULL — that's how an admin sets a
+  // doctor back to طب عام.
+  career_stage: z.enum(CAREER_STAGES).nullable().optional(),
+  residency_start_year: z
+    .number()
+    .int()
+    .min(RESIDENCY_YEAR_MIN)
+    .max(2100)
+    .nullable()
+    .optional(),
 });
 
 export const PATCH = withJsonErrors(async (

@@ -5,6 +5,8 @@
 // once the Supabase CLI is linked to the project. Until then, this file
 // keeps type imports in app code working.
 
+import type { WorkplaceType } from "@/lib/workplace";
+
 export interface Doctor {
   id: string;
   auth_user_id: string | null;
@@ -37,6 +39,8 @@ export interface Doctor {
     | "name_mismatch_overridden"
     | null;
   career_stage: "resident" | "specialist" | null;
+  /** Asked of residents only; null for everyone else. */
+  residency_start_year: number | null;
   subspecialty: string | null;
   subspecialty_normalized: string | null;
   email: string | null;
@@ -48,8 +52,6 @@ export interface Doctor {
   is_visible: boolean;
   is_admin_approved: boolean;
   is_admin: boolean;
-  phone_is_visible: boolean;
-  workplaces_is_visible: boolean;
   profile_picture_url: string | null;
   created_at: string;
   updated_at: string;
@@ -58,6 +60,8 @@ export interface Doctor {
 export interface Specialty {
   id: string;
   name_ar: string;
+  /** Stable handle for rows the app has to single out — see 0009. */
+  code: string | null;
   name_ar_normalized: string;
   name_he: string | null;
   name_en: string | null;
@@ -93,7 +97,7 @@ export interface DoctorWorkplace {
   doctor_id: string;
   name: string;
   name_normalized: string;
-  workplace_type: "hospital" | "clinic";
+  workplace_type: WorkplaceType;
   details: string | null;
   is_primary: boolean;
   sort_order: number;

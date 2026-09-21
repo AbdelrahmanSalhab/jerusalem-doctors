@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import type { SearchHit } from "@/app/api/search/route";
-import { CAREER_STAGE_LABEL } from "@/lib/careerStage";
+import { careerStageBadge } from "@/lib/careerStage";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
@@ -46,7 +46,7 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
             )}
             {doctor.career_stage && (
               <li className="rounded-full border border-sky-300/60 bg-sky-50/60 px-2 py-0.5 text-xs text-sky-900 dark:bg-sky-900/20 dark:text-sky-100">
-                {CAREER_STAGE_LABEL[doctor.career_stage]}
+                {careerStageBadge(doctor.career_stage, doctor.residency_start_year)}
               </li>
             )}
           </ul>

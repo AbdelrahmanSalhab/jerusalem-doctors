@@ -16,6 +16,7 @@ import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import type { WorkplaceType } from "@/lib/workplace";
 
 const Query = z.object({
   q: z.string().trim().max(100).default(""),
@@ -29,19 +30,21 @@ export interface SearchHit {
   hebrew_first_name: string | null;
   hebrew_family_name: string | null;
   license_number: string;
-  /** Null when the doctor opted to hide their phone via /profile. */
+  /** Null only when the column itself is unset — the directory always shows it. */
   phone_display: string | null;
-  /** Null when phone is hidden — disables the WhatsApp button on the card. */
+  /** Drives the WhatsApp button on the card. */
   whatsapp_url: string | null;
   email: string | null;
   subspecialty: string | null;
   bio: string | null;
   career_stage: "resident" | "specialist" | null;
+  /** Qualifies the resident badge: "طبيب مقيم · منذ ٢٠٢٢". */
+  residency_start_year: number | null;
   specialties: string[];
-  /** Empty array when the doctor opted to hide their workplaces. */
+  /** Empty only for a doctor with no workplace rows. */
   workplaces: {
     name: string;
-    workplace_type: "hospital" | "clinic";
+    workplace_type: WorkplaceType;
     details: string | null;
     is_primary: boolean;
   }[];
@@ -87,13 +90,12 @@ export const GET = withJsonErrors(async (req: Request) => {
       license_number,
       phone_display,
       phone_e164,
-      phone_is_visible,
-      workplaces_is_visible,
       profile_picture_url,
       email,
       subspecialty,
       bio,
       career_stage,
+      residency_start_year,
       doctor_specialties${parsed.data.specialty_id ? "!inner" : ""}(
         specialty:specialties(id, name_ar)
       ),
@@ -200,26 +202,26 @@ export const GET = withJsonErrors(async (req: Request) => {
       })
       .filter((n): n is string => Boolean(n));
 
-    const workplaces = d.workplaces_is_visible
-      ? ((d.doctor_workplaces ?? []) as Array<{
-          name: string;
-          workplace_type: "hospital" | "clinic";
-          details: string | null;
-          is_primary: boolean;
-          sort_order: number;
-        }>)
-          .slice()
-          .sort((a, b) => {
-            if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
-            return a.sort_order - b.sort_order;
-          })
-          .map(({ name, workplace_type, details, is_primary }) => ({
-            name,
-            workplace_type,
-            details,
-            is_primary,
-          }))
-      : [];
+    const workplaces = (
+      (d.doctor_workplaces ?? []) as Array<{
+        name: string;
+        workplace_type: WorkplaceType;
+        details: string | null;
+        is_primary: boolean;
+        sort_order: number;
+      }>
+    )
+      .slice()
+      .sort((a, b) => {
+        if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+        return a.sort_order - b.sort_order;
+      })
+      .map(({ name, workplace_type, details, is_primary }) => ({
+        name,
+        workplace_type,
+        details,
+        is_primary,
+      }));
 
     return {
       id: d.id,
@@ -228,12 +230,16 @@ export const GET = withJsonErrors(async (req: Request) => {
       hebrew_first_name: d.hebrew_first_name,
       hebrew_family_name: d.hebrew_family_name,
       license_number: d.license_number,
-      phone_display: d.phone_is_visible ? d.phone_display : null,
-      whatsapp_url: d.phone_is_visible ? buildWhatsAppLink(d.phone_e164) : null,
+      phone_display: d.phone_display,
+      // buildWhatsAppLink throws on an empty string, and the old
+      // phone_is_visible ternary was incidentally shielding that — keep a
+      // guard so one malformed row can't 500 the whole search response.
+      whatsapp_url: d.phone_e164 ? buildWhatsAppLink(d.phone_e164) : null,
       email: d.email,
       subspecialty: d.subspecialty,
       bio: d.bio,
       career_stage: d.career_stage,
+      residency_start_year: d.residency_start_year,
       specialties,
       workplaces,
       profile_picture_url: d.profile_picture_url ?? null,

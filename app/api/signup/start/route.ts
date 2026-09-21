@@ -8,22 +8,24 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { verifyLicense } from "@/lib/moh/match";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
-import { isValidLicenseFormat, licenseFormatErrorMessage } from "@/lib/normalize/license";
+import { canonicalLicenseNumber, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
+import { WORKPLACE_TYPES, type WorkplaceType } from "@/lib/workplace";
 
 const PENDING_TTL_MS = 15 * 60_000;
 
 const WorkplaceInput = z.object({
   name: z.string().trim().min(2).max(120),
-  workplace_type: z.enum(["hospital", "clinic"]).default("hospital"),
+  workplace_type: z.enum(WORKPLACE_TYPES).default("hospital"),
   details: z.string().trim().max(300).optional().nullable(),
   is_primary: z.boolean(),
 });
@@ -45,6 +47,17 @@ const Body = z
     hebrew_first_name: z.string().trim().max(80).optional().nullable(),
     hebrew_family_name: z.string().trim().max(80).optional().nullable(),
     specialty_ids: z.array(z.uuid()).min(1).max(5),
+    // Self-declared (see lib/careerStage.ts). null == طب عام. Deliberately
+    // no cross-field rules — which stage may pair with which workplace type
+    // or specialty is a form-level guide, not a data constraint.
+    career_stage: z.enum(CAREER_STAGES).nullable().optional(),
+    residency_start_year: z
+      .number()
+      .int()
+      .min(RESIDENCY_YEAR_MIN)
+      .max(2100)
+      .nullable()
+      .optional(),
     subspecialty: z.string().trim().optional().nullable(),
     email: z.email(),
     bio: z.string().trim().max(500).optional().nullable(),
@@ -111,25 +124,38 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
-  const license = parsed.license_number.trim();
   const region = parsed.license_region;
   const secondaryRegion = parsed.secondary_license_region ?? null;
-  const secondaryLicense = parsed.secondary_license_number?.trim() || null;
-  const hasSecondary = Boolean(secondaryRegion && secondaryLicense);
+  const rawSecondaryLicense = parsed.secondary_license_number?.trim() || null;
+  const hasSecondary = Boolean(secondaryRegion && rawSecondaryLicense);
 
-  if (!isValidLicenseFormat(region, license)) {
-    return jsonError(400, {
-      error: "invalid_license",
-      code: "invalid_license",
-      fields: { license_number: licenseFormatErrorMessage(region) },
-    });
-  }
-  if (hasSecondary && !isValidLicenseFormat(secondaryRegion!, secondaryLicense!)) {
+  // Canonicalise before anything else touches the number. An IL license
+  // reduces to the registry serial, so the profession prefix the MoH site
+  // displays (`1-189371`, or `1189371` once the hyphen is dropped) can't
+  // reach the uniqueness check, the registry lookup, or the stored row under
+  // three different spellings.
+  const license = canonicalLicenseNumber(region, parsed.license_number);
+  if (license === null) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
       fields: {
-        secondary_license_number: licenseFormatErrorMessage(secondaryRegion!),
+        license_number: licenseFormatErrorMessage(region, parsed.license_number),
+      },
+    });
+  }
+  const secondaryLicense = hasSecondary
+    ? canonicalLicenseNumber(secondaryRegion!, rawSecondaryLicense!)
+    : null;
+  if (hasSecondary && secondaryLicense === null) {
+    return jsonError(400, {
+      error: "invalid_license",
+      code: "invalid_license",
+      fields: {
+        secondary_license_number: licenseFormatErrorMessage(
+          secondaryRegion!,
+          rawSecondaryLicense!,
+        ),
       },
     });
   }
@@ -225,41 +251,14 @@ export const POST = withJsonErrors(async (req: Request) => {
         ? ({ status: "not_found", source: "none" } as const)
         : null;
 
-  // Career stage is only auto-derivable from an IL match: the registry row
-  // carries `שם התמחות` (specialty certificate name) when the doctor holds a
-  // specialization certificate, and omits it when they don't yet — i.e.
-  // still a resident / general practitioner. No equivalent signal exists for
-  // PS, so a PS-only doctor stays unset (admin can set it manually later). A
-  // dual-licensed doctor takes the more specific answer from either match.
-  //
-  // `allowMismatch` lets the primary license count a `name_mismatch` result:
-  // by the time we reach this point a primary mismatch can only mean the
-  // doctor clicked through the override-confirm flow above (an unconfirmed
-  // mismatch already returned 409 earlier), so the license-number match is
-  // just as trustworthy as `verified` — only the name-spelling confidence
-  // differs, which the override already resolved. The secondary license has
-  // no override flow, so its mismatches never count.
-  const stageFrom = (
-    result: { status: string; registrySpecialtyHe?: string | null } | null,
-    allowMismatch: boolean,
-  ): "resident" | "specialist" | null => {
-    if (!result) return null;
-    const usable =
-      result.status === "verified" ||
-      result.status === "soft_match" ||
-      (allowMismatch && result.status === "name_mismatch");
-    if (!usable) return null;
-    return result.registrySpecialtyHe ? "specialist" : "resident";
-  };
-  const primaryStage = region === "IL" ? stageFrom(verified, true) : null;
-  const secondaryStage =
-    secondaryRegion === "IL" ? stageFrom(secondaryVerified, false) : null;
-  const careerStage =
-    primaryStage === "specialist" || secondaryStage === "specialist"
-      ? "specialist"
-      : primaryStage === "resident" || secondaryStage === "resident"
-        ? "resident"
-        : null;
+  // Career stage is NOT derived from the registry. It used to be: a row
+  // without `שם התמחות` was read as "resident". But a blank specialty means
+  // "holds no board certificate", which is just as true of a general
+  // practitioner who never pursued one, so long-practising GPs were badged
+  // طبيب مقيم. The registry publishes nothing that tells the two apart, so
+  // the doctor declares it on the form and we store what they say.
+  // `registrySpecialtyHe` is still surfaced by /api/signup/check-license as
+  // an informational signal.
 
   // Pre-compute normalized columns for the doctors row we'll insert on /verify.
   const arabicFirstNorm = normalizeArabic(parsed.arabic_first_name);
@@ -292,7 +291,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   const workplaces: {
     name: string;
     name_normalized: string;
-    workplace_type: "hospital" | "clinic";
+    workplace_type: WorkplaceType;
     details: string | null;
     is_primary: boolean;
     sort_order: number;
@@ -342,7 +341,8 @@ export const POST = withJsonErrors(async (req: Request) => {
         subspecialty_normalized: subspecialtyNorm,
         email: parsed.email?.trim() || null,
         bio: parsed.bio?.trim() || null,
-        career_stage: careerStage,
+        career_stage: parsed.career_stage ?? null,
+        residency_start_year: parsed.residency_start_year ?? null,
 
         specialty_ids: parsed.specialty_ids,
         workplaces,
