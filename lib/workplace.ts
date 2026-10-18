@@ -42,8 +42,15 @@ export function isValidClinicPhone(raw: string): boolean {
   return digits >= PHONE_DIGITS_MIN && digits <= PHONE_DIGITS_MAX;
 }
 
-/** Which required clinic fields a named عيادة row still lacks. The caller
- *  decides whether the stage asks for them at all (specialists only). */
+/** A phone typed into a named row that the server would reject. Blank is
+ *  fine: clinic details are optional. */
+export function hasInvalidClinicPhone(w: { name: string; phone: string }): boolean {
+  return w.name.trim() !== "" && w.phone.trim() !== "" && !isValidClinicPhone(w.phone);
+}
+
+/** Which clinic details a named عيادة row still lacks. Optional, so this only
+ *  drives the profile's reminder; the caller decides whether the stage shows
+ *  them at all (specialists only). */
 export function missingClinicFields(w: {
   name: string;
   workplace_type: WorkplaceType;
@@ -69,6 +76,25 @@ export function workplaceInfoLine(w: {
     .filter(Boolean)
     .join(" · ");
   return line || w.details?.trim() || null;
+}
+
+/** A clinic phone as a tap-to-call link: digits, plus a leading +. */
+export function clinicTelHref(phone: string | null): string | null {
+  const trimmed = phone?.trim() ?? "";
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+  return `tel:${trimmed.startsWith("+") ? "+" : ""}${digits}`;
+}
+
+/** Search links that open a clinic's address in Google Maps and Waze. */
+export function mapLinks(address: string | null): { google: string; waze: string } | null {
+  const q = address?.trim();
+  if (!q) return null;
+  const enc = encodeURIComponent(q);
+  return {
+    google: `https://www.google.com/maps/search/?api=1&query=${enc}`,
+    waze: `https://waze.com/ul?q=${enc}&navigate=yes`,
+  };
 }
 
 const optionalText = (max: number) =>

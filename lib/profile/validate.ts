@@ -2,7 +2,12 @@
 // /api/profile validates again; these only give a readable message first.
 
 import { isValidResidencyYear, type StageOption } from "@/lib/careerStage";
-import { cleanWorkplaces, missingClinicFields, type WorkplaceEntry } from "@/lib/workplace";
+import {
+  cleanWorkplaces,
+  hasInvalidClinicPhone,
+  missingClinicFields,
+  type WorkplaceEntry,
+} from "@/lib/workplace";
 
 export interface ProfileCheck {
   message: string;
@@ -20,11 +25,8 @@ export function profileFormError(f: {
   if (cleaned.length === 0 && !f.stageOpt?.workplaceOptional) {
     return { message: "الرجاء إدخال مكان عمل واحد على الأقل." };
   }
-  if (
-    f.stageOpt?.showsClinicFields &&
-    f.workplaces.some((w) => missingClinicFields(w).length > 0)
-  ) {
-    return { message: "أدخل عنوان العيادة ورقم هاتفها.", openWorkplaces: true };
+  if (f.workplaces.some(hasInvalidClinicPhone)) {
+    return { message: "رقم هاتف العيادة غير صالح.", openWorkplaces: true };
   }
   const primaryCount = cleaned.filter((w) => w.is_primary).length;
   if (cleaned.length > 0 && primaryCount !== 1) {
@@ -40,4 +42,16 @@ export function profileFormError(f: {
     return { message: "أدخل سنة بداية التخصص." };
   }
   return null;
+}
+
+/** Names of the clinics still missing an address or phone. Saving doesn't
+ *  need them (a doctor can sign up on the spot); the profile reminds. */
+export function clinicsMissingDetails(
+  stageOpt: StageOption | null,
+  workplaces: readonly WorkplaceEntry[],
+): string[] {
+  if (!stageOpt?.showsClinicFields) return [];
+  return workplaces
+    .filter((w) => missingClinicFields(w).length > 0)
+    .map((w) => w.name.trim());
 }

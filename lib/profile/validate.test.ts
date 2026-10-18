@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { STAGE_BY_KEY } from "@/lib/careerStage";
 import { emptyWorkplace, type WorkplaceEntry } from "@/lib/workplace";
-import { profileFormError } from "./validate";
+import { clinicsMissingDetails, profileFormError } from "./validate";
 
 const row = (over: Partial<WorkplaceEntry> = {}): WorkplaceEntry => ({
   ...emptyWorkplace(true),
@@ -35,9 +35,13 @@ describe("profileFormError", () => {
     ).toBeNull();
   });
 
-  it("asks a specialist's clinic for its address and phone, opening the section", () => {
-    expect(profileFormError({ ...ok, workplaces: [row({ workplace_type: "clinic" })] })).toEqual({
-      message: "أدخل عنوان العيادة ورقم هاتفها.",
+  it("saves a specialist's clinic without its address and phone", () => {
+    expect(profileFormError({ ...ok, workplaces: [row({ workplace_type: "clinic" })] })).toBeNull();
+  });
+
+  it("rejects a clinic phone that was typed but is invalid", () => {
+    expect(profileFormError({ ...ok, workplaces: [row({ workplace_type: "clinic", phone: "12" })] })).toEqual({
+      message: "رقم هاتف العيادة غير صالح.",
       openWorkplaces: true,
     });
   });
@@ -58,5 +62,18 @@ describe("profileFormError", () => {
     expect(profileFormError({ ...ok, stageOpt: STAGE_BY_KEY.resident })?.message).toBe(
       "أدخل سنة بداية التخصص.",
     );
+  });
+});
+
+describe("clinicsMissingDetails", () => {
+  it("names a specialist's clinics that lack an address or phone", () => {
+    const clinic = row({ name: "عيادة النور", workplace_type: "clinic" });
+    const done = row({ name: "عيادة الشفاء", workplace_type: "clinic", address: "القدس", phone: "02-6271234" });
+    expect(clinicsMissingDetails(STAGE_BY_KEY.specialist, [clinic, done, row()])).toEqual(["عيادة النور"]);
+  });
+
+  it("asks nothing of a stage without clinic fields", () => {
+    expect(clinicsMissingDetails(STAGE_BY_KEY.general, [row({ workplace_type: "clinic" })])).toEqual([]);
+    expect(clinicsMissingDetails(null, [row({ workplace_type: "clinic" })])).toEqual([]);
   });
 });

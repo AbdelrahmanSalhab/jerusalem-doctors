@@ -1,7 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
-import { workplaceInfoLine } from "@/lib/workplace";
+import { WorkplaceDetails } from "@/components/WorkplaceDetails";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
@@ -68,15 +68,13 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
             </span>{" "}
             <span className="font-medium">{primaryWp.name}</span>
           </p>
-          {workplaceInfoLine(primaryWp) && (
-            <p className="mt-0.5 text-foreground/65">{workplaceInfoLine(primaryWp)}</p>
-          )}
+          <WorkplaceDetails w={primaryWp} />
           {otherWps.length > 0 && (
             <ul className="mt-1 list-inside list-disc text-foreground/75">
               {otherWps.map((w) => (
                 <li key={w.name}>
                   {w.name}
-                  {workplaceInfoLine(w) ? ` · ${workplaceInfoLine(w)}` : ""}
+                  <WorkplaceDetails w={w} />
                 </li>
               ))}
             </ul>
