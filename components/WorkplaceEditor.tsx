@@ -7,6 +7,7 @@
 // Input ids (`workplace_<i>_<field>`) are what the missing-fields list
 // focuses.
 
+import { useEffect, useState } from "react";
 import { Field } from "@/components/FormField";
 import { STAGE_BY_KEY, type Stage, workplaceForStage } from "@/lib/careerStage";
 import { toAsciiDigits } from "@/lib/normalize/digits";
@@ -20,6 +21,36 @@ import {
   type WorkplaceType,
 } from "@/lib/workplace";
 
+type Suggestion = { name: string; kind: "hospital" | "hmo" | "clinic_network" };
+
+// One fetch per page load, shared by every row and both forms.
+let suggestions: Promise<Suggestion[]> | null = null;
+function loadSuggestions(): Promise<Suggestion[]> {
+  suggestions ??= fetch("/api/institutions")
+    .then((r) => (r.ok ? r.json() : { institutions: [] }))
+    .then((b) => (b.institutions ?? []) as Suggestion[])
+    .catch(() => []);
+  return suggestions;
+}
+
+/** Hospitals for a hospital row; health funds and clinic networks otherwise. */
+function Suggestions({ list }: { list: Suggestion[] }) {
+  return (
+    <>
+      <datalist id="institutions-hospital">
+        {list.filter((s) => s.kind === "hospital").map((s) => (
+          <option key={s.name} value={s.name} />
+        ))}
+      </datalist>
+      <datalist id="institutions-other">
+        {list.filter((s) => s.kind !== "hospital").map((s) => (
+          <option key={s.name} value={s.name} />
+        ))}
+      </datalist>
+    </>
+  );
+}
+
 export function WorkplaceEditor({
   workplaces,
   onChange,
@@ -30,6 +61,14 @@ export function WorkplaceEditor({
   /** null: a legacy profile that never declared a stage; nothing is coerced. */
   stage: Stage | null;
 }) {
+  const [known, setKnown] = useState<Suggestion[]>([]);
+  useEffect(() => {
+    let live = true;
+    loadSuggestions().then((l) => live && setKnown(l));
+    return () => {
+      live = false;
+    };
+  }, []);
   const opt = stage ? STAGE_BY_KEY[stage] : null;
   const types = opt?.workplaceTypes ?? WORKPLACE_TYPES;
   const showsClinic = opt ? opt.showsClinicFields : true;
@@ -74,6 +113,7 @@ export function WorkplaceEditor({
 
   return (
     <div className="space-y-4">
+      <Suggestions list={known} />
       {workplaces.map((wp, i) => {
         const id = (field: string) => `workplace_${i}_${field}`;
         const clinicOpen = showsClinic && wp.workplace_type === "clinic";
@@ -85,6 +125,8 @@ export function WorkplaceEditor({
                 aria-label="اسم مكان العمل"
                 required={i === 0 && !opt?.workplaceOptional}
                 className="input flex-1"
+                // Suggests the institutions list; anything else can still be typed.
+                list={wp.workplace_type === "hospital" ? "institutions-hospital" : "institutions-other"}
                 value={wp.name}
                 maxLength={120}
                 onChange={(e) => patch(i, { name: e.target.value })}

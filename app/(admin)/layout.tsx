@@ -34,6 +34,12 @@ export default async function AdminLayout({
           التخصصات
         </Link>
         <Link
+          href="/admin/institutions"
+          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
+        >
+          المستشفيات
+        </Link>
+        <Link
           href="/admin/audit"
           className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
         >

@@ -30,8 +30,11 @@ export default async function AdminStatsPage() {
   const u = s.usage;
   const pendingDays = daysSince(a.pending_oldest);
   const deletionDays = daysSince(a.deletion_oldest);
+  const hospitals = s.institutions.filter((i) => i.kind === "hospital").slice(0, 10);
+  const funds = s.institutions.filter((i) => i.kind !== "hospital");
   const attentionTotal =
     a.pending + a.deletion_requests + a.clinics_missing_details + u.login_send_failed_24h +
+    a.unmatched_workplaces +
     (sms !== null && sms < LOW_SMS ? 1 : 0);
 
   return (
@@ -74,6 +77,11 @@ export default async function AdminStatsPage() {
               count={a.deletion_requests}
               text={`طلب حذف ينتظر الإتمام${deletionDays ? `، أقدمها منذ ${deletionDays} يوم` : ""}.`}
               href="/admin?status=suspended"
+            />
+            <Attention
+              count={a.unmatched_workplaces}
+              text="اسم مستشفى أو صندوق مرضى غير مربوط بالقائمة (يُحسب ويُبحث عنه منفصلًا)."
+              href="/admin/institutions"
             />
             <Attention
               count={a.clinics_missing_details}
@@ -199,7 +207,10 @@ export default async function AdminStatsPage() {
 
       <div className="grid gap-10 md:grid-cols-2">
         <Section title="أكثر المستشفيات">
-          <BarList total={d.total} items={s.top_hospitals} />
+          <BarList total={d.total} items={hospitals} />
+        </Section>
+        <Section title="صناديق المرضى وشبكات العيادات">
+          <BarList total={d.total} items={funds} />
         </Section>
         <Section
           title="تخصصات يبحثون عنها ولا يجدون أحدًا"

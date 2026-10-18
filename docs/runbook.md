@@ -240,6 +240,10 @@ in an issue is more than 0 in 1 minute") for:
 - `signInWithOtp failed` tagged `route:login/start` or `route:login/resend`:
   login codes are not being sent.
 - `SMS4FREE balance low`: from the daily balance cron.
+- `Workplace names not in the institutions list`: from the daily
+  institutions cron. Open /admin/institutions and, for each name, either
+  "ربط كطريقة كتابة" (add it as a spelling of an existing hospital or fund)
+  or "مؤسسة جديدة". Every change re-links all doctors at once.
 
 ## Common one-liners
 

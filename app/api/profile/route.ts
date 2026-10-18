@@ -10,6 +10,7 @@ import { normalizeArabic } from "@/lib/normalize/arabic";
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { rateLimit } from "@/lib/ratelimit";
+import { relinkDoctor } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { WorkplaceInputSchema } from "@/lib/workplace";
 
@@ -166,6 +167,8 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     console.error("[profile.patch] save failed", error);
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
+  // Link the saved workplaces to their hospitals and funds (0016).
+  if (workplaceRows) await relinkDoctor(service, me.id);
 
   return jsonOk({ ok: true });
 });
