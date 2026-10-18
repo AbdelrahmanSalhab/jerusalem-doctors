@@ -17,6 +17,8 @@ import { toAsciiDigits } from "@/lib/normalize/digits";
 // Allow only digits, +, -, space, parens — common phone-number characters.
 // Server-side `normalizePhone` is the source of truth; this just keeps
 // junk out of the input as the user types or pastes.
+const TURNSTILE_WAIT_MS = 15_000;
+
 const PHONE_DISALLOWED = /[^0-9+\-\s()]/g;
 
 export function LoginForm() {
@@ -50,11 +52,22 @@ export function LoginForm() {
     }
 
     setSubmitting(true);
+    // The invisible check can still be running when the doctor taps (slow
+    // mobile data, or right after a reset), and an empty token is a 403.
+    // Wait for it the way SignupForm does.
+    let token = turnstileToken;
+    try {
+      token ||= (await turnstileRef.current?.getToken(TURNSTILE_WAIT_MS)) ?? "";
+    } catch {
+      setError("لم يكتمل التحقق من المتصفح. تأكد من الاتصال وأعد المحاولة.");
+      setSubmitting(false);
+      return;
+    }
     try {
       const res = await fetch("/api/login/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, turnstile_token: turnstileToken }),
+        body: JSON.stringify({ phone, turnstile_token: token }),
       });
       if (!res.ok) {
         // Turnstile tokens are single-use — reset the widget after every
