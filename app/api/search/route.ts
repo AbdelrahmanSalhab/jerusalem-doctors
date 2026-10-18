@@ -1,9 +1,9 @@
 // GET /api/search?q=...&specialty_id=...
 // Authenticated-doctor search across the directory.
 //
-// MVP search (plan §8): ILIKE on the doctor's normalized Arabic name fields,
-// Hebrew full name, normalized subspecialty, and normalized workplace names.
-// Optional specialty filter via doctor_specialties join.
+// ILIKE on the doctor's normalized Arabic name fields, subspecialty and
+// certificates, plus specialty and workplace names resolved to doctor ids.
+// Optional specialty filter, also resolved to doctor ids.
 //
 // Visibility: only active, visible, phone-verified, admin-approved, consented
 // doctors are returned. RLS would enforce this even if the query didn't, but
@@ -24,6 +24,34 @@ const Query = z.object({
 });
 
 export type { SearchHit, SearchWorkplace } from "@/lib/directory";
+
+/** Ids per query: ~37 bytes each, so 150 keeps a URL well under 8 KB. */
+const ID_CHUNK = 150;
+
+function chunks(ids: string[]): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) out.push(ids.slice(i, i + ID_CHUNK));
+  return out;
+}
+
+/** A query's rows, or a throw: a swallowed error would read as "nobody
+ *  matched" (the handler turns the throw into a reported 500). */
+async function read<T>(query: PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function doctorIdsWithSpecialties(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  specialtyIds: string[],
+): Promise<string[]> {
+  if (specialtyIds.length === 0) return [];
+  const rows = await read(
+    service.from("doctor_specialties").select("doctor_id").in("specialty_id", specialtyIds),
+  );
+  return rows.map((r) => r.doctor_id as string);
+}
 
 export const GET = withJsonErrors(async (req: Request) => {
   // requireDoctor, not getCurrentDoctor: a deactivated doctor's session must
@@ -50,108 +78,94 @@ export const GET = withJsonErrors(async (req: Request) => {
   const qRaw = parsed.data.q;
   const qNorm = normalizeArabic(qRaw);
   const service = createSupabaseServiceClient();
+  const empty = () => jsonOk({ results: [], count: 0, truncated: false });
 
-  // Use service-role + manual visibility filter — simpler than threading the
-  // user-scoped client through nested selects, and the RLS contract is
-  // duplicated here for defense-in-depth.
-  let query = directoryQuery(service, Boolean(parsed.data.specialty_id))
-    .order("arabic_full_name", { ascending: true })
-    // One extra row tells us whether more matched than we return.
-    .limit(SEARCH_PAGE_SIZE + 1);
+  // PostgREST `or` parses commas, parens, and dots structurally, and
+  // backslash / quote characters can break the embedded ILIKE value. We
+  // reduce to letters/digits/spaces: searches are by name, specialty, or
+  // workplace anyway, none of which need punctuation.
+  const escaped = qNorm ? toIlikeTerm(qRaw) : "";
+  // All-punctuation query: nothing to search for.
+  if (qNorm && !escaped) return empty();
+  const pattern = `*${escaped}*`;
 
   // An internist is stored under their subspecialty only, so a parent
-  // (الباطنية) has to match its children too, both here and in the text
-  // search below. The table is ~30 rows; one read covers both. Started now,
-  // awaited where needed, so a text search reads it alongside its matches.
-  const needsTree = Boolean(parsed.data.specialty_id || qNorm);
-  const treeRead = needsTree
-    ? service.from("specialties").select("id, parent_id").then((r) => r.data ?? [])
-    : Promise.resolve([]);
+  // (الباطنية) has to match its children too, both in the filter and in the
+  // text search. The table is ~30 rows; one read covers both.
+  const tree = parsed.data.specialty_id || escaped ? await read(service.from("specialties").select("id, parent_id")) : [];
+  const filterIds = parsed.data.specialty_id
+    ? withSubspecialties(tree, [parsed.data.specialty_id])
+    : null;
 
-  if (parsed.data.specialty_id) {
-    query = query.in(
-      "doctor_specialties.specialty_id",
-      withSubspecialties(await treeRead, [parsed.data.specialty_id]),
+  // The specialty filter is an inner-joined embed (no id list, no row cap);
+  // ~30 specialty ids at most, so it always fits the URL.
+  const page = () => {
+    const q = directoryQuery(service, Boolean(filterIds))
+      .order("arabic_full_name", { ascending: true })
+      // One extra row tells us whether more matched than we return.
+      .limit(SEARCH_PAGE_SIZE + 1);
+    return filterIds ? q.in("specialty_filter.specialty_id", filterIds) : q;
+  };
+
+  const reads: PromiseLike<{ data: unknown; error: unknown }>[] = [];
+  if (escaped) {
+    reads.push(
+      page().or(
+        [
+          `arabic_full_name_normalized.ilike.${pattern}`,
+          `arabic_first_name_normalized.ilike.${pattern}`,
+          `arabic_family_name_normalized.ilike.${pattern}`,
+          `subspecialty_normalized.ilike.${pattern}`,
+          `certificates_normalized.ilike.${pattern}`,
+        ].join(","),
+      ),
     );
-  }
-
-  if (qNorm) {
-    // PostgREST `or` parses commas, parens, and dots structurally, and
-    // backslash / quote characters can break the embedded ILIKE value. We
-    // reduce to letters/digits/spaces — searches are by name, specialty, or
-    // workplace anyway, none of which need punctuation.
-    const escaped = toIlikeTerm(qRaw);
-    if (!escaped) {
-      // All-punctuation query → return empty results (no DB call).
-      return jsonOk({ results: [], count: 0, truncated: false });
-    }
-    const pattern = `*${escaped}*`;
 
     // Arabic-only search (Hebrew search disabled by product decision).
-    // Specialty + workplace matches live in joined tables, so we pre-resolve
-    // their doctor IDs and OR them into the main filter.
-    const [specialtyTree, specialtyMatches, workplaceMatches] = await Promise.all([
-      treeRead,
-      service
-        .from("specialties")
-        .select("id")
-        .or(
-          [
-            `name_ar_normalized.ilike.${pattern}`,
-            `name_ar.ilike.${pattern}`,
-          ].join(","),
-        ),
-      service
-        .from("doctor_workplaces")
-        .select("doctor_id")
-        .or(
-          [
-            `name_normalized.ilike.${pattern}`,
-            `name.ilike.${pattern}`,
-          ].join(","),
-        ),
+    // Specialty and workplace matches live in joined tables, so they are
+    // resolved to doctor ids first.
+    const [specialtyMatches, workplaceMatches] = await Promise.all([
+      read(
+        service
+          .from("specialties")
+          .select("id")
+          .or([`name_ar_normalized.ilike.${pattern}`, `name_ar.ilike.${pattern}`].join(",")),
+      ),
+      read(
+        service
+          .from("doctor_workplaces")
+          .select("doctor_id")
+          .or([`name_normalized.ilike.${pattern}`, `name.ilike.${pattern}`].join(",")),
+      ),
     ]);
+    const joined = new Set([
+      ...(await doctorIdsWithSpecialties(service, withSubspecialties(tree, specialtyMatches.map((r) => r.id)))),
+      ...workplaceMatches.map((r) => r.doctor_id as string),
+    ]);
+    // These lists grow with the directory, so they never go into one URL (a
+    // few hundred uuids pass the gateway's limit): each chunk is its own
+    // query, run in parallel, and the pages are merged below.
+    for (const ids of chunks([...joined])) reads.push(page().in("id", ids));
+  } else {
+    reads.push(page());
+  }
 
-    const specialtyIds = withSubspecialties(
-      specialtyTree,
-      (specialtyMatches.data ?? []).map((r) => r.id),
-    );
-    const doctorIdsViaSpecialty = specialtyIds.length
-      ? (
-          await service
-            .from("doctor_specialties")
-            .select("doctor_id")
-            .in("specialty_id", specialtyIds)
-        ).data?.map((r) => r.doctor_id) ?? []
-      : [];
-
-    const doctorIdsViaWorkplace =
-      (workplaceMatches.data ?? []).map((r) => r.doctor_id);
-
-    const joinedDoctorIds = Array.from(
-      new Set([...doctorIdsViaSpecialty, ...doctorIdsViaWorkplace]),
-    );
-
-    const orFilters = [
-      `arabic_full_name_normalized.ilike.${pattern}`,
-      `arabic_first_name_normalized.ilike.${pattern}`,
-      `arabic_family_name_normalized.ilike.${pattern}`,
-      `subspecialty_normalized.ilike.${pattern}`,
-      `certificates_normalized.ilike.${pattern}`,
-    ];
-    if (joinedDoctorIds.length) {
-      orFilters.push(`id.in.(${joinedDoctorIds.join(",")})`);
+  const pages = await Promise.all(reads);
+  const failed = pages.find((r) => r.error);
+  if (failed) throw failed.error;
+  const byId = new Map<string, { id: string; arabic_full_name?: string }>();
+  for (const r of pages) {
+    for (const row of (r.data ?? []) as { id: string; arabic_full_name?: string }[]) {
+      byId.set(row.id, row);
     }
-    query = query.or(orFilters.join(","));
   }
-
-  const { data, error } = await query;
-  if (error) {
-    // Don't 500 on bad input — log it and return empty results so the UI
-    // shows "no matches" instead of "something went wrong".
-    console.error("[search] query failed", error);
-    return jsonOk({ results: [], count: 0, truncated: false });
-  }
+  // Code-unit order, the same order Postgres gave each page, so the merged
+  // first 50 are the first 50 overall (locale order ranks أ and ا together).
+  const data = [...byId.values()].sort((a, b) => {
+    const x = a.arabic_full_name ?? "";
+    const y = b.arabic_full_name ?? "";
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
 
   const hits = toSearchHits(data);
   const results = hits.slice(0, SEARCH_PAGE_SIZE);
