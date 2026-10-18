@@ -44,3 +44,14 @@ export function normalizeArabic(input: string): string {
     .trim()
     .toLowerCase();
 }
+
+/**
+ * A typed query turned into something safe to embed in a PostgREST
+ * `or=(col.ilike.*term*)` filter against the *_normalized columns: same
+ * normalization as the stored text, and only letters, digits and spaces,
+ * since commas, parens and dots are filter syntax. "" means nothing left
+ * to search for.
+ */
+export function toIlikeTerm(raw: string): string {
+  return normalizeArabic(raw).replace(/[^\p{L}\p{N}\s]/gu, " ").trim();
+}

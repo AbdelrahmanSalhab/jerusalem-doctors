@@ -13,7 +13,7 @@ import { z } from "zod";
 import { directoryQuery, toSearchHits } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
-import { normalizeArabic } from "@/lib/normalize/arabic";
+import { normalizeArabic, toIlikeTerm } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { withSubspecialties } from "@/lib/specialtyTree";
@@ -76,7 +76,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     // backslash / quote characters can break the embedded ILIKE value. We
     // reduce to letters/digits/spaces — searches are by name, specialty, or
     // workplace anyway, none of which need punctuation.
-    const escaped = qNorm.replace(/[^\p{L}\p{N}\s]/gu, " ").trim();
+    const escaped = toIlikeTerm(qRaw);
     if (!escaped) {
       // All-punctuation query → return empty results (no DB call).
       return jsonOk({ results: [], count: 0 });

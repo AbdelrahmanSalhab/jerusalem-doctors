@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeArabic } from "./arabic";
+import { normalizeArabic, toIlikeTerm } from "./arabic";
 
 describe("normalizeArabic", () => {
   it("collapses all hamza-on-alef forms to bare alef", () => {
@@ -99,5 +99,23 @@ describe("normalizeArabic", () => {
       "الطب الطبيعي واعادة التاهيل",
     );
     expect(normalizeArabic("أمراض الكلى")).toBe("امراض الكلي");
+  });
+});
+
+describe("toIlikeTerm", () => {
+  it("normalizes hamza so إياس matches the stored اياس", () => {
+    expect(toIlikeTerm("إياس")).toBe("اياس");
+  });
+
+  it("strips PostgREST filter syntax", () => {
+    expect(toIlikeTerm("a,b(c).d")).toBe("a b c  d");
+  });
+
+  it("keeps digits of a phone or license", () => {
+    expect(toIlikeTerm("+972545")).toBe("972545");
+  });
+
+  it("returns empty for punctuation only", () => {
+    expect(toIlikeTerm(" ,.() ")).toBe("");
   });
 });
