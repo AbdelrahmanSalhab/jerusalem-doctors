@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoUploader } from "./PhotoUploader";
-import { Field } from "@/components/FormField";
+import { CertificatesEditor } from "@/components/CertificatesEditor";
+import { Field, SeekingWorkCheckbox } from "@/components/FormField";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { WorkplaceEditor } from "@/components/WorkplaceEditor";
 import {
@@ -60,6 +61,8 @@ export function ProfileForm({
   const [email, setEmail] = useState(doctor.email ?? "");
   const [subspecialty, setSubspecialty] = useState(doctor.subspecialty ?? "");
   const [bio, setBio] = useState(doctor.bio ?? "");
+  const [certificates, setCertificates] = useState<string[]>(doctor.certificates ?? []);
+  const [seekingWork, setSeekingWork] = useState(doctor.seeking_work ?? false);
   const [specialtyIds, setSpecialtyIds] = useState<string[]>(
     currentSpecialtyIds,
   );
@@ -131,6 +134,7 @@ export function ProfileForm({
       setEditingSpecialties(true);
     }
     if (!opt.requiresResidencyStartYear) setResidencyStartYear("");
+    if (!opt.showsCertificates) setCertificates([]);
     // Untouched rows adopt the stage's default type; named ones are only
     // corrected when the new stage doesn't offer their type.
     const coerced = workplaces.map((w) =>
@@ -212,7 +216,9 @@ export function ProfileForm({
               stage === "resident" && residencyStartYear
                 ? Number(residencyStartYear)
                 : null,
+            certificates: STAGE_BY_KEY[stage].showsCertificates ? certificates : [],
           }),
+          seeking_work: seekingWork,
           workplaces: cleanedWorkplaces,
         }),
       });
@@ -373,6 +379,7 @@ export function ProfileForm({
             )}
           </ReadOnlyView>
         )}
+        <SeekingWorkCheckbox checked={seekingWork} onChange={setSeekingWork} />
       </Section>
 
       <Section
@@ -404,6 +411,15 @@ export function ProfileForm({
                 placeholder="اختياري"
               />
             </Field>
+            )}
+            {stageOpt?.showsCertificates && (
+              <Field label="شهادات إضافية (تظهر على بطاقتك بدل «الطب العام»)" htmlFor="certificates">
+                <CertificatesEditor
+                  id="certificates"
+                  value={certificates}
+                  onChange={setCertificates}
+                />
+              </Field>
             )}
             <Field label="نبذة عني">
               <textarea
@@ -447,6 +463,27 @@ export function ProfileForm({
                     <span className="text-foreground/40">— غير محدد —</span>
                   )}
                 </span>
+              </div>
+            )}
+            {stageOpt?.showsCertificates && (
+              <div>
+                <div className="mb-1 text-sm text-foreground/65">شهادات إضافية</div>
+                {certificates.filter((c) => c.trim()).length === 0 ? (
+                  <span className="text-foreground/40">لا يوجد</span>
+                ) : (
+                  <ul className="flex flex-wrap gap-1.5">
+                    {certificates
+                      .filter((c) => c.trim())
+                      .map((c) => (
+                        <li
+                          key={c}
+                          className="rounded-full border border-foreground/20 bg-foreground/5 px-2.5 py-0.5 text-sm"
+                        >
+                          {c}
+                        </li>
+                      ))}
+                  </ul>
+                )}
               </div>
             )}
             <div>

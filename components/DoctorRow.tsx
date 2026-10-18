@@ -1,5 +1,5 @@
 import { Avatar } from "@/components/Avatar";
-import type { SearchHit } from "@/app/api/search/route";
+import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { workplaceInfoLine } from "@/lib/workplace";
 
@@ -13,6 +13,7 @@ const WHATSAPP_LABEL = "تواصل عبر واتساب";
  */
 export function DoctorRow({ doctor }: { doctor: SearchHit }) {
   const name = `${doctor.arabic_first_name} ${doctor.arabic_family_name}`;
+  const chips = cardChips(doctor);
   const primaryWp = doctor.workplaces.find((w) => w.is_primary);
   const otherWps = doctor.workplaces.filter((w) => !w.is_primary);
 
@@ -28,11 +29,11 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
       <div className="min-w-0 flex-1 space-y-1.5">
         <h3 className="text-lg font-bold leading-tight">{name}</h3>
 
-        {(doctor.specialties.length > 0 ||
+        {(chips.length > 0 || doctor.seeking_work ||
           doctor.subspecialty ||
           doctor.career_stage) && (
           <ul className="flex flex-wrap gap-1.5">
-            {doctor.specialties.map((s) => (
+            {chips.map((s) => (
               <li
                 key={s}
                 className="rounded-full border border-foreground/15 bg-foreground/5 px-2 py-0.5 text-xs"
@@ -48,6 +49,11 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
             {doctor.career_stage && (
               <li className="rounded-full border border-sky-300/60 bg-sky-50/60 px-2 py-0.5 text-xs text-sky-900 dark:bg-sky-900/20 dark:text-sky-100">
                 {careerStageBadge(doctor.career_stage, doctor.residency_start_year)}
+              </li>
+            )}
+            {doctor.seeking_work && (
+              <li className="rounded-full border border-emerald-300/60 bg-emerald-50/60 px-2 py-0.5 text-xs text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-100">
+                {SEEKING_WORK_LABEL}
               </li>
             )}
           </ul>

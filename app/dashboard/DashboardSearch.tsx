@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
 import { SpecialtyFilter } from "@/components/SpecialtyFilter";
-import type { SearchHit } from "@/app/api/search/route";
+import type { FeaturedDoctors, SearchHit } from "@/lib/directory";
 
 type Specialty = { id: string; name_ar: string; parent_id: string | null };
 type SearchState =
@@ -18,7 +18,13 @@ type ViewMode = "cards" | "rows";
 const DEBOUNCE_MS = 250;
 const VIEW_STORAGE_KEY = "search:view";
 
-export function DashboardSearch({ specialties }: { specialties: Specialty[] }) {
+export function DashboardSearch({
+  specialties,
+  featured,
+}: {
+  specialties: Specialty[];
+  featured: FeaturedDoctors;
+}) {
   const [q, setQ] = useState("");
   const [specialtyId, setSpecialtyId] = useState<string>("");
   const [state, setState] = useState<SearchState>({ status: "idle" });
@@ -111,6 +117,7 @@ export function DashboardSearch({ specialties }: { specialties: Specialty[] }) {
 
       <ResultsRegion
         state={state}
+        featured={featured}
         view={view}
         setView={setViewPersisted}
       />
@@ -120,18 +127,41 @@ export function DashboardSearch({ specialties }: { specialties: Specialty[] }) {
 
 function ResultsRegion({
   state,
+  featured,
   view,
   setView,
 }: {
   state: SearchState;
+  featured: FeaturedDoctors;
   view: ViewMode;
   setView: (v: ViewMode) => void;
 }) {
   if (state.status === "idle") {
+    const hasFeatured = featured.doctor || featured.graduates.length > 0;
     return (
-      <p className="rounded border border-dashed border-foreground/20 p-8 text-center text-foreground/60">
-        ابدأ بكتابة اسم أو تخصص لعرض النتائج.
-      </p>
+      <div className="space-y-8">
+        {!hasFeatured && (
+          <p className="rounded border border-dashed border-foreground/20 p-8 text-center text-foreground/60">
+            ابدأ بكتابة اسم أو تخصص لعرض النتائج.
+          </p>
+        )}
+        {featured.doctor && (
+          <FeaturedSection title="طبيب مميز">
+            <DoctorCard doctor={featured.doctor} />
+          </FeaturedSection>
+        )}
+        {featured.graduates.length > 0 && (
+          <FeaturedSection title="خريجون جدد يبحثون عن عمل">
+            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {featured.graduates.map((d) => (
+                <li key={d.id}>
+                  <DoctorCard doctor={d} />
+                </li>
+              ))}
+            </ul>
+          </FeaturedSection>
+        )}
+      </div>
     );
   }
 
@@ -217,5 +247,20 @@ function ResultsRegion({
         </ul>
       )}
     </div>
+  );
+}
+
+function FeaturedSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-label={title} className="space-y-3">
+      <h2 className="text-lg font-bold">{title}</h2>
+      {children}
+    </section>
   );
 }

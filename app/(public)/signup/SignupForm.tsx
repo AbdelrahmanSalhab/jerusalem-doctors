@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Field, RequiredMark } from "@/components/FormField";
+import { Field, RequiredMark, SeekingWorkCheckbox } from "@/components/FormField";
+import { CertificatesEditor } from "@/components/CertificatesEditor";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import {
   TurnstileWidget,
@@ -51,6 +52,9 @@ type FormState = {
   subspecialty: string;
   email: string;
   bio: string;
+  /** طب عام only; see lib/certificates.ts. */
+  certificates: string[];
+  seeking_work: boolean;
   workplaces: WorkplaceEntry[];
   consent: boolean;
 };
@@ -74,6 +78,8 @@ const INITIAL: FormState = {
   subspecialty: "",
   email: "",
   bio: "",
+  certificates: [],
+  seeking_work: false,
   workplaces: [emptyWorkplace(true)],
   consent: false,
 };
@@ -161,6 +167,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           : []
         : s.specialty_ids.filter((id) => id !== generalSpecialtyId),
       subspecialty: opt.showsSpecialtyPicker ? s.subspecialty : "",
+      certificates: opt.showsCertificates ? s.certificates : [],
       residency_start_year: opt.requiresResidencyStartYear
         ? s.residency_start_year
         : "",
@@ -551,7 +558,27 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             />
           </Field>
         )}
+
+        <SeekingWorkCheckbox
+          checked={form.seeking_work}
+          onChange={(v) => update("seeking_work", v)}
+        />
       </Section>
+
+      {stageOpt?.showsCertificates && (
+        <Section title="شهادات إضافية (اختياري)">
+          <Field
+            label="تظهر على بطاقتك بدل «الطب العام»"
+            htmlFor="certificates"
+          >
+            <CertificatesEditor
+              id="certificates"
+              value={form.certificates}
+              onChange={(v) => update("certificates", v)}
+            />
+          </Field>
+        </Section>
+      )}
 
       {showSpecialtyPicker && (
         <Section title="التخصص">

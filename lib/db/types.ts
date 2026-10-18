@@ -53,6 +53,14 @@ export interface Doctor {
   is_admin_approved: boolean;
   is_admin: boolean;
   profile_picture_url: string | null;
+  /** Self-declared on /signup and /profile (0013). */
+  seeking_work: boolean;
+  /** Set by an admin; drives the dashboard's featured sections. */
+  featured: "doctor" | "graduate" | null;
+  featured_at: string | null;
+  /** طب عام only, at most 5. */
+  certificates: string[];
+  certificates_normalized: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -6,6 +6,7 @@
 // POSTs its Send SMS Hook to /api/auth/hooks/send-otp, which sends it over
 // SMS via the SMS4FREE API.
 
+import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
@@ -66,6 +67,8 @@ const Body = z
     // Exactly one entry must be is_primary:true when any are given —
     // validated below. Residents may give none (they rotate).
     workplaces: z.array(WorkplaceInputSchema).max(20),
+    certificates: CertificatesSchema.optional(),
+    seeking_work: z.boolean().optional(),
     consent: z.literal(true),
     turnstile_token: z.string().optional(),
     // Soft-match override flow: client confirms registry name; we record it.
@@ -352,6 +355,8 @@ export const POST = withJsonErrors(async (req: Request) => {
         bio: parsed.bio?.trim() || null,
         career_stage: parsed.career_stage ?? null,
         residency_start_year: parsed.residency_start_year ?? null,
+        ...certificateFields(parsed.career_stage ? [] : (parsed.certificates ?? [])),
+        seeking_work: parsed.seeking_work ?? false,
 
         specialty_ids: parsed.specialty_ids,
         workplaces,
@@ -450,4 +455,9 @@ function zodFields(e: z.ZodError): Record<string, string> {
     fields[key] = issue.message;
   }
   return fields;
+}
+
+/** Only a طب عام doctor (career_stage null) keeps certificates. */
+function certificateFields(certificates: string[]) {
+  return { certificates, certificates_normalized: certificatesNormalized(certificates) };
 }

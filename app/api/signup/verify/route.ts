@@ -56,6 +56,10 @@ interface PendingPayload {
   bio: string | null;
   career_stage: "resident" | "specialist" | null;
   residency_start_year: number | null;
+  /** Absent on rows written before 0013. */
+  certificates?: string[];
+  certificates_normalized?: string | null;
+  seeking_work?: boolean;
   specialty_ids: string[];
   workplaces: PendingWorkplace[];
   license_verification_status:
@@ -149,6 +153,9 @@ export const POST = withJsonErrors(async (req: Request) => {
       // previous deploy has no such key, and supabase-js would silently drop
       // an undefined from the insert.
       residency_start_year: payload.residency_start_year ?? null,
+      certificates: payload.certificates ?? [],
+      certificates_normalized: payload.certificates_normalized ?? null,
+      seeking_work: payload.seeking_work ?? false,
       license_verified_at:
         payload.license_verification_status === "verified" ||
         payload.license_verification_status === "soft_match"

@@ -1,9 +1,11 @@
 // PATCH /api/admin/doctors/[id]
-// Admin-only moderation toggles for is_admin_approved + is_active.
+// Admin-only moderation toggles for is_admin_approved + is_active, the
+// career stage, and the dashboard's featured sections.
 // Audit-logs every state change.
 
 import { z } from "zod";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
+import { FEATURED_KINDS } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdmin } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -23,6 +25,8 @@ const Body = z.object({
     .max(2100)
     .nullable()
     .optional(),
+  // null takes the doctor out of the featured sections.
+  featured: z.enum(FEATURED_KINDS).nullable().optional(),
 });
 
 export const PATCH = withJsonErrors(async (
@@ -47,7 +51,12 @@ export const PATCH = withJsonErrors(async (
   }
 
   const service = createSupabaseServiceClient();
-  const r = await service.from("doctors").update(body).eq("id", id);
+  // Re-featuring bumps featured_at, so the newest pick leads the section.
+  const updates =
+    body.featured === undefined
+      ? body
+      : { ...body, featured_at: body.featured ? new Date().toISOString() : null };
+  const r = await service.from("doctors").update(updates).eq("id", id);
   if (r.error) {
     console.error("[admin.doctors.patch] update failed", r.error);
     return jsonError(500, { error: "update_failed", code: "update_failed" });
