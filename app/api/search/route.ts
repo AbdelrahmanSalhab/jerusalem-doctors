@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { directoryQuery, SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
-import { getCurrentDoctor } from "@/lib/auth/session";
+import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic, toIlikeTerm } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -26,7 +26,9 @@ const Query = z.object({
 export type { SearchHit, SearchWorkplace } from "@/lib/directory";
 
 export const GET = withJsonErrors(async (req: Request) => {
-  const me = await getCurrentDoctor().catch(() => null);
+  // requireDoctor, not getCurrentDoctor: a deactivated doctor's session must
+  // not keep reading the directory. Its redirect throws, which lands here.
+  const me = await requireDoctor().catch(() => null);
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }

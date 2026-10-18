@@ -31,6 +31,7 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 | Symptom | Likely cause |
 |---|---|
 | `/api/signup/start` returns 502 `otp_send_failed` | Supabase rejected the request before the hook ran — Phone provider off, or the hook returned non-2xx |
+| Many `otp_send_failed` at once, across different numbers | Supabase's own Auth rate limit (SMS per hour, project-wide) is exhausted. Dashboard → Authentication → Rate Limits; size it for the expected signups per hour |
 | `/api/login/start` returns 400 `phone_unsupported` | Not an incident: the number is outside +972 or is a landline. See "Which numbers we can reach" below |
 | Vercel logs show `[send-otp] delivery failed: SMS4FREE send failed (status -N)` | The provider rejected the send — read the status table below |
 | No `[send-otp]` line in Vercel logs at all | Supabase never reached us — wrong hook URL, or the hook is disabled |
@@ -186,7 +187,7 @@ After this, the doctor's next login attempt with the new number works.
 
 ### Spam signups
 
-`/api/signup/start` rate limits are per-phone (3/hr) and per-IP (10/hr) via Upstash. If they're being bypassed:
+`/api/signup/start` rate limits are per-phone (3/hr) and per-IP (30/hr) via Upstash; every limit is in `lib/ratelimit.ts`. The per-IP ones are deliberately loose because a hospital or event Wi-Fi puts many doctors behind one address; the per-phone ones and Turnstile are the real brake. If they're being bypassed:
 
 1. Check Upstash dashboard — confirm the limiter is hitting the right keys.
 2. Tighten limits in `lib/ratelimit.ts` and redeploy.

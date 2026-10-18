@@ -85,13 +85,14 @@ export async function requireDoctor(): Promise<Doctor> {
 }
 
 /**
- * Like requireDoctor, but additionally requires `is_admin`. Used by the
+ * Like requireDoctor, but additionally requires `is_admin` (and an active
+ * account: a deactivated admin is no admin). Used by the
  * admin panel layout. Returns 404 (notFound) for non-admins so the panel's
  * existence isn't leaked to regular users.
  */
 export async function requireAdmin(): Promise<Doctor> {
   const doctor = await getCurrentDoctor();
-  if (!doctor || !doctor.is_admin) {
+  if (!doctor || !doctor.is_admin || !doctor.is_active) {
     const { notFound } = await import("next/navigation");
     notFound(); // throws — control never returns here
   }

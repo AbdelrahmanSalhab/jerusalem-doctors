@@ -79,6 +79,7 @@ export const auth = {
   getClaims: vi.fn(),
   signInWithOtp: vi.fn(),
   verifyOtp: vi.fn(),
+  signOut: vi.fn(),
 };
 
 export function jsonRequest(url: string, body: unknown, headers: Record<string, string> = {}): Request {

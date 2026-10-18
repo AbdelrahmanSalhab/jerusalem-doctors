@@ -11,15 +11,26 @@ import { Redis } from "@upstash/redis";
 type WindowSpec = `${number} ${"s" | "m" | "h" | "d"}`;
 type LimitDef = { limit: number; window: WindowSpec };
 
+// Per-phone / per-session limits are the real brake on OTP guessing and SMS
+// spend. The per-IP ones only stop a single machine flooding: a hospital or
+// event Wi-Fi puts many doctors behind one NAT address, so they must be far
+// looser than the per-phone ones, or the fourth doctor to sign up there in an
+// hour is locked out.
 export const RATE_LIMITS = {
   signupStart: { limit: 3, window: "1 h" },
+  signupStartIp: { limit: 30, window: "1 h" },
   signupVerify: { limit: 5, window: "10 m" },
+  signupVerifyIp: { limit: 50, window: "10 m" },
   signupResend: { limit: 3, window: "10 m" },
-  signupCheckLicense: { limit: 10, window: "1 h" },
-  signupCheckUnique: { limit: 30, window: "1 h" },
+  signupResendIp: { limit: 20, window: "10 m" },
+  signupCheckLicense: { limit: 100, window: "1 h" },
+  signupCheckUnique: { limit: 200, window: "1 h" },
   loginStart: { limit: 5, window: "1 h" },
+  loginStartIp: { limit: 30, window: "1 h" },
   loginVerify: { limit: 5, window: "10 m" },
+  loginVerifyIp: { limit: 50, window: "10 m" },
   loginResend: { limit: 3, window: "10 m" },
+  loginResendIp: { limit: 20, window: "10 m" },
   search: { limit: 30, window: "1 m" },
   profilePatch: { limit: 10, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;

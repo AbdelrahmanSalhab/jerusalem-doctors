@@ -1,8 +1,12 @@
+import { requireAdmin } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAuditPage() {
+  // The (admin) layout's check alone is not enough: Next can render this
+  // page without re-running the layout. requireAdmin is request-cached.
+  await requireAdmin();
   const service = createSupabaseServiceClient();
   const { data: rows, error } = await service
     .from("audit_logs")

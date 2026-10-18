@@ -26,9 +26,10 @@ vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
 }));
 
-vi.mock("@/lib/auth/session", () => ({
-  getCurrentDoctor: vi.fn(async () => ({ id: "me" })),
+const { requireDoctor } = vi.hoisted(() => ({
+  requireDoctor: vi.fn(async () => ({ id: "me" })),
 }));
+vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
 
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
@@ -142,5 +143,13 @@ describe("GET /api/search: result cap", () => {
   it("an all-punctuation query is not truncated", async () => {
     const body = await (await search({ q: "..." })).json();
     expect(body).toEqual({ results: [], count: 0, truncated: false });
+  });
+});
+
+describe("GET /api/search access", () => {
+  it("401s when requireDoctor refuses (no session, or a deactivated doctor)", async () => {
+    requireDoctor.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    const res = await search({ q: "x" });
+    expect(res.status).toBe(401);
   });
 });

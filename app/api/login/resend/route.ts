@@ -1,12 +1,12 @@
 // POST /api/login/resend
-// Re-sends the login OTP. Split out from /api/login/start because the /verify
-// page has no Turnstile widget, and re-posting to /login/start without a token
-// 403s in production (verifyTurnstile treats a missing token as a failure).
+// Re-sends the login OTP from the /verify page. Turnstile-gated like
+// /api/login/start: every send spends from Supabase's project-wide SMS
+// budget, and an ungated resend let anyone who knows doctors' phones drain
+// it and lock everyone out of login and signup.
 //
-// This endpoint is unauthenticated and ungated, so it must not become a phone
-// enumeration oracle: it returns 200 whether or not the number is registered,
-// and only actually sends when an active doctor exists. Abuse is bounded by a
-// 3-per-10-minutes limit on both the phone and the IP.
+// It must not become a phone enumeration oracle: it returns 200 whether or
+// not the number is registered, and only actually sends when an active doctor
+// exists. Further bounded by per-phone and per-IP limits.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
@@ -15,9 +15,11 @@ import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 const Body = z.object({
   phone: z.string().min(1),
+  turnstile_token: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -28,6 +30,11 @@ export async function POST(req: Request) {
     parsed = Body.parse(await req.json());
   } catch {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
+  }
+
+  const ts = await verifyTurnstile(parsed.turnstile_token, ip);
+  if (!ts.ok) {
+    return jsonError(403, { error: "turnstile_failed", code: "turnstile_failed" });
   }
 
   let phoneE164: string;
@@ -47,7 +54,7 @@ export async function POST(req: Request) {
   // they cost one Redis round trip instead of two.
   const [rl, rlIp] = await Promise.all([
     rateLimit("loginResend", `phone:${phoneE164}`),
-    rateLimit("loginResend", `ip:${ip}`),
+    rateLimit("loginResendIp", `ip:${ip}`),
   ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });

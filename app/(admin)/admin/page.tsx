@@ -1,5 +1,6 @@
 import { AdminDoctorsTable } from "./AdminDoctorsTable";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
+import { requireAdmin } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export default async function AdminDoctorsPage({
   const status = sp.status ?? "pending";
   const q = sp.q?.trim() ?? "";
 
+  // The (admin) layout's check alone is not enough: Next can render this
+  // page without re-running the layout. requireAdmin is request-cached.
+  await requireAdmin();
   const service = createSupabaseServiceClient();
   let query = service
     .from("doctors")

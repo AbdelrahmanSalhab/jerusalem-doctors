@@ -91,7 +91,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
 
   // Per-IP gate first; per-phone limit after we normalize.
-  const rlIp = await rateLimit("signupStart", `ip:${ip}`);
+  const rlIp = await rateLimit("signupStartIp", `ip:${ip}`);
   if (!rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }

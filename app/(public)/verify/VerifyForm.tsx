@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Mode = "signup" | "login";
 
@@ -15,6 +15,13 @@ import {
   getHandoff,
 } from "@/lib/client/verify_handoff";
 import { toAsciiDigits } from "@/lib/normalize/digits";
+import {
+  TurnstileWidget,
+  type TurnstileHandle,
+} from "@/components/TurnstileWidget";
+
+const TURNSTILE_WAIT_MS = 15_000;
+const noop = () => {};
 
 export function VerifyForm() {
   const router = useRouter();
@@ -48,6 +55,9 @@ export function VerifyForm() {
   const [resendIn, setResendIn] = useState(60);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Login resends are Turnstile-gated (they spend the shared SMS budget);
+  // signup resends are bound to the signup session instead.
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   // Login answers "code sent" even for an unregistered number (no account
   // enumeration), so a doctor who never signed up waits for nothing. After a
@@ -123,18 +133,28 @@ export function VerifyForm() {
     // Dedicated resend endpoints rather than re-posting to /*/start: those are
     // Turnstile-gated and the token is single-use, so a replay 403s in prod.
     const url = mode === "signup" ? "/api/signup/resend" : "/api/login/resend";
-    const body =
-      mode === "signup" ? { signup_session_id: sessionId } : { phone };
 
     try {
+      const body =
+        mode === "signup"
+          ? { signup_session_id: sessionId }
+          : {
+              phone,
+              turnstile_token:
+                (await turnstileRef.current?.getToken(TURNSTILE_WAIT_MS)) ?? "",
+            };
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      // Tokens are single-use: the next resend needs a fresh one either way.
+      turnstileRef.current?.reset();
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        if (data?.code === "session_expired") {
+        if (data?.code === "turnstile_failed") {
+          setError("لم يكتمل التحقق من المتصفح. تأكد من الاتصال وأعد المحاولة.");
+        } else if (data?.code === "session_expired") {
           setError("انتهت صلاحية الجلسة. الرجاء البدء من جديد.");
         } else if (data?.code === "rate_limited") {
           setError("عدد كبير من المحاولات. حاول لاحقًا.");
@@ -193,6 +213,10 @@ export function VerifyForm() {
             ? `إعادة إرسال الرمز خلال ${resendIn} ثانية`
             : "إعادة إرسال الرمز"}
       </button>
+
+      {mode === "login" && (
+        <TurnstileWidget ref={turnstileRef} onToken={noop} action="login_resend" />
+      )}
 
       {mode === "login" && !waitedLong && (
         <p className="text-center text-sm text-foreground/70">
