@@ -80,6 +80,9 @@ function levenshtein(a: string, b: string): number {
   return prev[b.length] ?? 0;
 }
 
+/** The live fallback runs while a doctor waits on the form. */
+const LIVE_LOOKUP = { timeoutMs: 5_000, retries: 0 } as const;
+
 /**
  * Verify (license, Hebrew name) against the MoH registry.
  * Pure of UI concerns; the API route translates the status into Arabic copy.
@@ -109,9 +112,18 @@ export async function verifyLicense(
     return compareNames(mirror.data, inputFirst, inputFamily, "mirror");
   }
 
-  // 2) Fallback to live CKAN (handles freshly issued licenses).
-  const client = options.mohClient ?? new MohClient();
-  const live = await client.findByLicense(input.licenseNumber);
+  // 2) Fallback to live CKAN (handles freshly issued licenses). A doctor is
+  // waiting on this, so it gets one short try: data.gov.il being down or
+  // blocking us must not fail the signup. It lands in admin review instead,
+  // the same as a license the registry doesn't know.
+  const client = options.mohClient ?? new MohClient(LIVE_LOOKUP);
+  let live: Awaited<ReturnType<MohClient["findByLicense"]>>;
+  try {
+    live = await client.findByLicense(input.licenseNumber);
+  } catch (err) {
+    console.error("[moh] live registry lookup failed, treating as not_found", err);
+    return { status: "not_found", source: "none" };
+  }
   if (!live) return { status: "not_found", source: "none" };
 
   const liveRow: MirrorRow = {

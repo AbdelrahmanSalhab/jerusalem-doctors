@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -18,6 +19,9 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  const disabled = rejectWhilePhoneAuthDisabled();
+  if (disabled) return disabled;
+
   const ip = ipFromHeaders(req);
 
   let parsed: z.infer<typeof Body>;

@@ -11,6 +11,8 @@ const dupeFilters: string[] = [];
 const pendingInserts: Record<string, unknown>[] = [];
 /** The doctor already holding the signup's phone, if any. */
 let phoneOwner: { id: string } | null = null;
+/** The doctor already holding the signup's license, if any. */
+let licenseHolder: { id: string } | null = null;
 const purges: [string, string][] = [];
 let purgeError: unknown = null;
 
@@ -50,7 +52,7 @@ vi.mock("@/lib/supabase/service", () => ({
               dupeFilters.push(filter);
               return {
                 limit: () => ({
-                  maybeSingle: async () => ({ data: null, error: null }),
+                  maybeSingle: async () => ({ data: licenseHolder, error: null }),
                 }),
               };
             },
@@ -241,9 +243,46 @@ describe("POST /api/signup/start: a phone that already has an account", () => {
     });
   });
 
-  it("skips the license duplicate check", async () => {
-    await start({ license_number: "123456" });
-    expect(dupeFilters).toHaveLength(0);
+  it("lets the owner re-enter their own license", async () => {
+    licenseHolder = { id: "doc-1" };
+    const r = await start({ license_number: "123456" });
+    licenseHolder = null;
+    expect(r.status).toBe(200);
+  });
+
+  it("answers another doctor's license exactly like an unregistered phone does", async () => {
+    licenseHolder = { id: "doc-2" };
+    const existing = await start({ license_number: "123456" });
+    phoneOwner = null;
+    const fresh = await start({ license_number: "123456" });
+    licenseHolder = null;
+    expect(existing.status).toBe(409);
+    expect(existing).toEqual(fresh);
+  });
+
+  it("answers an invalid workplace set exactly like an unregistered phone does", async () => {
+    const workplaces = [
+      { name: "مستشفى أ", workplace_type: "hospital", is_primary: true },
+      { name: "مستشفى ب", workplace_type: "hospital", is_primary: true },
+    ];
+    const existing = await start({ license_number: "123456", workplaces });
+    phoneOwner = null;
+    const fresh = await start({ license_number: "123456", workplaces });
+    expect(existing.status).toBe(400);
+    expect(existing).toEqual(fresh);
+  });
+});
+
+describe("POST /api/signup/start: emergency switch", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("refuses with 503 before sending anything", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PHONE_AUTH_DISABLED", "1");
+    pendingInserts.length = 0;
+    const r = await start({ license_number: "23456" });
+    expect(r.status).toBe(503);
+    expect(r.body.code).toBe("phone_auth_disabled");
+    expect(pendingInserts).toHaveLength(0);
   });
 });
 

@@ -99,7 +99,7 @@ completed. If that ever changes, `OTP_PROVIDER=whatsapp_meta` plus the
 restriction, since WhatsApp delivers over data.
 
 **Quick mitigation if delivery is broken:** flip `NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`
-in Vercel and redeploy. /signup and /login will show a "coming soon" banner.
+in Vercel and redeploy. /signup and /login show a "coming soon" banner, and every route that sends an SMS (signup and login start, both resends) answers 503 `phone_auth_disabled`, so bots stop too.
 
 **Testing the hook without waiting for a doctor.** The signature is the only
 auth on that route, so you can probe it directly. Expect 401 on a bad
@@ -131,7 +131,7 @@ curl -i -X POST https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp \
    curl -X GET "https://jerusalem-doctors.vercel.app/api/cron/sync-moh" \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
-4. If data.gov.il itself is the issue, the route falls back to live CKAN per signup, so signups still work — they just take a few hundred ms longer and route through admin queue.
+4. If data.gov.il itself is the issue: a license missing from the mirror gets one live CKAN try (5 s, no retries). If that fails it is treated as `not_found`, so the signup still completes and lands in the admin queue. Look for `[moh] live registry lookup failed` in the logs.
 
 If the dataset URL changed, update `MOH_RESOURCE_ID` in Vercel env vars; no code change needed.
 

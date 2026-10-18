@@ -24,7 +24,7 @@ import {
   licenseFormatErrorMessage,
 } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
-import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
+import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -88,6 +88,9 @@ const Body = z
   });
 
 export const POST = withJsonErrors(async (req: Request) => {
+  const disabled = rejectWhilePhoneAuthDisabled();
+  if (disabled) return disabled;
+
   const ip = ipFromHeaders(req);
 
   // Per-IP gate first; per-phone limit after we normalize.
@@ -224,24 +227,19 @@ export const POST = withJsonErrors(async (req: Request) => {
   const secondaryLicense = secondary?.serial ?? null;
   const secondaryVerified = secondary?.result ?? null;
 
-  // A phone that already has an account goes through the same steps and gets
-  // the same response as a new signup, so this form can't be used to test
-  // whether a number is registered. Its OTP logs the owner in instead (see
-  // existing_doctor_id in signup/verify).
+  // A phone that already has an account goes through every check a new
+  // signup does and gets the same response, so this form can't be used to
+  // test whether a number is registered. Its OTP logs the owner in instead
+  // (see existing_doctor_id in signup/verify). The branch is taken only after
+  // the last check that could reject a new signup: answering early would
+  // make "registered" observable through any body a new signup would fail.
   const phoneOwner = await service
     .from("doctors")
     .select("id")
     .eq("phone_e164", phoneE164)
     .maybeSingle();
   if (phoneOwner.error && phoneOwner.error.code !== "PGRST116") throw phoneOwner.error;
-  if (phoneOwner.data) {
-    return startPendingSignup(
-      service,
-      phoneE164,
-      { phone_e164: phoneE164, existing_doctor_id: phoneOwner.data.id },
-      verified.status,
-    );
-  }
+  const ownerId: string | null = phoneOwner.data?.id ?? null;
 
   // Defensive uniqueness re-check against race with check-unique. License
   // numbers are only unique within their own issuing region, and a license
@@ -263,7 +261,8 @@ export const POST = withJsonErrors(async (req: Request) => {
     .limit(1)
     .maybeSingle();
   if (dupe.error && dupe.error.code !== "PGRST116") throw dupe.error;
-  if (dupe.data) {
+  // The owner re-entering their own license is not a duplicate.
+  if (dupe.data && dupe.data.id !== ownerId) {
     return jsonError(409, {
       error: "duplicate",
       code: "duplicate",
@@ -307,6 +306,15 @@ export const POST = withJsonErrors(async (req: Request) => {
       code: "invalid_body",
       fields: { workplaces: "يجب أن يكون هناك مكان عمل رئيسي واحد" },
     });
+  }
+
+  if (ownerId) {
+    return startPendingSignup(
+      service,
+      phoneE164,
+      { phone_e164: phoneE164, existing_doctor_id: ownerId },
+      verified.status,
+    );
   }
 
   // Dedupe by normalized name, keep the primary first.

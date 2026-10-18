@@ -4,6 +4,18 @@ import {
   assertSmsDeliverable,
 } from "@/lib/normalize/phone";
 import type { NextResponse } from "next/server";
+import { isPhoneAuthDisabled } from "@/lib/auth/session";
+
+/**
+ * The runbook's hard stop (NEXT_PUBLIC_PHONE_AUTH_DISABLED=1, then redeploy)
+ * for spam or a broken delivery path. The login and signup pages only show a
+ * banner, so every route that can send an SMS checks it too; without this the
+ * forms and any bot kept sending.
+ */
+export function rejectWhilePhoneAuthDisabled(): NextResponse | null {
+  if (!isPhoneAuthDisabled()) return null;
+  return jsonError(503, { error: "phone_auth_disabled", code: "phone_auth_disabled" });
+}
 
 /**
  * Reject a number we cannot deliver an OTP to, before asking Supabase to
