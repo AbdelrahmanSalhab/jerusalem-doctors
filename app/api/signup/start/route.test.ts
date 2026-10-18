@@ -11,6 +11,8 @@ const dupeFilters: string[] = [];
 const pendingInserts: Record<string, unknown>[] = [];
 /** The doctor already holding the signup's phone, if any. */
 let phoneOwner: { id: string } | null = null;
+const purges: [string, string][] = [];
+let purgeError: unknown = null;
 
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
@@ -65,7 +67,13 @@ vi.mock("@/lib/supabase/service", () => ({
             }),
           };
         },
-        delete: () => ({ eq: async () => ({ error: null }) }),
+        delete: () => ({
+          eq: async () => ({ error: null }),
+          lt: async (col: string, value: string) => {
+            purges.push([col, value]);
+            return { error: purgeError };
+          },
+        }),
       };
     },
   }),
@@ -236,5 +244,31 @@ describe("POST /api/signup/start: a phone that already has an account", () => {
   it("skips the license duplicate check", async () => {
     await start({ license_number: "123456" });
     expect(dupeFilters).toHaveLength(0);
+  });
+});
+
+describe("POST /api/signup/start: expired pending rows", () => {
+  beforeEach(() => {
+    purges.length = 0;
+    purgeError = null;
+  });
+
+  it("purges pending signups that have already expired", async () => {
+    const before = Date.now();
+    const r = await start({ license_number: "23456" });
+    expect(r.status).toBe(200);
+    expect(purges).toHaveLength(1);
+    const [col, cutoff] = purges[0];
+    expect(col).toBe("expires_at");
+    expect(Date.parse(cutoff)).toBeGreaterThanOrEqual(before - 1000);
+    expect(Date.parse(cutoff)).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("still starts the signup when the purge fails", async () => {
+    purgeError = { message: "boom" };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await start({ license_number: "23456" });
+    expect(r.status).toBe(200);
+    expect(r.body.signup_session_id).toBe("session-1");
   });
 });

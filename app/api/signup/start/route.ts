@@ -397,6 +397,17 @@ async function startPendingSignup(
   const now = Date.now();
   const expiresAt = new Date(now + PENDING_TTL_MS).toISOString();
 
+  // Abandoned signups would otherwise keep their phone, names and license in
+  // pending_signups forever. Each new signup clears the expired ones; a
+  // failed purge is retried by the next signup, so it never blocks this one.
+  const purge = await service
+    .from("pending_signups")
+    .delete()
+    .lt("expires_at", new Date(now).toISOString());
+  if (purge.error) {
+    console.error("[signup/start] expired pending purge failed", purge.error);
+  }
+
   const insert = await service
     .from("pending_signups")
     .insert({ phone_e164: phoneE164, payload, expires_at: expiresAt })

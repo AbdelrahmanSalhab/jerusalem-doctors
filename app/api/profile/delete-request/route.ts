@@ -6,6 +6,7 @@
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { writeAudit } from "@/lib/audit";
 
 export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
@@ -28,7 +29,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(500, { error: "delete_failed", code: "delete_failed" });
   }
 
-  await service.from("audit_logs").insert({
+  await writeAudit(service, {
     actor_doctor_id: me.id,
     action: "delete_requested",
     target_doctor_id: me.id,
