@@ -1,10 +1,45 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanWorkplaces,
+  emptyWorkplace,
   isValidClinicPhone,
   missingClinicFields,
+  toWorkplaceEntries,
   workplaceInfoLine,
 } from "./workplace";
+
+describe("toWorkplaceEntries", () => {
+  it("gives a doctor with no saved rows one empty primary row", () => {
+    expect(toWorkplaceEntries([])).toEqual([emptyWorkplace(true)]);
+  });
+
+  it("turns null columns into empty strings", () => {
+    expect(
+      toWorkplaceEntries([
+        {
+          name: "عيادة",
+          workplace_type: "clinic",
+          details: null,
+          address: "شارع",
+          hours: null,
+          phone: null,
+          is_primary: true,
+          sort_order: 0,
+        },
+      ]),
+    ).toEqual([
+      {
+        name: "عيادة",
+        workplace_type: "clinic",
+        details: "",
+        address: "شارع",
+        hours: "",
+        phone: "",
+        is_primary: true,
+      },
+    ]);
+  });
+});
 
 describe("isValidClinicPhone", () => {
   it("accepts landlines, mobiles and international numbers", () => {

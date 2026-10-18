@@ -125,6 +125,32 @@ export const emptyWorkplace = (
   is_primary: isPrimary,
 });
 
+/** A doctor_workplaces row as the profile page reads it. */
+export interface SavedWorkplace {
+  name: string;
+  workplace_type: WorkplaceType;
+  details: string | null;
+  address: string | null;
+  hours: string | null;
+  phone: string | null;
+  is_primary: boolean;
+  sort_order: number;
+}
+
+/** Saved rows as form entries (nulls as ""); one empty primary row if none. */
+export function toWorkplaceEntries(rows: readonly SavedWorkplace[]): WorkplaceEntry[] {
+  if (rows.length === 0) return [emptyWorkplace(true)];
+  return rows.map((w) => ({
+    name: w.name,
+    workplace_type: w.workplace_type,
+    details: w.details ?? "",
+    address: w.address ?? "",
+    hours: w.hours ?? "",
+    phone: w.phone ?? "",
+    is_primary: w.is_primary,
+  }));
+}
+
 /** Trimmed, unnamed rows dropped, blanks as null: the request body shape. */
 export function cleanWorkplaces(rows: readonly WorkplaceEntry[]) {
   const orNull = (v: string) => v.trim() || null;

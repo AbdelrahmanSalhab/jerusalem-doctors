@@ -2,36 +2,39 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DeleteAccountSection, HelpSection } from "./AccountSections";
 import { PhotoUploader } from "./PhotoUploader";
+import { EditButton, LockableField, ReadOnlyView, Section } from "./ProfileFields";
+import {
+  FixedInfoSection,
+  SpecialtiesSummary,
+  StageSummary,
+  WorkplacesSummary,
+} from "./ProfileSummaries";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
 import { Field, SeekingWorkCheckbox } from "@/components/FormField";
+import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
+import { StageRadios } from "@/components/StageRadios";
 import { WorkplaceEditor } from "@/components/WorkplaceEditor";
 import {
   findGeneralSpecialtyId,
-  isValidResidencyYear,
   RESIDENCY_YEAR_MIN,
   residencyYearMax,
   STAGE_BY_KEY,
-  STAGE_OPTIONS,
   type Stage,
   stageFromCareerStage,
   workplaceForStage,
 } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
+import { profileFormError } from "@/lib/profile/validate";
 import type { SpecialtyNode } from "@/lib/specialtyTree";
 import {
   cleanWorkplaces,
-  emptyWorkplace,
-  missingClinicFields,
-  WORKPLACE_TYPE_LABEL,
+  toWorkplaceEntries,
+  type SavedWorkplace,
   type WorkplaceEntry,
-  workplaceInfoLine,
-  type WorkplaceType,
 } from "@/lib/workplace";
-
-const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
-const WHATSAPP_URL = "https://wa.me/972524209156";
 
 type Specialty = SpecialtyNode & { code: string | null };
 
@@ -44,16 +47,7 @@ export function ProfileForm({
   doctor: Doctor;
   specialties: Specialty[];
   currentSpecialtyIds: string[];
-  currentWorkplaces: {
-    name: string;
-    workplace_type: WorkplaceType;
-    details: string | null;
-    address: string | null;
-    hours: string | null;
-    phone: string | null;
-    is_primary: boolean;
-    sort_order: number;
-  }[];
+  currentWorkplaces: SavedWorkplace[];
 }) {
   const router = useRouter();
   const [arabicFirst, setArabicFirst] = useState(doctor.arabic_first_name);
@@ -66,20 +60,10 @@ export function ProfileForm({
   const [specialtyIds, setSpecialtyIds] = useState<string[]>(
     currentSpecialtyIds,
   );
-  const initialWorkplaces: WorkplaceEntry[] =
-    currentWorkplaces.length > 0
-      ? currentWorkplaces.map((w) => ({
-          name: w.name,
-          workplace_type: w.workplace_type,
-          details: w.details ?? "",
-          address: w.address ?? "",
-          hours: w.hours ?? "",
-          phone: w.phone ?? "",
-          is_primary: w.is_primary,
-        }))
-      : [emptyWorkplace(true)];
   const [workplaces, setWorkplaces] =
-    useState<WorkplaceEntry[]>(initialWorkplaces);
+    useState<WorkplaceEntry[]>(() =>
+    toWorkplaceEntries(currentWorkplaces),
+  );
   const [photoUrl, setPhotoUrl] = useState<string | null>(
     doctor.profile_picture_url,
   );
@@ -161,38 +145,15 @@ export function ProfileForm({
     setError(null);
     setSaved(false);
 
-    const cleanedWorkplaces = cleanWorkplaces(workplaces);
-
-    if (cleanedWorkplaces.length === 0 && !stageOpt?.workplaceOptional) {
-      setError("الرجاء إدخال مكان عمل واحد على الأقل.");
-      setSaving(false);
-      return;
-    }
-    if (
-      stageOpt?.showsClinicFields &&
-      workplaces.some((w) => missingClinicFields(w).length > 0)
-    ) {
-      setError("أدخل عنوان العيادة ورقم هاتفها.");
-      setEditingWorkplaces(true);
-      setSaving(false);
-      return;
-    }
-    const primaryCount = cleanedWorkplaces.filter((w) => w.is_primary).length;
-    if (cleanedWorkplaces.length > 0 && primaryCount !== 1) {
-      setError("اختر مكان عمل رئيسي واحد فقط.");
-      setSaving(false);
-      return;
-    }
-    if (specialtyIds.length === 0) {
-      setError("اختر تخصصًا واحدًا على الأقل.");
-      setSaving(false);
-      return;
-    }
-    if (
-      stageOpt?.requiresResidencyStartYear &&
-      !isValidResidencyYear(residencyStartYear)
-    ) {
-      setError("أدخل سنة بداية التخصص.");
+    const problem = profileFormError({
+      stageOpt,
+      workplaces,
+      specialtyIds,
+      residencyStartYear,
+    });
+    if (problem) {
+      setError(problem.message);
+      if (problem.openWorkplaces) setEditingWorkplaces(true);
       setSaving(false);
       return;
     }
@@ -219,7 +180,7 @@ export function ProfileForm({
             certificates: STAGE_BY_KEY[stage].showsCertificates ? certificates : [],
           }),
           seeking_work: seekingWork,
-          workplaces: cleanedWorkplaces,
+          workplaces: cleanWorkplaces(workplaces),
         }),
       });
       const body = await res.json();
@@ -238,19 +199,6 @@ export function ProfileForm({
     }
   };
 
-  const requestDelete = async () => {
-    const ok = window.confirm(
-      "هل أنت متأكد؟ سيتم إخفاء حسابك من البحث فورًا، وسيقوم المسؤول بالمراجعة.",
-    );
-    if (!ok) return;
-    const res = await fetch("/api/profile/delete-request", { method: "POST" });
-    if (res.ok) {
-      window.location.href = "/";
-    } else {
-      setError("لم نتمكن من تسجيل طلب الحذف.");
-    }
-  };
-
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 sm:gap-6">
       <Section title="الصورة الشخصية">
@@ -261,32 +209,7 @@ export function ProfileForm({
         />
       </Section>
 
-      <Section title="معلومات ثابتة">
-        <p className="text-sm text-foreground/65">
-          هذه المعلومات لا يمكن تعديلها ذاتيًا. للحاجة إلى تعديل، تواصل مع
-          المطوّر من زر الأسفل.
-        </p>
-        <Locked label="رقم الهاتف">{doctor.phone_e164}</Locked>
-        <Locked label="رقم الترخيص">
-          {doctor.license_number}{" "}
-          <span className="text-foreground/50">
-            ({doctor.license_region === "IL" ? "إسرائيلي" : "فلسطيني"})
-          </span>
-        </Locked>
-        {doctor.secondary_license_number && (
-          <Locked label="ترخيص إضافي">
-            {doctor.secondary_license_number}{" "}
-            <span className="text-foreground/50">
-              ({doctor.secondary_license_region === "IL" ? "إسرائيلي" : "فلسطيني"})
-            </span>
-          </Locked>
-        )}
-        {(doctor.hebrew_first_name || doctor.hebrew_family_name) && (
-          <Locked label="الاسم بالعبرية">
-            {doctor.hebrew_first_name} {doctor.hebrew_family_name}
-          </Locked>
-        )}
-      </Section>
+      <FixedInfoSection doctor={doctor} />
 
       <Section title="الاسم بالعربية والبريد">
         <p className="text-sm text-foreground/65">
@@ -324,25 +247,7 @@ export function ProfileForm({
       >
         {editingStage ? (
           <>
-            <div className="flex flex-col gap-2">
-              {STAGE_OPTIONS.map((o) => (
-                <label key={o.stage} className="flex items-start gap-2">
-                  <input
-                    type="radio"
-                    name="stage"
-                    className="mt-1"
-                    checked={stage === o.stage}
-                    onChange={() => applyStage(o.stage)}
-                  />
-                  <span>
-                    {o.label}
-                    <span className="block text-sm text-foreground/60">
-                      {o.hint}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
+            <StageRadios value={stage} onChange={applyStage} />
             {stageOpt?.requiresResidencyStartYear && (
               <Field label="سنة بداية التخصص">
                 <input
@@ -367,16 +272,7 @@ export function ProfileForm({
           </>
         ) : (
           <ReadOnlyView>
-            {stageOpt ? (
-              <span>
-                {stageOpt.label}
-                {stageOpt.requiresResidencyStartYear && residencyStartYear
-                  ? ` — بداية التخصص ${residencyStartYear}`
-                  : ""}
-              </span>
-            ) : (
-              <span className="text-foreground/40">— غير محدد —</span>
-            )}
+            <StageSummary stageOpt={stageOpt} residencyStartYear={residencyStartYear} />
           </ReadOnlyView>
         )}
         <SeekingWorkCheckbox checked={seekingWork} onChange={setSeekingWork} />
@@ -434,64 +330,15 @@ export function ProfileForm({
           </>
         ) : (
           <ReadOnlyView>
-            <div>
-              <div className="mb-1 text-sm text-foreground/65">التخصصات</div>
-              {specialtyIds.length === 0 ? (
-                <span className="text-foreground/40">— لا يوجد —</span>
-              ) : (
-                <ul className="flex flex-wrap gap-1.5">
-                  {specialties
-                    .filter((s) => specialtyIds.includes(s.id))
-                    .map((s) => (
-                      <li
-                        key={s.id}
-                        className="rounded-full border border-foreground/20 bg-foreground/5 px-2.5 py-0.5 text-sm"
-                      >
-                        {s.name_ar}
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </div>
-            {showSpecialtyPicker && (
-              <div>
-                <div className="mb-1 text-sm text-foreground/65">
-                  التخصص الفرعي
-                </div>
-                <span>
-                  {subspecialty || (
-                    <span className="text-foreground/40">— غير محدد —</span>
-                  )}
-                </span>
-              </div>
-            )}
-            {stageOpt?.showsCertificates && (
-              <div>
-                <div className="mb-1 text-sm text-foreground/65">شهادات إضافية</div>
-                {certificates.filter((c) => c.trim()).length === 0 ? (
-                  <span className="text-foreground/40">لا يوجد</span>
-                ) : (
-                  <ul className="flex flex-wrap gap-1.5">
-                    {certificates
-                      .filter((c) => c.trim())
-                      .map((c) => (
-                        <li
-                          key={c}
-                          className="rounded-full border border-foreground/20 bg-foreground/5 px-2.5 py-0.5 text-sm"
-                        >
-                          {c}
-                        </li>
-                      ))}
-                  </ul>
-                )}
-              </div>
-            )}
-            <div>
-              <div className="mb-1 text-sm text-foreground/65">نبذة عني</div>
-              <span className="whitespace-pre-line">
-                {bio || <span className="text-foreground/40">— غير محدد —</span>}
-              </span>
-            </div>
+            <SpecialtiesSummary
+              specialties={specialties}
+              specialtyIds={specialtyIds}
+              showSubspecialty={showSpecialtyPicker}
+              subspecialty={subspecialty}
+              showCertificates={Boolean(stageOpt?.showsCertificates)}
+              certificates={certificates}
+              bio={bio}
+            />
           </ReadOnlyView>
         )}
       </Section>
@@ -512,32 +359,7 @@ export function ProfileForm({
           />
         ) : (
           <ReadOnlyView>
-            {workplaces.filter((w) => w.name.trim().length > 0).length === 0 ? (
-              <span className="text-foreground/40">— لا يوجد —</span>
-            ) : (
-              <ul className="space-y-1">
-                {workplaces
-                  .filter((w) => w.name.trim().length > 0)
-                  .map((w, i) => (
-                    <li key={i} className="flex flex-wrap items-center gap-2">
-                      {w.is_primary && (
-                        <span className="rounded-full border border-foreground/20 bg-foreground/5 px-2 py-0.5 text-xs">
-                          رئيسي
-                        </span>
-                      )}
-                      <span className="rounded-full border border-foreground/15 px-2 py-0.5 text-xs text-foreground/65">
-                        {WORKPLACE_TYPE_LABEL[w.workplace_type]}
-                      </span>
-                      <span>{w.name}</span>
-                      {workplaceInfoLine(w) && (
-                        <span className="text-foreground/60">
-                          ({workplaceInfoLine(w)})
-                        </span>
-                      )}
-                    </li>
-                  ))}
-              </ul>
-            )}
+            <WorkplacesSummary workplaces={workplaces} />
           </ReadOnlyView>
         )}
       </Section>
@@ -561,168 +383,11 @@ export function ProfileForm({
         {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
       </button>
 
-      <Section title="بحاجة لمساعدة؟">
-        <p className="text-sm text-foreground/75">
-          لتعديل أي معلومة مقفلة، أو لطلب إخفاء كامل من البحث، تواصل مع
-          المطوّر مباشرة.
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 rounded-md bg-[#25d366] px-4 py-2.5 text-center font-medium text-white hover:opacity-90"
-          >
-            مراسلة المطوّر عبر واتساب
-          </a>
-          <a
-            href={LINKEDIN_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 rounded-md border border-foreground/20 px-4 py-2.5 text-center hover:bg-foreground/5"
-          >
-            ملف LinkedIn
-          </a>
-        </div>
-      </Section>
+      <HelpSection />
 
-      <Section title="حذف الحساب">
-        <p className="text-sm text-foreground/75">
-          عند الضغط على الزر، سيتم إخفاء حسابك من البحث فورًا، وستتم مراجعة
-          طلبك من قبل المسؤول.
-        </p>
-        <button
-          type="button"
-          onClick={requestDelete}
-          className="rounded-md border border-red-400 px-4 py-2 text-red-700 hover:bg-red-50"
-        >
-          طلب حذف الحساب
-        </button>
-      </Section>
+      <DeleteAccountSection onError={setError} />
 
-      <style jsx>{`
-        :global(.input) {
-          width: 100%;
-          padding: 0.75rem 0.875rem;
-          font-size: 1rem;
-          border-radius: 0.375rem;
-          border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
-          background: transparent;
-        }
-        :global(.input:focus) {
-          outline: 2px solid currentColor;
-          outline-offset: 1px;
-        }
-      `}</style>
+      <InputStyles />
     </form>
-  );
-}
-
-function Section({
-  title,
-  children,
-  action,
-}: {
-  title: string;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-4 rounded-lg border border-foreground/15 p-5">
-      <div className="flex items-center justify-between gap-2 border-b border-foreground/10 pb-2">
-        <h2 className="text-lg font-bold">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function EditButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-md border border-foreground/20 px-3 py-1 text-sm hover:bg-foreground/5"
-    >
-      تعديل
-    </button>
-  );
-}
-
-function ReadOnlyView({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="space-y-3 rounded-md border border-foreground/15 bg-foreground/5 p-4">
-      {children}
-    </div>
-  );
-}
-
-function Locked({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-foreground/65">
-        {label}
-      </label>
-      <div className="rounded-md border border-dashed border-foreground/20 bg-foreground/5 px-3 py-2 text-foreground/80">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function LockableField({
-  label,
-  value,
-  onChange,
-  type = "text",
-  dir,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  dir?: "ltr" | "rtl" | "auto";
-}) {
-  const [editing, setEditing] = useState(false);
-  return (
-    <div>
-      <label className="mb-1.5 block text-base font-medium">{label}</label>
-      {editing ? (
-        <input
-          type={type}
-          dir={dir}
-          required
-          autoFocus
-          className="input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      ) : (
-        <div className="flex items-stretch gap-2">
-          <div
-            className="flex flex-1 items-center rounded-md border border-foreground/15 bg-foreground/5 px-3 py-2.5 text-foreground/85"
-            dir={dir}
-          >
-            {value || (
-              <span className="text-foreground/40">— غير محدد —</span>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="rounded-md border border-foreground/20 px-3 text-sm hover:bg-foreground/5"
-          >
-            تعديل
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
