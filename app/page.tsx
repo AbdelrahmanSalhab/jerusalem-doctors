@@ -25,7 +25,7 @@ export default async function HomePage() {
       </div>
 
       <p className="max-w-xl text-sm text-foreground/65">
-        منصة مهنية مغلقة — البحث متاح فقط للأطباء
+        منصة مهنية مغلقة: البحث متاح فقط للأطباء
       </p>
     </main>
   );
