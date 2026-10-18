@@ -20,22 +20,21 @@ vi.mock("@/lib/auth/session", () => ({
   requireDoctor: vi.fn(async () => me),
 }));
 
+/** Every save_doctor_profile call, and the error the next one returns. */
+const rpcSpy = vi.fn();
+let rpcError: unknown = null;
+
+// The route saves through one save_doctor_profile call (0014). The spies
+// split it back into what lands in each table, as the function does.
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
-    from(table: string) {
-      const chain = {
-        update(values: Record<string, unknown>) {
-          updateSpy(table, values);
-          return chain;
-        },
-        eq: async () => ({ error: null }),
-        delete: () => chain,
-        insert: async (rows: unknown) => {
-          insertSpy(table, rows);
-          return { error: null };
-        },
-      };
-      return chain;
+    async rpc(name: string, args: Record<string, unknown>) {
+      rpcSpy(name, args);
+      const updates = args.p_updates as Record<string, unknown>;
+      if (Object.keys(updates).length > 0) updateSpy("doctors", updates);
+      if (args.p_specialty_ids !== null) insertSpy("doctor_specialties", args.p_specialty_ids);
+      if (args.p_workplaces !== null) insertSpy("doctor_workplaces", args.p_workplaces);
+      return { error: rpcError };
     },
   }),
 }));
@@ -172,7 +171,8 @@ describe("PATCH /api/profile: workplaces", () => {
     me = { id: "doc-1", career_stage: "resident" };
     const res = await call({ workplaces: [] });
     expect(res.status).toBe(200);
-    expect(workplaceInsert()).toBeUndefined();
+    // An empty list, not null: the save clears them and inserts none.
+    expect(workplaceInsert()).toEqual([]);
   });
 
   it("also honours a stage declared in the same request", async () => {
@@ -223,5 +223,52 @@ describe("PATCH /api/profile: certificates and seeking work", () => {
     const res = await call({ seeking_work: true });
     expect(res.status).toBe(200);
     expect(doctorUpdate()).toMatchObject({ seeking_work: true });
+  });
+});
+
+describe("PATCH /api/profile: one transaction", () => {
+  beforeEach(() => {
+    rpcSpy.mockClear();
+    rpcError = null;
+  });
+
+  it("saves row, specialties and workplaces in a single call", async () => {
+    const res = await call({
+      bio: "نص",
+      specialty_ids: ["11111111-1111-4111-8111-111111111111"],
+      workplaces: [{ name: "مستشفى المقاصد", workplace_type: "hospital", is_primary: true }],
+    });
+    expect(res.status).toBe(200);
+    expect(rpcSpy).toHaveBeenCalledTimes(1);
+    expect(rpcSpy.mock.calls[0][0]).toBe("save_doctor_profile");
+    expect(rpcSpy.mock.calls[0][1]).toMatchObject({
+      p_doctor_id: "doc-1",
+      p_specialty_ids: ["11111111-1111-4111-8111-111111111111"],
+    });
+  });
+
+  it("leaves untouched lists out (null), so they are kept", async () => {
+    await call({ bio: "نص" });
+    expect(rpcSpy.mock.calls[0][1]).toMatchObject({ p_specialty_ids: null, p_workplaces: null });
+  });
+
+  it("rejects two primary workplaces before writing anything", async () => {
+    const res = await call({
+      bio: "نص",
+      workplaces: [
+        { name: "أ", workplace_type: "hospital", is_primary: true },
+        { name: "ب", workplace_type: "hospital", is_primary: true },
+      ],
+    });
+    expect(res.status).toBe(400);
+    expect(rpcSpy).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed save", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    rpcError = { message: "boom" };
+    const res = await call({ bio: "نص" });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ code: "update_failed" });
   });
 });
