@@ -5,6 +5,7 @@
 // Hard guard in production: throw if the secret is missing.
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const VERIFY_TIMEOUT_MS = 5_000;
 
 export interface TurnstileResult {
   ok: boolean;
@@ -36,11 +37,18 @@ export async function verifyTurnstile(
   const body = new URLSearchParams({ secret, response: token });
   if (remoteIp) body.set("remoteip", remoteIp);
 
-  const res = await fetch(VERIFY_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  let res: Response;
+  try {
+    res = await fetch(VERIFY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+      // A hung Cloudflare call must not hold the doctor's request open.
+      signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
+    });
+  } catch {
+    return { ok: false, errors: ["turnstile-unreachable"] };
+  }
   if (!res.ok) {
     return { ok: false, errors: [`turnstile-http-${res.status}`] };
   }

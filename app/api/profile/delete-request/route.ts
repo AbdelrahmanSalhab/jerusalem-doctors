@@ -5,6 +5,7 @@
 
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
 
@@ -17,9 +18,8 @@ export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
   const service = createSupabaseServiceClient();
 
-  // Immediate effect: hide from search + mark inactive. Admin will see in
-  // queue and confirm. The doctor's session stays valid for now; their next
-  // protected route hit will redirect via requireDoctor's is_active check.
+  // Immediate effect: hide from search + mark inactive. An admin completes
+  // the deletion from /admin (DELETE /api/admin/doctors/[id]).
   const r = await service
     .from("doctors")
     .update({ is_visible: false, is_active: false })
@@ -35,6 +35,10 @@ export const POST = withJsonErrors(async (req: Request) => {
     target_doctor_id: me.id,
     metadata: { ip },
   });
+
+  // The account is suspended now; end the session with it.
+  const ssr = await createSupabaseServerClient();
+  await ssr.auth.signOut();
 
   return jsonOk({ ok: true });
 });

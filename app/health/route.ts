@@ -16,7 +16,9 @@ export async function GET() {
     const preMigration = error?.code === "42P01" || error?.code === "PGRST205";
 
     if (error && !preMigration) {
-      return Response.json({ ok: false, db: error.message }, { status: 503 });
+      // Public route: the details go to the logs, not the response.
+      console.error("[health] db check failed", error);
+      return Response.json({ ok: false, db: "unreachable" }, { status: 503 });
     }
 
     return Response.json({
@@ -24,9 +26,7 @@ export async function GET() {
       db: preMigration ? "reachable (pre-migration)" : "reachable",
     });
   } catch (err) {
-    return Response.json(
-      { ok: false, db: err instanceof Error ? err.message : "unknown" },
-      { status: 503 },
-    );
+    console.error("[health] db check threw", err);
+    return Response.json({ ok: false, db: "unreachable" }, { status: 503 });
   }
 }

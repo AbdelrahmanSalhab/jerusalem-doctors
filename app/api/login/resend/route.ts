@@ -8,6 +8,7 @@
 // not the number is registered, and only actually sends when an active doctor
 // exists. Further bounded by per-phone and per-IP limits.
 
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
@@ -89,8 +90,11 @@ export async function POST(req: Request) {
     options: { shouldCreateUser: false },
   });
   if (otpErr) {
+    // Same answer as for any other number: a 502 here, which only a
+    // registered phone can reach, would say the number has an account. The
+    // doctor sees the "no code?" help on /verify; we see this in Sentry.
     console.error("[login/resend] signInWithOtp failed", otpErr);
-    return jsonError(502, { error: "otp_send_failed", code: "otp_send_failed" });
+    Sentry.captureException(otpErr, { tags: { route: "login/resend" } });
   }
 
   return jsonOk({ ok: true });

@@ -1,11 +1,15 @@
 // POST /api/profile/delete-request hides and deactivates the caller at once.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { db, jsonRequest } from "@/test/fakeSupabase";
+import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
 const requireDoctor = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
+vi.mock("@/lib/supabase/server", async () => {
+  const { auth } = await import("@/test/fakeSupabase");
+  return { createSupabaseServerClient: async () => ({ auth }) };
+});
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -25,6 +29,8 @@ describe("POST /api/profile/delete-request", () => {
   it("hides the doctor and audits the request", async () => {
     const res = await call();
     expect(await res.json()).toEqual({ ok: true });
+    // The account is suspended, so the session ends with it.
+    expect(auth.signOut).toHaveBeenCalled();
     expect(db.argsOf("doctors", "update")).toEqual([[{ is_visible: false, is_active: false }]]);
     expect(db.argsOf("doctors", "eq")).toEqual([["id", "d1"]]);
     expect(db.argsOf("audit_logs", "insert")[0][0]).toEqual({
