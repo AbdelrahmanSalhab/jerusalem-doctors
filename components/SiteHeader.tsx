@@ -10,7 +10,10 @@ export const ORG_NAME_AR = "تجمّع أطباء العائلة المقدسي"
  * Server component — branches on whether the visitor has a session.
  */
 export async function SiteHeader() {
-  const doctor = await getCurrentDoctor().catch(() => null);
+  // A deactivated doctor can still hold a session, but every page sends
+  // them to /login; showing logged-in links there is a dead end.
+  const current = await getCurrentDoctor().catch(() => null);
+  const doctor = current?.is_active ? current : null;
 
   return (
     <header className="border-b border-foreground/10">

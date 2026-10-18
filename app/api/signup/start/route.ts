@@ -43,8 +43,8 @@ const Body = z
     // — enforced below.
     secondary_license_region: z.enum(["IL", "PS"]).optional().nullable(),
     secondary_license_number: z.string().trim().max(20).optional().nullable(),
-    arabic_first_name: z.string().min(2),
-    arabic_family_name: z.string().min(2),
+    arabic_first_name: z.string().trim().min(2).max(80),
+    arabic_family_name: z.string().trim().min(2).max(80),
     // Only meaningful when either license is IL — used solely to cross-check
     // the Israeli MoH registry. PS doctors have no registry to match against.
     hebrew_first_name: z.string().trim().max(80).optional().nullable(),
@@ -61,8 +61,8 @@ const Body = z
       .max(2100)
       .nullable()
       .optional(),
-    subspecialty: z.string().trim().optional().nullable(),
-    email: z.email(),
+    subspecialty: z.string().trim().max(120).optional().nullable(),
+    email: z.email().max(254),
     bio: z.string().trim().max(500).optional().nullable(),
     // Exactly one entry must be is_primary:true when any are given —
     // validated below. Residents may give none (they rotate).

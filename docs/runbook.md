@@ -175,11 +175,12 @@ update public.doctors
  where id = '<doctor-uuid>';
 ```
 
-You'll also need to update their corresponding `auth.users` row's phone:
+You'll also need to update their corresponding `auth.users` row's phone.
+Supabase Auth stores it **without** the leading `+`:
 
 ```sql
 update auth.users
-   set phone = '+972...'
+   set phone = '972...'
  where id = (select auth_user_id from public.doctors where id = '<doctor-uuid>');
 ```
 
@@ -213,6 +214,19 @@ privacy page promises an admin then completes the deletion. To do that:
 
 The button is offered only on suspended rows, and an admin can't delete
 their own account.
+
+### Supabase Auth settings that back our limits
+
+Our Upstash limits only cover requests that go through the app. Supabase Auth
+can also be called directly with the public anon key, so its own settings are
+the floor (Dashboard → Authentication):
+
+- **Rate Limits:** SMS sent per hour is project-wide. Size it for the busiest
+  expected hour (a launch wave plus resends); too low and every send fails
+  with `otp_send_failed`. Keep "token verifications" per IP low.
+- **Providers → Phone:** OTP length 6 or more, expiry 10 minutes or less.
+- The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
+  enforced in the Send SMS hook, so direct calls send nothing while it is on.
 
 ## Common one-liners
 

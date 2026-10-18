@@ -1,7 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
-import { workplaceInfoLine } from "@/lib/workplace";
+import { workplaceInfoLine, clinicTelHref } from "@/lib/workplace";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
@@ -82,10 +82,14 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
 
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm text-foreground/65">
           {doctor.phone_display && (
-            <span className="inline-flex items-center gap-1" dir="ltr">
+            <a
+              href={clinicTelHref(doctor.phone_display) ?? undefined}
+              className="inline-flex items-center gap-1 hover:underline"
+              dir="ltr"
+            >
               <span aria-hidden="true">📞</span>
               {doctor.phone_display}
-            </span>
+            </a>
           )}
           {doctor.email && (
             <span
