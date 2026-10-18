@@ -10,6 +10,7 @@
 // we filter explicitly so the user-scoped client doesn't have to.
 
 import { z } from "zod";
+import { fetchInstitutions, institutionsMatching } from "@/lib/institutions";
 import { directoryQuery, SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
@@ -125,7 +126,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     // Arabic-only search (Hebrew search disabled by product decision).
     // Specialty and workplace matches live in joined tables, so they are
     // resolved to doctor ids first.
-    const [specialtyMatches, workplaceMatches] = await Promise.all([
+    const [specialtyMatches, workplaceMatches, institutions] = await Promise.all([
       read(
         service
           .from("specialties")
@@ -138,10 +139,18 @@ export const GET = withJsonErrors(async (req: Request) => {
           .select("doctor_id")
           .or([`name_normalized.ilike.${pattern}`, `name.ilike.${pattern}`].join(",")),
       ),
+      fetchInstitutions(service),
     ]);
+    // A hospital or fund found by any of its spellings ("شعري" finds every
+    // Shaare Zedek doctor however they typed it).
+    const institutionIds = institutionsMatching(institutions, qRaw);
+    const viaInstitution = institutionIds.length
+      ? await read(service.from("doctor_workplaces").select("doctor_id").in("institution_id", institutionIds))
+      : [];
     const joined = new Set([
       ...(await doctorIdsWithSpecialties(service, withSubspecialties(tree, specialtyMatches.map((r) => r.id)))),
       ...workplaceMatches.map((r) => r.doctor_id as string),
+      ...viaInstitution.map((r) => r.doctor_id as string),
     ]);
     // These lists grow with the directory, so they never go into one URL (a
     // few hundred uuids pass the gateway's limit): each chunk is its own

@@ -9,6 +9,7 @@ import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/resp
 import { linkAuthUser } from "@/lib/auth/link";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { relinkDoctor } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { WorkplaceType } from "@/lib/workplace";
 import { writeAudit } from "@/lib/audit";
@@ -253,6 +254,8 @@ export const POST = withJsonErrors(async (req: Request) => {
     if (wp.error) {
       console.error("[signup/verify] workplace insert failed", wp.error);
       // Non-fatal: doctor can add workplaces later from /profile.
+    } else {
+      await relinkDoctor(service, insert.data.id);
     }
   }
 

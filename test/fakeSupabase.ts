@@ -24,7 +24,7 @@ export interface FakeCall {
 
 const METHODS = [
   "select", "insert", "update", "delete", "upsert",
-  "eq", "in", "or", "order", "limit", "maybeSingle", "single",
+  "eq", "in", "or", "order", "limit", "range", "maybeSingle", "single",
 ];
 
 function createDb() {

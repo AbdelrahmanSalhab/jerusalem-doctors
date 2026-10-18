@@ -17,10 +17,11 @@ const SAMPLE: AdminStats = {
   daily: Array.from({ length: 30 }, (_, i) => ({ day: `2026-09-${String(i + 1).padStart(2, "0")}`, signups: i % 4, searchers: i % 6 })),
   domains: [{ name: "الباطنية", count: 9 }, { name: "طب الأطفال", count: 6 }],
   workplace_types: { hospital: 28, clinic: 14, hmo: 6 },
-  top_hospitals: [{ name: "المقاصد", count: 11 }],
+  institutions: [{ name: "المقاصد", kind: "hospital", count: 11 }, { name: "كلاليت", kind: "hmo", count: 14 }],
   attention: {
     pending: 3, pending_oldest: "2026-10-15T09:00:00Z", pending_not_found: 2, pending_mismatch: 1,
     deletion_requests: 1, deletion_oldest: "2026-10-18T09:00:00Z", clinics: 14, clinics_missing_details: 4, never_logged_in: 3,
+    unmatched_workplaces: 2,
   },
   usage: {
     searchers_7d: 15, searches_7d: 140, filter_empty_7d: 6, signup_started_7d: 15, login_code_sent_7d: 50,
@@ -48,6 +49,8 @@ describe("/admin/stats", () => {
     expect(html).toContain("80%"); // 12 of 15 signups completed
     expect(html).toContain("القلب");
     expect(html).toContain("نجحت");
+    expect(html).toContain("كلاليت");
+    expect(html).toContain("/admin/institutions");
   });
 });
 

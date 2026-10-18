@@ -25,11 +25,13 @@ export interface AdminStats {
   daily: { day: string; signups: Count; searchers: Count }[];
   domains: NamedCount[];
   workplace_types: { hospital: Count; clinic: Count; hmo: Count };
-  top_hospitals: NamedCount[];
+  /** Doctors per institution (0016), most first. */
+  institutions: (NamedCount & { kind: "hospital" | "hmo" | "clinic_network" })[];
   attention: {
     pending: Count; pending_oldest: string | null; pending_not_found: Count;
     pending_mismatch: Count; deletion_requests: Count; deletion_oldest: string | null;
     clinics: Count; clinics_missing_details: Count; never_logged_in: Count;
+    unmatched_workplaces: Count;
   };
   usage: {
     searchers_7d: Count; searches_7d: Count; filter_empty_7d: Count;
