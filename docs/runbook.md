@@ -197,6 +197,22 @@ After this, the doctor's next login attempt with the new number works.
 
 By design — these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
 
+### A doctor asked to delete their account
+
+"طلب حذف الحساب" on /profile hides and suspends the account at once; the
+privacy page promises an admin then completes the deletion. To do that:
+
+1. /admin, filter "معلّقون / طلبات حذف", find the doctor (the audit page shows
+   the `delete_requested` entry and when).
+2. Press "حذف نهائي" and confirm. It removes the photo, the login
+   (`auth.users`) and the doctors row; workplaces, specialties and license
+   slots cascade. The audit log keeps only `admin_doctor_deleted` with the
+   old id, no personal data.
+3. If it reports a failure, press it again: each step is safe to retry.
+
+The button is offered only on suspended rows, and an admin can't delete
+their own account.
+
 ## Common one-liners
 
 ### Promote yourself to admin

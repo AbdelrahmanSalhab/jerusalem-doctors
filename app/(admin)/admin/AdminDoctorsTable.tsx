@@ -40,6 +40,13 @@ const statusLabels: Record<string, string> = {
   name_mismatch_overridden: "تم التغاضي يدويًا",
 };
 
+const STATUS_LABEL = {
+  pending: "قيد المراجعة",
+  approved: "مفعّلون",
+  suspended: "معلّقون / طلبات حذف",
+  all: "الكل",
+} as const;
+
 export function AdminDoctorsTable({
   rows,
   currentStatus,
@@ -71,6 +78,17 @@ export function AdminDoctorsTable({
       body: JSON.stringify(body),
     });
     if (res.ok) startTransition(() => router.refresh());
+    else window.alert("تعذّر حفظ التغيير. حاول مجددًا.");
+  };
+
+  // Erases the account for good (row, photo, login). Offered only on a
+  // suspended row; a deletion request suspends the account.
+  const deleteDoctor = async (r: Row) => {
+    const name = `${r.arabic_first_name} ${r.arabic_family_name}`;
+    if (!window.confirm(`حذف حساب ${name} نهائيًا؟ تُحذف كل بياناته وصورته ولا يمكن التراجع.`)) return;
+    const res = await fetch(`/api/admin/doctors/${r.id}`, { method: "DELETE" });
+    if (res.ok) startTransition(() => router.refresh());
+    else window.alert("تعذّر الحذف. حاول مجددًا.");
   };
 
   const toggle = (
@@ -92,7 +110,7 @@ export function AdminDoctorsTable({
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="inline-flex overflow-hidden rounded-md border border-foreground/20">
-          {(["pending", "approved", "all"] as const).map((s) => (
+          {(["pending", "approved", "suspended", "all"] as const).map((s) => (
             <button
               key={s}
               type="button"
@@ -104,7 +122,7 @@ export function AdminDoctorsTable({
                   : "hover:bg-foreground/5")
               }
             >
-              {s === "pending" ? "قيد المراجعة" : s === "approved" ? "مفعّلون" : "الكل"}
+              {STATUS_LABEL[s]}
             </button>
           ))}
         </div>
@@ -282,6 +300,16 @@ export function AdminDoctorsTable({
                     >
                       {r.is_active ? "تعليق" : "إعادة التفعيل"}
                     </button>
+                    {!r.is_active && (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => deleteDoctor(r)}
+                        className="rounded border border-red-600 bg-red-600 px-2.5 py-1 text-sm text-white hover:bg-red-700"
+                      >
+                        حذف نهائي
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
