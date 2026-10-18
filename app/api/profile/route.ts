@@ -118,39 +118,9 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     updates.seeking_work = parsed.seeking_work;
   }
 
-  if (Object.keys(updates).length > 0) {
-    const r = await service.from("doctors").update(updates).eq("id", me.id);
-    if (r.error) {
-      console.error("[profile.patch] doctor update failed", r.error);
-      return jsonError(500, {
-        error: "update_failed",
-        code: "update_failed",
-      });
-    }
-  }
-
-  if (parsed.specialty_ids) {
-    // Replace-all: clear old links, insert the new set.
-    await service.from("doctor_specialties").delete().eq("doctor_id", me.id);
-    if (parsed.specialty_ids.length > 0) {
-      const r = await service.from("doctor_specialties").insert(
-        parsed.specialty_ids.map((sid) => ({
-          doctor_id: me.id,
-          specialty_id: sid,
-        })),
-      );
-      if (r.error) {
-        console.error("[profile.patch] specialty replace failed", r.error);
-        return jsonError(500, {
-          error: "specialty_update_failed",
-          code: "specialty_update_failed",
-        });
-      }
-    }
-  }
-
+  // Validate everything before writing anything.
+  let workplaceRows: Record<string, unknown>[] | null = null;
   if (parsed.workplaces) {
-    // Validate exactly one primary (when there are any).
     const primaries = parsed.workplaces.filter((w) => w.is_primary).length;
     if (parsed.workplaces.length > 0 && primaries !== 1) {
       return jsonError(400, {
@@ -159,11 +129,11 @@ export const PATCH = withJsonErrors(async (req: Request) => {
         fields: { workplaces: "يجب أن يكون هناك مكان عمل رئيسي واحد" },
       });
     }
-
+    // Dedupe by normalized name with the primary first, so a duplicate of the
+    // primary can't knock it out and leave the doctor with none.
     const seen = new Set<string>();
-    const rows = parsed.workplaces
+    workplaceRows = parsed.workplaces
       .map((w, i) => ({
-        doctor_id: me.id,
         name: w.name,
         name_normalized: normalizeArabic(w.name),
         workplace_type: w.workplace_type,
@@ -174,23 +144,27 @@ export const PATCH = withJsonErrors(async (req: Request) => {
         is_primary: w.is_primary,
         sort_order: w.is_primary ? 0 : i + 1,
       }))
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
       .filter((w) => {
         if (seen.has(w.name_normalized)) return false;
         seen.add(w.name_normalized);
         return true;
       });
+  }
 
-    await service.from("doctor_workplaces").delete().eq("doctor_id", me.id);
-    const r = rows.length
-      ? await service.from("doctor_workplaces").insert(rows)
-      : { error: null };
-    if (r.error) {
-      console.error("[profile.patch] workplaces replace failed", r.error);
-      return jsonError(500, {
-        error: "workplaces_update_failed",
-        code: "workplaces_update_failed",
-      });
-    }
+  // One transaction (0014): the row, the specialties and the workplaces all
+  // save or none do, so a failure can't leave a doctor with an emptied list.
+  // null leaves a list untouched.
+  const { error } = await service.rpc("save_doctor_profile", {
+    p_doctor_id: me.id,
+    p_updates: updates,
+    // Deduped: a repeated id would hit the link table's key and fail the save.
+    p_specialty_ids: parsed.specialty_ids ? [...new Set(parsed.specialty_ids)] : null,
+    p_workplaces: workplaceRows,
+  });
+  if (error) {
+    console.error("[profile.patch] save failed", error);
+    return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
 
   return jsonOk({ ok: true });
