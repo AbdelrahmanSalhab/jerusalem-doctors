@@ -43,6 +43,9 @@ export interface SearchHit {
   profile_picture_url: string | null;
 }
 
+/** Search returns at most this many doctors; the UI says so when more matched. */
+export const SEARCH_PAGE_SIZE = 50;
+
 export const FEATURED_GRADUATES_MAX = 6;
 
 /** doctors.featured values (0013). */

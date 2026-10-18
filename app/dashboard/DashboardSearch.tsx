@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
 import { SpecialtyFilter } from "@/components/SpecialtyFilter";
-import type { FeaturedDoctors, SearchHit } from "@/lib/directory";
+import { SEARCH_PAGE_SIZE, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
 
 type Specialty = { id: string; name_ar: string; parent_id: string | null };
 type SearchState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "ready"; results: SearchHit[]; q: string }
+  | { status: "ready"; results: SearchHit[]; q: string; truncated: boolean }
   | { status: "error"; message: string };
 
 type ViewMode = "cards" | "rows";
@@ -78,6 +78,7 @@ export function DashboardSearch({
           status: "ready",
           results: body.results as SearchHit[],
           q: trimmed,
+          truncated: body.truncated === true,
         });
       } catch (err) {
         if ((err as Error)?.name === "AbortError") return;
@@ -228,6 +229,11 @@ function ResultsRegion({
           </button>
         </div>
       </div>
+      {state.truncated && (
+        <p className="text-sm text-foreground/65">
+          يتم عرض أول {SEARCH_PAGE_SIZE} نتيجة فقط، حدّد البحث أكثر لرؤية الباقي.
+        </p>
+      )}
 
       {view === "cards" ? (
         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">

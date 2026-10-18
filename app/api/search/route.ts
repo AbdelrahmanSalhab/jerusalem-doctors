@@ -10,7 +10,7 @@
 // we filter explicitly so the user-scoped client doesn't have to.
 
 import { z } from "zod";
-import { directoryQuery, toSearchHits } from "@/lib/directory";
+import { directoryQuery, SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { normalizeArabic, toIlikeTerm } from "@/lib/normalize/arabic";
@@ -54,7 +54,8 @@ export const GET = withJsonErrors(async (req: Request) => {
   // duplicated here for defense-in-depth.
   let query = directoryQuery(service, Boolean(parsed.data.specialty_id))
     .order("arabic_full_name", { ascending: true })
-    .limit(50);
+    // One extra row tells us whether more matched than we return.
+    .limit(SEARCH_PAGE_SIZE + 1);
 
   // An internist is stored under their subspecialty only, so a parent
   // (الباطنية) has to match its children too, both here and in the text
@@ -79,7 +80,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     const escaped = toIlikeTerm(qRaw);
     if (!escaped) {
       // All-punctuation query → return empty results (no DB call).
-      return jsonOk({ results: [], count: 0 });
+      return jsonOk({ results: [], count: 0, truncated: false });
     }
     const pattern = `*${escaped}*`;
 
@@ -145,9 +146,14 @@ export const GET = withJsonErrors(async (req: Request) => {
     // Don't 500 on bad input — log it and return empty results so the UI
     // shows "no matches" instead of "something went wrong".
     console.error("[search] query failed", error);
-    return jsonOk({ results: [], count: 0 });
+    return jsonOk({ results: [], count: 0, truncated: false });
   }
 
-  const results = toSearchHits(data);
-  return jsonOk({ results, count: results.length });
+  const hits = toSearchHits(data);
+  const results = hits.slice(0, SEARCH_PAGE_SIZE);
+  return jsonOk({
+    results,
+    count: results.length,
+    truncated: hits.length > SEARCH_PAGE_SIZE,
+  });
 });
