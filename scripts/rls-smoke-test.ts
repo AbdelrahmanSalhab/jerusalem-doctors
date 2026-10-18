@@ -6,10 +6,18 @@
 //   1. Anonymous (publishable key) cannot read any doctor row.
 //   2. Anonymous cannot read pending_signups, audit_logs, moh_practitioners.
 //   3. Anonymous cannot read specialties (we only allow authenticated reads).
+//   4. Neither anon nor a signed-in doctor holds UPDATE on doctors,
+//      doctor_specialties or doctor_workplaces (0011). Every write goes
+//      through the service role; a grant here would let a doctor PATCH their
+//      own is_admin straight through PostgREST.
 //
 // Run with:
 //   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
 //     npm run test:rls
+//
+// Set RLS_TEST_DOCTOR_JWT to a signed-in doctor's access token to also run
+// the authenticated check. The update targets a row id that cannot exist, so
+// a leak is detected without changing any data.
 //
 // Exits 1 on any leak; 0 if everything is locked down.
 
@@ -29,6 +37,15 @@ const anon = createClient(url, anonKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+const NO_SUCH_ROW = "00000000-0000-0000-0000-000000000000";
+
+/** One harmless UPDATE per table, filtered on a key no row can have. */
+const WRITE_PROBES = [
+  { table: "doctors", patch: { is_admin: false }, key: "id" },
+  { table: "doctor_specialties", patch: { specialty_id: NO_SUCH_ROW }, key: "doctor_id" },
+  { table: "doctor_workplaces", patch: { name: "rls-probe" }, key: "id" },
+] as const;
+
 interface Check {
   name: string;
   run: () => Promise<{ leaked: boolean; detail: string }>;
@@ -42,9 +59,7 @@ const checks: Check[] = [
         .from("doctors")
         .select("id")
         .limit(1);
-      if (error) {
-        return { leaked: false, detail: `denied (${error.code ?? error.message})` };
-      }
+      if (error) return deniedOrUnreachable(error);
       const count = data?.length ?? 0;
       return {
         leaked: count > 0,
@@ -76,16 +91,58 @@ const checks: Check[] = [
     name: "anon cannot read doctor_workplaces",
     run: async () => testEmpty("doctor_workplaces"),
   },
+  ...writeChecks("anon", anon),
 ];
+
+const doctorJwt = process.env.RLS_TEST_DOCTOR_JWT;
+if (doctorJwt) {
+  const asDoctor = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${doctorJwt}` } },
+  });
+  checks.push(...writeChecks("doctor", asDoctor));
+}
+
+function writeChecks(role: string, client: typeof anon): Check[] {
+  return WRITE_PROBES.map((p) => ({
+    name: `${role} cannot update ${p.table}`,
+    run: async () => testNoUpdate(client, p),
+  }));
+}
+
+/** Postgres checks the table privilege before matching rows, so without the
+ *  grant this fails with 42501 even though no row matches. Success (with
+ *  zero rows touched) means the role still holds UPDATE. */
+async function testNoUpdate(
+  client: typeof anon,
+  probe: (typeof WRITE_PROBES)[number],
+): Promise<{ leaked: boolean; detail: string }> {
+  const { error } = await client
+    .from(probe.table)
+    .update(probe.patch)
+    .eq(probe.key, NO_SUCH_ROW);
+  if (error) return deniedOrUnreachable(error);
+  return { leaked: true, detail: "LEAK: UPDATE privilege granted" };
+}
+
+/** Postgres/PostgREST denials carry a code; a transport failure (bad URL,
+ *  network down) does not, and must fail the run rather than read as a
+ *  denial. */
+function deniedOrUnreachable(error: { code?: string; message: string }): {
+  leaked: boolean;
+  detail: string;
+} {
+  return error.code
+    ? { leaked: false, detail: `denied (${error.code})` }
+    : { leaked: true, detail: `UNREACHABLE: ${error.message}` };
+}
 
 async function testEmpty(table: string): Promise<{
   leaked: boolean;
   detail: string;
 }> {
   const { data, error } = await anon.from(table).select("*").limit(1);
-  if (error) {
-    return { leaked: false, detail: `denied (${error.code ?? error.message})` };
-  }
+  if (error) return deniedOrUnreachable(error);
   const count = data?.length ?? 0;
   return {
     leaked: count > 0,
