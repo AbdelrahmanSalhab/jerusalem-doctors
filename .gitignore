@@ -45,3 +45,4 @@ next-env.d.ts
 
 # trycycle worktrees (do not commit)
 .worktrees
+.claude/worktrees
