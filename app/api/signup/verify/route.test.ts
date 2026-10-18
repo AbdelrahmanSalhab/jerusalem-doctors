@@ -228,12 +228,14 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
     const res = await call(BODY);
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ code: "account_inactive" });
+    expect(auth.signOut).toHaveBeenCalled();
   });
 
   it("treats a doctor deleted since signup/start as an expired session", async () => {
     db.queue("pending_signups", EXISTING);
     const res = await call(BODY);
     expect(res.status).toBe(410);
+    expect(auth.signOut).toHaveBeenCalled();
   });
 
   it("reports a failed link", async () => {

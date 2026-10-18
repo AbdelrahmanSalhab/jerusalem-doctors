@@ -92,7 +92,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   // they cost one Redis round trip instead of two.
   const [rl, rlIp] = await Promise.all([
     rateLimit("signupVerify", `session:${parsed.signup_session_id}`),
-    rateLimit("signupVerify", `ip:${ip}`),
+    rateLimit("signupVerifyIp", `ip:${ip}`),
   ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
@@ -142,12 +142,16 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   const userId = verify.data.user.id;
   if ("existing_doctor_id" in pending.data.payload) {
-    return signInExisting(
+    const res = await signInExisting(
       service,
       pending.data.id,
       pending.data.payload as ExistingAccountPayload,
       userId,
     );
+    // verifyOtp already set the session cookies. A refused sign-in (inactive
+    // or vanished account) must not leave that session behind.
+    if (!res.ok) await ssr.auth.signOut();
+    return res;
   }
   const payload = pending.data.payload as PendingPayload;
 

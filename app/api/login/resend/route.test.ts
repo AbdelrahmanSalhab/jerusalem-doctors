@@ -4,9 +4,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
-const rateLimit = vi.hoisted(() => vi.fn());
+const { rateLimit, verifyTurnstile } = vi.hoisted(() => ({
+  rateLimit: vi.fn(),
+  verifyTurnstile: vi.fn(),
+}));
 
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
+vi.mock("@/lib/turnstile", () => ({ verifyTurnstile }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -26,6 +30,7 @@ describe("POST /api/login/resend", () => {
     db.reset();
     vi.clearAllMocks();
     rateLimit.mockResolvedValue({ success: true });
+    verifyTurnstile.mockResolvedValue({ ok: true });
     auth.signInWithOtp.mockResolvedValue({ error: null });
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -49,6 +54,14 @@ describe("POST /api/login/resend", () => {
     const res = await call({ phone: "0501234567" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("refuses without a passing browser check, before any send", async () => {
+    verifyTurnstile.mockResolvedValue({ ok: false });
+    const res = await call({ phone: "050-123-4567" });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "turnstile_failed" });
     expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 

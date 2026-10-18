@@ -59,7 +59,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   // they cost one Redis round trip instead of two.
   const [rl, rlIp] = await Promise.all([
     rateLimit("loginStart", `phone:${phoneE164}`),
-    rateLimit("loginStart", `ip:${ip}`),
+    rateLimit("loginStartIp", `ip:${ip}`),
   ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });

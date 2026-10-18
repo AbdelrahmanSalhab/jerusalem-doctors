@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   // they cost one Redis round trip instead of two.
   const [rl, rlIp] = await Promise.all([
     rateLimit("signupResend", `session:${parsed.signup_session_id}`),
-    rateLimit("signupResend", `ip:${ip}`),
+    rateLimit("signupResendIp", `ip:${ip}`),
   ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });

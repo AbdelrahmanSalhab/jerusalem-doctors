@@ -132,10 +132,16 @@ describe("lib/auth/session", () => {
       await expect((await session()).requireAdmin()).rejects.toThrow("NOT_FOUND");
     });
 
+    it("404s a deactivated admin", async () => {
+      signedIn();
+      db.queue("doctors", { data: { id: "d1", is_admin: true, is_active: false } });
+      await expect((await session()).requireAdmin()).rejects.toThrow("NOT_FOUND");
+    });
+
     it("returns an admin", async () => {
       signedIn();
-      db.queue("doctors", { data: { id: "d1", is_admin: true } });
-      expect(await (await session()).requireAdmin()).toEqual({ id: "d1", is_admin: true });
+      db.queue("doctors", { data: { id: "d1", is_admin: true, is_active: true } });
+      expect(await (await session()).requireAdmin()).toEqual({ id: "d1", is_admin: true, is_active: true });
     });
   });
 

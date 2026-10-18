@@ -74,7 +74,7 @@ describe("POST /api/login/start", () => {
     rateLimit.mockResolvedValueOnce({ success: true }).mockResolvedValueOnce({ success: false });
     const res = await call({ phone: "0501234567" });
     expect(res.status).toBe(429);
-    expect(rateLimit).toHaveBeenCalledWith("loginStart", "ip:1.2.3.4");
+    expect(rateLimit).toHaveBeenCalledWith("loginStartIp", "ip:1.2.3.4");
   });
 
   // Enumeration: every number gets the response a registered one gets.
