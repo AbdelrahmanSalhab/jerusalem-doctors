@@ -6,7 +6,7 @@
 import { isValidResidencyYear, STAGE_BY_KEY, type Stage } from "@/lib/careerStage";
 import {
   CLINIC_FIELD_LABEL,
-  missingClinicFields,
+  hasInvalidClinicPhone,
   type WorkplaceType,
 } from "@/lib/workplace";
 
@@ -86,16 +86,16 @@ export function getMissingFields(f: SignupFields): MissingField[] {
       "workplace_0_name",
       "مكان العمل",
     );
-    if (opt.showsClinicFields) {
-      f.workplaces.forEach((w, i) => {
-        for (const field of missingClinicFields(w)) {
-          missing.push({
-            key: `workplace_${i}_${field}`,
-            label: `${CLINIC_FIELD_LABEL[field]} (${w.name.trim()})`,
-          });
-        }
-      });
-    }
+    // Clinic address and phone are optional so a doctor can sign up on the
+    // spot; only a phone typed wrong is flagged, as the server rejects it.
+    f.workplaces.forEach((w, i) => {
+      if (hasInvalidClinicPhone(w)) {
+        missing.push({
+          key: `workplace_${i}_phone`,
+          label: `${CLINIC_FIELD_LABEL.phone} (${w.name.trim()})`,
+        });
+      }
+    });
   }
 
   need(!f.consent, "consent", "الموافقة على استخدام المعلومات");

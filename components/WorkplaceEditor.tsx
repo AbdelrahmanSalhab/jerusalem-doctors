@@ -2,7 +2,8 @@
 
 // Workplace rows for /signup and /profile. What a row offers follows the
 // doctor's stage (lib/careerStage.ts): which types, whether a specialist's
-// عيادة asks for address/hours/phone, and whether any workplace is required.
+// عيادة asks for address/hours/phone (all optional), and whether any
+// workplace is required.
 // Input ids (`workplace_<i>_<field>`) are what the missing-fields list
 // focuses.
 
@@ -31,7 +32,6 @@ export function WorkplaceEditor({
 }) {
   const opt = stage ? STAGE_BY_KEY[stage] : null;
   const types = opt?.workplaceTypes ?? WORKPLACE_TYPES;
-  const clinicRequired = opt?.showsClinicFields ?? false;
   const showsClinic = opt ? opt.showsClinicFields : true;
 
   const patch = (i: number, p: Partial<WorkplaceEntry>) =>
@@ -63,8 +63,14 @@ export function WorkplaceEditor({
     );
   };
 
-  const add = () =>
-    onChange([...workplaces, emptyWorkplace(false, opt?.defaultWorkplaceType)]);
+  /** One button per type, so a clinic opens with its fields ready. A blank
+   *  last row (the one every form starts with) takes the type instead of
+   *  leaving an empty row above the new one. */
+  const add = (type: WorkplaceType) => {
+    const last = workplaces.length - 1;
+    if (last >= 0 && !workplaces[last].name.trim()) return setType(last, type);
+    onChange([...workplaces, emptyWorkplace(workplaces.length === 0, type)]);
+  };
 
   return (
     <div className="space-y-4">
@@ -124,15 +130,10 @@ export function WorkplaceEditor({
             {clinicOpen && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <Field
-                    label={CLINIC_FIELD_LABEL.address}
-                    htmlFor={id("address")}
-                    required={clinicRequired}
-                  >
+                  <Field label={`${CLINIC_FIELD_LABEL.address} (اختياري)`} htmlFor={id("address")}>
                     <input
                       id={id("address")}
                       className="input"
-                      required={clinicRequired && wp.name.trim() !== ""}
                       maxLength={CLINIC_FIELD_MAX.address}
                       value={wp.address}
                       onChange={(e) => patch(i, { address: e.target.value })}
@@ -140,18 +141,13 @@ export function WorkplaceEditor({
                     />
                   </Field>
                 </div>
-                <Field
-                  label={CLINIC_FIELD_LABEL.phone}
-                  htmlFor={id("phone")}
-                  required={clinicRequired}
-                >
+                <Field label={`${CLINIC_FIELD_LABEL.phone} (اختياري)`} htmlFor={id("phone")}>
                   <input
                     id={id("phone")}
                     type="tel"
                     dir="ltr"
                     inputMode="tel"
                     className="input"
-                    required={clinicRequired && wp.name.trim() !== ""}
                     maxLength={CLINIC_FIELD_MAX.phone}
                     value={wp.phone}
                     onChange={(e) => patch(i, { phone: toAsciiDigits(e.target.value) })}
@@ -187,13 +183,18 @@ export function WorkplaceEditor({
         );
       })}
 
-      <button
-        type="button"
-        onClick={add}
-        className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
-      >
-        + إضافة مكان عمل آخر
-      </button>
+      <div className="flex flex-wrap gap-2">
+        {types.map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => add(t)}
+            className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
+          >
+            + إضافة {WORKPLACE_TYPE_LABEL[t]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

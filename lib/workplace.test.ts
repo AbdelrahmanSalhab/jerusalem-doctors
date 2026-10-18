@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  hasInvalidClinicPhone,
+  clinicTelHref,
+  mapLinks,
   cleanWorkplaces,
   emptyWorkplace,
   isValidClinicPhone,
@@ -113,5 +116,43 @@ describe("cleanWorkplaces", () => {
         is_primary: true,
       },
     ]);
+  });
+});
+
+describe("clinicTelHref", () => {
+  it("keeps digits and a leading plus", () => {
+    expect(clinicTelHref("02-627 1234")).toBe("tel:026271234");
+    expect(clinicTelHref("+972 2-627-1234")).toBe("tel:+97226271234");
+  });
+
+  it("returns null when there is nothing to dial", () => {
+    expect(clinicTelHref(null)).toBeNull();
+    expect(clinicTelHref("  ")).toBeNull();
+  });
+});
+
+describe("mapLinks", () => {
+  it("builds Google Maps and Waze search links for the address", () => {
+    expect(mapLinks("شارع صلاح الدين 12، القدس")).toEqual({
+      google: "https://www.google.com/maps/search/?api=1&query=%D8%B4%D8%A7%D8%B1%D8%B9%20%D8%B5%D9%84%D8%A7%D8%AD%20%D8%A7%D9%84%D8%AF%D9%8A%D9%86%2012%D8%8C%20%D8%A7%D9%84%D9%82%D8%AF%D8%B3",
+      waze: "https://waze.com/ul?q=%D8%B4%D8%A7%D8%B1%D8%B9%20%D8%B5%D9%84%D8%A7%D8%AD%20%D8%A7%D9%84%D8%AF%D9%8A%D9%86%2012%D8%8C%20%D8%A7%D9%84%D9%82%D8%AF%D8%B3&navigate=yes",
+    });
+  });
+
+  it("returns null without an address", () => {
+    expect(mapLinks(null)).toBeNull();
+    expect(mapLinks(" ")).toBeNull();
+  });
+});
+
+describe("hasInvalidClinicPhone", () => {
+  const w = (phone: string) => ({ name: "عيادة", workplace_type: "clinic" as const, phone });
+  it("accepts an empty or valid phone", () => {
+    expect(hasInvalidClinicPhone(w(""))).toBe(false);
+    expect(hasInvalidClinicPhone(w("02-6271234"))).toBe(false);
+  });
+  it("flags a typed but invalid phone on a named row", () => {
+    expect(hasInvalidClinicPhone(w("12"))).toBe(true);
+    expect(hasInvalidClinicPhone({ ...w("12"), name: " " })).toBe(false);
   });
 });

@@ -98,11 +98,16 @@ describe("getMissingFields", () => {
     expect(keys(f)).toEqual(["specialty_ids", "workplace_0_name"]);
   });
 
-  it("asks a specialist for each named clinic's address and phone", () => {
+  it("lets a specialist sign up before filling a clinic's address and phone", () => {
     const clinic = { name: "عيادة النور", workplace_type: "clinic" as const, address: "", phone: "" };
     const f = { ...COMPLETE, workplaces: [{ ...WP, name: "المقاصد" }, clinic] };
-    const missing = getMissingFields(f);
-    expect(missing.map((m) => m.key)).toEqual(["workplace_1_address", "workplace_1_phone"]);
+    expect(keys(f)).toEqual([]);
+  });
+
+  it("still flags a clinic phone that was typed but is invalid", () => {
+    const clinic = { name: "عيادة النور", workplace_type: "clinic" as const, address: "", phone: "12" };
+    const missing = getMissingFields({ ...COMPLETE, workplaces: [{ ...WP, name: "المقاصد" }, clinic] });
+    expect(missing.map((m) => m.key)).toEqual(["workplace_1_phone"]);
     expect(missing[0]!.label).toContain("عيادة النور");
   });
 

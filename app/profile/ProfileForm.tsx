@@ -27,7 +27,7 @@ import {
   workplaceForStage,
 } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
-import { profileFormError } from "@/lib/profile/validate";
+import { clinicsMissingDetails, profileFormError } from "@/lib/profile/validate";
 import type { SpecialtyNode } from "@/lib/specialtyTree";
 import {
   cleanWorkplaces,
@@ -363,6 +363,12 @@ export function ProfileForm({
           <ReadOnlyView>
             <WorkplacesSummary workplaces={workplaces} />
           </ReadOnlyView>
+        )}
+        {clinicsMissingDetails(stageOpt, workplaces).length > 0 && (
+          <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            أضف عنوان وهاتف {clinicsMissingDetails(stageOpt, workplaces).join("، ")} ليتمكّن
+            الزملاء من الوصول إلى عيادتك والاتصال بها مباشرة.
+          </p>
         )}
       </Section>
 
