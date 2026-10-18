@@ -22,6 +22,11 @@ describe("normalizePhone (Israeli default)", () => {
     expect(normalizePhone("972501234567")).toBe("+972501234567");
   });
 
+  it("accepts Arabic-Indic digits", () => {
+    expect(normalizePhone("٠٥٠١٢٣٤٥٦٧")).toBe("+972501234567");
+    expect(normalizePhone("۰۵۰-۱۲۳۴۵۶۷")).toBe("+972501234567");
+  });
+
   it("strips internal hyphens", () => {
     expect(normalizePhone("050-123-4567")).toBe("+972501234567");
     expect(normalizePhone("+972-50-123-4567")).toBe("+972501234567");

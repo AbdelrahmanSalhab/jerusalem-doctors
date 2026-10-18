@@ -62,6 +62,8 @@ export interface Specialty {
   name_ar: string;
   /** Stable handle for rows the app has to single out — see 0009. */
   code: string | null;
+  /** One level of nesting (0012): a subspecialty points at its parent. */
+  parent_id: string | null;
   name_ar_normalized: string;
   name_he: string | null;
   name_en: string | null;
@@ -98,7 +100,11 @@ export interface DoctorWorkplace {
   name: string;
   name_normalized: string;
   workplace_type: WorkplaceType;
+  /** Legacy free text, superseded by address/hours/phone (0012). */
   details: string | null;
+  address: string | null;
+  hours: string | null;
+  phone: string | null;
   is_primary: boolean;
   sort_order: number;
   created_at: string;

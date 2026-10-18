@@ -1,6 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import type { SearchHit } from "@/app/api/search/route";
 import { careerStageBadge } from "@/lib/careerStage";
+import { workplaceInfoLine } from "@/lib/workplace";
 
 const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
@@ -62,8 +63,8 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
           <div className="flex flex-wrap items-baseline gap-x-2 text-sm text-foreground/75">
             <span aria-hidden="true">📍</span>
             <span className="font-medium text-foreground">{primaryWp.name}</span>
-            {primaryWp.details && (
-              <span className="text-foreground/60">({primaryWp.details})</span>
+            {workplaceInfoLine(primaryWp) && (
+              <span className="text-foreground/60">({workplaceInfoLine(primaryWp)})</span>
             )}
             {otherWps.length > 0 && (
               <span className="text-foreground/65">

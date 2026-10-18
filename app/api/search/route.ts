@@ -15,6 +15,7 @@ import { getCurrentDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { withSubspecialties } from "@/lib/specialtyTree";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import type { WorkplaceType } from "@/lib/workplace";
 
@@ -22,6 +23,17 @@ const Query = z.object({
   q: z.string().trim().max(100).default(""),
   specialty_id: z.uuid().optional(),
 });
+
+export interface SearchWorkplace {
+  name: string;
+  workplace_type: WorkplaceType;
+  /** Legacy free text; cards show it only when the clinic fields are empty. */
+  details: string | null;
+  address: string | null;
+  hours: string | null;
+  phone: string | null;
+  is_primary: boolean;
+}
 
 export interface SearchHit {
   id: string;
@@ -42,12 +54,7 @@ export interface SearchHit {
   residency_start_year: number | null;
   specialties: string[];
   /** Empty only for a doctor with no workplace rows. */
-  workplaces: {
-    name: string;
-    workplace_type: WorkplaceType;
-    details: string | null;
-    is_primary: boolean;
-  }[];
+  workplaces: SearchWorkplace[];
   profile_picture_url: string | null;
 }
 
@@ -99,7 +106,7 @@ export const GET = withJsonErrors(async (req: Request) => {
       doctor_specialties${parsed.data.specialty_id ? "!inner" : ""}(
         specialty:specialties(id, name_ar)
       ),
-      doctor_workplaces(name, workplace_type, details, is_primary, sort_order)
+      doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order)
     `,
     )
     .eq("is_active", true)
@@ -110,10 +117,18 @@ export const GET = withJsonErrors(async (req: Request) => {
     .order("arabic_full_name", { ascending: true })
     .limit(50);
 
+  // An internist is stored under their subspecialty only, so a parent
+  // (الباطنية) has to match its children too, both here and in the text
+  // search below. The table is ~30 rows; one read covers both.
+  const needsTree = Boolean(parsed.data.specialty_id || qNorm);
+  const specialtyTree = needsTree
+    ? ((await service.from("specialties").select("id, parent_id")).data ?? [])
+    : [];
+
   if (parsed.data.specialty_id) {
-    query = query.eq(
+    query = query.in(
       "doctor_specialties.specialty_id",
-      parsed.data.specialty_id,
+      withSubspecialties(specialtyTree, [parsed.data.specialty_id]),
     );
   }
 
@@ -153,7 +168,10 @@ export const GET = withJsonErrors(async (req: Request) => {
         ),
     ]);
 
-    const specialtyIds = (specialtyMatches.data ?? []).map((r) => r.id);
+    const specialtyIds = withSubspecialties(
+      specialtyTree,
+      (specialtyMatches.data ?? []).map((r) => r.id),
+    );
     const doctorIdsViaSpecialty = specialtyIds.length
       ? (
           await service
@@ -203,24 +221,21 @@ export const GET = withJsonErrors(async (req: Request) => {
       .filter((n): n is string => Boolean(n));
 
     const workplaces = (
-      (d.doctor_workplaces ?? []) as Array<{
-        name: string;
-        workplace_type: WorkplaceType;
-        details: string | null;
-        is_primary: boolean;
-        sort_order: number;
-      }>
+      (d.doctor_workplaces ?? []) as Array<SearchWorkplace & { sort_order: number }>
     )
       .slice()
       .sort((a, b) => {
         if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
         return a.sort_order - b.sort_order;
       })
-      .map(({ name, workplace_type, details, is_primary }) => ({
-        name,
-        workplace_type,
-        details,
-        is_primary,
+      .map((w): SearchWorkplace => ({
+        name: w.name,
+        workplace_type: w.workplace_type,
+        details: w.details,
+        address: w.address,
+        hours: w.hours,
+        phone: w.phone,
+        is_primary: w.is_primary,
       }));
 
     return {

@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { Field, RequiredMark } from "@/components/FormField";
+import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import {
   TurnstileWidget,
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
+import { WorkplaceEditor } from "@/components/WorkplaceEditor";
 import {
   findGeneralSpecialtyId,
-  isValidResidencyYear,
   RESIDENCY_YEAR_MIN,
   residencyYearMax,
   STAGE_BY_KEY,
@@ -21,16 +23,14 @@ import {
   SS_SESSION,
   setHandoff,
 } from "@/lib/client/verify_handoff";
-import { WORKPLACE_TYPE_LABEL, type WorkplaceType } from "@/lib/workplace";
+import { toAsciiDigits } from "@/lib/normalize/digits";
+import { getMissingFields, needsHebrewName } from "@/lib/signup/missingFields";
+import type { SpecialtyNode } from "@/lib/specialtyTree";
+import { cleanWorkplaces, emptyWorkplace, type WorkplaceEntry } from "@/lib/workplace";
+import { MissingFieldsNotice } from "./MissingFieldsNotice";
 
-type Specialty = { id: string; name_ar: string; code: string | null };
+type Specialty = SpecialtyNode & { code: string | null };
 type LicenseRegion = "IL" | "PS";
-type WorkplaceEntry = {
-  name: string;
-  workplace_type: WorkplaceType;
-  details: string;
-  is_primary: boolean;
-};
 
 type FormState = {
   phone: string;
@@ -55,16 +55,6 @@ type FormState = {
   consent: boolean;
 };
 
-const EMPTY_WORKPLACE = (
-  isPrimary: boolean,
-  workplace_type: WorkplaceType = "hospital",
-): WorkplaceEntry => ({
-  name: "",
-  workplace_type,
-  details: "",
-  is_primary: isPrimary,
-});
-
 const OTHER_REGION: Record<LicenseRegion, LicenseRegion> = { IL: "PS", PS: "IL" };
 
 const INITIAL: FormState = {
@@ -84,8 +74,32 @@ const INITIAL: FormState = {
   subspecialty: "",
   email: "",
   bio: "",
-  workplaces: [EMPTY_WORKPLACE(true)],
+  workplaces: [emptyWorkplace(true)],
   consent: false,
+};
+
+// Strip disallowed chars from phone + license inputs so a paste of
+// "Phone: 050-1234567" still produces a clean digit string. Arabic-Indic
+// digits are converted first: an Arabic keyboard types ٠٥٠, and stripping
+// them used to leave the field empty. Server-side normalization is the
+// actual source of truth.
+const cleanPhone = (next: string) =>
+  toAsciiDigits(next).replace(/[^0-9+\-\s()]/g, "");
+
+// An IL license may be typed the way registries.health.gov.il prints it —
+// `1-189371`, profession code + serial — so the hyphen has to survive the
+// input; the server reduces both forms to the serial. Only the first
+// hyphen is kept, since there is only ever one.
+// PS licenses have no confirmed public format, so we only strip characters
+// that would break the request.
+const cleanLicense = (region: LicenseRegion, next: string) => {
+  const ascii = toAsciiDigits(next);
+  if (region === "PS") return ascii.replace(/[,()]/g, "");
+  const cleaned = ascii.replace(/[^\d-]/g, "");
+  const cut = cleaned.indexOf("-");
+  return cut === -1
+    ? cleaned
+    : cleaned.slice(0, cut + 1) + cleaned.slice(cut + 1).replace(/-/g, "");
 };
 
 export function SignupForm({ specialties }: { specialties: Specialty[] }) {
@@ -127,6 +141,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       ? specialties.filter((s) => s.id !== generalSpecialtyId)
       : specialties;
 
+  const missing = getMissingFields(form);
+  const hebrewRequired = needsHebrewName(form);
+
   /**
    * Everything the choice implies, applied in one update so the form can
    * never render a state that contradicts it: the auto-attached specialty,
@@ -161,24 +178,13 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     }));
   };
 
-  const toggleSpecialty = (id: string) =>
-    setForm((s) => ({
-      ...s,
-      specialty_ids: s.specialty_ids.includes(id)
-        ? s.specialty_ids.filter((x) => x !== id)
-        : [...s.specialty_ids, id],
-    }));
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (missing.length > 0) return;
     setError(null);
     setFieldErrors({});
     setRegistryName(null);
     setSubmitting(true);
-
-    const cleanedWorkplaces = form.workplaces
-      .map((w) => ({ ...w, name: w.name.trim(), details: w.details.trim() }))
-      .filter((w) => w.name.length > 0);
 
     try {
       // Uniqueness is re-checked server-side in /signup/start, so we don't
@@ -244,7 +250,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           residency_start_year: form.residency_start_year
             ? Number(form.residency_start_year)
             : null,
-          workplaces: cleanedWorkplaces,
+          workplaces: cleanWorkplaces(form.workplaces),
           secondary_license_region: form.has_secondary_license
             ? form.secondary_license_region
             : null,
@@ -280,85 +286,24 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
   const fieldError = (k: string) => fieldErrors[k];
 
-  const needsHebrewName =
-    form.license_region === "IL" ||
-    (form.has_secondary_license && form.secondary_license_region === "IL");
-
-  // Strip disallowed chars from phone + license inputs so a paste of
-  // "Phone: 050-1234567" still produces a clean digit string. Server-side
-  // normalization is the actual source of truth.
-  const onPhoneChange = (next: string) => {
-    update("phone", next.replace(/[^0-9+\-\s()]/g, ""));
-  };
-  // An IL license may be typed the way registries.health.gov.il prints it —
-  // `1-189371`, profession code + serial — so the hyphen has to survive the
-  // input; the server reduces both forms to the serial. Only the first
-  // hyphen is kept, since there is only ever one.
-  // PS licenses have no confirmed public format, so we only strip characters
-  // that would break the request.
-  const sanitizeIlLicense = (next: string) => {
-    const cleaned = next.replace(/[^\d-]/g, "");
-    const cut = cleaned.indexOf("-");
-    return cut === -1
-      ? cleaned
-      : cleaned.slice(0, cut + 1) + cleaned.slice(cut + 1).replace(/-/g, "");
-  };
-  const onLicenseChange = (next: string) => {
-    update(
-      "license_number",
-      form.license_region === "IL"
-        ? sanitizeIlLicense(next)
-        : next.replace(/[,()]/g, ""),
-    );
-  };
-
-  const setWorkplacePrimary = (i: number) =>
+  const setRegion = (region: LicenseRegion) =>
     setForm((s) => ({
       ...s,
-      workplaces: s.workplaces.map((w, j) => ({ ...w, is_primary: j === i })),
+      license_region: region,
+      secondary_license_region: OTHER_REGION[region],
     }));
-  const updateWorkplace = (i: number, patch: Partial<WorkplaceEntry>) =>
-    setForm((s) => ({
-      ...s,
-      workplaces: s.workplaces.map((w, j) =>
-        j === i ? { ...w, ...patch } : w,
-      ),
-    }));
-  /** Type changes go through workplaceForStage so `details` never survives a
-   *  switch into a cell that hides it. */
-  const setWorkplaceType = (i: number, workplace_type: WorkplaceType) =>
-    setForm((s) => ({
-      ...s,
-      workplaces: s.workplaces.map((w, j) =>
-        j === i && s.stage
-          ? workplaceForStage({ ...w, workplace_type }, s.stage)
-          : w,
-      ),
-    }));
-  const addWorkplace = () =>
-    setForm((s) => ({
-      ...s,
-      workplaces: [
-        ...s.workplaces,
-        EMPTY_WORKPLACE(
-          false,
-          s.stage ? STAGE_BY_KEY[s.stage].defaultWorkplaceType : "hospital",
-        ),
-      ],
-    }));
-  const removeWorkplace = (i: number) =>
-    setForm((s) => {
-      const next = s.workplaces.filter((_, j) => j !== i);
-      if (next.length === 0) return { ...s, workplaces: [EMPTY_WORKPLACE(true)] };
-      if (!next.some((w) => w.is_primary)) next[0] = { ...next[0]!, is_primary: true };
-      return { ...s, workplaces: next };
-    });
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 sm:gap-6">
+      <p className="text-sm text-foreground/70">
+        الحقول المشار إليها بـ
+        <RequiredMark /> إلزامية.
+      </p>
+
       <Section title="معلومات الاتصال والترخيص">
-        <Field label="رقم الهاتف" error={fieldError("phone")}>
+        <Field label="رقم الهاتف" htmlFor="phone" required error={fieldError("phone")}>
           <input
+            id="phone"
             type="tel"
             required
             dir="ltr"
@@ -367,25 +312,19 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             pattern="[0-9+\-\s()]*"
             className="input"
             value={form.phone}
-            onChange={(e) => onPhoneChange(e.target.value)}
+            onChange={(e) => update("phone", cleanPhone(e.target.value))}
             placeholder="0501234567"
           />
         </Field>
 
-        <Field label="جهة الترخيص">
+        <Field label="جهة الترخيص" required>
           <div className="flex gap-4">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
                 name="license_region"
                 checked={form.license_region === "IL"}
-                onChange={() =>
-                  setForm((s) => ({
-                    ...s,
-                    license_region: "IL",
-                    secondary_license_region: "PS",
-                  }))
-                }
+                onChange={() => setRegion("IL")}
               />
               <span>ترخيص إسرائيلي (وزارة الصحة)</span>
             </label>
@@ -394,13 +333,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
                 type="radio"
                 name="license_region"
                 checked={form.license_region === "PS"}
-                onChange={() =>
-                  setForm((s) => ({
-                    ...s,
-                    license_region: "PS",
-                    secondary_license_region: "IL",
-                  }))
-                }
+                onChange={() => setRegion("PS")}
               />
               <span>ترخيص فلسطيني (نقابة الأطباء / وزارة الصحة)</span>
             </label>
@@ -414,8 +347,14 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           )}
         </Field>
 
-        <Field label="رقم الترخيص" error={fieldError("license_number")}>
+        <Field
+          label="رقم الترخيص"
+          htmlFor="license_number"
+          required
+          error={fieldError("license_number")}
+        >
           <input
+            id="license_number"
             required
             dir="ltr"
             inputMode={form.license_region === "IL" ? "numeric" : "text"}
@@ -423,11 +362,17 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             className="input"
             placeholder={form.license_region === "IL" ? "189371" : undefined}
             value={form.license_number}
-            onChange={(e) => onLicenseChange(e.target.value)}
+            onChange={(e) =>
+              update("license_number", cleanLicense(form.license_region, e.target.value))
+            }
           />
         </Field>
 
-        <Field label="ترخيص إضافي">
+        <Field
+          label="ترخيص إضافي"
+          htmlFor="secondary_license_number"
+          required={form.has_secondary_license}
+        >
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -441,6 +386,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           </label>
           {form.has_secondary_license && (
             <input
+              id="secondary_license_number"
               required
               dir="ltr"
               className="input mt-2"
@@ -451,9 +397,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
               onChange={(e) =>
                 update(
                   "secondary_license_number",
-                  form.secondary_license_region === "IL"
-                    ? sanitizeIlLicense(e.target.value)
-                    : e.target.value.replace(/[,()]/g, ""),
+                  cleanLicense(form.secondary_license_region, e.target.value),
                 )
               }
               placeholder={
@@ -470,8 +414,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           )}
         </Field>
 
-        <Field label="البريد الإلكتروني" error={fieldError("email")}>
+        <Field label="البريد الإلكتروني" htmlFor="email" required error={fieldError("email")}>
           <input
+            id="email"
             type="email"
             required
             dir="ltr"
@@ -485,57 +430,47 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
       <Section title="الاسم">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="الاسم بالعربية" error={fieldError("arabic_first_name")}>
-            <input
-              required
-              className="input"
-              value={form.arabic_first_name}
-              onChange={(e) => update("arabic_first_name", e.target.value)}
-            />
-          </Field>
-          <Field label="اسم العائلة بالعربية" error={fieldError("arabic_family_name")}>
-            <input
-              required
-              className="input"
-              value={form.arabic_family_name}
-              onChange={(e) => update("arabic_family_name", e.target.value)}
-            />
-          </Field>
+          <TextField
+            id="arabic_first_name"
+            label="الاسم بالعربية"
+            required
+            value={form.arabic_first_name}
+            onChange={(v) => update("arabic_first_name", v)}
+            error={fieldError("arabic_first_name")}
+          />
+          <TextField
+            id="arabic_family_name"
+            label="اسم العائلة بالعربية"
+            required
+            value={form.arabic_family_name}
+            onChange={(v) => update("arabic_family_name", v)}
+            error={fieldError("arabic_family_name")}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field
-            label={
-              needsHebrewName ? "الاسم بالعبرية" : "الاسم بالعبرية (اختياري)"
-            }
+          <TextField
+            id="hebrew_first_name"
+            label={hebrewRequired ? "الاسم بالعبرية" : "الاسم بالعبرية (اختياري)"}
+            required={hebrewRequired}
+            dir="auto"
+            value={form.hebrew_first_name}
+            onChange={(v) => update("hebrew_first_name", v)}
             error={fieldError("hebrew_first_name")}
-          >
-            <input
-              required={needsHebrewName}
-              dir="auto"
-              className="input"
-              value={form.hebrew_first_name}
-              onChange={(e) => update("hebrew_first_name", e.target.value)}
-            />
-          </Field>
-          <Field
+          />
+          <TextField
+            id="hebrew_family_name"
             label={
-              needsHebrewName
-                ? "اسم العائلة بالعبرية"
-                : "اسم العائلة بالعبرية (اختياري)"
+              hebrewRequired ? "اسم العائلة بالعبرية" : "اسم العائلة بالعبرية (اختياري)"
             }
+            required={hebrewRequired}
+            dir="auto"
+            value={form.hebrew_family_name}
+            onChange={(v) => update("hebrew_family_name", v)}
             error={fieldError("hebrew_family_name")}
-          >
-            <input
-              required={needsHebrewName}
-              dir="auto"
-              className="input"
-              value={form.hebrew_family_name}
-              onChange={(e) => update("hebrew_family_name", e.target.value)}
-            />
-          </Field>
+          />
         </div>
-        {needsHebrewName && (
+        {hebrewRequired && (
           <p className="text-sm text-foreground/65">
             نستخدم الاسم بالعبرية فقط لمطابقة رقم الترخيص مع سجل وزارة الصحة
             الإسرائيلية.
@@ -572,8 +507,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       </Section>
 
       <Section title="المرحلة المهنية">
-        <Field label="اختر ما ينطبق عليك" error={fieldError("career_stage")}>
-          <div className="flex flex-col gap-2">
+        <Field label="اختر ما ينطبق عليك" required error={fieldError("career_stage")}>
+          <div id="stage" tabIndex={-1} className="flex flex-col gap-2">
             {STAGE_OPTIONS.map((o) => (
               <label key={o.stage} className="flex items-start gap-2">
                 <input
@@ -597,9 +532,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         {stageOpt?.requiresResidencyStartYear && (
           <Field
             label="سنة بداية التخصص"
+            htmlFor="residency_start_year"
+            required
             error={fieldError("residency_start_year")}
           >
             <input
+              id="residency_start_year"
               className="input"
               type="number"
               inputMode="numeric"
@@ -616,42 +554,37 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       </Section>
 
       {showSpecialtyPicker && (
-      <Section title="التخصص">
-        <Field label="التخصص (اختر واحدًا أو أكثر)" error={fieldError("specialty_ids")}>
-          <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
-            {visibleSpecialties.map((s) => (
-              <label
-                key={s.id}
-                className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
-              >
-                <input
-                  type="checkbox"
-                  checked={form.specialty_ids.includes(s.id)}
-                  onChange={() => toggleSpecialty(s.id)}
-                  disabled={
-                    !form.specialty_ids.includes(s.id) &&
-                    form.specialty_ids.length >= 5
-                  }
-                />
-                <span>{s.name_ar}</span>
-              </label>
-            ))}
-          </div>
-        </Field>
+        <Section title="التخصص">
+          <Field
+            label="التخصص (اختر واحدًا أو أكثر)"
+            required
+            error={fieldError("specialty_ids")}
+          >
+            <SpecialtyPicker
+              id="specialty_ids"
+              specialties={visibleSpecialties}
+              selected={form.specialty_ids}
+              onChange={(ids) => update("specialty_ids", ids)}
+            />
+          </Field>
 
-        <Field label="التخصص الفرعي (اختياري)">
-          <input
-            className="input"
+          <TextField
+            id="subspecialty"
+            label="التخصص الدقيق أو مجال الاهتمام (اختياري)"
             value={form.subspecialty}
-            onChange={(e) => update("subspecialty", e.target.value)}
+            onChange={(v) => update("subspecialty", v)}
+            placeholder="مثلاً: جراحة اليد"
           />
-        </Field>
-      </Section>
+        </Section>
       )}
 
       <Section title="نبذة عني (اختياري)">
-        <Field label="اكتب ما تريد زملاءك أن يعرفوه عنك — خبرة، اهتمامات مهنية، أو أي شيء آخر">
+        <Field
+          label="اكتب ما تريد زملاءك أن يعرفوه عنك — خبرة، اهتمامات مهنية، أو أي شيء آخر"
+          htmlFor="bio"
+        >
           <textarea
+            id="bio"
             className="input"
             rows={3}
             maxLength={500}
@@ -663,87 +596,28 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       </Section>
 
       {stageOpt && (
-      <Section title="مكان العمل">
-        <div className="space-y-4">
-          {form.workplaces.map((wp, i) => (
-            <div
-              key={i}
-              className="space-y-2 rounded border border-foreground/15 p-3"
-            >
-              <div className="flex gap-2">
-                <input
-                  required={i === 0}
-                  className="input flex-1"
-                  value={wp.name}
-                  onChange={(e) => updateWorkplace(i, { name: e.target.value })}
-                  placeholder="مثلاً: مستشفى هداسا عين كارم"
-                />
-                {form.workplaces.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeWorkplace(i)}
-                    className="shrink-0 rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
-                    aria-label="حذف مكان العمل"
-                  >
-                    حذف
-                  </button>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                {stageOpt.workplaceTypes.map((t) => (
-                  <label key={t} className="flex items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name={`workplace_type_${i}`}
-                      checked={wp.workplace_type === t}
-                      onChange={() => setWorkplaceType(i, t)}
-                    />
-                    {WORKPLACE_TYPE_LABEL[t]}
-                  </label>
-                ))}
-                {form.workplaces.length > 1 && (
-                  <label className="flex items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name="workplace_primary"
-                      checked={wp.is_primary}
-                      onChange={() => setWorkplacePrimary(i)}
-                    />
-                    مكان العمل الرئيسي
-                  </label>
-                )}
-              </div>
-
-              {stageOpt.showsWorkplaceDetails &&
-                wp.workplace_type === "clinic" && (
-                <input
-                  className="input"
-                  value={wp.details}
-                  onChange={(e) =>
-                    updateWorkplace(i, { details: e.target.value })
-                  }
-                  placeholder="عنوان العيادة / أوقات الدوام / رقم الهاتف (اختياري)"
-                />
-              )}
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={addWorkplace}
-            className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
-          >
-            + إضافة مكان عمل آخر
-          </button>
-        </div>
-        {fieldError("workplaces") && (
-          <p className="mt-1 text-sm text-red-600">{fieldError("workplaces")}</p>
-        )}
-      </Section>
+        <Section
+          title={stageOpt.workplaceOptional ? "مكان التدريب الحالي (اختياري)" : "مكان العمل"}
+          required={!stageOpt.workplaceOptional}
+        >
+          {stageOpt.workplaceOptional && (
+            <p className="text-sm text-foreground/65">
+              يمكنك تركه فارغًا إذا كنت تتنقل بين الأقسام أو المستشفيات خلال
+              التخصص، وتعديله لاحقًا من ملفك.
+            </p>
+          )}
+          <WorkplaceEditor
+            workplaces={form.workplaces}
+            onChange={(next) => update("workplaces", next)}
+            stage={form.stage}
+          />
+          {fieldError("workplaces") && (
+            <p className="mt-1 text-sm text-red-600">{fieldError("workplaces")}</p>
+          )}
+        </Section>
       )}
 
-      <Section title="الموافقة">
+      <Section title="الموافقة" required>
         <div className="rounded border border-foreground/15 bg-foreground/5 p-4 text-base leading-relaxed">
           <p>
             المعلومات التي أدخلتها — الاسم، رقم الهاتف، رقم الترخيص،
@@ -755,6 +629,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
         <label className="flex items-start gap-3 rounded border border-foreground/15 p-3 text-base">
           <input
+            id="consent"
             type="checkbox"
             required
             checked={form.consent}
@@ -780,19 +655,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </p>
       )}
 
+      <MissingFieldsNotice missing={missing} />
+
       <button
         type="submit"
-        disabled={
-          submitting ||
-          form.specialty_ids.length === 0 ||
-          !form.workplaces.some((w) => w.name.trim()) ||
-          !form.email.trim() ||
-          !form.consent ||
-          stageOpt === null ||
-          (stageOpt.requiresResidencyStartYear &&
-            !isValidResidencyYear(form.residency_start_year)) ||
-          (form.has_secondary_license && !form.secondary_license_number.trim())
-        }
+        disabled={submitting || missing.length > 0}
         className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
       >
         {submitting
@@ -827,35 +694,54 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
 function Section({
   title,
+  required,
   children,
 }: {
   title: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-lg border border-foreground/15 p-5 space-y-4">
       <h2 className="border-b border-foreground/10 pb-2 text-lg font-bold">
         {title}
+        {required && <RequiredMark />}
       </h2>
       {children}
     </section>
   );
 }
 
-function Field({
+function TextField({
+  id,
   label,
+  value,
+  onChange,
+  required,
   error,
-  children,
+  dir,
+  placeholder,
 }: {
+  id: string;
   label: string;
+  value: string;
+  onChange: (v: string) => void;
+  required?: boolean;
   error?: string;
-  children: React.ReactNode;
+  dir?: "auto";
+  placeholder?: string;
 }) {
   return (
-    <div>
-      <label className="mb-1.5 block text-base font-medium">{label}</label>
-      {children}
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-    </div>
+    <Field label={label} htmlFor={id} required={required} error={error}>
+      <input
+        id={id}
+        required={required}
+        dir={dir}
+        className="input"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </Field>
   );
 }

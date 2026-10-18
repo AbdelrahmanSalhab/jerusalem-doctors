@@ -10,7 +10,7 @@ export default async function DashboardPage() {
   const service = createSupabaseServiceClient();
   const { data: specialties } = await service
     .from("specialties")
-    .select("id, name_ar")
+    .select("id, name_ar, parent_id")
     .eq("is_active", true)
     .order("sort_order");
 

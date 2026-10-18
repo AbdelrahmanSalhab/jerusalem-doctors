@@ -9,26 +9,28 @@
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
-import { verifyLicense } from "@/lib/moh/match";
+import {
+  type LicenseVerifyResult,
+  type ResolvedIlLicense,
+  resolveIlLicense,
+} from "@/lib/moh/match";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
-import { canonicalLicenseNumber, licenseFormatErrorMessage } from "@/lib/normalize/license";
+import {
+  canonicalLicenseNumber,
+  ilLicenseCandidates,
+  type LicenseRegion,
+  licenseFormatErrorMessage,
+} from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
-import { WORKPLACE_TYPES, type WorkplaceType } from "@/lib/workplace";
+import { type WorkplaceType, WorkplaceInputSchema } from "@/lib/workplace";
 
 const PENDING_TTL_MS = 15 * 60_000;
-
-const WorkplaceInput = z.object({
-  name: z.string().trim().min(2).max(120),
-  workplace_type: z.enum(WORKPLACE_TYPES).default("hospital"),
-  details: z.string().trim().max(300).optional().nullable(),
-  is_primary: z.boolean(),
-});
 
 const Body = z
   .object({
@@ -61,8 +63,9 @@ const Body = z
     subspecialty: z.string().trim().optional().nullable(),
     email: z.email(),
     bio: z.string().trim().max(500).optional().nullable(),
-    // Exactly one entry must be is_primary:true — validated below.
-    workplaces: z.array(WorkplaceInput).min(1).max(20),
+    // Exactly one entry must be is_primary:true when any are given —
+    // validated below. Residents may give none (they rotate).
+    workplaces: z.array(WorkplaceInputSchema).max(20),
     consent: z.literal(true),
     turnstile_token: z.string().optional(),
     // Soft-match override flow: client confirms registry name; we record it.
@@ -75,6 +78,10 @@ const Body = z
   .refine((b) => b.secondary_license_region !== b.license_region, {
     message: "الترخيص الإضافي يجب أن يكون من الجهة الأخرى",
     path: ["secondary_license_region"],
+  })
+  .refine((b) => b.career_stage === "resident" || b.workplaces.length > 0, {
+    message: "أدخل مكان عمل واحدًا على الأقل",
+    path: ["workplaces"],
   });
 
 export const POST = withJsonErrors(async (req: Request) => {
@@ -129,13 +136,14 @@ export const POST = withJsonErrors(async (req: Request) => {
   const rawSecondaryLicense = parsed.secondary_license_number?.trim() || null;
   const hasSecondary = Boolean(secondaryRegion && rawSecondaryLicense);
 
-  // Canonicalise before anything else touches the number. An IL license
+  // Read both numbers before anything else touches them. An IL license
   // reduces to the registry serial, so the profession prefix the MoH site
   // displays (`1-189371`, or `1189371` once the hyphen is dropped) can't
   // reach the uniqueness check, the registry lookup, or the stored row under
-  // three different spellings.
-  const license = canonicalLicenseNumber(region, parsed.license_number);
-  if (license === null) {
+  // three different spellings. An unseparated `123456` has a second reading
+  // (`1-23456`); which one is stored is settled by the registry below.
+  const primaryReading = readLicense(region, parsed.license_number);
+  if (primaryReading === null) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
@@ -144,10 +152,10 @@ export const POST = withJsonErrors(async (req: Request) => {
       },
     });
   }
-  const secondaryLicense = hasSecondary
-    ? canonicalLicenseNumber(secondaryRegion!, rawSecondaryLicense!)
+  const secondaryReading = hasSecondary
+    ? readLicense(secondaryRegion!, rawSecondaryLicense!)
     : null;
-  if (hasSecondary && secondaryLicense === null) {
+  if (hasSecondary && secondaryReading === null) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
@@ -182,6 +190,36 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   const service = createSupabaseServiceClient();
+  const names = {
+    hebrewFirstName: parsed.hebrew_first_name ?? "",
+    hebrewFamilyName: parsed.hebrew_family_name ?? "",
+  };
+
+  // MoH cross-check only applies to the Israeli registry. PS-track signups
+  // have nothing to check against, so they always fall through to manual
+  // admin review — same outcome as an IL license we can't find. It runs
+  // before the uniqueness check because it decides which serial is stored.
+  const primary = await resolveReading(service, primaryReading, names);
+  const verified = primary.result;
+  if (verified.status === "name_mismatch" && !parsed.override_name_mismatch) {
+    return jsonError(409, {
+      error: "license_name_mismatch",
+      code: "license_name_mismatch",
+      fields: {
+        hebrew_full_name: "الاسم العبري لا يطابق سجل وزارة الصحة",
+      },
+    });
+  }
+  const license = primary.serial;
+
+  // The secondary license is supplementary — we opportunistically cross-check
+  // it against the IL registry when applicable, but it never blocks signup
+  // or requires the override flow (only the primary license gates access).
+  const secondary = secondaryReading
+    ? await resolveReading(service, secondaryReading, names)
+    : null;
+  const secondaryLicense = secondary?.serial ?? null;
+  const secondaryVerified = secondary?.result ?? null;
 
   // Defensive uniqueness re-check against race with check-unique. License
   // numbers are only unique within their own issuing region, and a license
@@ -216,41 +254,6 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   }
 
-  // MoH cross-check only applies to the Israeli registry. PS-track signups
-  // have nothing to check against, so they always fall through to manual
-  // admin review — same outcome as an IL license we can't find.
-  const verified =
-    region === "IL"
-      ? await verifyLicense(service, {
-          licenseNumber: Number(license),
-          hebrewFirstName: parsed.hebrew_first_name!,
-          hebrewFamilyName: parsed.hebrew_family_name!,
-        })
-      : ({ status: "not_found", source: "none" } as const);
-  if (verified.status === "name_mismatch" && !parsed.override_name_mismatch) {
-    return jsonError(409, {
-      error: "license_name_mismatch",
-      code: "license_name_mismatch",
-      fields: {
-        hebrew_full_name: "الاسم العبري لا يطابق سجل وزارة الصحة",
-      },
-    });
-  }
-
-  // The secondary license is supplementary — we opportunistically cross-check
-  // it against the IL registry when applicable, but it never blocks signup
-  // or requires the override flow (only the primary license gates access).
-  const secondaryVerified =
-    hasSecondary && secondaryRegion === "IL"
-      ? await verifyLicense(service, {
-          licenseNumber: Number(secondaryLicense),
-          hebrewFirstName: parsed.hebrew_first_name!,
-          hebrewFamilyName: parsed.hebrew_family_name!,
-        })
-      : hasSecondary
-        ? ({ status: "not_found", source: "none" } as const)
-        : null;
-
   // Career stage is NOT derived from the registry. It used to be: a row
   // without `שם התמחות` was read as "resident". But a blank specialty means
   // "holds no board certificate", which is just as true of a general
@@ -276,9 +279,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     ? normalizeArabic(parsed.subspecialty)
     : null;
 
-  // Exactly one workplace must be primary.
+  // Exactly one workplace must be primary (when there are any).
   const primaryCount = parsed.workplaces.filter((w) => w.is_primary).length;
-  if (primaryCount !== 1) {
+  if (parsed.workplaces.length > 0 && primaryCount !== 1) {
     return jsonError(400, {
       error: "invalid_body",
       code: "invalid_body",
@@ -293,6 +296,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     name_normalized: string;
     workplace_type: WorkplaceType;
     details: string | null;
+    address: string | null;
+    hours: string | null;
+    phone: string | null;
     is_primary: boolean;
     sort_order: number;
   }[] = [];
@@ -307,7 +313,10 @@ export const POST = withJsonErrors(async (req: Request) => {
       name: w.name,
       name_normalized: norm,
       workplace_type: w.workplace_type,
-      details: w.details?.trim() || null,
+      details: w.details,
+      address: w.address,
+      hours: w.hours,
+      phone: w.phone,
       is_primary: w.is_primary,
       sort_order: i,
     });
@@ -385,6 +394,33 @@ export const POST = withJsonErrors(async (req: Request) => {
     license_status: verified.status,
   });
 });
+
+/** A typed license, read but not yet matched: IL may have two readings. */
+type LicenseReading =
+  | { region: "IL"; candidates: string[] }
+  | { region: "PS"; license: string };
+
+function readLicense(region: LicenseRegion, raw: string): LicenseReading | null {
+  if (region === "IL") {
+    const candidates = ilLicenseCandidates(raw);
+    return candidates && { region, candidates };
+  }
+  const license = canonicalLicenseNumber("PS", raw);
+  return license === null ? null : { region, license };
+}
+
+/** IL goes to the registry; PS has none, so it lands in admin review. */
+async function resolveReading(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  reading: LicenseReading,
+  names: { hebrewFirstName: string; hebrewFamilyName: string },
+): Promise<ResolvedIlLicense> {
+  if (reading.region === "PS") {
+    const result: LicenseVerifyResult = { status: "not_found", source: "none" };
+    return { serial: reading.license, result };
+  }
+  return resolveIlLicense(service, { candidates: reading.candidates, ...names });
+}
 
 function licenseStatusToColumn(
   status: "verified" | "soft_match" | "name_mismatch" | "not_found",

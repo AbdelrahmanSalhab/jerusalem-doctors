@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canonicalLicenseNumber,
+  ilLicenseCandidates,
   isValidLicenseFormat,
   licenseFormatErrorMessage,
   parseIlLicense,
@@ -178,5 +179,57 @@ describe("licenseFormatErrorMessage", () => {
 
   it("returns a generic invalid message for PS", () => {
     expect(licenseFormatErrorMessage("PS")).toMatch(/غير صالح/);
+  });
+});
+
+describe("Arabic-Indic digits", () => {
+  // An Arabic keyboard types ١٢٣٤٥٦; the input used to drop every one of
+  // them, leaving an empty field.
+  it("parses an IL license typed with Arabic-Indic digits", () => {
+    expect(parseIlLicense("١-١٨٩٣٧١")).toEqual({
+      ok: true,
+      serial: "189371",
+      hadProfessionPrefix: true,
+    });
+    expect(canonicalLicenseNumber("IL", "١٨٩٣٧١")).toBe("189371");
+  });
+
+  it("canonicalises a PS license to ASCII digits", () => {
+    expect(canonicalLicenseNumber("PS", "١٢٣٤")).toBe("1234");
+  });
+});
+
+describe("ilLicenseCandidates", () => {
+  // The registry holds 5-digit serials (e.g. 23456, issued 1992). Its site
+  // prints them as 1-23456, so a doctor who drops the hyphen types 123456,
+  // which parses as a different, 6-digit serial.
+  it("offers the serial without the leading 1 for an unseparated input", () => {
+    expect(ilLicenseCandidates("123456")).toEqual(["123456", "23456"]);
+  });
+
+  it("keeps the number as typed first, so a real 1xxxxx serial wins ties", () => {
+    expect(ilLicenseCandidates("189371")?.[0]).toBe("189371");
+  });
+
+  it("works for shorter serials too", () => {
+    expect(ilLicenseCandidates("12345")).toEqual(["12345", "2345"]);
+  });
+
+  it("drops leading zeros the prefix exposes", () => {
+    expect(ilLicenseCandidates("1012345")).toEqual(["12345"]);
+    expect(ilLicenseCandidates("102345")).toEqual(["102345", "2345"]);
+  });
+
+  it("offers one candidate when the input is unambiguous", () => {
+    expect(ilLicenseCandidates("1-23456")).toEqual(["23456"]);
+    expect(ilLicenseCandidates("23456")).toEqual(["23456"]);
+    expect(ilLicenseCandidates("1189371")).toEqual(["189371"]);
+    expect(ilLicenseCandidates("123")).toEqual(["123"]);
+  });
+
+  it("returns null for unreadable input", () => {
+    expect(ilLicenseCandidates("")).toBeNull();
+    expect(ilLicenseCandidates("2-45678")).toBeNull();
+    expect(ilLicenseCandidates("abc")).toBeNull();
   });
 });

@@ -12,6 +12,7 @@ import {
   clearHandoff,
   setHandoff,
 } from "@/lib/client/verify_handoff";
+import { toAsciiDigits } from "@/lib/normalize/digits";
 
 // Allow only digits, +, -, space, parens — common phone-number characters.
 // Server-side `normalizePhone` is the source of truth; this just keeps
@@ -33,7 +34,7 @@ export function LoginForm() {
   const onPhoneChange = (next: string) => {
     // Strip disallowed chars instead of rejecting the whole input — this
     // makes paste-from-WhatsApp ("Phone: 050-...") work seamlessly.
-    setPhone(next.replace(PHONE_DISALLOWED, ""));
+    setPhone(toAsciiDigits(next).replace(PHONE_DISALLOWED, ""));
     // Clear stale errors as the user edits — previous error no longer
     // applies to the new input.
     if (error) setError(null);
