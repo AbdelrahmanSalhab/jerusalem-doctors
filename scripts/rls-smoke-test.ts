@@ -6,10 +6,17 @@
 //   1. Anonymous (publishable key) cannot read any doctor row.
 //   2. Anonymous cannot read pending_signups, audit_logs, moh_practitioners.
 //   3. Anonymous cannot read specialties (we only allow authenticated reads).
+//   4. Neither anon nor a signed-in doctor holds UPDATE on `doctors` (0011).
+//      Every write goes through the service role; a grant here would let a
+//      doctor PATCH their own is_admin straight through PostgREST.
 //
 // Run with:
 //   NEXT_PUBLIC_SUPABASE_URL=... NEXT_PUBLIC_SUPABASE_ANON_KEY=... \
 //     npm run test:rls
+//
+// Set RLS_TEST_DOCTOR_JWT to a signed-in doctor's access token to also run
+// the authenticated check. The update targets a row id that cannot exist, so
+// a leak is detected without changing any data.
 //
 // Exits 1 on any leak; 0 if everything is locked down.
 
@@ -76,7 +83,42 @@ const checks: Check[] = [
     name: "anon cannot read doctor_workplaces",
     run: async () => testEmpty("doctor_workplaces"),
   },
+  {
+    name: "anon cannot update doctors",
+    run: async () => testNoDoctorUpdate(anon),
+  },
 ];
+
+const doctorJwt = process.env.RLS_TEST_DOCTOR_JWT;
+if (doctorJwt) {
+  const asDoctor = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${doctorJwt}` } },
+  });
+  checks.push({
+    name: "doctor cannot update doctors (is_admin)",
+    run: async () => testNoDoctorUpdate(asDoctor),
+  });
+}
+
+const NO_SUCH_ROW = "00000000-0000-0000-0000-000000000000";
+
+/** Postgres checks the column privilege before matching rows, so without the
+ *  grant this fails with 42501 even though no row has this id. Success (with
+ *  zero rows touched) means the role still holds UPDATE. */
+async function testNoDoctorUpdate(client: typeof anon): Promise<{
+  leaked: boolean;
+  detail: string;
+}> {
+  const { error } = await client
+    .from("doctors")
+    .update({ is_admin: false })
+    .eq("id", NO_SUCH_ROW);
+  if (error) {
+    return { leaked: false, detail: `denied (${error.code ?? error.message})` };
+  }
+  return { leaked: true, detail: "LEAK — UPDATE privilege granted" };
+}
 
 async function testEmpty(table: string): Promise<{
   leaked: boolean;
