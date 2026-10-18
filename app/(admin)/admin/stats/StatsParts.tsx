@@ -103,13 +103,15 @@ export function DailyBars({
   days: { day: string; value: number }[];
   label: string;
 }) {
-  const max = Math.max(1, ...days.map((d) => d.value));
+  const peak = Math.max(0, ...days.map((d) => d.value));
+  // Scale to at least 1 so an empty month draws flat bars, not NaN heights.
+  const max = Math.max(1, peak);
   const total = days.reduce((n, d) => n + d.value, 0);
   return (
     <figure className="flex flex-col gap-2">
       <figcaption className="text-sm text-foreground/65">
         {label}: <span className="tabular-nums font-semibold text-foreground">{total}</span> في 30 يومًا
-        (أعلى يوم {max})
+        (أعلى يوم {peak})
       </figcaption>
       <div className="flex h-28 items-end gap-0.5" dir="ltr" role="img" aria-label={`${label}، آخر 30 يومًا`}>
         {days.map((d) => (

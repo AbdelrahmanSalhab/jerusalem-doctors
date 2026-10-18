@@ -50,3 +50,13 @@ describe("/admin/stats", () => {
     expect(html).toContain("نجحت");
   });
 });
+
+describe("/admin/stats with no activity yet", () => {
+  it("labels an empty month's peak as 0, not 1", async () => {
+    const { DailyBars } = await import("./StatsParts");
+    const html = renderToStaticMarkup(
+      DailyBars({ label: "أطباء بحثوا", days: [{ day: "2026-10-18", value: 0 }, { day: "2026-10-19", value: 0 }] }),
+    );
+    expect(html).toContain("أعلى يوم 0");
+  });
+});
