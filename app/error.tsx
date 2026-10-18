@@ -3,6 +3,7 @@
 // Per-route error boundary — caught by Next when a server component or
 // route handler throws. Stays inside the site shell (header + footer).
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 export default function ErrorPage({
@@ -36,12 +37,12 @@ export default function ErrorPage({
         >
           إعادة المحاولة
         </button>
-        <a
+        <Link
           href="/"
           className="rounded-md border border-foreground/20 px-5 py-2.5 hover:bg-foreground/5"
         >
           الرئيسية
-        </a>
+        </Link>
       </div>
     </main>
   );

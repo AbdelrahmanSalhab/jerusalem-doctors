@@ -26,6 +26,9 @@ export function VerifyForm() {
   useEffect(() => {
     const p = getHandoff(SS_PHONE);
     const s = getHandoff(SS_SESSION);
+    // Browser-only storage: reading it during render would differ from the
+    // server render and break hydration, so it is read once after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhone(p);
     setSessionId(s);
 

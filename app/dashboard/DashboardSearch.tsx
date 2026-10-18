@@ -34,6 +34,8 @@ export function DashboardSearch({
   // Restore the user's preferred view on first paint.
   useEffect(() => {
     const stored = localStorage.getItem(VIEW_STORAGE_KEY);
+    // Read after mount on purpose: the server render has no localStorage.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored === "rows" || stored === "cards") setView(stored);
   }, []);
 
@@ -44,10 +46,8 @@ export function DashboardSearch({
 
   useEffect(() => {
     const trimmed = q.trim();
-    if (!trimmed && !specialtyId) {
-      setState({ status: "idle" });
-      return;
-    }
+    // An empty query renders as idle (see `shown` below), no fetch needed.
+    if (!trimmed && !specialtyId) return;
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -116,7 +116,7 @@ export function DashboardSearch({
       </div>
 
       <ResultsRegion
-        state={state}
+        state={!q.trim() && !specialtyId ? { status: "idle" } : state}
         featured={featured}
         view={view}
         setView={setViewPersisted}
