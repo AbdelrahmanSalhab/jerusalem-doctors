@@ -3,6 +3,7 @@ import {
   CAREER_STAGES,
   careerStageBadge,
   findGeneralSpecialtyId,
+  initialProfileStage,
   isValidResidencyYear,
   RESIDENCY_YEAR_MIN,
   residencyYearMax,
@@ -186,5 +187,27 @@ describe("findGeneralSpecialtyId", () => {
 
   it("finds it by code among a normal catalog", () => {
     expect(findGeneralSpecialtyId([other, general])).toBe("g");
+  });
+});
+
+describe("initialProfileStage", () => {
+  it("keeps a stored stage", () => {
+    expect(initialProfileStage("resident", [], "g")).toBe("resident");
+    expect(initialProfileStage("specialist", ["s1"], "g")).toBe("specialist");
+  });
+
+  it("reads NULL with only الطب العام as a declared طب عام", () => {
+    expect(initialProfileStage(null, ["g"], "g")).toBe("general");
+  });
+
+  it("leaves a legacy NULL row undeclared", () => {
+    expect(initialProfileStage(null, [], "g")).toBeNull();
+    expect(initialProfileStage(null, ["s1"], "g")).toBeNull();
+    // Saving as طب عام would replace their other specialties.
+    expect(initialProfileStage(null, ["g", "s1"], "g")).toBeNull();
+  });
+
+  it("stays undeclared when the catalog has no الطب العام row", () => {
+    expect(initialProfileStage(null, ["g"], null)).toBeNull();
   });
 });

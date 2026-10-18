@@ -23,7 +23,7 @@ import {
   residencyYearMax,
   STAGE_BY_KEY,
   type Stage,
-  stageFromCareerStage,
+  initialProfileStage,
   workplaceForStage,
 } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
@@ -68,14 +68,16 @@ export function ProfileForm({
     doctor.profile_picture_url,
   );
 
-  // Deliberately null — not stageFromCareerStage(null) — for a doctor who has
-  // never declared a stage. Pre-selecting طب عام would mean that saving any
-  // unrelated field silently replaces their specialties with الطب العام,
-  // because /api/profile writes specialties replace-all.
-  const [stage, setStage] = useState<Stage | null>(
-    doctor.career_stage === null
-      ? null
-      : stageFromCareerStage(doctor.career_stage),
+  // Null, not طب عام, for a doctor who has never declared a stage:
+  // pre-selecting طب عام would mean that saving any unrelated field silently
+  // replaces their specialties with الطب العام, because /api/profile writes
+  // specialties replace-all. A declared طب عام is told apart by its specialty.
+  const [stage, setStage] = useState<Stage | null>(() =>
+    initialProfileStage(
+      doctor.career_stage,
+      currentSpecialtyIds,
+      findGeneralSpecialtyId(specialties),
+    ),
   );
   const [residencyStartYear, setResidencyStartYear] = useState(
     doctor.residency_start_year ? String(doctor.residency_start_year) : "",
