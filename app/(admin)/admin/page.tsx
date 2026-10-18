@@ -1,4 +1,5 @@
 import { AdminDoctorsTable } from "./AdminDoctorsTable";
+import { toIlikeTerm } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +29,14 @@ export default async function AdminDoctorsPage({
 
   if (status === "pending") query = query.eq("is_admin_approved", false);
   if (status === "approved") query = query.eq("is_admin_approved", true);
-  if (q) {
+  // Stored names are normalized (إ/أ/آ to ا), so the typed text must be too.
+  const term = toIlikeTerm(q);
+  if (term) {
     query = query.or(
       [
-        `arabic_full_name_normalized.ilike.*${q}*`,
-        `license_number.ilike.*${q}*`,
-        `phone_e164.ilike.*${q}*`,
+        `arabic_full_name_normalized.ilike.*${term}*`,
+        `license_number.ilike.*${term}*`,
+        `phone_e164.ilike.*${term}*`,
       ].join(","),
     );
   }
