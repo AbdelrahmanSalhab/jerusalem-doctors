@@ -12,6 +12,7 @@ import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/resp
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordEvent } from "@/lib/usage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -80,6 +81,8 @@ export const POST = withJsonErrors(async (req: Request) => {
   // timing signal behind Turnstile and the per-phone/IP limits. Pad the
   // response time if those ever stop being enough.
   if (!found.data || !found.data.is_active || !found.data.is_phone_verified) {
+    // Counted (no number kept): doctors trying to log in before signing up.
+    await recordEvent(service, "login_unregistered");
     return jsonOk({ ok: true, phone_e164: phoneE164 });
   }
 
@@ -108,6 +111,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     console.error("[login/start] signInWithOtp failed", otpErr);
     Sentry.captureException(otpErr, { tags: { route: "login/start" } });
   }
+  await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
+    doctorId: found.data.id,
+  });
 
   return jsonOk({ ok: true, phone_e164: phoneE164 });
 });

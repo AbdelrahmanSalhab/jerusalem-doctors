@@ -14,6 +14,7 @@ import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordEvent } from "@/lib/usage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -96,6 +97,10 @@ export async function POST(req: Request) {
     console.error("[login/resend] signInWithOtp failed", otpErr);
     Sentry.captureException(otpErr, { tags: { route: "login/resend" } });
   }
+  await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
+    doctorId: found.data.id,
+    meta: { resend: true },
+  });
 
   return jsonOk({ ok: true });
 }

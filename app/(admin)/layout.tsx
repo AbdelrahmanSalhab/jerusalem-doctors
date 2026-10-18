@@ -22,6 +22,12 @@ export default async function AdminLayout({
           الأطباء
         </Link>
         <Link
+          href="/admin/stats"
+          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
+        >
+          الإحصائيات
+        </Link>
+        <Link
           href="/admin/specialties"
           className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
         >
