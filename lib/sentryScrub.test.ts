@@ -9,6 +9,13 @@ describe("Sentry scrubbing", () => {
     expect(scrubString("send to +972 52-869-7375 failed")).toBe("send to [phone] failed");
     expect(scrubString("local 052-869-7375")).toBe("local [phone]");
     expect(scrubString("license 1-189371, status 404")).toBe("license 1-189371, status 404");
+    expect(scrubString("Key (phone_e164)=(+970599123456) exists")).toBe("Key (phone_e164)=([phone]) exists");
+  });
+
+  it("leaves ids alone that happen to contain 972", () => {
+    const uuid = "5f3c2972-1234-4567-8901-123456789012";
+    expect(scrubString(uuid)).toBe(uuid);
+    expect(scrubString("99723456789012")).toBe("99723456789012");
   });
 
   it("replaces values under PII keys, at any depth", () => {

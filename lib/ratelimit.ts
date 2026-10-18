@@ -4,7 +4,7 @@
 // single-process in-memory limiter so signup flows still work end-to-end on
 // localhost. The fallback is per-process, fine for development, not for
 // production. Production fails loudly if the env is missing; a Redis timeout
-// fails open (see rateLimit).
+// lets the request through (see rateLimit).
 
 import * as Sentry from "@sentry/nextjs";
 import { Ratelimit } from "@upstash/ratelimit";
@@ -54,6 +54,7 @@ const redisFromEnv = (): Redis | null => {
 };
 
 const upstashLimiters = new Map<RateLimitKey, Ratelimit>();
+let lastTimeoutReport = 0;
 const localCounters = new Map<string, { count: number; resetAt: number }>();
 
 function getUpstashLimiter(key: RateLimitKey, redis: Redis): Ratelimit {
@@ -128,13 +129,17 @@ export async function rateLimit(
 
   const limiter = getUpstashLimiter(key, redis);
   const r = await limiter.limit(identifier);
-  // ponytail: @upstash/ratelimit lets the request through when Redis doesn't
-  // answer within its 5 s timeout (fail-open). Kept on purpose: an Upstash
-  // outage shouldn't lock every doctor out, and Turnstile plus Supabase's own
-  // limits still stand. Reported so an outage is noticed.
+  // ponytail: a slow Redis (no answer within @upstash/ratelimit's 5 s) lets
+  // the request through, so a slowdown doesn't lock doctors out; Turnstile and
+  // Supabase's own limits still stand. A hard Upstash error (DNS, 5xx) makes
+  // limit() throw instead, and the route answers 500. Reported at most once a
+  // minute per instance so an outage doesn't flood Sentry.
   if (r.reason === "timeout") {
     console.error(`[ratelimit] ${key} timed out, request allowed`);
-    Sentry.captureMessage("Rate limiter timed out (fail-open)", { level: "warning", tags: { key } });
+    if (Date.now() - lastTimeoutReport > 60_000) {
+      lastTimeoutReport = Date.now();
+      Sentry.captureMessage("Rate limiter timed out (fail-open)", { level: "warning", tags: { key } });
+    }
   }
   return {
     success: r.success,

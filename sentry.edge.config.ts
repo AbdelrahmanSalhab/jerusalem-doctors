@@ -1,6 +1,6 @@
 // Sentry edge-runtime init (middleware/proxy.ts runs here).
 import * as Sentry from "@sentry/nextjs";
-import { scrubBreadcrumb, scrubEvent } from "@/lib/sentryScrub";
+import { scrubBreadcrumb, scrubEvent, scrubTransaction } from "@/lib/sentryScrub";
 
 const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
 
@@ -12,5 +12,6 @@ if (dsn) {
     sendDefaultPii: false,
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
+    beforeSendTransaction: scrubTransaction,
   });
 }

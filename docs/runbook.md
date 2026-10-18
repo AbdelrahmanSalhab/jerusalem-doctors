@@ -31,7 +31,7 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 | Symptom | Likely cause |
 |---|---|
 | `/api/signup/start` returns 502 `otp_send_failed` | Supabase rejected the request before the hook ran — Phone provider off, or the hook returned non-2xx |
-| Many `otp_send_failed` at once, across different numbers | Supabase's own Auth rate limit (SMS per hour, project-wide) is exhausted. Dashboard → Authentication → Rate Limits; size it for the expected signups per hour |
+| Many `otp_send_failed` at once on signup, or many Sentry `signInWithOtp failed` events tagged `route:login/start` / `route:login/resend` | Supabase's own Auth rate limit (SMS per hour, project-wide) is exhausted. Dashboard → Authentication → Rate Limits; size it for the expected signups per hour. Login never shows this error to the doctor (it would reveal the number is registered); they see the code screen and its "no code?" help, so Sentry is the only signal |
 | `/api/login/start` returns 400 `phone_unsupported` | Not an incident: the number is outside +972 or is a landline. See "Which numbers we can reach" below |
 | Vercel logs show `[send-otp] delivery failed: SMS4FREE send failed (status -N)` | The provider rejected the send — read the status table below |
 | No `[send-otp]` line in Vercel logs at all | Supabase never reached us — wrong hook URL, or the hook is disabled |
@@ -223,10 +223,23 @@ the floor (Dashboard → Authentication):
 
 - **Rate Limits:** SMS sent per hour is project-wide. Size it for the busiest
   expected hour (a launch wave plus resends); too low and every send fails
-  with `otp_send_failed`. Keep "token verifications" per IP low.
+  (signup shows `otp_send_failed`; login stays silent and only Sentry sees
+  it). Keep "token verifications" per IP low.
 - **Providers → Phone:** OTP length 6 or more, expiry 10 minutes or less.
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
+
+### Sentry alert rules worth having
+
+Sentry groups identical messages into one issue, and a default "new issue"
+alert fires only the first time. Add event-frequency rules ("number of events
+in an issue is more than 0 in 1 minute") for:
+
+- `New doctor waiting for approval`: a doctor needs approval (the admin nav
+  badge shows the count too).
+- `signInWithOtp failed` tagged `route:login/start` or `route:login/resend`:
+  login codes are not being sent.
+- `SMS4FREE balance low`: from the daily balance cron.
 
 ## Common one-liners
 

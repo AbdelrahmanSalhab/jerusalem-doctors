@@ -62,6 +62,9 @@ export async function SiteHeader() {
               )}
               <LogoutButton className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3" />
             </>
+          ) : current ? (
+            // Deactivated but still signed in: the only useful control.
+            <LogoutButton className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3" />
           ) : (
             <>
               <Link
