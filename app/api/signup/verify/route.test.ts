@@ -189,3 +189,68 @@ describe("POST /api/signup/verify", () => {
     expect(await (await call(BODY)).json()).toMatchObject({ code: "create_failed" });
   });
 });
+
+describe("POST /api/signup/verify: a phone that already has an account", () => {
+  const EXISTING = pending({
+    payload: { phone_e164: "+972501234567", existing_doctor_id: "d1" },
+  });
+
+  beforeEach(() => {
+    db.reset();
+    vi.clearAllMocks();
+    rateLimit.mockResolvedValue({ success: true });
+    auth.verifyOtp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
+  });
+
+  it("signs the owner in instead of creating a second doctor", async () => {
+    db.queue("pending_signups", EXISTING);
+    db.queue("doctors", {
+      data: { id: "d1", is_active: true, is_admin_approved: true, auth_user_id: null },
+    });
+    const res = await call(BODY);
+    expect(await res.json()).toEqual({ ok: true, auto_approved: true, existing_account: true });
+    expect(db.argsOf("doctors", "insert")).toHaveLength(0);
+    expect(db.argsOf("doctors", "update")).toEqual([[{ auth_user_id: "u1" }]]);
+    expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);
+  });
+
+  it("checks the OTP first", async () => {
+    db.queue("pending_signups", EXISTING);
+    auth.verifyOtp.mockResolvedValue({ data: { user: null }, error: { message: "bad" } });
+    const res = await call(BODY);
+    expect(await res.json()).toMatchObject({ code: "invalid_otp" });
+    expect(db.argsOf("doctors", "select")).toHaveLength(0);
+  });
+
+  it("refuses an inactive account", async () => {
+    db.queue("pending_signups", EXISTING);
+    db.queue("doctors", { data: { id: "d1", is_active: false, is_admin_approved: true, auth_user_id: "u1" } });
+    const res = await call(BODY);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "account_inactive" });
+  });
+
+  it("treats a doctor deleted since signup/start as an expired session", async () => {
+    db.queue("pending_signups", EXISTING);
+    const res = await call(BODY);
+    expect(res.status).toBe(410);
+  });
+
+  it("reports a failed link", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    db.queue("pending_signups", EXISTING);
+    db.queue(
+      "doctors",
+      { data: { id: "d1", is_active: true, is_admin_approved: false, auth_user_id: null } },
+      { error: { message: "boom" } },
+    );
+    const res = await call(BODY);
+    expect(res.status).toBe(500);
+  });
+
+  it("returns a JSON 500 when the doctor read fails", async () => {
+    db.queue("pending_signups", EXISTING);
+    db.queue("doctors", { error: { code: "XX000", message: "boom" } });
+    expect((await call(BODY)).status).toBe(500);
+  });
+});

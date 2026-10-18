@@ -3,6 +3,7 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { linkAuthUser } from "@/lib/auth/link";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -79,10 +80,8 @@ export const POST = withJsonErrors(async (req: Request) => {
   const userId = verify.data.user.id;
   const service = createSupabaseServiceClient();
 
-  // Look up the doctor by phone (not auth_user_id) — older doctor rows may
-  // exist without an auth.users link (e.g. the dev seed, or rows created
-  // before login was wired up). Stitch the link so future page renders find
-  // them via getCurrentDoctor().
+  // By phone, not auth_user_id: the row may not be linked yet (see
+  // linkAuthUser).
   const doctor = await service
     .from("doctors")
     .select("id, is_active, is_admin_approved, auth_user_id")
@@ -93,15 +92,8 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(404, { error: "not_found", code: "not_found" });
   }
 
-  if (doctor.data.auth_user_id !== userId) {
-    const link = await service
-      .from("doctors")
-      .update({ auth_user_id: userId })
-      .eq("id", doctor.data.id);
-    if (link.error) {
-      console.error("[login/verify] auth_user_id link failed", link.error);
-      return jsonError(500, { error: "link_failed", code: "link_failed" });
-    }
+  if (!(await linkAuthUser(service, doctor.data, userId))) {
+    return jsonError(500, { error: "link_failed", code: "link_failed" });
   }
 
   return jsonOk({

@@ -29,23 +29,17 @@ describe("POST /api/signup/check-unique", () => {
     verifyTurnstile.mockResolvedValue({ ok: true });
   });
 
-  it("reports a free phone and license", async () => {
-    db.queue("doctors", { count: 0 }, { count: 0 });
+  it("reports a free license, and never looks the phone up", async () => {
+    db.queue("doctors", { count: 0 });
     expect(await (await call(BODY)).json()).toEqual({ available: true });
     expect(db.argsOf("doctors", "eq")).toEqual([
-      ["phone_e164", "+972501234567"],
       ["license_region", "IL"],
       ["license_number", expect.any(String)],
     ]);
   });
 
-  it("flags a taken phone", async () => {
-    db.queue("doctors", { count: 1 });
-    expect(await (await call(BODY)).json()).toEqual({ available: false, duplicate_field: "phone" });
-  });
-
   it("flags a taken license", async () => {
-    db.queue("doctors", { count: 0 }, { count: 1 });
+    db.queue("doctors", { count: 1 });
     expect(await (await call(BODY)).json()).toEqual({ available: false, duplicate_field: "license_number" });
   });
 
@@ -75,11 +69,8 @@ describe("POST /api/signup/check-unique", () => {
     expect(await res.json()).toMatchObject({ code: "invalid_license" });
   });
 
-  it.each([[{ error: { code: "XX000" } }], [{ count: 0 }, { error: { code: "XX000" } }]])(
-    "returns a JSON 500 on a DB error",
-    async (...results) => {
-      db.queue("doctors", ...results);
-      expect((await call(BODY)).status).toBe(500);
-    },
-  );
+  it("returns a JSON 500 on a DB error", async () => {
+    db.queue("doctors", { error: { code: "XX000" } });
+    expect((await call(BODY)).status).toBe(500);
+  });
 });

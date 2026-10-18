@@ -64,9 +64,7 @@ export function LoginForm() {
         // say) answers with an HTML error page, and letting res.json() throw
         // here would report it as a connection error the request never had.
         const data = await res.json().catch(() => null);
-        if (data?.code === "not_found") {
-          setError("رقم الهاتف غير موجود في النظام. الرجاء إنشاء حساب جديد.");
-        } else if (data?.code === "invalid_phone") {
+        if (data?.code === "invalid_phone") {
           setError("صيغة رقم الهاتف غير صحيحة.");
         } else if (data?.code === "phone_unsupported") {
           // Server-side message: it distinguishes an out-of-region number
@@ -75,8 +73,6 @@ export function LoginForm() {
             data?.fields?.phone ??
               "الدخول متاح حاليًا للأرقام الإسرائيلية (+972) فقط.",
           );
-        } else if (data?.code === "account_inactive") {
-          setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "rate_limited") {
           setError("عدد كبير من المحاولات. حاول لاحقًا.");
         } else if (data?.code === "turnstile_failed") {

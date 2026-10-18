@@ -1,7 +1,7 @@
 // POST /api/signup/start stores, and checks uniqueness on, the registry
 // serial the doctor's number actually resolves to, not the literal reading.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const REGISTRY: Record<number, { first: string; family: string }> = {
   23456: { first: "דניאל", family: "דריפוס" },
@@ -9,6 +9,8 @@ const REGISTRY: Record<number, { first: string; family: string }> = {
 
 const dupeFilters: string[] = [];
 const pendingInserts: Record<string, unknown>[] = [];
+/** The doctor already holding the signup's phone, if any. */
+let phoneOwner: { id: string } | null = null;
 
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
@@ -39,6 +41,9 @@ vi.mock("@/lib/supabase/service", () => ({
       if (table === "doctors") {
         return {
           select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: phoneOwner, error: null }),
+            }),
             or: (filter: string) => {
               dupeFilters.push(filter);
               return {
@@ -123,6 +128,7 @@ describe("POST /api/signup/start: license resolution", () => {
   beforeEach(() => {
     dupeFilters.length = 0;
     pendingInserts.length = 0;
+    phoneOwner = null;
   });
 
   it("stores the serial that verified, not the literal reading", async () => {
@@ -202,5 +208,33 @@ describe("POST /api/signup/start: workplaces", () => {
       hours: null,
       phone: "02-6271234",
     });
+  });
+});
+
+describe("POST /api/signup/start: a phone that already has an account", () => {
+  beforeEach(() => {
+    dupeFilters.length = 0;
+    pendingInserts.length = 0;
+    phoneOwner = { id: "doc-1" };
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  it("answers exactly like a new signup and stores a login-only pending row", async () => {
+    vi.useFakeTimers({ now: new Date("2026-10-18T12:00:00Z"), toFake: ["Date"] });
+    const existing = await start({ license_number: "123456" });
+    phoneOwner = null;
+    const fresh = await start({ license_number: "123456" });
+
+    expect(existing).toEqual(fresh);
+    expect(pendingInserts[0].payload).toEqual({
+      phone_e164: "+972501234567",
+      existing_doctor_id: "doc-1",
+    });
+  });
+
+  it("skips the license duplicate check", async () => {
+    await start({ license_number: "123456" });
+    expect(dupeFilters).toHaveLength(0);
   });
 });

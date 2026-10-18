@@ -224,10 +224,30 @@ export const POST = withJsonErrors(async (req: Request) => {
   const secondaryLicense = secondary?.serial ?? null;
   const secondaryVerified = secondary?.result ?? null;
 
+  // A phone that already has an account goes through the same steps and gets
+  // the same response as a new signup, so this form can't be used to test
+  // whether a number is registered. Its OTP logs the owner in instead (see
+  // existing_doctor_id in signup/verify).
+  const phoneOwner = await service
+    .from("doctors")
+    .select("id")
+    .eq("phone_e164", phoneE164)
+    .maybeSingle();
+  if (phoneOwner.error && phoneOwner.error.code !== "PGRST116") throw phoneOwner.error;
+  if (phoneOwner.data) {
+    return startPendingSignup(
+      service,
+      phoneE164,
+      { phone_e164: phoneE164, existing_doctor_id: phoneOwner.data.id },
+      verified.status,
+    );
+  }
+
   // Defensive uniqueness re-check against race with check-unique. License
   // numbers are only unique within their own issuing region, and a license
   // number can't be reused across doctors regardless of which slot
-  // (primary/secondary) it's registered in.
+  // (primary/secondary) it's registered in. Licenses are public in the MoH
+  // registry, so naming this duplicate gives nothing away.
   const licensePairs = [{ region, license }];
   if (hasSecondary) licensePairs.push({ region: secondaryRegion!, license: secondaryLicense! });
   const licenseOr = licensePairs
@@ -238,22 +258,19 @@ export const POST = withJsonErrors(async (req: Request) => {
     .join(",");
   const dupe = await service
     .from("doctors")
-    .select("id, phone_e164, license_number, secondary_license_number")
-    .or(`phone_e164.eq.${phoneE164},${licenseOr}`)
+    .select("id")
+    .or(licenseOr)
     .limit(1)
     .maybeSingle();
   if (dupe.error && dupe.error.code !== "PGRST116") throw dupe.error;
   if (dupe.data) {
-    const field =
-      dupe.data.phone_e164 === phoneE164 ? "phone" : "license_number";
-    const message =
-      field === "phone"
-        ? "رقم الهاتف مُسجّل مسبقًا. الرجاء تسجيل الدخول."
-        : "رقم الترخيص مُسجّل مسبقًا. تواصل مع الإدارة إذا كنت تعتقد أن هذا خطأ.";
     return jsonError(409, {
       error: "duplicate",
       code: "duplicate",
-      fields: { [field]: message },
+      fields: {
+        license_number:
+          "رقم الترخيص مُسجّل مسبقًا. تواصل مع الإدارة إذا كنت تعتقد أن هذا خطأ.",
+      },
     });
   }
 
@@ -325,52 +342,64 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   });
 
+  return startPendingSignup(
+    service,
+    phoneE164,
+    {
+      phone_e164: phoneE164,
+      phone_display: parsed.phone.trim(),
+      license_number: license,
+      license_region: region,
+      secondary_license_region: hasSecondary ? secondaryRegion : null,
+      secondary_license_number: hasSecondary ? secondaryLicense : null,
+
+      arabic_first_name: parsed.arabic_first_name.trim(),
+      arabic_family_name: parsed.arabic_family_name.trim(),
+      arabic_first_name_normalized: arabicFirstNorm,
+      arabic_family_name_normalized: arabicFamilyNorm,
+      arabic_full_name_normalized: arabicFullNorm,
+
+      hebrew_first_name: hebrewFirstStored,
+      hebrew_family_name: hebrewFamilyStored,
+
+      subspecialty: parsed.subspecialty?.trim() || null,
+      subspecialty_normalized: subspecialtyNorm,
+      email: parsed.email?.trim() || null,
+      bio: parsed.bio?.trim() || null,
+      career_stage: parsed.career_stage ?? null,
+      residency_start_year: parsed.residency_start_year ?? null,
+      ...certificateFields(parsed.career_stage ? [] : (parsed.certificates ?? [])),
+      seeking_work: parsed.seeking_work ?? false,
+
+      specialty_ids: parsed.specialty_ids,
+      workplaces,
+
+      license_verification_status: licenseStatusToColumn(
+        verified.status,
+        parsed.override_name_mismatch,
+      ),
+      secondary_license_verification_status: secondaryVerified
+        ? licenseStatusToColumn(secondaryVerified.status, false)
+        : null,
+    },
+    verified.status,
+  );
+});
+
+/** Stores the pending row and sends the OTP: the one response every accepted
+ *  signup gets, new or already registered. */
+async function startPendingSignup(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  phoneE164: string,
+  payload: Record<string, unknown>,
+  licenseStatus: string,
+) {
   const now = Date.now();
   const expiresAt = new Date(now + PENDING_TTL_MS).toISOString();
 
   const insert = await service
     .from("pending_signups")
-    .insert({
-      phone_e164: phoneE164,
-      payload: {
-        phone_e164: phoneE164,
-        phone_display: parsed.phone.trim(),
-        license_number: license,
-        license_region: region,
-        secondary_license_region: hasSecondary ? secondaryRegion : null,
-        secondary_license_number: hasSecondary ? secondaryLicense : null,
-
-        arabic_first_name: parsed.arabic_first_name.trim(),
-        arabic_family_name: parsed.arabic_family_name.trim(),
-        arabic_first_name_normalized: arabicFirstNorm,
-        arabic_family_name_normalized: arabicFamilyNorm,
-        arabic_full_name_normalized: arabicFullNorm,
-
-        hebrew_first_name: hebrewFirstStored,
-        hebrew_family_name: hebrewFamilyStored,
-
-        subspecialty: parsed.subspecialty?.trim() || null,
-        subspecialty_normalized: subspecialtyNorm,
-        email: parsed.email?.trim() || null,
-        bio: parsed.bio?.trim() || null,
-        career_stage: parsed.career_stage ?? null,
-        residency_start_year: parsed.residency_start_year ?? null,
-        ...certificateFields(parsed.career_stage ? [] : (parsed.certificates ?? [])),
-        seeking_work: parsed.seeking_work ?? false,
-
-        specialty_ids: parsed.specialty_ids,
-        workplaces,
-
-        license_verification_status: licenseStatusToColumn(
-          verified.status,
-          parsed.override_name_mismatch,
-        ),
-        secondary_license_verification_status: secondaryVerified
-          ? licenseStatusToColumn(secondaryVerified.status, false)
-          : null,
-      },
-      expires_at: expiresAt,
-    })
+    .insert({ phone_e164: phoneE164, payload, expires_at: expiresAt })
     .select("id")
     .single();
   if (insert.error) throw insert.error;
@@ -396,9 +425,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   return jsonOk({
     signup_session_id: insert.data.id,
     expires_at: expiresAt,
-    license_status: verified.status,
+    license_status: licenseStatus,
   });
-});
+}
 
 /** A typed license, read but not yet matched: IL may have two readings. */
 type LicenseReading =

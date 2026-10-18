@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -75,6 +76,8 @@ export function VerifyForm() {
           setError("رمز التحقق غير صحيح. حاول مرة أخرى.");
         } else if (data?.code === "session_expired") {
           setError("انتهت صلاحية الجلسة. الرجاء البدء من جديد.");
+        } else if (data?.code === "account_inactive") {
+          setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "too_many_attempts") {
           setError("عدد المحاولات تجاوز الحد. الرجاء البدء من جديد.");
         } else if (data?.code === "rate_limited") {
@@ -178,6 +181,16 @@ export function VerifyForm() {
             ? `إعادة إرسال الرمز خلال ${resendIn} ثانية`
             : "إعادة إرسال الرمز"}
       </button>
+
+      {mode === "login" && (
+        <p className="text-center text-sm text-foreground/70">
+          لم يصلك الرمز؟ تأكد من رقم الهاتف، أو{" "}
+          <Link href="/signup" className="underline">
+            أنشئ حسابًا جديدًا
+          </Link>{" "}
+          إن لم تكن مسجّلًا.
+        </p>
+      )}
     </form>
   );
 }
