@@ -104,6 +104,8 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
           }
         },
         getToken: (timeoutMs = 5000) => {
+          // No site key (local dev): no widget, and the server skips the check.
+          if (!siteKey) return Promise.resolve("");
           if (stateRef.current.currentToken) {
             return Promise.resolve(stateRef.current.currentToken);
           }
@@ -122,7 +124,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
           });
         },
       }),
-      [],
+      [siteKey],
     );
 
     useEffect(() => {
