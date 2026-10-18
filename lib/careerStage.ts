@@ -109,6 +109,25 @@ export function stageFromCareerStage(cs: CareerStage | null): Stage {
   return cs === null ? "general" : cs;
 }
 
+/**
+ * The stage /profile opens with. NULL is both a declared طب عام and a legacy
+ * row that never chose; only the first carries الطب العام and nothing else
+ * (the stage attaches it), so that is what tells them apart. Anything else
+ * stays undeclared (null) for the reason given on stageFromCareerStage.
+ */
+export function initialProfileStage(
+  cs: CareerStage | null,
+  specialtyIds: readonly string[],
+  generalSpecialtyId: string | null,
+): Stage | null {
+  if (cs !== null) return cs;
+  const onlyGeneral =
+    generalSpecialtyId !== null &&
+    specialtyIds.length === 1 &&
+    specialtyIds[0] === generalSpecialtyId;
+  return onlyGeneral ? "general" : null;
+}
+
 /** Public badge label. NULL career_stage renders no badge at all. */
 export const CAREER_STAGE_LABEL: Record<CareerStage, string> = {
   resident: "طبيب مقيم",
