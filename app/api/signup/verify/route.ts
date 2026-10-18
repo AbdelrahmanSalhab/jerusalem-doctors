@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { linkAuthUser } from "@/lib/auth/link";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -28,6 +29,12 @@ interface PendingWorkplace {
   phone?: string | null;
   is_primary: boolean;
   sort_order: number;
+}
+
+/** signup/start's pending row for a phone that already has an account. */
+interface ExistingAccountPayload {
+  phone_e164: string;
+  existing_doctor_id: string;
 }
 
 interface PendingPayload {
@@ -132,6 +139,14 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   const userId = verify.data.user.id;
+  if ("existing_doctor_id" in pending.data.payload) {
+    return signInExisting(
+      service,
+      pending.data.id,
+      pending.data.payload as ExistingAccountPayload,
+      userId,
+    );
+  }
   const payload = pending.data.payload as PendingPayload;
 
   const isAutoApproved = payload.license_verification_status === "verified";
@@ -248,3 +263,35 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   return jsonOk({ ok: true, auto_approved: isAutoApproved });
 });
+
+/** The OTP proved the phone, so the owner is signed in to the account they
+ *  already have: past this point, saying it exists reveals nothing. */
+async function signInExisting(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  pendingId: string,
+  payload: ExistingAccountPayload,
+  userId: string,
+) {
+  await service.from("pending_signups").delete().eq("id", pendingId);
+
+  const doctor = await service
+    .from("doctors")
+    .select("id, is_active, is_admin_approved, auth_user_id")
+    .eq("id", payload.existing_doctor_id)
+    .maybeSingle();
+  if (doctor.error && doctor.error.code !== "PGRST116") throw doctor.error;
+  if (!doctor.data) {
+    return jsonError(410, { error: "session_expired", code: "session_expired" });
+  }
+  if (!doctor.data.is_active) {
+    return jsonError(403, { error: "account_inactive", code: "account_inactive" });
+  }
+  if (!(await linkAuthUser(service, doctor.data, userId))) {
+    return jsonError(500, { error: "link_failed", code: "link_failed" });
+  }
+  return jsonOk({
+    ok: true,
+    auto_approved: doctor.data.is_admin_approved,
+    existing_account: true,
+  });
+}

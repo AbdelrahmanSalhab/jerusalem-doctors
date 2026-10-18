@@ -77,19 +77,24 @@ describe("POST /api/login/start", () => {
     expect(rateLimit).toHaveBeenCalledWith("loginStart", "ip:1.2.3.4");
   });
 
-  it("answers 404 for an unknown phone", async () => {
+  // Enumeration: every number gets the response a registered one gets.
+  const SENT = { ok: true, phone_e164: "+972501234567" };
+
+  it("answers an unknown phone like a known one, without sending", async () => {
     const res = await call({ phone: "0501234567" });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(SENT);
     expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
   it.each([
     { is_active: false, is_phone_verified: true },
     { is_active: true, is_phone_verified: false },
-  ])("refuses an inactive or unverified account %o", async (flags) => {
+  ])("answers an inactive or unverified account the same way %o", async (flags) => {
     db.queue("doctors", { data: { id: "d1", ...flags } });
     const res = await call({ phone: "0501234567" });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(SENT);
     expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
@@ -103,7 +108,8 @@ describe("POST /api/login/start", () => {
   it("treats PGRST116 as no row", async () => {
     db.queue("doctors", { error: { code: "PGRST116" } });
     const res = await call({ phone: "0501234567" });
-    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual(SENT);
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
   it("reports a failed send as 502", async () => {

@@ -1,6 +1,8 @@
 // POST /api/login/start
-// Single-field login by phone. Verifies the doctor exists + is active, then
-// kicks off Supabase Auth's OTP flow. Delivery is handled by the Send SMS
+// Single-field login by phone. Sends the OTP only to an active, verified
+// doctor, but answers the same way for any number: an unregistered phone
+// must be indistinguishable from a registered one (OWASP authentication
+// guidance; /api/login/resend and /api/signup/start follow the same rule). Delivery is handled by the Send SMS
 // Hook at /api/auth/hooks/send-otp (SMS via the SMS4FREE API).
 // Resends go to /api/login/resend, which is not Turnstile-gated.
 
@@ -66,11 +68,11 @@ export const POST = withJsonErrors(async (req: Request) => {
     .eq("phone_e164", phoneE164)
     .maybeSingle();
   if (found.error && found.error.code !== "PGRST116") throw found.error;
-  if (!found.data) {
-    return jsonError(404, { error: "not_found", code: "not_found" });
-  }
-  if (!found.data.is_active || !found.data.is_phone_verified) {
-    return jsonError(403, { error: "account_inactive", code: "account_inactive" });
+  // ponytail: skipping the send makes this branch faster than a real one, a
+  // timing signal behind Turnstile and the per-phone/IP limits. Pad the
+  // response time if those ever stop being enough.
+  if (!found.data || !found.data.is_active || !found.data.is_phone_verified) {
+    return jsonOk({ ok: true, phone_e164: phoneE164 });
   }
 
   // Dev-only short-circuit: when USE_DEV_USER=1 we skip Supabase Auth and

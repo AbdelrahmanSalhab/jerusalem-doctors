@@ -1,11 +1,12 @@
 // POST /api/signup/check-unique
-// Pre-OTP guard: tells the form whether { phone, license_number } is free.
+// Pre-OTP guard: tells the form whether the license number is free. The phone
+// is deliberately not checked: answering "registered" for a phone would make
+// this an oracle for who is in the directory. A registered phone continues to
+// the OTP step, where signup/start turns it into a login.
 // No PII written; only counts (read).
 //
-// Gated by Turnstile. Without the gate this endpoint becomes a phone/license
-// enumeration oracle for anyone who can hit it at scale (pentest finding M1).
-// The matching duplicate_field is still returned so the UI can highlight the
-// specific input — the Turnstile gate makes that disclosure safe.
+// Gated by Turnstile (pentest finding M1). Licenses are public in the MoH
+// registry, so naming a duplicate one gives nothing away.
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
@@ -44,9 +45,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   }
 
-  let phoneE164: string;
+  // Still validated, so a typo is flagged on the form before the OTP step.
   try {
-    phoneE164 = normalizePhone(parsed.phone);
+    normalizePhone(parsed.phone);
   } catch (e) {
     if (e instanceof InvalidPhoneError) {
       return jsonError(400, {
@@ -74,15 +75,6 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   const supabase = createSupabaseServiceClient();
-
-  const phoneHit = await supabase
-    .from("doctors")
-    .select("id", { count: "exact", head: true })
-    .eq("phone_e164", phoneE164);
-  if (phoneHit.error) throw phoneHit.error;
-  if ((phoneHit.count ?? 0) > 0) {
-    return jsonOk({ available: false, duplicate_field: "phone" as const });
-  }
 
   const licHit = await supabase
     .from("doctors")
