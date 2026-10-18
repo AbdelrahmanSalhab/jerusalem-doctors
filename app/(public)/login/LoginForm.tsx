@@ -1,5 +1,6 @@
 "use client";
 
+import { apiErrorMessage } from "@/lib/client/apiError";
 import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 import {
@@ -90,6 +91,8 @@ export function LoginForm() {
           setError("عدد كبير من المحاولات. حاول لاحقًا.");
         } else if (data?.code === "turnstile_failed") {
           setError("لم يكتمل التحقق من المتصفح. الرجاء المحاولة مرة أخرى.");
+        } else if (data?.code === "phone_auth_disabled") {
+          setError(apiErrorMessage(data.code));
         } else if (res.status >= 500) {
           setError("الخادم غير متاح حاليًا. الرجاء المحاولة بعد قليل.");
         } else {

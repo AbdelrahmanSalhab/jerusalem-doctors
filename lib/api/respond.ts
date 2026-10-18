@@ -1,5 +1,8 @@
 // Tiny helper for consistent JSON responses across all route handlers.
 import { NextResponse } from "next/server";
+import type { z } from "zod";
+// Side effect: zod field errors in our responses come out in Arabic.
+import "@/lib/zodArabic";
 
 export interface ApiErrorBody {
   error: string;
@@ -16,6 +19,16 @@ export function jsonError(
   body: ApiErrorBody,
 ): NextResponse {
   return NextResponse.json(body, { status });
+}
+
+/** Zod issues as { "path.to.field": message }, for a form to show. */
+export function zodFields(e: z.ZodError): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const issue of e.issues) {
+    const key = issue.path.map(String).join(".") || "_";
+    fields[key] = issue.message;
+  }
+  return fields;
 }
 
 export function ipFromHeaders(req: Request): string {

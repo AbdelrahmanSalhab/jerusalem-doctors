@@ -1,5 +1,6 @@
 "use client";
 
+import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DeleteAccountSection, HelpSection } from "./AccountSections";
@@ -185,9 +186,9 @@ export function ProfileForm({
           workplaces: cleanWorkplaces(workplaces),
         }),
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(body?.fields?.workplaces ?? body?.error ?? "حدث خطأ.");
+        setError(body?.fields?.workplaces ?? fieldErrorMessage(body?.fields) ?? apiErrorMessage(body?.code));
         setSaving(false);
         return;
       }

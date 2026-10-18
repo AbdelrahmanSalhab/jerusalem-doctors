@@ -14,6 +14,7 @@ import {
   clearHandoff,
   getHandoff,
 } from "@/lib/client/verify_handoff";
+import { apiErrorMessage } from "@/lib/client/apiError";
 import { toAsciiDigits } from "@/lib/normalize/digits";
 import {
   TurnstileWidget,
@@ -156,10 +157,8 @@ export function VerifyForm() {
           setError("لم يكتمل التحقق من المتصفح. تأكد من الاتصال وأعد المحاولة.");
         } else if (data?.code === "session_expired") {
           setError("انتهت صلاحية الجلسة. الرجاء البدء من جديد.");
-        } else if (data?.code === "rate_limited") {
-          setError("عدد كبير من المحاولات. حاول لاحقًا.");
         } else {
-          setError("تعذّر إرسال الرمز. حاول لاحقًا.");
+          setError(apiErrorMessage(data?.code, "تعذّر إرسال الرمز. حاول لاحقًا."));
         }
         return;
       }
