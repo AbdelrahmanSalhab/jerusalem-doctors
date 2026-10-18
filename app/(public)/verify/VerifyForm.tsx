@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 
 type Mode = "signup" | "login";
 
+const NO_CODE_HINT_DELAY_MS = 30_000;
+
 import {
   SS_PHONE,
   SS_SESSION,
@@ -46,6 +48,16 @@ export function VerifyForm() {
   const [resendIn, setResendIn] = useState(60);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Login answers "code sent" even for an unregistered number (no account
+  // enumeration), so a doctor who never signed up waits for nothing. After a
+  // while, say plainly what the two likely causes are.
+  const [waitedLong, setWaitedLong] = useState(false);
+  useEffect(() => {
+    if (mode !== "login") return;
+    const t = setTimeout(() => setWaitedLong(true), NO_CODE_HINT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [mode]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -182,7 +194,7 @@ export function VerifyForm() {
             : "إعادة إرسال الرمز"}
       </button>
 
-      {mode === "login" && (
+      {mode === "login" && !waitedLong && (
         <p className="text-center text-sm text-foreground/70">
           لم يصلك الرمز؟ تأكد من رقم الهاتف، أو{" "}
           <Link href="/signup" className="underline">
@@ -190,6 +202,38 @@ export function VerifyForm() {
           </Link>{" "}
           إن لم تكن مسجّلًا.
         </p>
+      )}
+
+      {mode === "login" && waitedLong && (
+        <div
+          role="status"
+          className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+        >
+          <p className="font-medium">لم يصلك الرمز بعد؟</p>
+          <p>
+            نرسل الرمز فقط إلى رقم مسجّل لدينا. أُرسل الطلب إلى{" "}
+            <span dir="ltr" className="font-medium">
+              {phone}
+            </span>
+            .
+          </p>
+          <ul className="list-disc space-y-1 ps-5">
+            <li>
+              إن كان الرقم خاطئًا،{" "}
+              <Link href="/login" className="underline">
+                عُد وصحّحه
+              </Link>
+              .
+            </li>
+            <li>إن لم تُنشئ حسابًا بعد، سجّل أولًا ثم ادخل.</li>
+          </ul>
+          <Link
+            href="/signup"
+            className="block w-full rounded-md bg-foreground px-6 py-2 text-center text-background"
+          >
+            إنشاء حساب جديد
+          </Link>
+        </div>
       )}
     </form>
   );
