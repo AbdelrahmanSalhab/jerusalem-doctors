@@ -10,17 +10,20 @@ const { requireAdmin, from } = vi.hoisted(() => ({
   }),
   from: vi.fn(),
 }));
+const rpc = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auth/session", () => ({ requireAdmin }));
-vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({ from }) }));
+vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({ from, rpc }) }));
 
 describe("admin pages", () => {
   it.each([
     ["doctors", () => import("./page"), { searchParams: Promise.resolve({}) }],
     ["audit", () => import("./audit/page"), undefined],
     ["specialties", () => import("./specialties/page"), undefined],
+    ["stats", () => import("./stats/page"), undefined],
   ] as const)("%s refuses a non-admin before reading any data", async (_name, load, props) => {
     const Page = (await load()).default as (p: unknown) => Promise<unknown>;
     await expect(Page(props)).rejects.toThrow("NEXT_NOT_FOUND");
     expect(from).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

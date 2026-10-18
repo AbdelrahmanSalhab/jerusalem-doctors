@@ -26,6 +26,7 @@ import {
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordEvent } from "@/lib/usage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -443,6 +444,8 @@ async function startPendingSignup(
       code: "otp_send_failed",
     });
   }
+
+  await recordEvent(service, "signup_started");
 
   return jsonOk({
     signup_session_id: insert.data.id,

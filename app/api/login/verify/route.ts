@@ -6,6 +6,7 @@ import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/resp
 import { linkAuthUser } from "@/lib/auth/link";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordEvent } from "@/lib/usage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -99,6 +100,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (!(await linkAuthUser(service, doctor.data, userId))) {
     return jsonError(500, { error: "link_failed", code: "link_failed" });
   }
+  await recordEvent(service, "login_succeeded", { doctorId: doctor.data.id });
 
   return jsonOk({
     ok: true,

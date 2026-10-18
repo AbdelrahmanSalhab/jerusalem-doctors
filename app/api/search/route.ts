@@ -15,6 +15,7 @@ import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic, toIlikeTerm } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
+import { recordEvent } from "@/lib/usage";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { withSubspecialties } from "@/lib/specialtyTree";
 
@@ -169,6 +170,16 @@ export const GET = withJsonErrors(async (req: Request) => {
 
   const hits = toSearchHits(data);
   const results = hits.slice(0, SEARCH_PAGE_SIZE);
+  // No search text is kept. A specialty filter that finds nobody tells us
+  // which specialties the directory is missing.
+  await recordEvent(service, "search", {
+    doctorId: me.id,
+    meta: {
+      results: hits.length,
+      filtered: Boolean(parsed.data.specialty_id),
+      ...(parsed.data.specialty_id && { specialty_id: parsed.data.specialty_id }),
+    },
+  });
   return jsonOk({
     results,
     count: results.length,

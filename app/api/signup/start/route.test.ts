@@ -42,6 +42,7 @@ vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from(table: string) {
       if (table === "moh_practitioners") return mohMirror();
+      if (table === "usage_events") return { insert: async () => ({ error: null }) };
       if (table === "doctors") {
         return {
           select: () => ({

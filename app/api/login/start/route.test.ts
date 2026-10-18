@@ -153,3 +153,31 @@ describe("emergency switch", () => {
     expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 });
+
+describe("usage events", () => {
+  beforeEach(() => {
+    db.reset();
+    vi.clearAllMocks();
+    rateLimit.mockResolvedValue({ success: true });
+    verifyTurnstile.mockResolvedValue({ ok: true });
+    auth.signInWithOtp.mockResolvedValue({ error: null });
+  });
+
+  const kinds = () => db.argsOf("usage_events", "insert").map(([row]) => (row as { kind: string }).kind);
+
+  it("counts a login attempt from a number with no account, keeping no number", async () => {
+    await call({ phone: "0501234567", turnstile_token: "t" });
+    expect(kinds()).toEqual(["login_unregistered"]);
+    expect(JSON.stringify(db.argsOf("usage_events", "insert"))).not.toContain("501234567");
+  });
+
+  it("counts a sent code, and a failed send", async () => {
+    db.queue("doctors", { data: { id: "d1", is_active: true, is_phone_verified: true } });
+    await call({ phone: "0501234567", turnstile_token: "t" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    auth.signInWithOtp.mockResolvedValue({ error: { message: "hook failed" } });
+    db.queue("doctors", { data: { id: "d1", is_active: true, is_phone_verified: true } });
+    await call({ phone: "0501234567", turnstile_token: "t" });
+    expect(kinds()).toEqual(["login_code_sent", "login_send_failed"]);
+  });
+});
