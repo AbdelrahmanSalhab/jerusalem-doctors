@@ -90,7 +90,7 @@ describe("GET /api/search: specialty tree", () => {
   });
 
   const specialtyFilter = () =>
-    inCalls.find((c) => c.table === "doctor_specialties" && c.column === "specialty_id");
+    inCalls.find((c) => c.table === "doctors" && c.column === "specialty_filter.specialty_id");
 
   it("filtering by الباطنية includes its subspecialties", async () => {
     const res = await search({ specialty_id: INTERNAL });
@@ -104,10 +104,14 @@ describe("GET /api/search: specialty tree", () => {
     expect(specialtyFilter()?.values).toEqual([NEPHRO]);
   });
 
-  it("filters by doctor id, so a card keeps its other specialties", async () => {
+  it("filters through a separate inner embed, so a card keeps its other specialties", async () => {
     await search({ specialty_id: NEPHRO });
-    expect(inCalls.find((c) => c.table === "doctors")).toMatchObject({ column: "id", values: ["doc-1"] });
-    expect(doctorSelects.join()).not.toContain("!inner");
+    expect(inCalls.find((c) => c.table === "doctors")).toMatchObject({
+      column: "specialty_filter.specialty_id",
+      values: [NEPHRO],
+    });
+    expect(doctorSelects[0]).toContain("specialty_filter:doctor_specialties!inner(specialty_id)");
+    expect(doctorSelects[0]).toMatch(/doctor_specialties\(\s*specialty:specialties/);
   });
 
   it("a text match on الباطنية also matches doctors under its subspecialties", async () => {
@@ -179,7 +183,7 @@ describe("GET /api/search at directory scale", () => {
 
   it("splits a long id list across queries instead of one huge URL", async () => {
     specialtyLinks = Array.from({ length: 400 }, (_, i) => ({ doctor_id: `doc-${i}` }));
-    await search({ specialty_id: NEPHRO });
+    await search({ q: "باطنية" });
     const idQueries = inCalls.filter((c) => c.table === "doctors" && c.column === "id");
     expect(idQueries).toHaveLength(3);
     expect(Math.max(...idQueries.map((c) => c.values.length))).toBeLessThanOrEqual(150);
@@ -189,7 +193,7 @@ describe("GET /api/search at directory scale", () => {
   it("merges pages without duplicates", async () => {
     specialtyLinks = Array.from({ length: 200 }, (_, i) => ({ doctor_id: `doc-${i}` }));
     doctorRows = [doctorRow(1), doctorRow(2)];
-    const body = await (await search({ specialty_id: NEPHRO })).json();
+    const body = await (await search({ q: "باطنية" })).json();
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(["doc-1", "doc-2"]);
   });
 
@@ -198,6 +202,22 @@ describe("GET /api/search at directory scale", () => {
     doctorError = { message: "URI too long" };
     const res = await search({ q: "طبيب" });
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ code: "search_failed" });
+    expect(await res.json()).toMatchObject({ code: "internal_error" });
+  });
+});
+
+describe("GET /api/search merge order", () => {
+  beforeEach(() => {
+    doctorError = null;
+  });
+
+  it("sorts merged pages in code-unit order, as Postgres orders each page", async () => {
+    specialtyLinks = Array.from({ length: 200 }, (_, i) => ({ doctor_id: `doc-${i}` }));
+    doctorRows = [
+      { ...doctorRow(1), arabic_full_name: "ابراهيم" },
+      { ...doctorRow(2), arabic_full_name: "أحمد" },
+    ];
+    const body = await (await search({ q: "باطنية" })).json();
+    expect(body.results.map((r: { id: string }) => r.id)).toEqual(["doc-2", "doc-1"]);
   });
 });

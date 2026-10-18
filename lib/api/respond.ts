@@ -1,4 +1,5 @@
 // Tiny helper for consistent JSON responses across all route handlers.
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
 // Side effect: zod field errors in our responses come out in Arabic.
@@ -53,7 +54,9 @@ export function withJsonErrors<Args extends unknown[]>(
     try {
       return await handler(req, ...args);
     } catch (err) {
-      console.error(`[${new URL(req.url).pathname}] unhandled error`, err);
+      const route = new URL(req.url).pathname;
+      console.error(`[${route}] unhandled error`, err);
+      Sentry.captureException(err, { tags: { route } });
       return jsonError(500, { error: "internal_error", code: "internal_error" });
     }
   };

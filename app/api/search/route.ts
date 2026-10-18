@@ -9,7 +9,6 @@
 // doctors are returned. RLS would enforce this even if the query didn't, but
 // we filter explicitly so the user-scoped client doesn't have to.
 
-import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { directoryQuery, SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
@@ -35,17 +34,23 @@ function chunks(ids: string[]): string[][] {
   return out;
 }
 
+/** A query's rows, or a throw: a swallowed error would read as "nobody
+ *  matched" (the handler turns the throw into a reported 500). */
+async function read<T>(query: PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
 async function doctorIdsWithSpecialties(
   service: ReturnType<typeof createSupabaseServiceClient>,
   specialtyIds: string[],
 ): Promise<string[]> {
   if (specialtyIds.length === 0) return [];
-  const { data, error } = await service
-    .from("doctor_specialties")
-    .select("doctor_id")
-    .in("specialty_id", specialtyIds);
-  if (error) throw error;
-  return (data ?? []).map((r) => r.doctor_id as string);
+  const rows = await read(
+    service.from("doctor_specialties").select("doctor_id").in("specialty_id", specialtyIds),
+  );
+  return rows.map((r) => r.doctor_id as string);
 }
 
 export const GET = withJsonErrors(async (req: Request) => {
@@ -87,90 +92,80 @@ export const GET = withJsonErrors(async (req: Request) => {
   // An internist is stored under their subspecialty only, so a parent
   // (الباطنية) has to match its children too, both in the filter and in the
   // text search. The table is ~30 rows; one read covers both.
-  const tree = parsed.data.specialty_id || escaped
-    ? ((await service.from("specialties").select("id, parent_id")).data ?? [])
-    : [];
+  const tree = parsed.data.specialty_id || escaped ? await read(service.from("specialties").select("id, parent_id")) : [];
+  const filterIds = parsed.data.specialty_id
+    ? withSubspecialties(tree, [parsed.data.specialty_id])
+    : null;
 
-  // Doctors in the chosen specialty, as ids. Filtering this way rather than
-  // through an inner-joined embed keeps each card's other specialties.
-  let allowed: Set<string> | null = null;
-  if (parsed.data.specialty_id) {
-    allowed = new Set(
-      await doctorIdsWithSpecialties(service, withSubspecialties(tree, [parsed.data.specialty_id])),
-    );
-    if (allowed.size === 0) return empty();
-  }
-
-  const page = () =>
-    directoryQuery(service)
+  // The specialty filter is an inner-joined embed (no id list, no row cap);
+  // ~30 specialty ids at most, so it always fits the URL.
+  const page = () => {
+    const q = directoryQuery(service, Boolean(filterIds))
       .order("arabic_full_name", { ascending: true })
       // One extra row tells us whether more matched than we return.
       .limit(SEARCH_PAGE_SIZE + 1);
+    return filterIds ? q.in("specialty_filter.specialty_id", filterIds) : q;
+  };
 
-  // Id lists can grow with the directory, so they never go into one URL
-  // (a few hundred uuids pass the gateway's limit): each chunk is its own
-  // query, run in parallel, and the pages are merged below.
   const reads: PromiseLike<{ data: unknown; error: unknown }>[] = [];
   if (escaped) {
-    const nameFilter = [
-      `arabic_full_name_normalized.ilike.${pattern}`,
-      `arabic_first_name_normalized.ilike.${pattern}`,
-      `arabic_family_name_normalized.ilike.${pattern}`,
-      `subspecialty_normalized.ilike.${pattern}`,
-      `certificates_normalized.ilike.${pattern}`,
-    ].join(",");
-    if (allowed) {
-      for (const ids of chunks([...allowed])) reads.push(page().or(nameFilter).in("id", ids));
-    } else {
-      reads.push(page().or(nameFilter));
-    }
+    reads.push(
+      page().or(
+        [
+          `arabic_full_name_normalized.ilike.${pattern}`,
+          `arabic_first_name_normalized.ilike.${pattern}`,
+          `arabic_family_name_normalized.ilike.${pattern}`,
+          `subspecialty_normalized.ilike.${pattern}`,
+          `certificates_normalized.ilike.${pattern}`,
+        ].join(","),
+      ),
+    );
 
     // Arabic-only search (Hebrew search disabled by product decision).
     // Specialty and workplace matches live in joined tables, so they are
     // resolved to doctor ids first.
     const [specialtyMatches, workplaceMatches] = await Promise.all([
-      service
-        .from("specialties")
-        .select("id")
-        .or([`name_ar_normalized.ilike.${pattern}`, `name_ar.ilike.${pattern}`].join(",")),
-      service
-        .from("doctor_workplaces")
-        .select("doctor_id")
-        .or([`name_normalized.ilike.${pattern}`, `name.ilike.${pattern}`].join(",")),
+      read(
+        service
+          .from("specialties")
+          .select("id")
+          .or([`name_ar_normalized.ilike.${pattern}`, `name_ar.ilike.${pattern}`].join(",")),
+      ),
+      read(
+        service
+          .from("doctor_workplaces")
+          .select("doctor_id")
+          .or([`name_normalized.ilike.${pattern}`, `name.ilike.${pattern}`].join(",")),
+      ),
     ]);
-    const specialtyIds = withSubspecialties(
-      tree,
-      (specialtyMatches.data ?? []).map((r) => r.id),
-    );
     const joined = new Set([
-      ...(await doctorIdsWithSpecialties(service, specialtyIds)),
-      ...(workplaceMatches.data ?? []).map((r) => r.doctor_id as string),
+      ...(await doctorIdsWithSpecialties(service, withSubspecialties(tree, specialtyMatches.map((r) => r.id)))),
+      ...workplaceMatches.map((r) => r.doctor_id as string),
     ]);
-    const joinedIds = [...joined].filter((id) => !allowed || allowed.has(id));
-    for (const ids of chunks(joinedIds)) reads.push(page().in("id", ids));
-  } else if (allowed) {
-    for (const ids of chunks([...allowed])) reads.push(page().in("id", ids));
+    // These lists grow with the directory, so they never go into one URL (a
+    // few hundred uuids pass the gateway's limit): each chunk is its own
+    // query, run in parallel, and the pages are merged below.
+    for (const ids of chunks([...joined])) reads.push(page().in("id", ids));
   } else {
     reads.push(page());
   }
 
   const pages = await Promise.all(reads);
   const failed = pages.find((r) => r.error);
-  if (failed) {
-    // Report it: an empty list here would read as "nobody matched".
-    console.error("[search] query failed", failed.error);
-    Sentry.captureException(failed.error, { tags: { route: "search" } });
-    return jsonError(500, { error: "search_failed", code: "search_failed" });
-  }
+  if (failed) throw failed.error;
   const byId = new Map<string, { id: string; arabic_full_name?: string }>();
   for (const r of pages) {
     for (const row of (r.data ?? []) as { id: string; arabic_full_name?: string }[]) {
       byId.set(row.id, row);
     }
   }
-  const data = [...byId.values()].sort((a, b) =>
-    (a.arabic_full_name ?? "").localeCompare(b.arabic_full_name ?? "", "ar"),
-  );
+  // Code-unit order, the same order Postgres gave each page, so the merged
+  // first 50 are the first 50 overall (locale order ranks أ and ا together).
+  const data = [...byId.values()].sort((a, b) => {
+    const x = a.arabic_full_name ?? "";
+    const y = b.arabic_full_name ?? "";
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
 
   const hits = toSearchHits(data);
   const results = hits.slice(0, SEARCH_PAGE_SIZE);
