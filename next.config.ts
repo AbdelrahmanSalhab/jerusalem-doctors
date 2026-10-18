@@ -12,7 +12,20 @@ const SECURITY_HEADERS = [
     key: "Permissions-Policy",
     value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
   },
+  // The directives that need no allow-list. Scripts and styles are left to
+  // the defaults: Next's inline bootstrap, Turnstile and Sentry would each
+  // need nonces or hosts, and React already escapes everything we render.
+  {
+    key: "Content-Security-Policy",
+    value: "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'",
+  },
 ];
+
+// Photos come from our own Supabase project only; a wildcard would let the
+// image optimizer be pointed at any project's bucket on our quota.
+const SUPABASE_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
+  : "*.supabase.co";
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["10.0.96.15"],
@@ -22,7 +35,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       // Supabase Storage public URLs
-      { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/**" },
+      { protocol: "https", hostname: SUPABASE_HOST, pathname: "/storage/**" },
     ],
   },
   async headers() {

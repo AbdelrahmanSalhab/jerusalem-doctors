@@ -374,7 +374,7 @@ export function ProfileForm({
       </Section>
 
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </p>
       )}

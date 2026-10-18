@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
+const DB_TIMEOUT_MS = 15_000;
+
 /**
  * Service-role client. Bypasses RLS. Server-only — never import from a
  * Client Component or expose the key to the browser.
@@ -13,6 +15,9 @@ export function createSupabaseServiceClient() {
         persistSession: false,
         autoRefreshToken: false,
       },
+      // supabase-js sets no timeout; a stalled request would hold the
+      // function until the platform kills it. Generous enough for uploads.
+      global: { fetch: (input, init) => fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(DB_TIMEOUT_MS) }) },
     },
   );
 }
