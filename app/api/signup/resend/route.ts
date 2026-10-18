@@ -27,8 +27,12 @@ export async function POST(req: Request) {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
   }
 
-  const rl = await rateLimit("signupResend", `session:${parsed.signup_session_id}`);
-  const rlIp = await rateLimit("signupResend", `ip:${ip}`);
+  // Both windows are checked (and counted) on every request; in parallel
+  // they cost one Redis round trip instead of two.
+  const [rl, rlIp] = await Promise.all([
+    rateLimit("signupResend", `session:${parsed.signup_session_id}`),
+    rateLimit("signupResend", `ip:${ip}`),
+  ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
