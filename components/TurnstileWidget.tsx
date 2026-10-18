@@ -1,6 +1,6 @@
 "use client";
 
-// Lightweight Cloudflare Turnstile renderer. No npm package — loads the
+// Lightweight Cloudflare Turnstile renderer. No npm package, loads the
 // official script once and uses the explicit-render API.
 //
 // Tokens are single-use; once the server has verified one, the widget needs
@@ -46,7 +46,7 @@ export interface TurnstileHandle {
   /**
    * Resolves with a fresh Turnstile token. If a token is already cached,
    * resolves immediately. Otherwise waits for the next `callback` from the
-   * widget — when `appearance: "interaction-only"` + passive checks pass,
+   * widget, when `appearance: "interaction-only"` + passive checks pass,
    * this is usually milliseconds.
    */
   getToken: (timeoutMs?: number) => Promise<string>;
@@ -99,7 +99,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
             try {
               window.turnstile.reset(widgetIdRef.current);
             } catch {
-              // widget gone — ignore
+              // widget gone, ignore
             }
           }
         },
@@ -158,7 +158,7 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
         "error-callback": () => handleToken.current(""),
         action,
         theme: "auto",
-        // Stay invisible while passive checks run — only render the
+        // Stay invisible while passive checks run, only render the
         // challenge UI if a user interaction is actually required. Prevents
         // the "Verifying..." overlay from briefly capturing page focus on
         // privacy-strict browsers (Brave etc.).

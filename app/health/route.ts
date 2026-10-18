@@ -12,7 +12,7 @@ export async function GET() {
     const { error } = await supabase.from("specialties").select("id").limit(1);
 
     // 42P01 (Postgres) and PGRST205 (PostgREST schema cache) both mean
-    // "relation does not exist" — expected before migrations run.
+    // "relation does not exist", expected before migrations run.
     const preMigration = error?.code === "42P01" || error?.code === "PGRST205";
 
     if (error && !preMigration) {

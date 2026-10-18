@@ -40,7 +40,7 @@ export function getOtpSender(): OtpSender {
   }
 }
 
-/** Reset the cached sender — used by tests. */
+/** Reset the cached sender, used by tests. */
 export function __resetOtpSenderForTests(): void {
   cached = null;
 }

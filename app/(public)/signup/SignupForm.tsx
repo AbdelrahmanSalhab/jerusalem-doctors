@@ -72,7 +72,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
   // A طب عام signup posts the الطب العام specialty on the doctor's behalf.
   // If that row has been deactivated from /admin/specialties there is nothing
   // to attach, and a silently empty specialty_ids would leave submit disabled
-  // with no explanation — so fall back to showing the normal picker.
+  // with no explanation, so fall back to showing the normal picker.
   const showSpecialtyPicker =
     !!stageOpt &&
     (stageOpt.showsSpecialtyPicker ||
@@ -102,7 +102,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       // round-trip and avoids the single-use token problem (each verified
       // token is consumed by Cloudflare; multiple calls per submit fail).
 
-      // The MoH cross-check only covers the Israeli registry — PS-track
+      // The MoH cross-check only covers the Israeli registry, PS-track
       // signups have nothing to check against, so they skip straight to
       // /start and land in admin review either way.
       let freshToken = turnstileToken;

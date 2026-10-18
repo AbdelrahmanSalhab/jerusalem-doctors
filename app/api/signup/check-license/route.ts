@@ -3,10 +3,10 @@
 // (data.gov.il, see plan §13). Called after check-unique, before /start.
 //
 // Outcomes:
-//   { status: "verified" }                            — proceed to /start, auto-approve later
-//   { status: "soft_match", registry_first/family }   — confirm-then-proceed (admin queue)
-//   { status: "name_mismatch", registry_first/family} — block; ask user to retype
-//   { status: "not_found" }                           — proceed to /start; admin queue
+//   { status: "verified" }, proceed to /start, auto-approve later
+//   { status: "soft_match", registry_first/family }, confirm-then-proceed (admin queue)
+//   { status: "name_mismatch", registry_first/family}, block; ask user to retype
+//   { status: "not_found" }, proceed to /start; admin queue
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";

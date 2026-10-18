@@ -32,7 +32,7 @@ export const SMS4FREE_STATUS: Record<
   number,
   { label: string; permanent: boolean }
 > = {
-  // "General error — contact customer service." Ambiguous by definition, and
+  // "General error, contact customer service." Ambiguous by definition, and
   // the contract says nothing was sent, so a bounded retry is safe and is the
   // only code here that could plausibly be transient.
   0: { label: "general provider error", permanent: false },
@@ -54,7 +54,7 @@ interface Sms4FreeCredentials {
 /**
  * Build the request body.
  *
- * Exported for unit testing without a network call — but note it carries the
+ * Exported for unit testing without a network call, but note it carries the
  * account password, so it must never be logged or attached to a Sentry event.
  */
 export function buildSendPayload(
@@ -80,7 +80,7 @@ export function buildSendPayload(
  * The documented shape is a JSON object, but the provider's own sample code
  * just prints the raw body, and v2 has been observed returning a bare number.
  * Accept both rather than treating a successful send as a parse failure.
- * Returns null when the body is neither — see the caller for why that is
+ * Returns null when the body is neither, see the caller for why that is
  * deliberately not treated as a failed send.
  */
 function bareInteger(trimmed: string): number | null {
@@ -116,14 +116,14 @@ export function parseSendResponse(
  * SMS4FREE sender (https://api.sms4free.co.il/ApiSMS/v2/SendSMS).
  *
  * Required env vars:
- *   SMS4FREE_KEY     — personal API key from the account page
- *   SMS4FREE_USER    — the phone number the account is registered with
- *   SMS4FREE_PASS    — the account password
- *   SMS4FREE_SENDER  — displayed sender; must be the registered number until
+ *   SMS4FREE_KEY, personal API key from the account page
+ *   SMS4FREE_USER, the phone number the account is registered with
+ *   SMS4FREE_PASS, the account password
+ *   SMS4FREE_SENDER, displayed sender; must be the registered number until
  *                      an SMS package is purchased, and must be verified once
  *                      by hand from the website before the API will accept it
  * Optional:
- *   SMS4FREE_API_URL — endpoint override, for staging or a contract change
+ *   SMS4FREE_API_URL, endpoint override, for staging or a contract change
  */
 export class Sms4FreeOtpSender implements OtpSender {
   readonly name = "sms4free";
@@ -187,7 +187,7 @@ export class Sms4FreeOtpSender implements OtpSender {
       });
     } catch (err) {
       // Network error or timeout. The request may have reached the provider
-      // and been billed — we cannot know. Transient, but see the runbook:
+      // and been billed, we cannot know. Transient, but see the runbook:
       // this is the "unknown" case, not a confirmed failure.
       throw new OtpProviderError(
         "SMS4FREE send failed: network error or timeout",
@@ -238,7 +238,7 @@ export class Sms4FreeOtpSender implements OtpSender {
 /**
  * Read the account's remaining message balance.
  *
- * The endpoint takes only the credentials — no sender, no recipient — and
+ * The endpoint takes only the credentials, no sender, no recipient, and
  * answers with a bare number (observed: HTTP 200, `10`), reusing the same
  * negative status codes as the send endpoint for credential failures.
  *
@@ -290,7 +290,7 @@ export async function fetchAvailableSms(): Promise<number> {
     );
   }
 
-  // A zero balance is a real, valid answer — only negatives are errors here.
+  // A zero balance is a real, valid answer, only negatives are errors here.
   if (parsed.status < 0) {
     const known = SMS4FREE_STATUS[parsed.status];
     throw new OtpProviderError(

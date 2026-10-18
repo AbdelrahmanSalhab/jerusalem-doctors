@@ -1,6 +1,6 @@
 // Sentry server-side init. Loaded by instrumentation.ts.
 //
-// No-ops cleanly when SENTRY_DSN is unset — dev local doesn't need a DSN.
+// No-ops cleanly when SENTRY_DSN is unset, dev local doesn't need a DSN.
 
 import * as Sentry from "@sentry/nextjs";
 import { scrubBreadcrumb, scrubEvent, scrubTransaction } from "@/lib/sentryScrub";

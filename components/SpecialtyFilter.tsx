@@ -1,7 +1,7 @@
 "use client";
 
 // Custom dropdown for specialty filtering. Replaces native <select> so the
-// open list matches the site's dark theme on every device — Android in
+// open list matches the site's dark theme on every device, Android in
 // particular renders native selects with stark white-on-grey options that
 // look out of place.
 

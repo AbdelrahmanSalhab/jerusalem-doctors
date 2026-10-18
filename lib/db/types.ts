@@ -68,7 +68,7 @@ export interface Doctor {
 export interface Specialty {
   id: string;
   name_ar: string;
-  /** Stable handle for rows the app has to single out — see 0009. */
+  /** Stable handle for rows the app has to single out, see 0009. */
   code: string | null;
   /** One level of nesting (0012): a subspecialty points at its parent. */
   parent_id: string | null;

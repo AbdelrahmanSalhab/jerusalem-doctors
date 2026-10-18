@@ -42,7 +42,7 @@ export function ipFromHeaders(req: Request): string {
 /**
  * Wraps a route handler so an unexpected throw (bad env config, a Supabase
  * client error we didn't anticipate, etc.) always comes back as JSON.
- * Without this, Next's default error page is HTML — the client's
+ * Without this, Next's default error page is HTML, the client's
  * `res.json()` then throws, and the user sees a generic "server connection
  * error" with zero information for us to act on. Every route handler should
  * be wrapped with this.

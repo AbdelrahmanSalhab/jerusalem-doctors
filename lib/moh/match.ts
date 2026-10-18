@@ -42,7 +42,7 @@ interface MirrorRow {
 /**
  * Conservative similarity check. We treat exact match plus single-edit and
  * substring-of as "close enough" to ask the user to confirm the registry's
- * spelling — *not* enough to auto-approve. Anything else is a mismatch.
+ * spelling, *not* enough to auto-approve. Anything else is a mismatch.
  */
 function closeEnough(a: string, b: string): boolean {
   if (!a || !b) return false;
@@ -52,7 +52,7 @@ function closeEnough(a: string, b: string): boolean {
 }
 
 /** Government CSV exports sometimes use a whitespace-only string for
- * "no specialty" instead of a real null — treat that the same as null so it
+ * "no specialty" instead of a real null, treat that the same as null so it
  * doesn't get misread as "this doctor holds a specialization certificate". */
 function cleanSpecialty(s: string | null | undefined): string | null {
   const trimmed = s?.trim();
@@ -173,7 +173,7 @@ function compareNames(
   }
 
   // Even on a name mismatch, we've still matched the license *number* to a
-  // real row — keep the specialty so a human-confirmed override (see
+  // real row, keep the specialty so a human-confirmed override (see
   // signup/start's override_name_mismatch flow) doesn't lose the career
   // stage signal.
   return {

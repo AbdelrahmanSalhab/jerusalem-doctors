@@ -1,6 +1,6 @@
 // Carries the phone (and signup session id) from /login or /signup to /verify.
 //
-// These stay out of the URL on purpose — they are PII, and a query string
+// These stay out of the URL on purpose, they are PII, and a query string
 // leaks into browser history, server logs and Referer headers.
 //
 // sessionStorage stays the primary store so a reload of /verify still works,
@@ -22,7 +22,7 @@ export function setHandoff(key: string, value: string): void {
   try {
     sessionStorage.setItem(key, value);
   } catch {
-    // Storage blocked — the in-memory copy above is what /verify will read.
+    // Storage blocked, the in-memory copy above is what /verify will read.
   }
 }
 
@@ -31,7 +31,7 @@ export function getHandoff(key: string): string {
     const stored = sessionStorage.getItem(key);
     if (stored !== null) return stored;
   } catch {
-    // Storage blocked — fall through to memory.
+    // Storage blocked, fall through to memory.
   }
   return memory.get(key) ?? "";
 }

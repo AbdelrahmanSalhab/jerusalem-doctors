@@ -15,7 +15,7 @@ import {
 } from "@/lib/client/verify_handoff";
 import { toAsciiDigits } from "@/lib/normalize/digits";
 
-// Allow only digits, +, -, space, parens — common phone-number characters.
+// Allow only digits, +, -, space, parens, common phone-number characters.
 // Server-side `normalizePhone` is the source of truth; this just keeps
 // junk out of the input as the user types or pastes.
 const TURNSTILE_WAIT_MS = 15_000;
@@ -35,10 +35,10 @@ export function LoginForm() {
   );
 
   const onPhoneChange = (next: string) => {
-    // Strip disallowed chars instead of rejecting the whole input — this
+    // Strip disallowed chars instead of rejecting the whole input, this
     // makes paste-from-WhatsApp ("Phone: 050-...") work seamlessly.
     setPhone(toAsciiDigits(next).replace(PHONE_DISALLOWED, ""));
-    // Clear stale errors as the user edits — previous error no longer
+    // Clear stale errors as the user edits, previous error no longer
     // applies to the new input.
     if (error) setError(null);
   };
@@ -71,7 +71,7 @@ export function LoginForm() {
         body: JSON.stringify({ phone, turnstile_token: token }),
       });
       if (!res.ok) {
-        // Turnstile tokens are single-use — reset the widget after every
+        // Turnstile tokens are single-use, reset the widget after every
         // submit so a retry gets a fresh token.
         turnstileRef.current?.reset();
         // Parse defensively: a platform-level failure (a function timeout,
@@ -102,7 +102,7 @@ export function LoginForm() {
         return;
       }
 
-      // Hand the phone to /verify off-URL — keeps PII out of browser history,
+      // Hand the phone to /verify off-URL, keeps PII out of browser history,
       // server logs, and Referer headers.
       setHandoff(SS_PHONE, phone);
       clearHandoff(SS_SESSION);

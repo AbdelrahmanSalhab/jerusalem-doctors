@@ -21,7 +21,7 @@ const Body = z.object({
   is_active: z.boolean().optional(),
   is_visible: z.boolean().optional(),
   // An explicit null is a present key, so it survives the no_fields guard
-  // below and reaches .update() as a real NULL — that's how an admin sets a
+  // below and reaches .update() as a real NULL, that's how an admin sets a
   // doctor back to طب عام.
   career_stage: z.enum(CAREER_STAGES).nullable().optional(),
   residency_start_year: z

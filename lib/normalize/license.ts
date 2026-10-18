@@ -3,7 +3,7 @@
 //
 // IL numbers come from the MoH practitioners registry. The registry's own
 // site (registries.health.gov.il) displays a license as
-// `<profession code>-<serial>` — e.g. `1-189371`, where `1` is רפואה
+// `<profession code>-<serial>`, e.g. `1-189371`, where `1` is רפואה
 // (medicine). The open-data mirror we sync (data.gov.il resource
 // 9c64c522-…) is physicians-only and stores the bare serial, so a doctor who
 // copies the number as printed types `1-189371` (or `1189371` once the
@@ -21,8 +21,8 @@ import { toAsciiDigits } from "./digits";
 
 export type LicenseRegion = "IL" | "PS";
 
-/** Profession code for רפואה (medicine). The registry publishes 30 codes —
- * 2 is dentistry, 3 pharmacy, 101/102 nursing — and only this one belongs to
+/** Profession code for רפואה (medicine). The registry publishes 30 codes:
+ * 2 is dentistry, 3 pharmacy, 101/102 nursing, and only this one belongs to
  * a physician. */
 export const IL_PHYSICIAN_PROFESSION_CODE = "1";
 
@@ -153,7 +153,7 @@ function stripLeadingZeros(s: string): string {
  * Canonical storage/lookup form of a license number, or null when the input
  * can't be read. IL collapses to the registry serial so that `1-189371`,
  * `1189371` and `189371` are the same license for uniqueness purposes. PS is
- * passed through trimmed — we have no registry to canonicalise against.
+ * passed through trimmed, we have no registry to canonicalise against.
  */
 export function canonicalLicenseNumber(
   region: LicenseRegion,

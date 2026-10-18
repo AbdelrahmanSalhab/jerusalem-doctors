@@ -1,4 +1,4 @@
-// POST /api/admin/specialties — create a new specialty.
+// POST /api/admin/specialties, create a new specialty.
 
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";

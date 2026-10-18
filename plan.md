@@ -1,4 +1,4 @@
-# Jerusalem Doctors Directory — Execution Plan (MVP)
+# Jerusalem Doctors Directory, Execution Plan (MVP)
 
 
 ## 1. Product Understanding
@@ -9,47 +9,47 @@
 - **Visibility rule (hard).** Only authenticated, phone-verified, active, visible, consented doctors appear in search results. Guests see only landing/login/signup/privacy.
 - **Arabic search correctness is a core feature, not polish.** Hamza variants (أ/إ/آ/ٱ → ا), ى → ي, ؤ → و, ئ → ي, tatweel and diacritics removal, all applied before storage and at query time. Search hits a normalized column, not the raw column.
 - **Stack is locked by spec:** Next.js + TypeScript + Tailwind on Vercel Hobby or Cloudflare Pages, Supabase Postgres + Auth + RLS, Twilio (or Meta Cloud API) for WhatsApp OTP.
-- **Free hosting, paid auth.** Hosting and DB fit free tiers; **WhatsApp authentication template messages are billed per delivery** — this is the only structurally non-free piece.
-- **Privacy is regulated.** Real identifiable healthcare professionals in Israel — Israeli Privacy Protection Data Security Regulations apply; legal review required before any wider launch.
+- **Free hosting, paid auth.** Hosting and DB fit free tiers; **WhatsApp authentication template messages are billed per delivery**, this is the only structurally non-free piece.
+- **Privacy is regulated.** Real identifiable healthcare professionals in Israel, Israeli Privacy Protection Data Security Regulations apply; legal review required before any wider launch.
 - **Out of scope (do not build):** ratings, patient reviews, public pages, in-app messaging, scheduling, patient-facing anything.
 
 ### Critical risks (called out up front)
-- **OTP cost runaway** — abuse or growth turns a free MVP into a real bill. Mitigation: rate limits, Turnstile, dev-mode mock OTP. (Section 10)
-- **Fake / unverified doctors** — phone verification proves a phone, not a license. Mitigation: automated cross-check at signup against the Israel MoH official doctors registry (data.gov.il, see §13); admin approval gate for soft-failures and edge cases.
-- **Privacy / regulatory exposure** — leak of phones + license numbers is a real-world incident. Mitigation: strict RLS, no public endpoints, audit logs, legal review pre-launch.
-- **Duplicate / collision profiles** — same doctor signs up twice with two phones, or two doctors share a phone. Mitigation: unique constraints on `phone_e164` and `license_number` enforced at DB level, admin merge tool.
-- **Arabic search false negatives** — if normalization is inconsistent between write path and read path, "احمد" silently fails to find "أحمد". Mitigation: single shared `normalizeArabic` utility used by both ingestion and query handler, with a unit-test corpus.
+- **OTP cost runaway**, abuse or growth turns a free MVP into a real bill. Mitigation: rate limits, Turnstile, dev-mode mock OTP. (Section 10)
+- **Fake / unverified doctors**, phone verification proves a phone, not a license. Mitigation: automated cross-check at signup against the Israel MoH official doctors registry (data.gov.il, see §13); admin approval gate for soft-failures and edge cases.
+- **Privacy / regulatory exposure**, leak of phones + license numbers is a real-world incident. Mitigation: strict RLS, no public endpoints, audit logs, legal review pre-launch.
+- **Duplicate / collision profiles**, same doctor signs up twice with two phones, or two doctors share a phone. Mitigation: unique constraints on `phone_e164` and `license_number` enforced at DB level, admin merge tool.
+- **Arabic search false negatives**, if normalization is inconsistent between write path and read path, "احمد" silently fails to find "أحمد". Mitigation: single shared `normalizeArabic` utility used by both ingestion and query handler, with a unit-test corpus.
 
 ---
 
 ## 2. Architecture Decisions (locked)
 
-### 2.1 Frontend — Next.js App Router, mostly Server Components
+### 2.1 Frontend, Next.js App Router, mostly Server Components
 - **Choice:** Next.js 14+ App Router. Public pages (landing, privacy) are static / server-rendered. Authenticated pages (dashboard, profile, admin) are server-rendered with the Supabase server client; interactive bits (search input, OTP form, multi-select) are Client Components.
 - **Why:** Server-side data fetching with Supabase keeps the access token off the client for the initial render, plays cleanly with RLS via the user's JWT, and gives us cheap RTL-correct SSR.
 - **Tradeoff:** App Router has a steeper mental model than Pages Router; we accept it because the alternative pushes more secrets and logic to the client.
 
-### 2.2 Backend — Next.js Route Handlers + Supabase, no separate service
+### 2.2 Backend, Next.js Route Handlers + Supabase, no separate service
 - **Choice:** All server logic lives in Next.js Route Handlers under `app/api/*`. Supabase is the database, the auth provider, and the RLS enforcer. No edge functions, no separate Node service.
 - **Why:** One deploy target, one language, one auth context. The whole MVP is CRUD + OTP + search; it doesn't justify a second runtime.
 - **Tradeoff:** Route Handlers run in Vercel's Node runtime; cold starts are fine for this scale. If we ever need Twilio webhooks or heavy fan-out, we revisit (not in MVP).
 
-### 2.3 Auth — Supabase Phone OTP via Twilio Verify (WhatsApp channel), with mock fallback in dev
+### 2.3 Auth, Supabase Phone OTP via Twilio Verify (WhatsApp channel), with mock fallback in dev
 - **Choice:** Use Supabase's built-in phone auth with Twilio Verify configured for WhatsApp. In `NODE_ENV=development` (or when `OTP_PROVIDER=mock`), bypass Twilio: fixed code `123456` for any phone, log it to console.
 - **Why:** Supabase Auth already issues sessions, refresh tokens, and JWTs we can use in RLS. Bolting Twilio Verify under it is the shortest path. Twilio Verify also lets us flip to SMS as a backup channel without rewriting code.
-- **Tradeoff:** We're tied to Supabase's OTP UX (template wording, retry policy). Acceptable. If Twilio's WhatsApp template approval drags, we ship with **SMS OTP** and switch the channel later — login/signup copy already says "رمز التحقق" generically; we just add "(عبر واتساب أو رسالة نصية)" until the WA template is live.
+- **Tradeoff:** We're tied to Supabase's OTP UX (template wording, retry policy). Acceptable. If Twilio's WhatsApp template approval drags, we ship with **SMS OTP** and switch the channel later, login/signup copy already says "رمز التحقق" generically; we just add "(عبر واتساب أو رسالة نصية)" until the WA template is live.
 
-### 2.4 Search — Postgres `ILIKE` over normalized columns for MVP, `pg_trgm` from day one
+### 2.4 Search, Postgres `ILIKE` over normalized columns for MVP, `pg_trgm` from day one
 - **Choice:** Store `*_normalized` columns. Query with `ILIKE '%' || normalize(q) || '%'` against a GIN trigram index (`gin_trgm_ops`). Enable `pg_trgm` in the first migration.
 - **Why:** Spec explicitly says ILIKE is the MVP minimum; trigram index makes substring queries actually fast at directory scale (< 100k rows is trivial). Skipping `to_tsvector('arabic', …)` because PG's Arabic FTS dictionary is weak and adds complexity without buying us much over normalize-then-ILIKE.
 - **Tradeoff:** No fuzzy / typo-tolerant search yet. Easy upgrade later: add `similarity()` ranking or move to a meilisearch sidecar.
 
-### 2.5 Data model — adopt the spec's later schema (section 16), drop the early one
+### 2.5 Data model, adopt the spec's later schema (section 16), drop the early one
 - **Choice:** Use the section-16 schema (`doctors` + `specialties` + `doctor_specialties` + `audit_logs`), not the section-3 schema. The section-3 schema has `specialities TEXT[]`, which conflicts with the admin-editable specialty list in section 17. Many-to-many is correct.
 - **Why:** Matches the spec's own admin requirements, gives us a single source of truth for specialty translations.
 - **Tradeoff:** One extra join in search. Negligible.
 
-### 2.6 Hosting — Vercel for MVP
+### 2.6 Hosting, Vercel for MVP
 - **Choice:** Vercel Hobby. Cloudflare Pages stays as a documented fallback.
 - **Why:** Tighter Next.js integration, zero-config Route Handlers, built-in env-var management. Cloudflare Pages requires the OpenNext adapter and is slightly more setup.
 - **Tradeoff:** Vendor lock-in to Vercel's Node runtime. Acceptable for MVP; the app code itself stays portable.
@@ -66,7 +66,7 @@
                                          │ HTTPS (cookie-based session)
                                          ▼
                         ┌─────────────────────────────────────────────┐
-                        │  Vercel — Next.js (App Router)               │
+                        │  Vercel, Next.js (App Router)               │
                         │  app/(public)/...   app/(auth)/dashboard ... │
                         │  app/api/signup, /login, /search, /profile   │
                         └────┬────────────────────────────────┬────────┘
@@ -81,7 +81,7 @@
                   └──────────────────────┘
 ```
 
-### Auth flow — signup
+### Auth flow, signup
 1. Client `POST /api/signup/check-unique` { phone, license_number } → server normalizes both, queries `doctors`, returns `{available, duplicate_field?}`.
 2. Client `POST /api/signup/check-license` { license_number, hebrew_first_name, hebrew_family_name } → server looks up `moh_practitioners` (synced daily from data.gov.il, see §13). Returns `{status: 'verified' | 'name_mismatch' | 'not_found' | 'specialty_warning', registry_first?, registry_family?}`. `name_mismatch` and `not_found` block OTP send.
 3. Client `POST /api/signup/start` with full form → server re-validates, normalizes Arabic + phone, writes a **pending_signups** row (token + payload + expiry), calls Supabase `auth.signInWithOtp({ phone, channel: 'whatsapp' })`.
@@ -89,7 +89,7 @@
 5. Client `POST /api/signup/verify` { signup_session_id, otp_code } → server calls `auth.verifyOtp`, on success copies pending payload into `doctors`, links `auth_user_id`, marks `is_phone_verified=true`, sets `is_admin_approved` per license-check outcome, deletes pending row, returns session cookie.
 6. Redirect → `/dashboard`. License-verified doctors are auto-approved; `not_found` / `specialty_warning` doctors land in the admin queue (`is_admin_approved=false` until reviewed).
 
-### Auth flow — login
+### Auth flow, login
 1. `POST /api/login/start` { phone } → normalize → check doctor exists & active → `auth.signInWithOtp` (login channel).
 2. `POST /api/login/verify` { phone, otp_code } → `auth.verifyOtp` → session cookie → `/dashboard`.
 
@@ -97,18 +97,18 @@
 1. Client types in dashboard search box (debounced 250 ms) → `GET /api/search?q=...`.
 2. Server validates session, normalizes query string.
 3. Single SQL query against `doctors` JOIN `doctor_specialties` JOIN `specialties` with `WHERE is_active AND is_visible AND is_phone_verified AND is_admin_approved AND consent_directory_use AND (norm(name) ILIKE %q% OR norm(specialty) ILIKE %q% OR norm(subspecialty) ILIKE %q% OR hebrew_full_name ILIKE %q%)`. Uses GIN trigram indexes.
-4. Server logs `search_submitted` to `audit_logs` with **only** actor id + query length (not the query text — privacy).
+4. Server logs `search_submitted` to `audit_logs` with **only** actor id + query length (not the query text, privacy).
 5. Returns array of doctor cards with `whatsapp_url` already constructed.
 
 ### WhatsApp interaction
 - Pure client-side `<a href={whatsapp_url} target="_blank" rel="noopener">`. No proxy through our server. URL format `https://wa.me/${phoneE164.replace('+','')}?text=${encodeURIComponent(prefilled)}`.
-- Optional: client-side fire-and-forget `POST /api/audit/whatsapp-click` to log the event for admin metrics — tolerate failure silently.
+- Optional: client-side fire-and-forget `POST /api/audit/whatsapp-click` to log the event for admin metrics, tolerate failure silently.
 
 ---
 
 ## 4. Development Phases
 
-### Phase 0 — Setup (1–2 days)
+### Phase 0, Setup (1–2 days)
 **Goal:** Empty but deployable Next.js app wired to Supabase, with CI green.
 **Deliverables:**
 - `package.json`, Next.js 14 App Router scaffold, Tailwind configured for RTL.
@@ -120,56 +120,56 @@
 
 **Done when:** A `/` page renders "دليل أطباء القدس" in RTL on a Vercel preview URL, and a server-side health route reads a row from a throwaway Supabase table.
 
-### Phase 1 — Core Infrastructure
+### Phase 1, Core Infrastructure
 **Goal:** Database schema, RLS policies, normalization utilities, shared types, all migrations checked in.
 **Deliverables:**
-- `supabase/migrations/0001_init.sql` — extensions (`pg_trgm`, `pgcrypto`), `doctors`, `specialties`, `doctor_specialties`, `audit_logs`, `pending_signups`, `moh_practitioners`, all unique constraints, all indexes.
-- `supabase/migrations/0002_rls.sql` — RLS policies (Section 9).
-- `supabase/migrations/0003_seed_specialties.sql` — 28 specialties from spec §17 with Arabic + Hebrew + English + normalized.
+- `supabase/migrations/0001_init.sql`, extensions (`pg_trgm`, `pgcrypto`), `doctors`, `specialties`, `doctor_specialties`, `audit_logs`, `pending_signups`, `moh_practitioners`, all unique constraints, all indexes.
+- `supabase/migrations/0002_rls.sql`, RLS policies (Section 9).
+- `supabase/migrations/0003_seed_specialties.sql`, 28 specialties from spec §17 with Arabic + Hebrew + English + normalized.
 - `lib/normalize/arabic.ts` + `lib/normalize/phone.ts` (E.164) + `lib/normalize/hebrew.ts` (niqqud/gershayim strip) + Vitest unit tests (≥ 30 cases each for Arabic and phone, ≥ 15 for Hebrew).
 - `lib/db/types.ts` generated via `supabase gen types typescript`.
 
 **Done when:** Migrations apply cleanly to a fresh Supabase project; `npm test` passes; manual SQL test confirms ILIKE on normalized columns matches hamza variants.
 
-### Phase 2 — Authentication
+### Phase 2, Authentication
 **Goal:** End-to-end signup and login with WhatsApp OTP working in dev (mock) and on a Twilio trial number, with MoH license cross-check live.
 **Deliverables:**
 - Pages: `app/(public)/signup`, `app/(public)/verify`, `app/(public)/login`.
 - API routes: `app/api/signup/check-unique`, `signup/check-license`, `signup/start`, `signup/verify`, `login/start`, `login/verify`, `auth/logout`.
-- `app/api/cron/sync-moh/route.ts` — Vercel Cron daily MoH practitioners sync (CKAN datastore_search, paginated upsert into `moh_practitioners`). Protected by `CRON_SECRET`.
-- `lib/moh/client.ts` — CKAN API client (`datastore_search`, `datastore_search_sql`) with retry + timeout.
-- `lib/moh/match.ts` — `verifyLicense({license_number, hebrew_first, hebrew_family})` returning `{status, registry_first?, registry_family?, registry_specialty_he?}`.
-- `lib/otp/{provider,twilio,mock}.ts` — provider interface + Twilio + mock implementations.
-- `lib/ratelimit.ts` — in-memory + Upstash Redis client (Upstash free tier).
+- `app/api/cron/sync-moh/route.ts`, Vercel Cron daily MoH practitioners sync (CKAN datastore_search, paginated upsert into `moh_practitioners`). Protected by `CRON_SECRET`.
+- `lib/moh/client.ts`, CKAN API client (`datastore_search`, `datastore_search_sql`) with retry + timeout.
+- `lib/moh/match.ts`, `verifyLicense({license_number, hebrew_first, hebrew_family})` returning `{status, registry_first?, registry_family?, registry_specialty_he?}`.
+- `lib/otp/{provider,twilio,mock}.ts`, provider interface + Twilio + mock implementations.
+- `lib/ratelimit.ts`, in-memory + Upstash Redis client (Upstash free tier).
 - Cloudflare Turnstile widget on signup and login forms; server-side verification.
 - Pending signup TTL: 15 min; OTP attempts: 5; OTP resends: 3/hour.
 
 **Done when:** A new doctor with a valid license + matching Hebrew name can sign up, receive a real WhatsApp code on a Twilio trial number, verify, and reach `/dashboard`. A signup with a Hebrew name not matching the registry is blocked **before** OTP is sent. A signup with an unknown license is queued for admin review (no `/dashboard` access until approved).
 
-### Phase 3 — Core Features: Search + Directory
+### Phase 3, Core Features: Search + Directory
 **Goal:** Verified doctor can find any other verified doctor and click WhatsApp.
 **Deliverables:**
-- `app/(auth)/dashboard/page.tsx` — Google-style centered search + specialty filter dropdown.
-- `app/api/search/route.ts` — query handler with trigram-indexed ILIKE.
-- `components/DoctorCard.tsx` — card layout per spec §15, includes `<WhatsAppButton phone={...} />`.
-- `lib/whatsapp.ts` — `buildWhatsAppLink`, `buildPrefilledMessage`.
+- `app/(auth)/dashboard/page.tsx`, Google-style centered search + specialty filter dropdown.
+- `app/api/search/route.ts`, query handler with trigram-indexed ILIKE.
+- `components/DoctorCard.tsx`, card layout per spec §15, includes `<WhatsAppButton phone={...} />`.
+- `lib/whatsapp.ts`, `buildWhatsAppLink`, `buildPrefilledMessage`.
 - Empty / loading / error states for search.
 - Specialty multi-select reused on signup form.
 
 **Done when:** Searching "احمد" returns a row whose stored Arabic first name is "أحمد"; clicking the WhatsApp button opens `wa.me/972…?text=…` in a new tab.
 
-### Phase 4 — Profile & Admin
+### Phase 4, Profile & Admin
 **Goal:** Doctors edit their own data, admins moderate.
 **Deliverables:**
 - `app/(auth)/profile/page.tsx` + `app/api/profile/route.ts` (PATCH). Editable: Arabic names, Hebrew names, specialties, subspecialty, email, `is_visible`. Locked: `phone_e164`, `license_number`, `is_admin_approved`, `is_active`.
 - Phone change flow (post-MVP placeholder): request goes to admin queue.
-- `app/(admin)/admin/page.tsx` — list + filter doctors; toggle `is_active`, `is_admin_approved`; merge duplicates (manual SQL link until Phase 5 polish); view `audit_logs`.
-- `is_admin` boolean on `doctors` (or separate `admins` table — pick `is_admin` for simplicity); admin RLS policy.
-- `app/(public)/privacy/page.tsx` — static Arabic content from spec §25.
+- `app/(admin)/admin/page.tsx`, list + filter doctors; toggle `is_active`, `is_admin_approved`; merge duplicates (manual SQL link until Phase 5 polish); view `audit_logs`.
+- `is_admin` boolean on `doctors` (or separate `admins` table, pick `is_admin` for simplicity); admin RLS policy.
+- `app/(public)/privacy/page.tsx`, static Arabic content from spec §25.
 
 **Done when:** Admin user can deactivate a doctor; that doctor disappears from search next request; the doctor edits their visibility and disappears from search; audit log shows both events.
 
-### Phase 5 — Security + Polish
+### Phase 5, Security + Polish
 **Goal:** Production-ready: hardened, observable, accessible.
 **Deliverables:**
 - Rate limits applied to every public API route.
@@ -203,57 +203,57 @@
 ### Phase 1
 1.1. `supabase init`; configure local dev; add `supabase/migrations/`.
 1.2. **Migration 0001:** enable `pg_trgm`, `pgcrypto`. Create `doctors`, `specialties`, `doctor_specialties`, `audit_logs`, `pending_signups`. Add unique indexes on `doctors.phone_e164`, `doctors.license_number`, `doctors.auth_user_id`. Add GIN trigram indexes on `arabic_full_name_normalized`, `arabic_first_name_normalized`, `arabic_family_name_normalized`, `subspecialty_normalized`, `hebrew_full_name`. Add B-tree on `is_active, is_visible, is_phone_verified, is_admin_approved, consent_directory_use`.
-1.3. **Migration 0002:** RLS policies — see §6 below.
+1.3. **Migration 0002:** RLS policies, see §6 below.
 1.4. **Migration 0003:** seed 28 specialties with Arabic / Hebrew / English / normalized.
 1.5. Run `supabase gen types typescript --linked > lib/db/types.ts`.
 1.6. Write `lib/normalize/arabic.ts` exactly as in spec §9 + tests covering: each hamza form, ى, ؤ, ئ, tatweel, all 8 diacritics, multi-space, mixed Arabic+Latin, empty string.
-1.7. Write `lib/normalize/phone.ts` — accept `0501234567`, `+972501234567`, `972501234567`, `05-012-34567`, `+970...`, return E.164 or throw `InvalidPhoneError`. Use `libphonenumber-js`. Tests: 15+ cases.
-1.8. Write `lib/normalize/hebrew.ts` — `normalizeHebrew(s)` strips niqqud (`U+0591`–`U+05C7`), gershayim/geresh (`"`, `'`, `״`, `׳`), collapses whitespace, NFKC-normalizes. Tests: 15+ cases including names with vowel marks, doubled letters, abbreviations (`ד״ר`).
-1.9. Write `lib/whatsapp.ts` — `buildWhatsAppLink(e164, prefilledText?)`.
-1.10. **Migration 0001 (addendum):** create `moh_practitioners` table — see §6. Includes B-tree on `(hebrew_first_norm, hebrew_family_norm)` and PK on `license_number`.
+1.7. Write `lib/normalize/phone.ts`, accept `0501234567`, `+972501234567`, `972501234567`, `05-012-34567`, `+970...`, return E.164 or throw `InvalidPhoneError`. Use `libphonenumber-js`. Tests: 15+ cases.
+1.8. Write `lib/normalize/hebrew.ts`, `normalizeHebrew(s)` strips niqqud (`U+0591`–`U+05C7`), gershayim/geresh (`"`, `'`, `״`, `׳`), collapses whitespace, NFKC-normalizes. Tests: 15+ cases including names with vowel marks, doubled letters, abbreviations (`ד״ר`).
+1.9. Write `lib/whatsapp.ts`, `buildWhatsAppLink(e164, prefilledText?)`.
+1.10. **Migration 0001 (addendum):** create `moh_practitioners` table, see §6. Includes B-tree on `(hebrew_first_norm, hebrew_family_norm)` and PK on `license_number`.
 
 ### Phase 2
-2.1. UI: `app/(public)/signup/page.tsx` — consent block (spec §8 verbatim) + form (10 fields) + Turnstile + submit.
-2.2. UI: `app/(public)/verify/page.tsx` — 6-digit OTP input, resend button (disabled 60 s), back link.
-2.3. UI: `app/(public)/login/page.tsx` — single phone input + Turnstile.
-2.4. `app/api/signup/check-unique/route.ts` — POST, normalize phone + license, SELECT, return JSON.
-2.5. `app/api/signup/start/route.ts` — POST: validate Turnstile → validate fields → normalize → uniqueness check → INSERT into `pending_signups` with TTL 15 min → call OTP provider → return `{ signup_session_id }`.
-2.6. `app/api/signup/verify/route.ts` — POST: load pending → call OTP provider verify → on success: Supabase admin `createUser({phone})`, INSERT doctor with `auth_user_id` linked, `is_phone_verified=true`, INSERT `doctor_specialties`, DELETE pending → set Supabase session cookies.
-2.7. `app/api/login/start/route.ts` and `app/api/login/verify/route.ts` — analogous, simpler.
+2.1. UI: `app/(public)/signup/page.tsx`, consent block (spec §8 verbatim) + form (10 fields) + Turnstile + submit.
+2.2. UI: `app/(public)/verify/page.tsx`, 6-digit OTP input, resend button (disabled 60 s), back link.
+2.3. UI: `app/(public)/login/page.tsx`, single phone input + Turnstile.
+2.4. `app/api/signup/check-unique/route.ts`, POST, normalize phone + license, SELECT, return JSON.
+2.5. `app/api/signup/start/route.ts`, POST: validate Turnstile → validate fields → normalize → uniqueness check → INSERT into `pending_signups` with TTL 15 min → call OTP provider → return `{ signup_session_id }`.
+2.6. `app/api/signup/verify/route.ts`, POST: load pending → call OTP provider verify → on success: Supabase admin `createUser({phone})`, INSERT doctor with `auth_user_id` linked, `is_phone_verified=true`, INSERT `doctor_specialties`, DELETE pending → set Supabase session cookies.
+2.7. `app/api/login/start/route.ts` and `app/api/login/verify/route.ts`, analogous, simpler.
 2.8. `app/api/auth/logout/route.ts`.
-2.9. `lib/otp/provider.ts` — `interface OTPProvider { send(phone): Promise<string> /*sessionId*/; verify(phone, code): Promise<boolean>; }`.
-2.10. `lib/otp/twilio.ts` — Twilio Verify implementation, channel `whatsapp`, fallback `sms`.
-2.11. `lib/otp/mock.ts` — accepts any code === `'123456'`.
-2.12. `lib/otp/index.ts` — picks based on `process.env.OTP_PROVIDER`.
-2.13. `lib/ratelimit.ts` — Upstash sliding window: 5 OTP requests / phone / hour, 5 verify attempts / session, 30 search reqs / user / minute, 10 license-checks / IP / hour.
-2.14. `lib/turnstile.ts` — server-side `verify(token)` against Cloudflare API.
-2.15. `middleware.ts` — refresh Supabase session, redirect unauthenticated `/dashboard` and `/profile` to `/login`.
-2.16. `lib/moh/client.ts` — typed wrapper around `https://data.gov.il/api/3/action/datastore_search` and `datastore_search_sql`. Resource ID lives in `MOH_RESOURCE_ID` env var (default `9c64c522-bbc2-48fe-96fb-3b2a8626f59e`). 10s timeout, 2 retries with backoff.
-2.17. `lib/moh/match.ts` — `verifyLicense({license_number, hebrew_first, hebrew_family})`: looks up `moh_practitioners` by `license_number`, compares `normalizeHebrew(input)` to stored `*_norm`. Exact match → `verified`. Levenshtein ≤ 1 or substring → `verified` (log soft-match). License missing → fallback to live `datastore_search_sql` (in case of post-snapshot license issuance), then `not_found` if still missing. Different name → `name_mismatch` with registry name returned.
-2.18. `app/api/signup/check-license/route.ts` — POST: rate-limit (10 / IP / hour) → Turnstile verify → call `verifyLicense` → return JSON. Audit log every call (`license_check_passed` / `license_check_failed`, license number only, no PII in metadata beyond outcome).
-2.19. `app/api/cron/sync-moh/route.ts` — GET, header check `Authorization: Bearer ${CRON_SECRET}`. Paginate CKAN `datastore_search` in 1000-row chunks; upsert into `moh_practitioners`; record `last_synced_at` somewhere (e.g. `audit_logs` with action `moh_sync_completed`, metadata `{rows_upserted, duration_ms}`). Add `vercel.json` cron schedule `0 3 * * *`.
-2.20. Wire `check-license` into `app/(public)/signup/page.tsx` — call after `check-unique`, before submitting full form. On `name_mismatch`, surface registry's spelling and ask user to retype. On `not_found`, show "سيتم مراجعة طلبك من قبل الإدارة قبل تفعيل الحساب" and let signup proceed (admin queue).
+2.9. `lib/otp/provider.ts`, `interface OTPProvider { send(phone): Promise<string> /*sessionId*/; verify(phone, code): Promise<boolean>; }`.
+2.10. `lib/otp/twilio.ts`, Twilio Verify implementation, channel `whatsapp`, fallback `sms`.
+2.11. `lib/otp/mock.ts`, accepts any code === `'123456'`.
+2.12. `lib/otp/index.ts`, picks based on `process.env.OTP_PROVIDER`.
+2.13. `lib/ratelimit.ts`, Upstash sliding window: 5 OTP requests / phone / hour, 5 verify attempts / session, 30 search reqs / user / minute, 10 license-checks / IP / hour.
+2.14. `lib/turnstile.ts`, server-side `verify(token)` against Cloudflare API.
+2.15. `middleware.ts`, refresh Supabase session, redirect unauthenticated `/dashboard` and `/profile` to `/login`.
+2.16. `lib/moh/client.ts`, typed wrapper around `https://data.gov.il/api/3/action/datastore_search` and `datastore_search_sql`. Resource ID lives in `MOH_RESOURCE_ID` env var (default `9c64c522-bbc2-48fe-96fb-3b2a8626f59e`). 10s timeout, 2 retries with backoff.
+2.17. `lib/moh/match.ts`, `verifyLicense({license_number, hebrew_first, hebrew_family})`: looks up `moh_practitioners` by `license_number`, compares `normalizeHebrew(input)` to stored `*_norm`. Exact match → `verified`. Levenshtein ≤ 1 or substring → `verified` (log soft-match). License missing → fallback to live `datastore_search_sql` (in case of post-snapshot license issuance), then `not_found` if still missing. Different name → `name_mismatch` with registry name returned.
+2.18. `app/api/signup/check-license/route.ts`, POST: rate-limit (10 / IP / hour) → Turnstile verify → call `verifyLicense` → return JSON. Audit log every call (`license_check_passed` / `license_check_failed`, license number only, no PII in metadata beyond outcome).
+2.19. `app/api/cron/sync-moh/route.ts`, GET, header check `Authorization: Bearer ${CRON_SECRET}`. Paginate CKAN `datastore_search` in 1000-row chunks; upsert into `moh_practitioners`; record `last_synced_at` somewhere (e.g. `audit_logs` with action `moh_sync_completed`, metadata `{rows_upserted, duration_ms}`). Add `vercel.json` cron schedule `0 3 * * *`.
+2.20. Wire `check-license` into `app/(public)/signup/page.tsx`, call after `check-unique`, before submitting full form. On `name_mismatch`, surface registry's spelling and ask user to retype. On `not_found`, show "سيتم مراجعة طلبك من قبل الإدارة قبل تفعيل الحساب" and let signup proceed (admin queue).
 
 ### Phase 3
-3.1. `app/(auth)/dashboard/page.tsx` — server component reading user from cookie, rendering `<SearchBar/>` + `<SpecialtyFilter/>`.
-3.2. `components/SearchBar.tsx` — Client Component, debounced 250 ms, posts to `/api/search`.
-3.3. `app/api/search/route.ts` — GET, validate session, normalize `q`, single SQL query joining 3 tables, returns up to 50 rows.
+3.1. `app/(auth)/dashboard/page.tsx`, server component reading user from cookie, rendering `<SearchBar/>` + `<SpecialtyFilter/>`.
+3.2. `components/SearchBar.tsx`, Client Component, debounced 250 ms, posts to `/api/search`.
+3.3. `app/api/search/route.ts`, GET, validate session, normalize `q`, single SQL query joining 3 tables, returns up to 50 rows.
 3.4. `components/DoctorCard.tsx` per spec §15.
-3.5. `components/WhatsAppButton.tsx` — `<a target=_blank>` with prefilled message from spec §15.
-3.6. `components/SpecialtyMultiSelect.tsx` — reused on signup; combobox over `specialties` table.
+3.5. `components/WhatsAppButton.tsx`, `<a target=_blank>` with prefilled message from spec §15.
+3.6. `components/SpecialtyMultiSelect.tsx`, reused on signup; combobox over `specialties` table.
 3.7. Empty-result state with Arabic copy.
 3.8. Audit log on every search (actor id + length only).
 
 ### Phase 4
-4.1. `app/(auth)/profile/page.tsx` — read current doctor by `auth_user_id`, prefill form.
-4.2. `app/api/profile/route.ts` — PATCH: whitelist editable columns server-side; reject `phone_e164`, `license_number`, `is_admin_approved`, `is_active` even if sent.
+4.1. `app/(auth)/profile/page.tsx`, read current doctor by `auth_user_id`, prefill form.
+4.2. `app/api/profile/route.ts`, PATCH: whitelist editable columns server-side; reject `phone_e164`, `license_number`, `is_admin_approved`, `is_active` even if sent.
 4.3. Add `is_admin boolean default false` to `doctors`. Migration 0004.
 4.4. RLS: admin policies allowing SELECT/UPDATE on all rows when `is_admin=true`.
-4.5. `app/(admin)/layout.tsx` — server-side guard: 404 if not admin.
-4.6. `app/(admin)/admin/page.tsx` — table of doctors (search + filter on `is_admin_approved`, `is_active`).
-4.7. `app/api/admin/doctors/[id]/route.ts` — PATCH: toggle moderation flags, write `audit_logs`.
-4.8. `app/(admin)/admin/audit/page.tsx` — paginated list of audit events.
-4.9. `app/(public)/privacy/page.tsx` — static Arabic content.
+4.5. `app/(admin)/layout.tsx`, server-side guard: 404 if not admin.
+4.6. `app/(admin)/admin/page.tsx`, table of doctors (search + filter on `is_admin_approved`, `is_active`).
+4.7. `app/api/admin/doctors/[id]/route.ts`, PATCH: toggle moderation flags, write `audit_logs`.
+4.8. `app/(admin)/admin/audit/page.tsx`, paginated list of audit events.
+4.9. `app/(public)/privacy/page.tsx`, static Arabic content.
 4.10. Account-deletion request: `app/api/profile/delete-request/route.ts` → audit log row + `is_visible=false` immediately; admin processes hard delete.
 
 ### Phase 5
@@ -410,7 +410,7 @@ create index doctor_workplaces_name_norm_trgm
 - `doctors`: enable RLS.
   - **SELECT** (regular users): `is_active AND is_visible AND is_phone_verified AND is_admin_approved AND consent_directory_use`.
   - **SELECT own row**: `auth.uid() = auth_user_id` (so users can see their full profile).
-  - **UPDATE own row**: `auth.uid() = auth_user_id`. Editable columns enforced in API, not RLS (Postgres column-level grants are too coarse here — the API route whitelists).
+  - **UPDATE own row**: `auth.uid() = auth_user_id`. Editable columns enforced in API, not RLS (Postgres column-level grants are too coarse here, the API route whitelists).
   - **Admin SELECT/UPDATE all**: `exists(select 1 from doctors d where d.auth_user_id = auth.uid() and d.is_admin)`.
 - `doctor_specialties`: SELECT mirrors doctors visibility via join policy; INSERT/DELETE only by owner or admin.
 - `specialties`: SELECT public to authenticated users; INSERT/UPDATE/DELETE admin only.
@@ -419,23 +419,23 @@ create index doctor_workplaces_name_norm_trgm
 - `moh_practitioners`: deny all from users; only service role reads/writes (the cron job and signup license-check route).
 
 ### Migration order
-1. `0001_init.sql` — extensions + tables (incl. `moh_practitioners`) + constraints + indexes.
-2. `0002_rls.sql` — enable RLS, define policies.
-3. `0003_seed_specialties.sql` — seed 28 specialties.
-4. `0004_admin_flag.sql` (Phase 4) — `is_admin` column + admin policies (or fold into 0002 if we know admins from day one).
-5. `0005_license_verification.sql` (Phase 2) — `doctors.license_verified_at`, `doctors.license_verification_status`. Folded into 0001 if we lock §13 in before the first migration apply.
-6. `0004_workplaces.sql` (mid-Phase-2 add) — `doctor_workplaces` table + RLS. Required field `main_workplace` on signup, optional unbounded list of others. Searchable via trigram-indexed normalized column; surfaced in Phase 3 dashboard cards and Phase 4 profile editor.
+1. `0001_init.sql`, extensions + tables (incl. `moh_practitioners`) + constraints + indexes.
+2. `0002_rls.sql`, enable RLS, define policies.
+3. `0003_seed_specialties.sql`, seed 28 specialties.
+4. `0004_admin_flag.sql` (Phase 4), `is_admin` column + admin policies (or fold into 0002 if we know admins from day one).
+5. `0005_license_verification.sql` (Phase 2), `doctors.license_verified_at`, `doctors.license_verification_status`. Folded into 0001 if we lock §13 in before the first migration apply.
+6. `0004_workplaces.sql` (mid-Phase-2 add), `doctor_workplaces` table + RLS. Required field `main_workplace` on signup, optional unbounded list of others. Searchable via trigram-indexed normalized column; surfaced in Phase 3 dashboard cards and Phase 4 profile editor.
 
 ---
 
 ## 7. Authentication & OTP Strategy
 
-### Recommended approach (revised — May 2026)
+### Recommended approach (revised, May 2026)
 **Skip Twilio entirely. Build the rest of the site behind a dev-user shim, then plug in the direct Meta WhatsApp Cloud API as the last build step before pilot.**
 
 Why the change from the earlier "Twilio first" plan:
 - Twilio's all-in cost (number rental + Verify per-attempt + per-message) burns money during development for delivery we don't need yet.
-- Twilio's WhatsApp Verify requires bringing your own WhatsApp Business sender (Meta verification, ~1–2 weeks). Same upstream Meta dependency we'd hit for direct Meta — no delivery-time saving.
+- Twilio's WhatsApp Verify requires bringing your own WhatsApp Business sender (Meta verification, ~1–2 weeks). Same upstream Meta dependency we'd hit for direct Meta, no delivery-time saving.
 - Direct Meta has no number rental, no Verify markup; only per-message delivery (~$0.005–$0.03 / Israel auth). Cheapest at any scale.
 - The OTP layer is one swappable file (`lib/otp/*` interface), so deferring is risk-free.
 
@@ -451,7 +451,7 @@ Why the change from the earlier "Twilio first" plan:
 - Send: `POST https://graph.facebook.com/v21.0/{phone-number-id}/messages` with `type=template`, language `ar`, body parameter = generated code.
 - Verify: code stored hashed in `pending_signups.payload.otp_hash` (we own the lifecycle, not Meta).
 - Optional: `app/api/webhooks/whatsapp/route.ts` for delivery-status callbacks with `x-hub-signature-256` verification.
-- No DB, route, or UI changes — the `OtpProvider` interface (`lib/otp/provider.ts`) already covers it.
+- No DB, route, or UI changes, the `OtpProvider` interface (`lib/otp/provider.ts`) already covers it.
 
 ### Risks (current strategy)
 - **Late integration surfaces bugs.** Mitigation: dev-user shim exercises every auth-protected page through real RLS by issuing a session JWT for the dev doctor (Phase 3 work). Bugs surface at dev time, not pilot time.
@@ -465,7 +465,7 @@ Why the change from the earlier "Twilio first" plan:
 
 ### MVP search
 - Single endpoint: `GET /api/search?q=...&specialty_id=...`.
-- Server normalizes `q` with `normalizeArabic(q)` (same fn used at write time — single source of truth).
+- Server normalizes `q` with `normalizeArabic(q)` (same fn used at write time, single source of truth).
 - One SQL query:
   ```sql
   select d.id, d.arabic_full_name, d.hebrew_full_name, d.license_number,
@@ -497,7 +497,7 @@ Why the change from the earlier "Twilio first" plan:
 - Tests prove invariants: `normalize("أحمد") === normalize("احمد") === normalize("إحمد")`.
 
 ### Performance
-- Trigram GIN indexes make `ILIKE '%q%'` index-eligible — directory of < 50k rows answers in single-digit ms.
+- Trigram GIN indexes make `ILIKE '%q%'` index-eligible, directory of < 50k rows answers in single-digit ms.
 - Limit 50 results, no pagination in MVP (typical query returns < 10 rows).
 - Debounce 250 ms client-side.
 
@@ -512,9 +512,9 @@ Why the change from the earlier "Twilio first" plan:
 
 ### RLS enforcement
 - RLS **on** for every table with personal data (`doctors`, `doctor_specialties`, `audit_logs`, `pending_signups`).
-- Default-deny: no policy ⇒ no access. Service role bypasses RLS — used only in server-side API routes, never exposed to browser.
+- Default-deny: no policy ⇒ no access. Service role bypasses RLS, used only in server-side API routes, never exposed to browser.
 - Anon role gets **zero** policies on `doctors` (public site reads no doctor data, ever).
-- Test: every Phase 5 release runs a "RLS smoke test" — a script that hits PostgREST as anon and as a non-admin user, verifying no privileged data leaks.
+- Test: every Phase 5 release runs a "RLS smoke test", a script that hits PostgREST as anon and as a non-admin user, verifying no privileged data leaks.
 
 ### API protection
 - Every Route Handler:
@@ -539,12 +539,12 @@ Why the change from the earlier "Twilio first" plan:
 - Reject any request without a valid Turnstile token at these routes.
 
 ### Sensitive data handling
-- `audit_logs.metadata` never contains the search query string, OTP code, or phone number — only IDs, lengths, and timestamps.
+- `audit_logs.metadata` never contains the search query string, OTP code, or phone number, only IDs, lengths, and timestamps.
 - Sentry breadcrumbs scrub `phone`, `phone_e164`, `license_number`, `otp_code`, `code` keys.
 - HTTPS only (Vercel default).
 - Cookies: `httpOnly`, `secure`, `sameSite=lax`.
 - No `console.log` of full doctor records in server routes.
-- Backups (Supabase automatic) — document retention; ensure deletion requests propagate (eventually; document as known limitation).
+- Backups (Supabase automatic), document retention; ensure deletion requests propagate (eventually; document as known limitation).
 - `Content-Security-Policy` header restricting scripts to self + Turnstile + Sentry.
 - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`.
 
@@ -579,7 +579,7 @@ Why the change from the earlier "Twilio first" plan:
 | Phase 5 | Rate-limit hardening, Sentry, CSP, runbook, RLS smoke test, Lighthouse, manual pen pass, tag `v0.1.0-mvp` | All §12 acceptance criteria pass |
 
 **Critical dependencies:**
-- Twilio WA template approval (start of week 3 at the latest — can take 1–7 days).
+- Twilio WA template approval (start of week 3 at the latest, can take 1–7 days).
 - Supabase project provisioned (week 1).
 - Pilot doctor list ready (week 6) for week 7 invite-only smoke test.
 
@@ -603,7 +603,7 @@ Why the change from the earlier "Twilio first" plan:
 - [ ] WhatsApp button opens `wa.me/<e164-no-plus>?text=<encoded prefilled>` in a new tab.
 - [ ] Guests cannot reach `/dashboard`, `/profile`, or any doctor data via URL or API. Confirmed by RLS smoke test.
 - [ ] Doctors can update their Arabic / Hebrew name, specialties, subspecialty, email, visibility on `/profile`.
-- [ ] Doctors **cannot** change `phone_e164`, `license_number`, `is_admin_approved`, or `is_active` — confirmed both in UI and at the API level.
+- [ ] Doctors **cannot** change `phone_e164`, `license_number`, `is_admin_approved`, or `is_active`, confirmed both in UI and at the API level.
 - [ ] Admin panel lists all doctors, can deactivate / reactivate, can approve / unapprove, can view audit logs.
 - [ ] `/privacy` page renders the Arabic privacy text from spec §25.
 - [ ] Rate limits live on every public API route.
@@ -621,10 +621,10 @@ Why the change from the earlier "Twilio first" plan:
 ### What we cross-check
 Every signup is gated on the **Israel Ministry of Health doctors registry** before any OTP is sent. The registry is a public, open-licensed dataset published on data.gov.il and updated monthly.
 
-- **Dataset:** מאגר רישיונות רופאים משרד הבריאות (Database of Doctors Licenses — Ministry of Health).
+- **Dataset:** מאגר רישיונות רופאים משרד הבריאות (Database of Doctors Licenses, Ministry of Health).
 - **Resource ID:** `9c64c522-bbc2-48fe-96fb-3b2a8626f59e` (kept in `MOH_RESOURCE_ID` env var so we can swap if Israel re-publishes).
 - **Volume:** ~63,000 rows.
-- **License:** "אחר (פתוח)" — open.
+- **License:** "אחר (פתוח)", open.
 - **Disclaimer (from MoH):** the registry "should not be regarded as an official document; for legal purposes, verify directly with the Department for Licensing of Medical Professions". We use it for access gating, not legal attestation.
 
 ### Fields used
@@ -640,7 +640,7 @@ We ignore `מספר תעודת התמחות` and `תאריך רישום התמח
 
 ### Recommended approach: nightly sync + on-signup local lookup
 
-Don't hit data.gov.il in the signup hot path — it's a third party with no SLA. Mirror it nightly.
+Don't hit data.gov.il in the signup hot path, it's a third party with no SLA. Mirror it nightly.
 
 #### 1. Daily sync
 - Vercel Cron at `0 3 * * *` UTC → `GET /api/cron/sync-moh` (route handler).
@@ -664,10 +664,10 @@ const row = await db.from('moh_practitioners')
   .select('*').eq('license_number', license_number).single();
 
 if (!row) {
-  // Fall back to live CKAN — handles licenses issued after last snapshot.
+  // Fall back to live CKAN, handles licenses issued after last snapshot.
   const liveRow = await mohClient.searchByLicense(license_number);
   if (!liveRow) return { status: 'not_found' };
-  // Treat live hit as if synced — proceed with comparison.
+  // Treat live hit as if synced, proceed with comparison.
   ...
 }
 
@@ -726,10 +726,10 @@ At signup, after license-check passes, server compares the registry's `specialty
 - **Cron failure:** the daily snapshot is idempotent and ~3 MB; missing one day is harmless because every signup falls back to live CKAN on miss. Alarm if `audit_logs` shows no `moh_sync_completed` for > 48 h.
 
 ### Privacy & data hygiene
-- `moh_practitioners` is a mirror of public open data — no privacy escalation.
+- `moh_practitioners` is a mirror of public open data, no privacy escalation.
 - We do **not** publish or expose `moh_practitioners` to clients; RLS denies all user access.
-- We do **not** store the registry copy of any doctor's license date in the `doctors` table — the doctor's authoritative record is what they entered themselves; the registry is consulted only at verification time.
-- License-check audit logs record only license number and outcome — not the doctor's name input or registry response body.
+- We do **not** store the registry copy of any doctor's license date in the `doctors` table, the doctor's authoritative record is what they entered themselves; the registry is consulted only at verification time.
+- License-check audit logs record only license number and outcome, not the doctor's name input or registry response body.
 
 ### Env vars
 ```

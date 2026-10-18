@@ -1,20 +1,20 @@
 -- 0009_career_stage_self_declared.sql
 -- Career stage becomes self-declared at signup instead of inferred from the
--- Israeli MoH registry. Apply after 0008. Idempotent — safe to re-run.
+-- Israeli MoH registry. Apply after 0008. Idempotent, safe to re-run.
 --
--- Why: 0007 derived career_stage from the registry's `שם התמחות` column — a
+-- Why: 0007 derived career_stage from the registry's `שם התמחות` column, a
 -- blank specialty was read as "resident". Blank actually means "holds no
 -- board certificate", which covers residents AND general practitioners, so
 -- real GPs were badged طبيب مقيم. The column keeps its two values; طب عام is
 -- represented by NULL (no new enum value), and the doctor declares it.
 --
 -- Changes:
---   1. doctor_workplaces.workplace_type gains 'hmo' (صندوق مرضى) — where
+--   1. doctor_workplaces.workplace_type gains 'hmo' (صندوق مرضى), where
 --      residents actually work, and where neither hospital nor clinic fit.
---   2. doctors.residency_start_year — asked of residents only. No DB-level
+--   2. doctors.residency_start_year, asked of residents only. No DB-level
 --      cross-field rule: the stage is self-declared and the legal
 --      combinations are enforced in the form, not the schema.
---   3. specialties.code — a stable, rename-proof handle. The signup form has
+--   3. specialties.code, a stable, rename-proof handle. The signup form has
 --      to find الطب العام at runtime (auto-attach it for طب عام, filter it
 --      out of the grid for the other two stages), and an admin can rename
 --      any specialty from /admin/specialties, so a name match is fragile.

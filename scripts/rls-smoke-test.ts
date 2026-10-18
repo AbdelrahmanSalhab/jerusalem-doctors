@@ -63,7 +63,7 @@ const checks: Check[] = [
       const count = data?.length ?? 0;
       return {
         leaked: count > 0,
-        detail: count > 0 ? `LEAK — read ${count} row(s)` : "ok (empty)",
+        detail: count > 0 ? `LEAK, read ${count} row(s)` : "ok (empty)",
       };
     },
   },
@@ -146,7 +146,7 @@ async function testEmpty(table: string): Promise<{
   const count = data?.length ?? 0;
   return {
     leaked: count > 0,
-    detail: count > 0 ? `LEAK — read ${count} row(s)` : "ok (empty)",
+    detail: count > 0 ? `LEAK, read ${count} row(s)` : "ok (empty)",
   };
 }
 
@@ -163,5 +163,5 @@ async function testEmpty(table: string): Promise<{
     console.error(`RLS test FAILED: ${leaked} leak(s) detected.`);
     process.exit(1);
   }
-  console.log("RLS test passed — no anon leaks detected.");
+  console.log("RLS test passed, no anon leaks detected.");
 })();

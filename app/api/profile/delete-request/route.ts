@@ -1,7 +1,7 @@
 // POST /api/profile/delete-request
 // Soft-disables the doctor immediately and queues a delete request for the
 // admin. The doctor row remains for audit purposes; admin actions the
-// final state via /admin (also soft-only — no hard delete in MVP).
+// final state via /admin (also soft-only, no hard delete in MVP).
 
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";

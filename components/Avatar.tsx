@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 /**
- * Doctor avatar — uses profile_picture_url if present, otherwise renders the
+ * Doctor avatar, uses profile_picture_url if present, otherwise renders the
  * first Arabic letter of the doctor's name as a fallback. Round, sized via
  * the `size` prop (Tailwind h-/w- utilities recompute automatically).
  */

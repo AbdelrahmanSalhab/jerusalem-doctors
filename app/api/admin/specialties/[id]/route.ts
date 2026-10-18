@@ -1,4 +1,4 @@
-// PATCH /api/admin/specialties/[id] — rename, reorder, or toggle active.
+// PATCH /api/admin/specialties/[id], rename, reorder, or toggle active.
 
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";

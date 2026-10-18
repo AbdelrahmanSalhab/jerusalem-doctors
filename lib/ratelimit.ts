@@ -110,7 +110,7 @@ export async function rateLimit(
 ): Promise<RateLimitResult> {
   if (!identifier) {
     // Defensive: an empty identifier means "every caller shares one bucket"
-    // — almost certainly a bug. Fail closed in production, allow in dev.
+    //, almost certainly a bug. Fail closed in production, allow in dev.
     if (process.env.NODE_ENV === "production") {
       return { success: false, limit: 0, remaining: 0, reset: Date.now() };
     }

@@ -44,7 +44,7 @@ describe("parseIlLicense", () => {
   it("leaves an ambiguous 6-digit number alone", () => {
     // `145678` is both a plausible `1` + `45678` and a real serial of its
     // own. Only the registry name can tell them apart, so the parser must
-    // not guess — see lib/moh/match.ts.
+    // not guess, see lib/moh/match.ts.
     expect(parseIlLicense("145678")).toEqual({
       ok: true,
       serial: "145678",

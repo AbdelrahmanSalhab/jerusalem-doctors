@@ -2,7 +2,7 @@
 // cards and every zod schema that accepts a workplace.
 //
 // Kept in its own module (rather than inside careerStage.ts) because the
-// literal union used to be hand-written in ten places — widening it by hand
+// literal union used to be hand-written in ten places, widening it by hand
 // is exactly the kind of edit that gets missed in one of them.
 
 import { z } from "zod";

@@ -6,7 +6,7 @@ import { useState } from "react";
 /**
  * Search bar shown to anonymous visitors on the landing page. Any attempt to
  * use it (focus, type, submit) opens a modal directing the visitor to sign
- * in. The directory is closed by spec — search is gated behind auth.
+ * in. The directory is closed by spec, search is gated behind auth.
  */
 export function PublicSearchBar() {
   const [showModal, setShowModal] = useState(false);

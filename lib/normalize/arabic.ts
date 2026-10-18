@@ -13,7 +13,7 @@
 //   collapse whitespace, trim, lowercase
 //
 // IMPORTANT: the diacritics range is U+064B–U+065F only. Do NOT extend it to
-// U+0670 in a single character class — that range silently swallows the
+// U+0670 in a single character class, that range silently swallows the
 // Arabic-Indic digits U+0660–U+0669 and the punctuation block U+066A–U+066F,
 // breaking phone numbers, dates, license numbers, etc. typed in Arabic. Use
 // a separate replace for the dagger alef instead.

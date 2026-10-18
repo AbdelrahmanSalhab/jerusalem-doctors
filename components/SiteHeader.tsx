@@ -18,7 +18,7 @@ export const ORG_NAME_AR = "تجمّع أطباء العائلة المقدسي"
 
 /**
  * Site-wide header with logo, organization name, and auth controls.
- * Server component — branches on whether the visitor has a session.
+ * Server component, branches on whether the visitor has a session.
  */
 export async function SiteHeader() {
   // A deactivated doctor can still hold a session, but every page sends

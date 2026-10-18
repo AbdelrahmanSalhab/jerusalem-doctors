@@ -26,7 +26,7 @@ export function rejectWhilePhoneAuthDisabled(): NextResponse | null {
  * number. Failing here instead makes the reason visible on the phone field.
  *
  * This is about the number typed into the form, not about any account, so a
- * 400 here reveals nothing an attacker could use to enumerate members — which
+ * 400 here reveals nothing an attacker could use to enumerate members, which
  * is why /login/resend can call it despite answering 200 to everything else.
  */
 export function rejectUndeliverablePhone(e164: string): NextResponse | null {

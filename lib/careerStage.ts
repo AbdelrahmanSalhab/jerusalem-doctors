@@ -1,4 +1,4 @@
-// Career stage — self-declared at signup, editable afterwards from /profile
+// Career stage, self-declared at signup, editable afterwards from /profile
 // and /admin.
 //
 // It used to be derived from the Israeli MoH registry: a row with no
@@ -9,8 +9,8 @@
 // that separates the two, so the doctor now tells us.
 //
 // The UI offers three choices; the column still holds two values, with طب عام
-// represented by NULL. Everything each choice implies — which specialties are
-// offered, which workplace types, whether a residency year is asked for —
+// represented by NULL. Everything each choice implies, which specialties are
+// offered, which workplace types, whether a residency year is asked for:
 // lives in STAGE_OPTIONS so the two forms and the admin table agree.
 
 import { type WorkplaceType, WORKPLACE_TYPES } from "@/lib/workplace";
@@ -102,7 +102,7 @@ export const STAGE_BY_KEY: Record<Stage, StageOption> = Object.fromEntries(
 /**
  * NULL reads as طب عام. Callers that must tell a declared GP apart from a
  * legacy row that never declared anything check `career_stage === null`
- * themselves before calling — /profile does exactly that, so opening the page
+ * themselves before calling, /profile does exactly that, so opening the page
  * and saving an unrelated field can't silently re-label the doctor.
  */
 export function stageFromCareerStage(cs: CareerStage | null): Stage {
@@ -150,14 +150,14 @@ const ARABIC_INDIC = "٠١٢٣٤٥٦٧٨٩";
 
 /**
  * 2022 → "٢٠٢٢". A plain digit map rather than Intl: deterministic across
- * Node ICU builds, and no `useGrouping: false` to forget — ar-EG would
+ * Node ICU builds, and no `useGrouping: false` to forget, ar-EG would
  * otherwise render a year as ٢٬٠٢٢.
  */
 export function toArabicIndicDigits(n: number): string {
   return String(n).replace(/\d/g, (d) => ARABIC_INDIC[Number(d)]);
 }
 
-/** "طبيب مقيم · منذ ٢٠٢٢" — the year only ever qualifies a resident. */
+/** "طبيب مقيم · منذ ٢٠٢٢", the year only ever qualifies a resident. */
 export function careerStageBadge(
   careerStage: CareerStage,
   residencyStartYear: number | null,
@@ -198,7 +198,7 @@ export const GENERAL_SPECIALTY_CODE = "general";
 /**
  * Resolve the الطب العام row. Prefers the stable `code` column (0009) and
  * falls back to the display name so the app keeps working before that
- * migration lands — and so a `null` here never strands the form.
+ * migration lands, and so a `null` here never strands the form.
  */
 export function findGeneralSpecialtyId(
   specialties: { id: string; name_ar: string; code?: string | null }[],

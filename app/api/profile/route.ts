@@ -1,7 +1,7 @@
-// PATCH /api/profile — partial update of the signed-in doctor's row.
+// PATCH /api/profile, partial update of the signed-in doctor's row.
 // Server-side whitelist of editable columns. Locked fields (phone, license,
 // hebrew name, admin flags) are ignored even if sent. Workplaces are managed
-// as a single replace-all set per request — simpler than diffing.
+// as a single replace-all set per request, simpler than diffing.
 
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";

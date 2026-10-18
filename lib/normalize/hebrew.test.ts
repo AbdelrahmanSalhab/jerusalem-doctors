@@ -42,7 +42,7 @@ describe("normalizeHebrew", () => {
   });
 
   it("preserves Hebrew final letters distinctly", () => {
-    // ך (U+05DA), ם (U+05DD), ן (U+05DF), ף (U+05E3), ץ (U+05E5) — should not be folded.
+    // ך (U+05DA), ם (U+05DD), ן (U+05DF), ף (U+05E3), ץ (U+05E5), should not be folded.
     expect(normalizeHebrew("מלך")).toBe("מלך");
     expect(normalizeHebrew("שלום")).toBe("שלום");
   });
