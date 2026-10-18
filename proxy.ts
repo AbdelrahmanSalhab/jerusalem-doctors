@@ -2,14 +2,14 @@
 // protected routes. See plan §3 (auth flow) and §9 (RLS reliance on session
 // JWT being fresh).
 //
-// Public routes: /, /login, /signup, /verify, /privacy, /api/*, /_next/*,
-// /favicon, /health, /robots.txt. Everything else requires a session.
+// Public routes: / (exactly), /login, /signup, /verify, /privacy, /api/*,
+// /_next/*, /favicon, /health, /robots.txt. Everything else requires a
+// session. "/" must match exactly: as a prefix it would match every path.
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PREFIXES = [
-  "/",
   "/login",
   "/signup",
   "/verify",
@@ -21,9 +21,10 @@ const PUBLIC_PREFIXES = [
   "/robots.txt",
 ];
 
-function isPublic(pathname: string): boolean {
-  return PUBLIC_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p),
+export function isPublic(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))
   );
 }
 

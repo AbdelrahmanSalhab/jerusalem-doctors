@@ -9,6 +9,7 @@
 // from a support message is too late, so we check daily and shout early.
 
 import * as Sentry from "@sentry/nextjs";
+import { verifyCronAuth } from "@/lib/api/cronAuth";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
 
@@ -19,18 +20,8 @@ export const runtime = "nodejs";
 const DEFAULT_THRESHOLD = 50;
 
 export const GET = withJsonErrors(async (req: Request) => {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      return jsonError(500, { error: "cron_unconfigured" });
-    }
-    // dev: allow without secret so it can be triggered locally for testing
-  } else {
-    const authz = req.headers.get("authorization");
-    if (authz !== `Bearer ${secret}`) {
-      return jsonError(401, { error: "unauthorized" });
-    }
-  }
+  const denied = verifyCronAuth(req);
+  if (denied) return denied;
 
   // Nothing to watch if delivery has been rolled back to another provider.
   const provider = (process.env.OTP_PROVIDER ?? "").trim().toLowerCase();

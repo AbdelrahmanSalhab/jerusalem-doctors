@@ -9,6 +9,7 @@ import { FEATURED_KINDS } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdmin } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { writeAudit } from "@/lib/audit";
 
 const Body = z.object({
   is_admin_approved: z.boolean().optional(),
@@ -62,7 +63,7 @@ export const PATCH = withJsonErrors(async (
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
 
-  await service.from("audit_logs").insert({
+  await writeAudit(service, {
     actor_doctor_id: admin.id,
     action: "admin_doctor_updated",
     target_doctor_id: id,

@@ -10,6 +10,7 @@ import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { WorkplaceType } from "@/lib/workplace";
+import { writeAudit } from "@/lib/audit";
 
 const MAX_ATTEMPTS = 5;
 
@@ -251,7 +252,7 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   await service.from("pending_signups").delete().eq("id", pending.data.id);
 
-  await service.from("audit_logs").insert({
+  await writeAudit(service, {
     actor_doctor_id: insert.data.id,
     action: "signup_verified",
     target_doctor_id: insert.data.id,

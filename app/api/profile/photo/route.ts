@@ -6,10 +6,15 @@
 
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
+import { sniffImageType, type ImageType } from "@/lib/imageType";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
-const ACCEPTED = new Set(["image/jpeg", "image/png", "image/webp"]);
+const EXT: Record<ImageType, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 const BUCKET = "doctor-photos";
 
 export const POST = withJsonErrors(async (req: Request) => {
@@ -27,23 +32,24 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (file.size > MAX_BYTES) {
     return jsonError(413, { error: "file_too_large", code: "file_too_large" });
   }
-  if (!ACCEPTED.has(file.type)) {
+  // The type comes from the bytes; file.type is whatever the client claims.
+  const arrayBuffer = await file.arrayBuffer();
+  const type = sniffImageType(new Uint8Array(arrayBuffer));
+  if (!type) {
     return jsonError(415, {
       error: "unsupported_type",
       code: "unsupported_type",
     });
   }
 
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-  const path = `${me.id}.${ext}`;
+  const path = `${me.id}.${EXT[type]}`;
   const service = createSupabaseServiceClient();
 
   // Upload (overwrites previous photo at the same path).
-  const arrayBuffer = await file.arrayBuffer();
   const { error: uploadErr } = await service.storage
     .from(BUCKET)
     .upload(path, arrayBuffer, {
-      contentType: file.type,
+      contentType: type,
       upsert: true,
       cacheControl: "60",
     });

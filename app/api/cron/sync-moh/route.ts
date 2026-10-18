@@ -8,27 +8,19 @@
 // re-run on failure.
 
 import { NextResponse } from "next/server";
-import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { verifyCronAuth } from "@/lib/api/cronAuth";
+import { jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { MohClient } from "@/lib/moh/client";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { writeAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes — full snapshot is ~3MB / 63k rows
 
 export const GET = withJsonErrors(async (req: Request) => {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      return jsonError(500, { error: "cron_unconfigured" });
-    }
-    // dev: allow without secret so it can be triggered locally for testing
-  } else {
-    const authz = req.headers.get("authorization");
-    if (authz !== `Bearer ${secret}`) {
-      return jsonError(401, { error: "unauthorized" });
-    }
-  }
+  const denied = verifyCronAuth(req);
+  if (denied) return denied;
 
   const startedAt = Date.now();
   const client = new MohClient();
@@ -66,7 +58,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     await flush();
   } catch (err) {
     console.error("[cron/sync-moh] failed", err);
-    await supabase.from("audit_logs").insert({
+    await writeAudit(supabase, {
       action: "moh_sync_failed",
       metadata: {
         error: err instanceof Error ? err.message : String(err),
@@ -80,7 +72,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     );
   }
 
-  await supabase.from("audit_logs").insert({
+  await writeAudit(supabase, {
     action: "moh_sync_completed",
     metadata: {
       rows_upserted: upserted,
