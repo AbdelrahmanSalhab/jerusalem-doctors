@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MohClient, type MohRecord } from "./client";
-import { verifyLicense } from "./match";
+import { resolveIlLicense, verifyLicense } from "./match";
 
 function fakeSupabase(row: {
   license_number: number;
@@ -125,5 +125,101 @@ describe("verifyLicense (live fallback)", () => {
     );
     expect(r.status).toBe("not_found");
     expect(r.source).toBe("none");
+  });
+});
+
+describe("resolveIlLicense", () => {
+  /** A mirror keyed by license number, so each candidate looks up its own row. */
+  function mirrorOf(rows: (typeof MIRROR_ROW)[]) {
+    const lookups: number[] = [];
+    const client = {
+      from: () => ({
+        select: () => ({
+          eq: (_col: string, license: number) => ({
+            maybeSingle: async () => {
+              lookups.push(license);
+              return {
+                data: rows.find((r) => r.license_number === license) ?? null,
+                error: null,
+              };
+            },
+          }),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+    return { client, lookups };
+  }
+
+  const NAMES = { hebrewFirstName: "דניאל", hebrewFamilyName: "דריפוס" };
+  const OTHER = {
+    ...MIRROR_ROW,
+    hebrew_first_name: "משה",
+    hebrew_family_name: "כהן",
+    hebrew_first_norm: "משה",
+    hebrew_family_norm: "כהן",
+  };
+  const offline = { mohClient: fakeMohClient(null) };
+
+  it("finds the doctor under the serial without the typed prefix", async () => {
+    const { client } = mirrorOf([{ ...MIRROR_ROW, license_number: 23456 }]);
+    const r = await resolveIlLicense(
+      client,
+      { candidates: ["123456", "23456"], ...NAMES },
+      offline,
+    );
+    expect(r.serial).toBe("23456");
+    expect(r.result.status).toBe("verified");
+  });
+
+  it("prefers the as-typed serial when it verifies, without a second lookup", async () => {
+    const { client, lookups } = mirrorOf([
+      { ...MIRROR_ROW, license_number: 123456 },
+      { ...OTHER, license_number: 23456 },
+    ]);
+    const r = await resolveIlLicense(
+      client,
+      { candidates: ["123456", "23456"], ...NAMES },
+      offline,
+    );
+    expect(r.serial).toBe("123456");
+    expect(r.result.status).toBe("verified");
+    expect(lookups).toEqual([123456]);
+  });
+
+  it("takes a name match on the stripped serial over a mismatch as typed", async () => {
+    // 123456 belongs to someone else; the doctor is 23456.
+    const { client } = mirrorOf([
+      { ...OTHER, license_number: 123456 },
+      { ...MIRROR_ROW, license_number: 23456 },
+    ]);
+    const r = await resolveIlLicense(
+      client,
+      { candidates: ["123456", "23456"], ...NAMES },
+      offline,
+    );
+    expect(r.serial).toBe("23456");
+    expect(r.result.status).toBe("verified");
+  });
+
+  it("keeps the as-typed mismatch when the stripped serial is not found", async () => {
+    const { client } = mirrorOf([{ ...OTHER, license_number: 123456 }]);
+    const r = await resolveIlLicense(
+      client,
+      { candidates: ["123456", "23456"], ...NAMES },
+      offline,
+    );
+    expect(r.serial).toBe("123456");
+    expect(r.result.status).toBe("name_mismatch");
+  });
+
+  it("falls back to the as-typed serial when nothing is found", async () => {
+    const { client } = mirrorOf([]);
+    const r = await resolveIlLicense(
+      client,
+      { candidates: ["123456", "23456"], ...NAMES },
+      offline,
+    );
+    expect(r.serial).toBe("123456");
+    expect(r.result.status).toBe("not_found");
   });
 });

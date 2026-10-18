@@ -21,6 +21,7 @@ import {
   SS_SESSION,
   setHandoff,
 } from "@/lib/client/verify_handoff";
+import { toAsciiDigits } from "@/lib/normalize/digits";
 import { WORKPLACE_TYPE_LABEL, type WorkplaceType } from "@/lib/workplace";
 
 type Specialty = { id: string; name_ar: string; code: string | null };
@@ -285,10 +286,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     (form.has_secondary_license && form.secondary_license_region === "IL");
 
   // Strip disallowed chars from phone + license inputs so a paste of
-  // "Phone: 050-1234567" still produces a clean digit string. Server-side
-  // normalization is the actual source of truth.
+  // "Phone: 050-1234567" still produces a clean digit string. Arabic-Indic
+  // digits are converted first: an Arabic keyboard types ٠٥٠, and stripping
+  // them used to leave the field empty. Server-side normalization is the
+  // actual source of truth.
   const onPhoneChange = (next: string) => {
-    update("phone", next.replace(/[^0-9+\-\s()]/g, ""));
+    update("phone", toAsciiDigits(next).replace(/[^0-9+\-\s()]/g, ""));
   };
   // An IL license may be typed the way registries.health.gov.il prints it —
   // `1-189371`, profession code + serial — so the hyphen has to survive the
@@ -297,7 +300,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
   // PS licenses have no confirmed public format, so we only strip characters
   // that would break the request.
   const sanitizeIlLicense = (next: string) => {
-    const cleaned = next.replace(/[^\d-]/g, "");
+    const cleaned = toAsciiDigits(next).replace(/[^\d-]/g, "");
     const cut = cleaned.indexOf("-");
     return cut === -1
       ? cleaned
@@ -308,7 +311,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       "license_number",
       form.license_region === "IL"
         ? sanitizeIlLicense(next)
-        : next.replace(/[,()]/g, ""),
+        : toAsciiDigits(next).replace(/[,()]/g, ""),
     );
   };
 
@@ -453,7 +456,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
                   "secondary_license_number",
                   form.secondary_license_region === "IL"
                     ? sanitizeIlLicense(e.target.value)
-                    : e.target.value.replace(/[,()]/g, ""),
+                    : toAsciiDigits(e.target.value).replace(/[,()]/g, ""),
                 )
               }
               placeholder={

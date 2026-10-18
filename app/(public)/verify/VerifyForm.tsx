@@ -11,6 +11,7 @@ import {
   clearHandoff,
   getHandoff,
 } from "@/lib/client/verify_handoff";
+import { toAsciiDigits } from "@/lib/normalize/digits";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -142,7 +143,7 @@ export function VerifyForm() {
         autoComplete="one-time-code"
         maxLength={8}
         value={code}
-        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+        onChange={(e) => setCode(toAsciiDigits(e.target.value).replace(/\D/g, ""))}
         className="w-full rounded-md border border-foreground/20 px-4 py-3 text-center text-2xl tracking-[0.5em]"
         placeholder="------"
         required

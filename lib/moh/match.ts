@@ -172,3 +172,52 @@ function compareNames(
     source,
   };
 }
+
+/** Best first. A name match beats a bare hit on the number, and any hit
+ *  beats a number the registry doesn't know. */
+const STATUS_RANK: Record<LicenseVerifyStatus, number> = {
+  verified: 0,
+  soft_match: 1,
+  name_mismatch: 2,
+  not_found: 3,
+};
+
+export interface ResolvedIlLicense {
+  /** The registry serial the result belongs to; what gets stored. */
+  serial: string;
+  result: LicenseVerifyResult;
+}
+
+/**
+ * Verify each reading from ilLicenseCandidates() in order and keep the best,
+ * preferring the earlier (more literal) reading on a tie. Stops at the first
+ * `verified`, so an unambiguous number still costs one lookup.
+ */
+export async function resolveIlLicense(
+  supabase: SupabaseClient,
+  input: {
+    candidates: readonly string[];
+    hebrewFirstName: string;
+    hebrewFamilyName: string;
+  },
+  options: { mohClient?: MohClient } = {},
+): Promise<ResolvedIlLicense> {
+  let best: ResolvedIlLicense | null = null;
+  for (const serial of input.candidates) {
+    const result = await verifyLicense(
+      supabase,
+      {
+        licenseNumber: Number(serial),
+        hebrewFirstName: input.hebrewFirstName,
+        hebrewFamilyName: input.hebrewFamilyName,
+      },
+      options,
+    );
+    if (!best || STATUS_RANK[result.status] < STATUS_RANK[best.result.status]) {
+      best = { serial, result };
+    }
+    if (result.status === "verified") break;
+  }
+  if (!best) throw new Error("resolveIlLicense: no candidates");
+  return best;
+}

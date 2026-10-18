@@ -17,6 +17,8 @@
 // 2026-08-22), so we only apply a loose sanity bound and defer everything
 // else to manual admin review.
 
+import { toAsciiDigits } from "./digits";
+
 export type LicenseRegion = "IL" | "PS";
 
 /** Profession code for רפואה (medicine). The registry publishes 30 codes —
@@ -71,13 +73,13 @@ export type ParsedIlLicense =
  *
  * Deliberately NOT handled here: an unseparated number of 6 digits or fewer
  * is returned as-is, even though a doctor with a 5-digit serial may have
- * typed `1` in front of it. That case is genuinely ambiguous — `145678` is
- * both a plausible prefix+serial and a real serial in its own right — and
- * can only be resolved by cross-checking the registry name. See
- * lib/moh/match.ts.
+ * typed `1` in front of it. That case is genuinely ambiguous: `145678` is
+ * both a plausible prefix+serial and a real serial in its own right. Only
+ * the registry name can settle it, so ilLicenseCandidates() lists both
+ * readings and resolveIlLicense() in lib/moh/match.ts picks one.
  */
 export function parseIlLicense(raw: string): ParsedIlLicense {
-  const input = raw.trim();
+  const input = toAsciiDigits(raw).trim();
   if (!input) return { ok: false, reason: "empty" };
 
   const separated = input.match(IL_SEPARATED);
@@ -109,6 +111,32 @@ export function parseIlLicense(raw: string): ParsedIlLicense {
   return finishSerial(digits.slice(professionCode.length), true);
 }
 
+/** Shortest input for which "leading 1 + serial" is a reading worth a
+ * registry lookup; below this the remainder is a 1-2 digit serial. */
+const MIN_AMBIGUOUS_DIGITS = 4;
+
+/**
+ * Every serial a typed IL license could mean, most literal first, or null
+ * when it can't be read at all. An unseparated input that starts with `1`
+ * may be the registry's `1-` profession prefix glued onto a shorter serial
+ * (`123456` for `1-23456`), so the serial without that `1` is offered as a
+ * second reading. The registry name decides between them.
+ */
+export function ilLicenseCandidates(raw: string): string[] | null {
+  const parsed = parseIlLicense(raw);
+  if (!parsed.ok) return null;
+  const { serial, hadProfessionPrefix } = parsed;
+  if (
+    hadProfessionPrefix ||
+    serial.length < MIN_AMBIGUOUS_DIGITS ||
+    !serial.startsWith(IL_PHYSICIAN_PROFESSION_CODE)
+  ) {
+    return [serial];
+  }
+  const stripped = stripLeadingZeros(serial.slice(1));
+  return stripped === "0" ? [serial] : [serial, stripped];
+}
+
 function finishSerial(rest: string, hadProfessionPrefix: boolean): ParsedIlLicense {
   const serial = stripLeadingZeros(rest);
   if (!serial || serial === "0") return { ok: false, reason: "empty" };
@@ -132,7 +160,7 @@ export function canonicalLicenseNumber(
   licenseNumber: string,
 ): string | null {
   if (region === "PS") {
-    const trimmed = licenseNumber.trim();
+    const trimmed = toAsciiDigits(licenseNumber).trim();
     return isValidLicenseFormat("PS", trimmed) ? trimmed : null;
   }
   const parsed = parseIlLicense(licenseNumber);

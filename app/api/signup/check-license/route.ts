@@ -10,8 +10,8 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
-import { verifyLicense } from "@/lib/moh/match";
-import { canonicalLicenseNumber, licenseFormatErrorMessage } from "@/lib/normalize/license";
+import { resolveIlLicense } from "@/lib/moh/match";
+import { ilLicenseCandidates, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
@@ -48,32 +48,32 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   // The registry mirror is keyed on the bare serial, so a number typed in
   // the form the MoH site displays (`1-189371`, or `1189371` once the hyphen
-  // is dropped) has to lose its profession prefix before the lookup.
+  // is dropped) has to lose its profession prefix before the lookup. An
+  // unseparated `123456` may also be `1-23456`; the registry name decides.
   const raw = String(parsed.license_number).trim();
-  const canonical = canonicalLicenseNumber("IL", raw);
-  if (canonical === null) {
+  const candidates = ilLicenseCandidates(raw);
+  if (candidates === null) {
     return jsonError(400, {
       error: "invalid_license",
       code: "invalid_license",
       fields: { license_number: licenseFormatErrorMessage("IL", raw) },
     });
   }
-  const license = Number(canonical);
 
   const supabase = createSupabaseServiceClient();
 
   try {
-    const result = await verifyLicense(supabase, {
-      licenseNumber: license,
+    const { serial, result } = await resolveIlLicense(supabase, {
+      candidates,
       hebrewFirstName: parsed.hebrew_first_name,
       hebrewFamilyName: parsed.hebrew_family_name,
     });
 
     return jsonOk({
       status: result.status,
-      // Echo the serial we actually looked up so the form can show the
+      // Echo the serial we actually matched so the form can show the
       // doctor the number as the registry knows it.
-      license_number: canonical,
+      license_number: serial,
       registry_first_name: result.registryFirstName,
       registry_family_name: result.registryFamilyName,
       registry_specialty_he: result.registrySpecialtyHe ?? null,
