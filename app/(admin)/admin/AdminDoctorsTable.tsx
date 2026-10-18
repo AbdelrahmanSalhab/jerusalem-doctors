@@ -83,12 +83,20 @@ export function AdminDoctorsTable({
 
   // Erases the account for good (row, photo, login). Offered only on a
   // suspended row; a deletion request suspends the account.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const deleteDoctor = async (r: Row) => {
     const name = `${r.arabic_first_name} ${r.arabic_family_name}`;
     if (!window.confirm(`حذف حساب ${name} نهائيًا؟ تُحذف كل بياناته وصورته ولا يمكن التراجع.`)) return;
-    const res = await fetch(`/api/admin/doctors/${r.id}`, { method: "DELETE" });
-    if (res.ok) startTransition(() => router.refresh());
-    else window.alert("تعذّر الحذف. حاول مجددًا.");
+    setDeletingId(r.id);
+    try {
+      const res = await fetch(`/api/admin/doctors/${r.id}`, { method: "DELETE" });
+      if (res.ok) startTransition(() => router.refresh());
+      else window.alert("تعذّر الحذف. حاول مجددًا.");
+    } catch {
+      window.alert("تعذّر الحذف. حاول مجددًا.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const toggle = (
@@ -303,7 +311,7 @@ export function AdminDoctorsTable({
                     {!r.is_active && (
                       <button
                         type="button"
-                        disabled={pending}
+                        disabled={pending || deletingId !== null}
                         onClick={() => deleteDoctor(r)}
                         className="rounded border border-red-600 bg-red-600 px-2.5 py-1 text-sm text-white hover:bg-red-700"
                       >

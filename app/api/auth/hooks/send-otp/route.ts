@@ -10,6 +10,7 @@
 // The OTP value must never reach a log line, an error message, or Sentry.
 
 import * as Sentry from "@sentry/nextjs";
+import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { getOtpSender, OtpProviderError } from "@/lib/otp";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 
@@ -64,6 +65,12 @@ export async function POST(req: Request) {
   if (secret && !verifySendSmsHook(rawBody, req.headers, secret)) {
     return hookResponse(401);
   }
+
+  // The kill switch, enforced where every SMS passes. The app routes also
+  // refuse, but a bot can ask Supabase Auth for an OTP directly with the
+  // public anon key, which reaches this hook without touching them. 400
+  // so Supabase doesn't retry.
+  if (isPhoneAuthDisabled()) return hookResponse(400);
 
   let payload: SendSmsHookPayload;
   try {

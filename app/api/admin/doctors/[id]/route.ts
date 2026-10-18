@@ -122,6 +122,13 @@ export const DELETE = withJsonErrors(async (
       return jsonError(500, { error: "delete_failed", code: "delete_failed" });
     }
   }
+  // Their audit rows would otherwise outlive them with only the id nulled
+  // (on delete set null), keeping e.g. the delete request's IP.
+  const trail = await service.from("audit_logs").delete().eq("target_doctor_id", id);
+  if (trail.error) {
+    console.error("[admin.doctors.delete] audit scrub failed", trail.error);
+    return jsonError(500, { error: "delete_failed", code: "delete_failed" });
+  }
   const row = await service.from("doctors").delete().eq("id", id);
   if (row.error) {
     console.error("[admin.doctors.delete] row removal failed", row.error);

@@ -24,7 +24,7 @@ vi.mock("@/lib/supabase/service", () => ({
       delete: () => ({
         eq: async () => {
           steps.push(`delete:${table}`);
-          return { error: rowError };
+          return { error: table === "doctors" ? rowError : null };
         },
       }),
       insert: async (row: Record<string, unknown>) => {
@@ -70,9 +70,9 @@ describe("DELETE /api/admin/doctors/[id]", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
-  it("erases photo, login and row, then audits without personal data", async () => {
+  it("erases photo, login, audit trail and row, then audits without personal data", async () => {
     expect((await del()).status).toBe(200);
-    expect(steps).toEqual(["photos:d1.jpg,d1.png,d1.webp", "user:u1", "delete:doctors"]);
+    expect(steps).toEqual(["photos:d1.jpg,d1.png,d1.webp", "user:u1", "delete:audit_logs", "delete:doctors"]);
     expect(audits).toEqual([
       {
         actor_doctor_id: "admin-1",
@@ -123,7 +123,7 @@ describe("DELETE /api/admin/doctors/[id]", () => {
     doctor = { id: "d1", is_active: false, auth_user_id: null };
     rowError = { message: "boom" };
     expect((await del()).status).toBe(500);
-    expect(steps).toEqual(["photos:d1.jpg,d1.png,d1.webp", "delete:doctors"]);
+    expect(steps).toEqual(["photos:d1.jpg,d1.png,d1.webp", "delete:audit_logs", "delete:doctors"]);
     expect(audits).toEqual([]);
   });
 });
