@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
-import { rejectUndeliverablePhone } from "@/lib/otp/phone_gate";
+import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -21,6 +21,9 @@ const Body = z.object({
 });
 
 export const POST = withJsonErrors(async (req: Request) => {
+  const disabled = rejectWhilePhoneAuthDisabled();
+  if (disabled) return disabled;
+
   const ip = ipFromHeaders(req);
 
   let parsed: z.infer<typeof Body>;

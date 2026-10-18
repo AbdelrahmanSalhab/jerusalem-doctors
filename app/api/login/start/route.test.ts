@@ -136,3 +136,16 @@ describe("POST /api/login/start", () => {
     expect(auth.signInWithOtp).toHaveBeenCalled();
   });
 });
+
+describe("emergency switch", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("refuses with 503 before sending anything", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PHONE_AUTH_DISABLED", "1");
+    const res = await call({ phone: "050-123-4567", turnstile_token: "t", signup_session_id: "11111111-1111-4111-8111-111111111111" });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: "phone_auth_disabled" });
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
+  });
+});

@@ -126,6 +126,21 @@ describe("verifyLicense (live fallback)", () => {
     expect(r.status).toBe("not_found");
     expect(r.source).toBe("none");
   });
+
+  it("treats a registry outage as not_found, so the signup goes to admin review", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const down = {
+      findByLicense: vi.fn(async () => {
+        throw new Error("data.gov.il timeout");
+      }),
+    } as unknown as MohClient;
+    const r = await verifyLicense(
+      fakeSupabase(null),
+      { licenseNumber: 99999, hebrewFirstName: "שלום", hebrewFamilyName: "כהן" },
+      { mohClient: down },
+    );
+    expect(r).toEqual({ status: "not_found", source: "none" });
+  });
 });
 
 describe("resolveIlLicense", () => {
