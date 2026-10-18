@@ -22,13 +22,14 @@ vi.mock("@/lib/supabase/server", async () => {
 });
 
 const session = () => import("./session");
-const signedIn = (id = "u1") => auth.getUser.mockResolvedValue({ data: { user: { id } } });
+const signedIn = (id = "u1") =>
+  auth.getClaims.mockResolvedValue({ data: { claims: { sub: id } }, error: null });
 
 describe("lib/auth/session", () => {
   beforeEach(() => {
     db.reset();
     vi.clearAllMocks();
-    auth.getUser.mockResolvedValue({ data: { user: null } });
+    auth.getClaims.mockResolvedValue({ data: null, error: null });
   });
   afterEach(() => vi.unstubAllEnvs());
 
@@ -50,6 +51,12 @@ describe("lib/auth/session", () => {
       expect(await (await session()).getCurrentDoctor()).toBeNull();
     });
 
+    it("treats an invalid token as no session", async () => {
+      auth.getClaims.mockResolvedValue({ data: null, error: { message: "invalid JWT" } });
+      expect(await (await session()).getCurrentDoctor()).toBeNull();
+      expect(db.calls).toHaveLength(0);
+    });
+
     it("throws on a DB error", async () => {
       signedIn();
       db.queue("doctors", { error: { message: "boom" } });
@@ -67,7 +74,7 @@ describe("lib/auth/session", () => {
       db.queue("doctors", { data: { id: "dev-1" } });
       expect(await (await session()).getCurrentDoctor()).toEqual({ id: "dev-1" });
       expect(db.argsOf("doctors", "eq")).toEqual([["id", "dev-1"]]);
-      expect(auth.getUser).not.toHaveBeenCalled();
+      expect(auth.getClaims).not.toHaveBeenCalled();
     });
 
     it("returns null when the dev doctor row is missing", async () => {
@@ -82,7 +89,7 @@ describe("lib/auth/session", () => {
     it("stays off without DEV_DOCTOR_ID", async () => {
       vi.stubEnv("DEV_DOCTOR_ID", "");
       expect(await (await session()).getCurrentDoctor()).toBeNull();
-      expect(auth.getUser).toHaveBeenCalled();
+      expect(auth.getClaims).toHaveBeenCalled();
     });
 
     it("is ignored in production, with a warning at load", async () => {
@@ -90,7 +97,7 @@ describe("lib/auth/session", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.resetModules();
       expect(await (await session()).getCurrentDoctor()).toBeNull();
-      expect(auth.getUser).toHaveBeenCalled();
+      expect(auth.getClaims).toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("USE_DEV_USER=1"));
       warn.mockRestore();
     });

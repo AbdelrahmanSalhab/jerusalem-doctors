@@ -46,10 +46,13 @@ export async function proxy(req: NextRequest) {
     },
   );
 
-  const { data } = await supabase.auth.getUser();
-  const user = data.user;
+  // Also refreshes an expiring session and writes the new cookies. getClaims
+  // verifies locally with asymmetric signing keys, so most requests skip the
+  // Auth round trip getUser always made.
+  const { data } = await supabase.auth.getClaims();
+  const signedIn = Boolean(data?.claims.sub);
 
-  if (!isPublic(req.nextUrl.pathname) && !user) {
+  if (!isPublic(req.nextUrl.pathname) && !signedIn) {
     const url = new URL("/login", req.url);
     url.searchParams.set("next", req.nextUrl.pathname);
     return NextResponse.redirect(url);

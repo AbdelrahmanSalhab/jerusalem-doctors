@@ -8,6 +8,7 @@
 // already exist in the DB — see `scripts/seed-dev-doctor.sql`.
 
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { Doctor } from "@/lib/db/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -37,8 +38,11 @@ if (process.env.USE_DEV_USER === "1" && isProd()) {
 /**
  * Returns the currently authenticated doctor, or null if no session.
  * Honours the dev-user shim when enabled.
+ *
+ * cache(): the header and the page both ask during one render; they share
+ * one lookup instead of two sequential round trips each.
  */
-export async function getCurrentDoctor(): Promise<Doctor | null> {
+export const getCurrentDoctor = cache(async (): Promise<Doctor | null> => {
   if (isDevUserEnabled()) {
     const id = process.env.DEV_DOCTOR_ID!; // checked in isDevUserEnabled()
     const service = createSupabaseServiceClient();
@@ -51,20 +55,23 @@ export async function getCurrentDoctor(): Promise<Doctor | null> {
     return (data as Doctor | null) ?? null;
   }
 
+  // getClaims verifies the JWT locally against the project's signing keys
+  // (no Auth round trip); with a legacy symmetric secret it falls back to the
+  // same server check getUser makes.
   const supabase = await createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
-  if (!user) return null;
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims.sub;
+  if (!userId) return null;
 
   const service = createSupabaseServiceClient();
   const { data, error } = await service
     .from("doctors")
     .select("*")
-    .eq("auth_user_id", user.id)
+    .eq("auth_user_id", userId)
     .maybeSingle();
   if (error) throw error;
   return (data as Doctor | null) ?? null;
-}
+});
 
 /**
  * Same as getCurrentDoctor, but redirects unauthenticated visitors to /login.

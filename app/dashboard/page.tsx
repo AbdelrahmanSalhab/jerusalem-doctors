@@ -6,10 +6,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const me = await requireDoctor();
-
+  // Started before the auth check so the two don't run back to back; nothing
+  // is rendered unless requireDoctor() passes.
   const service = createSupabaseServiceClient();
-  const [{ data: specialties }, featured] = await Promise.all([
+  const reads = Promise.all([
     service
       .from("specialties")
       .select("id, name_ar, parent_id")
@@ -17,6 +17,8 @@ export default async function DashboardPage() {
       .order("sort_order"),
     fetchFeatured(service),
   ]);
+  const me = await requireDoctor();
+  const [{ data: specialties }, featured] = await reads;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">

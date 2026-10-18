@@ -76,6 +76,7 @@ export const db = createDb();
 /** The Supabase Auth surface the routes touch, via createSupabaseServerClient. */
 export const auth = {
   getUser: vi.fn(),
+  getClaims: vi.fn(),
   signInWithOtp: vi.fn(),
   verifyOtp: vi.fn(),
 };
