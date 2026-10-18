@@ -58,7 +58,7 @@ function Chips({ items }: { items: { key: string; label: string }[] }) {
   );
 }
 
-const unset = <span className="text-foreground/40">— غير محدد —</span>;
+const unset = <span className="text-foreground/40">غير محدد</span>;
 
 export function StageSummary({
   stageOpt,
@@ -72,7 +72,7 @@ export function StageSummary({
     <span>
       {stageOpt.label}
       {stageOpt.requiresResidencyStartYear && residencyStartYear
-        ? ` — بداية التخصص ${residencyStartYear}`
+        ? ` · بداية التخصص ${residencyStartYear}`
         : ""}
     </span>
   );
@@ -101,7 +101,7 @@ export function SpecialtiesSummary({
       <div>
         <div className="mb-1 text-sm text-foreground/65">التخصصات</div>
         {specialtyIds.length === 0 ? (
-          <span className="text-foreground/40">— لا يوجد —</span>
+          <span className="text-foreground/40">لا يوجد</span>
         ) : (
           <Chips
             items={specialties
@@ -139,7 +139,7 @@ export function SpecialtiesSummary({
 export function WorkplacesSummary({ workplaces }: { workplaces: WorkplaceEntry[] }) {
   const named = workplaces.filter((w) => w.name.trim().length > 0);
   if (named.length === 0) {
-    return <span className="text-foreground/40">— لا يوجد —</span>;
+    return <span className="text-foreground/40">لا يوجد</span>;
   }
   return (
     <ul className="space-y-1">

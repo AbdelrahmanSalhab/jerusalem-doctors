@@ -197,7 +197,7 @@ export function AdminDoctorsTable({
                   {r.secondary_license_number && (
                     <div className="text-foreground/50">
                       +{r.secondary_license_number} ({r.secondary_license_region}
-                      {" — "}
+                      {" · "}
                       {statusLabels[r.secondary_license_verification_status ?? ""] ??
                         "غير محدد"}
                       )

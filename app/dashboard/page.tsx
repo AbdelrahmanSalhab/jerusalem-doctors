@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
 import { fetchFeatured } from "@/lib/directory";
 import { requireDoctor } from "@/lib/auth/session";
+import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +20,15 @@ export default async function DashboardPage() {
     fetchFeatured(service),
   ]);
   const me = await requireDoctor();
-  const [{ data: specialties }, featured] = await reads;
+  const [[{ data: specialties }, featured], { data: myWorkplaces }] = await Promise.all([
+    reads,
+    service
+      .from("doctor_workplaces")
+      .select("name, workplace_type, address, phone")
+      .eq("doctor_id", me.id),
+  ]);
+  // Staff accounts (admin, hidden from the directory) have no card to improve.
+  const gaps = me.is_admin && !me.is_visible ? [] : profileGaps(me, myWorkplaces ?? []);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -40,6 +50,28 @@ export default async function DashboardPage() {
           البحث في الدليل الآن، لكن اسمك لن يظهر للأطباء الآخرين حتى تتحقق
           الإدارة من ترخيصك.
         </p>
+      )}
+
+      {gaps.length > 0 && (
+        <section
+          aria-label="أكمل ملفك"
+          className="flex flex-col gap-2 rounded-md border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <p className="font-semibold">أكمل ملفك ليسهل على الزملاء الوصول إليك</p>
+            <ul className="mt-1 list-disc ps-5">
+              {gaps.map((g) => (
+                <li key={g}>{g}</li>
+              ))}
+            </ul>
+          </div>
+          <Link
+            href="/profile"
+            className="shrink-0 rounded-md bg-sky-900 px-4 py-2 text-center text-white hover:opacity-90"
+          >
+            إكمال الملف
+          </Link>
+        </section>
       )}
 
       <DashboardSearch specialties={specialties ?? []} featured={featured} />

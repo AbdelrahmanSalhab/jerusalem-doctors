@@ -327,7 +327,7 @@ export function ProfileForm({
                 maxLength={500}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="اختياري — خبرة، اهتمامات مهنية، أو أي شيء تريد زملاءك أن يعرفوه"
+                placeholder="اختياري: خبرة، اهتمامات مهنية، أو أي شيء تريد زملاءك أن يعرفوه"
               />
             </Field>
           </>

@@ -79,7 +79,7 @@ export function PhotoUploader({
           {uploading ? "جارٍ الرفع..." : url ? "تغيير الصورة" : "رفع صورة"}
         </button>
         <p className="text-xs text-foreground/60">
-          JPG / PNG / WebP — الحد الأقصى 2 ميغابايت
+          JPG أو PNG أو WebP، بحد أقصى 2 ميغابايت
         </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <input

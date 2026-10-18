@@ -47,10 +47,10 @@ export default async function AdminAuditPage() {
                 </td>
                 <td className="p-3 text-center font-medium">{r.action}</td>
                 <td className="p-3 text-center font-mono text-sm" dir="ltr">
-                  {r.actor_doctor_id?.slice(0, 8) ?? "—"}
+                  {r.actor_doctor_id?.slice(0, 8) ?? "-"}
                 </td>
                 <td className="p-3 text-center font-mono text-sm" dir="ltr">
-                  {r.target_doctor_id?.slice(0, 8) ?? "—"}
+                  {r.target_doctor_id?.slice(0, 8) ?? "-"}
                 </td>
                 <td className="p-3 max-w-md break-words text-center font-mono text-sm">
                   {r.metadata ? JSON.stringify(r.metadata) : ""}

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       );
       return hookResponse(500);
     }
-    console.error("[send-otp] SEND_SMS_HOOK_SECRET unset — skipping signature check (dev only)");
+    console.error("[send-otp] SEND_SMS_HOOK_SECRET unset, skipping signature check (dev only)");
   }
 
   // Read the raw bytes BEFORE parsing: the signature covers the exact body,
