@@ -94,10 +94,12 @@ describe("workplaceForStage", () => {
   });
 
   // طب عام and مقيم both hide the clinic inputs, so nothing may survive there.
-  it("drops clinic fields for stages that hide them", () => {
-    for (const stage of ["general", "resident"] as const) {
-      expect(workplaceForStage(CLINIC, stage)).toMatchObject(BLANK);
-    }
+  it("drops clinic fields for a stage that hides them", () => {
+    expect(workplaceForStage(CLINIC, "resident")).toMatchObject(BLANK);
+  });
+
+  it("keeps a طب عام doctor's clinic details", () => {
+    expect(workplaceForStage(CLINIC, "general")).toBe(CLINIC);
   });
 
   it("drops clinic fields when a specialist switches the row to مستشفى", () => {
@@ -142,10 +144,10 @@ describe("STAGE_OPTIONS", () => {
     ).toEqual(["resident"]);
   });
 
-  it("asks for clinic details only from specialists", () => {
+  it("offers clinic details to طب عام and specialists, not residents", () => {
     expect(
       STAGE_OPTIONS.filter((o) => o.showsClinicFields).map((o) => o.stage),
-    ).toEqual(["specialist"]);
+    ).toEqual(["general", "specialist"]);
     expect(STAGE_BY_KEY.specialist.workplaceTypes).toContain("clinic");
   });
 

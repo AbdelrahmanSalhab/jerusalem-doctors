@@ -73,7 +73,7 @@ describe("clinicsMissingDetails", () => {
   });
 
   it("asks nothing of a stage without clinic fields", () => {
-    expect(clinicsMissingDetails(STAGE_BY_KEY.general, [row({ workplace_type: "clinic" })])).toEqual([]);
+    expect(clinicsMissingDetails(STAGE_BY_KEY.resident, [row({ workplace_type: "clinic" })])).toEqual([]);
     expect(clinicsMissingDetails(null, [row({ workplace_type: "clinic" })])).toEqual([]);
   });
 });

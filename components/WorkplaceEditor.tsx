@@ -1,7 +1,7 @@
 "use client";
 
 // Workplace rows for /signup and /profile. What a row offers follows the
-// doctor's stage (lib/careerStage.ts): which types, whether a specialist's
+// doctor's stage (lib/careerStage.ts): which types, whether its
 // عيادة asks for address/hours/phone (all optional), and whether any
 // workplace is required.
 // Input ids (`workplace_<i>_<field>`) are what the missing-fields list
