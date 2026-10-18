@@ -10,6 +10,8 @@ const { rateLimit, verifyTurnstile } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
+const captureException = vi.hoisted(() => vi.fn());
+vi.mock("@sentry/nextjs", () => ({ captureException }));
 vi.mock("@/lib/turnstile", () => ({ verifyTurnstile }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
@@ -81,10 +83,12 @@ describe("POST /api/login/resend", () => {
     await expect(call({ phone: "0501234567" })).rejects.toMatchObject({ code: "XX000" });
   });
 
-  it("reports a failed send as 502", async () => {
+  it("answers a failed send like any other number, and reports it", async () => {
     db.queue("doctors", { data: { id: "d1", is_active: true, is_phone_verified: true } });
     auth.signInWithOtp.mockResolvedValue({ error: { message: "down" } });
-    expect((await call({ phone: "0501234567" })).status).toBe(502);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await call({ phone: "0501234567" })).status).toBe(200);
+    expect(captureException).toHaveBeenCalled();
   });
 
   it("short-circuits under the dev shim", async () => {

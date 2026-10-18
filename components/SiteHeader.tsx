@@ -2,6 +2,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
 import { getCurrentDoctor } from "@/lib/auth/session";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
+
+/** Active doctors waiting for approval; shown to admins on the nav link. */
+async function countPending(): Promise<number> {
+  const { count, error } = await createSupabaseServiceClient()
+    .from("doctors")
+    .select("id", { count: "exact", head: true })
+    .eq("is_admin_approved", false)
+    .eq("is_active", true);
+  return error ? 0 : (count ?? 0);
+}
 
 export const ORG_NAME_AR = "تجمّع أطباء العائلة المقدسي";
 
@@ -11,6 +22,7 @@ export const ORG_NAME_AR = "تجمّع أطباء العائلة المقدسي"
  */
 export async function SiteHeader() {
   const doctor = await getCurrentDoctor().catch(() => null);
+  const pending = doctor?.is_admin ? await countPending().catch(() => 0) : 0;
 
   return (
     <header className="border-b border-foreground/10">
@@ -55,6 +67,14 @@ export async function SiteHeader() {
                   className="rounded-md px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
                 >
                   الإدارة
+                  {pending > 0 && (
+                    <span
+                      className="ms-1.5 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white"
+                      aria-label={`${pending} بانتظار المراجعة`}
+                    >
+                      {pending}
+                    </span>
+                  )}
                 </Link>
               )}
               <LogoutButton className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3" />

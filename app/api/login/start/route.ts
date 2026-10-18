@@ -6,6 +6,7 @@
 // Hook at /api/auth/hooks/send-otp (SMS via the SMS4FREE API).
 // Resends go to /api/login/resend, which is not Turnstile-gated.
 
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
@@ -101,11 +102,11 @@ export const POST = withJsonErrors(async (req: Request) => {
     options: { channel: "sms" },
   });
   if (otpErr) {
+    // Same answer as for any other number: a 502 here, which only a
+    // registered phone can reach, would say the number has an account. The
+    // doctor sees the "no code?" help on /verify; we see this in Sentry.
     console.error("[login/start] signInWithOtp failed", otpErr);
-    return jsonError(502, {
-      error: "otp_send_failed",
-      code: "otp_send_failed",
-    });
+    Sentry.captureException(otpErr, { tags: { route: "login/start" } });
   }
 
   return jsonOk({ ok: true, phone_e164: phoneE164 });
