@@ -49,7 +49,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     stage: "general",
     label: "طب عام",
     shortLabel: "طب عام",
-    hint: "طبيب عام — بدون شهادة تخصص",
+    hint: "طبيب عام، بدون شهادة تخصص",
     careerStage: null,
     showsSpecialtyPicker: false,
     autoAttachesGeneralSpecialty: true,

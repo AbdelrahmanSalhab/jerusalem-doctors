@@ -283,7 +283,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
       <Section title="نبذة عني (اختياري)">
         <Field
-          label="اكتب ما تريد زملاءك أن يعرفوه عنك — خبرة، اهتمامات مهنية، أو أي شيء آخر"
+          label="اكتب ما تريد زملاءك أن يعرفوه عنك: خبرة، اهتمامات مهنية، أو أي شيء آخر"
           htmlFor="bio"
         >
           <textarea

@@ -95,7 +95,7 @@ export function LockableField({
             dir={dir}
           >
             {value || (
-              <span className="text-foreground/40">— غير محدد —</span>
+              <span className="text-foreground/40">غير محدد</span>
             )}
           </div>
           <button

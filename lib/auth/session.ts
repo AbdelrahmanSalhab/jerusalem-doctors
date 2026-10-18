@@ -30,7 +30,7 @@ const isDevUserEnabled = () =>
 // regardless of how USE_DEV_USER is set when NODE_ENV=production.
 if (process.env.USE_DEV_USER === "1" && isProd()) {
   console.warn(
-    "[auth/session] USE_DEV_USER=1 is set but NODE_ENV=production — " +
+    "[auth/session] USE_DEV_USER=1 is set but NODE_ENV=production; " +
       "the dev shim will be ignored. Unset USE_DEV_USER before deploy.",
   );
 }
