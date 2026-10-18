@@ -6,16 +6,11 @@
 
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
-import { sniffImageType, type ImageType } from "@/lib/imageType";
+import { sniffImageType } from "@/lib/imageType";
+import { PHOTO_BUCKET, photoPath } from "@/lib/photo";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
-const EXT: Record<ImageType, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-const BUCKET = "doctor-photos";
 
 export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
@@ -42,12 +37,12 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   }
 
-  const path = `${me.id}.${EXT[type]}`;
+  const path = photoPath(me.id, type);
   const service = createSupabaseServiceClient();
 
   // Upload (overwrites previous photo at the same path).
   const { error: uploadErr } = await service.storage
-    .from(BUCKET)
+    .from(PHOTO_BUCKET)
     .upload(path, arrayBuffer, {
       contentType: type,
       upsert: true,
@@ -58,7 +53,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(500, { error: "upload_failed", code: "upload_failed" });
   }
 
-  const { data: pub } = service.storage.from(BUCKET).getPublicUrl(path);
+  const { data: pub } = service.storage.from(PHOTO_BUCKET).getPublicUrl(path);
   // Cache-bust on overwrite by appending a version param.
   const url = `${pub.publicUrl}?v=${Date.now()}`;
 

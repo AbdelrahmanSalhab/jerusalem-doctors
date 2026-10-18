@@ -6,7 +6,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 export const dynamic = "force-dynamic";
 
 interface SearchParams {
-  status?: "pending" | "approved" | "all";
+  status?: "pending" | "approved" | "suspended" | "all";
   q?: string;
 }
 
@@ -33,6 +33,8 @@ export default async function AdminDoctorsPage({
 
   if (status === "pending") query = query.eq("is_admin_approved", false);
   if (status === "approved") query = query.eq("is_admin_approved", true);
+  // Suspended by an admin or by the doctor's own deletion request.
+  if (status === "suspended") query = query.eq("is_active", false);
   // Stored names are normalized (إ/أ/آ to ا), so the typed text must be too.
   const term = toIlikeTerm(q);
   if (term) {
