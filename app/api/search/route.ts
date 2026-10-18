@@ -10,53 +10,20 @@
 // we filter explicitly so the user-scoped client doesn't have to.
 
 import { z } from "zod";
+import { directoryQuery, toSearchHits } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { withSubspecialties } from "@/lib/specialtyTree";
-import { buildWhatsAppLink } from "@/lib/whatsapp";
-import type { WorkplaceType } from "@/lib/workplace";
 
 const Query = z.object({
   q: z.string().trim().max(100).default(""),
   specialty_id: z.uuid().optional(),
 });
 
-export interface SearchWorkplace {
-  name: string;
-  workplace_type: WorkplaceType;
-  /** Legacy free text; cards show it only when the clinic fields are empty. */
-  details: string | null;
-  address: string | null;
-  hours: string | null;
-  phone: string | null;
-  is_primary: boolean;
-}
-
-export interface SearchHit {
-  id: string;
-  arabic_first_name: string;
-  arabic_family_name: string;
-  hebrew_first_name: string | null;
-  hebrew_family_name: string | null;
-  license_number: string;
-  /** Null only when the column itself is unset — the directory always shows it. */
-  phone_display: string | null;
-  /** Drives the WhatsApp button on the card. */
-  whatsapp_url: string | null;
-  email: string | null;
-  subspecialty: string | null;
-  bio: string | null;
-  career_stage: "resident" | "specialist" | null;
-  /** Qualifies the resident badge: "طبيب مقيم · منذ ٢٠٢٢". */
-  residency_start_year: number | null;
-  specialties: string[];
-  /** Empty only for a doctor with no workplace rows. */
-  workplaces: SearchWorkplace[];
-  profile_picture_url: string | null;
-}
+export type { SearchHit, SearchWorkplace } from "@/lib/directory";
 
 export const GET = withJsonErrors(async (req: Request) => {
   const me = await getCurrentDoctor().catch(() => null);
@@ -85,35 +52,7 @@ export const GET = withJsonErrors(async (req: Request) => {
   // Use service-role + manual visibility filter — simpler than threading the
   // user-scoped client through nested selects, and the RLS contract is
   // duplicated here for defense-in-depth.
-  let query = service
-    .from("doctors")
-    .select(
-      `
-      id,
-      arabic_first_name,
-      arabic_family_name,
-      hebrew_first_name,
-      hebrew_family_name,
-      license_number,
-      phone_display,
-      phone_e164,
-      profile_picture_url,
-      email,
-      subspecialty,
-      bio,
-      career_stage,
-      residency_start_year,
-      doctor_specialties${parsed.data.specialty_id ? "!inner" : ""}(
-        specialty:specialties(id, name_ar)
-      ),
-      doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order)
-    `,
-    )
-    .eq("is_active", true)
-    .eq("is_visible", true)
-    .eq("is_phone_verified", true)
-    .eq("is_admin_approved", true)
-    .eq("consent_directory_use", true)
+  let query = directoryQuery(service, Boolean(parsed.data.specialty_id))
     .order("arabic_full_name", { ascending: true })
     .limit(50);
 
@@ -193,6 +132,7 @@ export const GET = withJsonErrors(async (req: Request) => {
       `arabic_first_name_normalized.ilike.${pattern}`,
       `arabic_family_name_normalized.ilike.${pattern}`,
       `subspecialty_normalized.ilike.${pattern}`,
+      `certificates_normalized.ilike.${pattern}`,
     ];
     if (joinedDoctorIds.length) {
       orFilters.push(`id.in.(${joinedDoctorIds.join(",")})`);
@@ -208,58 +148,6 @@ export const GET = withJsonErrors(async (req: Request) => {
     return jsonOk({ results: [], count: 0 });
   }
 
-  const results: SearchHit[] = (data ?? []).map((d) => {
-    // PostgREST returns nested relations as arrays, even on FK joins.
-    const specialties = ((d.doctor_specialties ?? []) as unknown as Array<{
-      specialty: { name_ar: string } | { name_ar: string }[] | null;
-    }>)
-      .flatMap((row) => {
-        const s = row.specialty;
-        if (!s) return [];
-        return Array.isArray(s) ? s.map((x) => x.name_ar) : [s.name_ar];
-      })
-      .filter((n): n is string => Boolean(n));
-
-    const workplaces = (
-      (d.doctor_workplaces ?? []) as Array<SearchWorkplace & { sort_order: number }>
-    )
-      .slice()
-      .sort((a, b) => {
-        if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
-        return a.sort_order - b.sort_order;
-      })
-      .map((w): SearchWorkplace => ({
-        name: w.name,
-        workplace_type: w.workplace_type,
-        details: w.details,
-        address: w.address,
-        hours: w.hours,
-        phone: w.phone,
-        is_primary: w.is_primary,
-      }));
-
-    return {
-      id: d.id,
-      arabic_first_name: d.arabic_first_name,
-      arabic_family_name: d.arabic_family_name,
-      hebrew_first_name: d.hebrew_first_name,
-      hebrew_family_name: d.hebrew_family_name,
-      license_number: d.license_number,
-      phone_display: d.phone_display,
-      // buildWhatsAppLink throws on an empty string, and the old
-      // phone_is_visible ternary was incidentally shielding that — keep a
-      // guard so one malformed row can't 500 the whole search response.
-      whatsapp_url: d.phone_e164 ? buildWhatsAppLink(d.phone_e164) : null,
-      email: d.email,
-      subspecialty: d.subspecialty,
-      bio: d.bio,
-      career_stage: d.career_stage,
-      residency_start_year: d.residency_start_year,
-      specialties,
-      workplaces,
-      profile_picture_url: d.profile_picture_url ?? null,
-    };
-  });
-
+  const results = toSearchHits(data);
   return jsonOk({ results, count: results.length });
 });

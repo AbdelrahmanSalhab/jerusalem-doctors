@@ -10,6 +10,7 @@ import {
   type Stage,
   stageFromCareerStage,
 } from "@/lib/careerStage";
+import { FEATURED_KINDS, FEATURED_LABEL, type FeaturedKind } from "@/lib/directory";
 
 interface Row {
   id: string;
@@ -27,6 +28,8 @@ interface Row {
   is_admin_approved: boolean;
   is_active: boolean;
   is_visible: boolean;
+  featured: FeaturedKind | null;
+  seeking_work: boolean;
   created_at: string;
 }
 
@@ -138,13 +141,14 @@ export function AdminDoctorsTable({
               <th className="p-3 text-center">الترخيص</th>
               <th className="p-3 text-center">حالة التحقق</th>
               <th className="p-3 text-center">المرحلة</th>
+              <th className="p-3 text-center">العرض في الصفحة الرئيسية</th>
               <th className="p-3 text-center">إجراءات</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-foreground/65">
+                <td colSpan={7} className="p-6 text-center text-foreground/65">
                   لا توجد نتائج.
                 </td>
               </tr>
@@ -223,6 +227,29 @@ export function AdminDoctorsTable({
                       placeholder="سنة بداية التخصص"
                       className="mt-1 w-28 rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-sm"
                     />
+                  )}
+                </td>
+                <td className="p-3 text-center">
+                  <select
+                    aria-label="العرض في الصفحة الرئيسية"
+                    disabled={pending}
+                    value={r.featured ?? ""}
+                    onChange={(e) =>
+                      patchDoctor(r.id, { featured: e.target.value || null })
+                    }
+                    className="rounded-md border border-foreground/20 bg-transparent px-2 py-1 text-sm"
+                  >
+                    <option value="">غير مميز</option>
+                    {FEATURED_KINDS.map((k) => (
+                      <option key={k} value={k}>
+                        {FEATURED_LABEL[k]}
+                      </option>
+                    ))}
+                  </select>
+                  {r.featured === "graduate" && !r.seeking_work && (
+                    <div className="mt-1 text-xs text-amber-700">
+                      لا يظهر: لم يفعّل &quot;أبحث عن فرصة عمل&quot;
+                    </div>
                   )}
                 </td>
                 <td className="p-3 text-center">

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
+import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -33,6 +34,9 @@ const Body = z.object({
   // Replace-all. Empty is only valid for a resident (checked below, since
   // the stage may come from this request or from the stored row).
   workplaces: z.array(WorkplaceInputSchema).max(20).optional(),
+  // Only kept for طب عام; any other stage stores an empty list.
+  certificates: CertificatesSchema.optional(),
+  seeking_work: z.boolean().optional(),
 });
 
 export const PATCH = withJsonErrors(async (req: Request) => {
@@ -100,6 +104,14 @@ export const PATCH = withJsonErrors(async (req: Request) => {
   }
   if (parsed.residency_start_year !== undefined) {
     updates.residency_start_year = parsed.residency_start_year;
+  }
+  if (parsed.certificates !== undefined) {
+    const certificates = stageAfterSave === null ? parsed.certificates : [];
+    updates.certificates = certificates;
+    updates.certificates_normalized = certificatesNormalized(certificates);
+  }
+  if (parsed.seeking_work !== undefined) {
+    updates.seeking_work = parsed.seeking_work;
   }
 
   if (Object.keys(updates).length > 0) {

@@ -186,3 +186,42 @@ describe("PATCH /api/profile: workplaces", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("PATCH /api/profile: certificates and seeking work", () => {
+  beforeEach(() => {
+    updateSpy.mockClear();
+    me = { id: "doc-1", career_stage: null };
+  });
+
+  it("stores a طب عام doctor's certificates, trimmed and de-duplicated, with a search key", async () => {
+    const res = await call({
+      career_stage: null,
+      certificates: [" دبلوم طب الأسرة ", "", "ACLS", "ACLS"],
+    });
+    expect(res.status).toBe(200);
+    expect(doctorUpdate()).toMatchObject({
+      certificates: ["دبلوم طب الأسرة", "ACLS"],
+      certificates_normalized: "دبلوم طب الاسرة acls",
+    });
+  });
+
+  it("drops certificates for any other stage", async () => {
+    const res = await call({ career_stage: "specialist", certificates: ["ACLS"] });
+    expect(res.status).toBe(200);
+    expect(doctorUpdate()).toMatchObject({
+      certificates: [],
+      certificates_normalized: null,
+    });
+  });
+
+  it("rejects more than 5 certificates", async () => {
+    const res = await call({ certificates: ["a", "b", "c", "d", "e", "f"] });
+    expect(res.status).toBe(400);
+  });
+
+  it("saves seeking_work", async () => {
+    const res = await call({ seeking_work: true });
+    expect(res.status).toBe(200);
+    expect(doctorUpdate()).toMatchObject({ seeking_work: true });
+  });
+});

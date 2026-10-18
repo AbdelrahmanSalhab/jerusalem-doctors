@@ -1,4 +1,5 @@
 import { DashboardSearch } from "./DashboardSearch";
+import { fetchFeatured } from "@/lib/directory";
 import { requireDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -8,11 +9,14 @@ export default async function DashboardPage() {
   const me = await requireDoctor();
 
   const service = createSupabaseServiceClient();
-  const { data: specialties } = await service
-    .from("specialties")
-    .select("id, name_ar, parent_id")
-    .eq("is_active", true)
-    .order("sort_order");
+  const [{ data: specialties }, featured] = await Promise.all([
+    service
+      .from("specialties")
+      .select("id, name_ar, parent_id")
+      .eq("is_active", true)
+      .order("sort_order"),
+    fetchFeatured(service),
+  ]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
@@ -25,7 +29,7 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <DashboardSearch specialties={specialties ?? []} />
+      <DashboardSearch specialties={specialties ?? []} featured={featured} />
     </main>
   );
 }

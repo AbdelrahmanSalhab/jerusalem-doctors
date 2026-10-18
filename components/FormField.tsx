@@ -36,3 +36,30 @@ export function RequiredMark() {
     </span>
   );
 }
+
+/** Shown on the card as a badge; also what lets an admin feature the
+ *  doctor in the dashboard's new-graduates section. */
+export function SeekingWorkCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2">
+      <input
+        type="checkbox"
+        className="mt-1"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>
+        أبحث عن فرصة عمل
+        <span className="block text-sm text-foreground/60">
+          تظهر عبارة &quot;يبحث عن فرصة عمل&quot; على بطاقتك، ويمكنك إلغاؤها في أي وقت من ملفك.
+        </span>
+      </span>
+    </label>
+  );
+}
