@@ -174,7 +174,7 @@ function ResultsRegion({
 
   if (state.status === "error") {
     return (
-      <p className="rounded border border-red-300 bg-red-50 p-4 text-center text-red-800">
+      <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-center text-red-800">
         {state.message}
       </p>
     );

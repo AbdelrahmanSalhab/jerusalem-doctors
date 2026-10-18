@@ -178,6 +178,7 @@ export function VerifyForm() {
         dir="ltr"
         inputMode="numeric"
         autoComplete="one-time-code"
+        aria-label="رمز التحقق"
         maxLength={8}
         value={code}
         onChange={(e) => setCode(toAsciiDigits(e.target.value).replace(/\D/g, ""))}
@@ -187,7 +188,7 @@ export function VerifyForm() {
       />
 
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </p>
       )}
