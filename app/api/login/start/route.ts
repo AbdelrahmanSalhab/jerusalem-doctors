@@ -55,8 +55,12 @@ export const POST = withJsonErrors(async (req: Request) => {
   const unsupported = rejectUndeliverablePhone(phoneE164);
   if (unsupported) return unsupported;
 
-  const rl = await rateLimit("loginStart", `phone:${phoneE164}`);
-  const rlIp = await rateLimit("loginStart", `ip:${ip}`);
+  // Both windows are checked (and counted) on every request; in parallel
+  // they cost one Redis round trip instead of two.
+  const [rl, rlIp] = await Promise.all([
+    rateLimit("loginStart", `phone:${phoneE164}`),
+    rateLimit("loginStart", `ip:${ip}`),
+  ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }

@@ -88,11 +88,12 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
   }
 
-  const rl = await rateLimit(
-    "signupVerify",
-    `session:${parsed.signup_session_id}`,
-  );
-  const rlIp = await rateLimit("signupVerify", `ip:${ip}`);
+  // Both windows are checked (and counted) on every request; in parallel
+  // they cost one Redis round trip instead of two.
+  const [rl, rlIp] = await Promise.all([
+    rateLimit("signupVerify", `session:${parsed.signup_session_id}`),
+    rateLimit("signupVerify", `ip:${ip}`),
+  ]);
   if (!rl.success || !rlIp.success) {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
