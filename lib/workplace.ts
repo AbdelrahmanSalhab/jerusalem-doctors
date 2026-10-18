@@ -50,7 +50,7 @@ export function hasInvalidClinicPhone(w: { name: string; phone: string }): boole
 
 /** Which clinic details a named عيادة row still lacks. Optional, so this only
  *  drives the profile's reminder; the caller decides whether the stage shows
- *  them at all (specialists only). */
+ *  them at all (طب عام and specialists). */
 export function missingClinicFields(w: {
   name: string;
   workplace_type: WorkplaceType;

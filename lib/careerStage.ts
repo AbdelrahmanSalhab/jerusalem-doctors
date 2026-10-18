@@ -36,7 +36,7 @@ export interface StageOption {
   readonly requiresResidencyStartYear: boolean;
   readonly workplaceTypes: readonly WorkplaceType[];
   readonly defaultWorkplaceType: WorkplaceType;
-  /** Only a specialist's عيادة asks for address, hours and phone. */
+  /** A عيادة here offers address, hours and phone (طب عام and specialists). */
   readonly showsClinicFields: boolean;
   /** A resident rotates during training, so no fixed workplace is required. */
   readonly workplaceOptional: boolean;
@@ -57,7 +57,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     requiresResidencyStartYear: false,
     workplaceTypes: ["hospital", "clinic"],
     defaultWorkplaceType: "clinic",
-    showsClinicFields: false,
+    showsClinicFields: true,
     workplaceOptional: false,
     showsCertificates: true,
   },
