@@ -117,8 +117,9 @@ export function LoginForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <label className="mb-1.5 block text-sm font-medium">رقم الهاتف</label>
+        <label htmlFor="login-phone" className="mb-1.5 block text-sm font-medium">رقم الهاتف</label>
         <input
+          id="login-phone"
           type="tel"
           required
           dir="ltr"
@@ -139,7 +140,7 @@ export function LoginForm() {
       />
 
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </p>
       )}

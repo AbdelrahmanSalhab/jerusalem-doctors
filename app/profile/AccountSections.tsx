@@ -1,6 +1,7 @@
 // The profile page's closing sections: contact the developer, and request
 // account deletion.
 
+import { useRouter } from "next/navigation";
 import { Section } from "./ProfileFields";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
@@ -36,6 +37,7 @@ export function HelpSection() {
 }
 
 export function DeleteAccountSection({ onError }: { onError: (msg: string) => void }) {
+  const router = useRouter();
   const requestDelete = async () => {
     const ok = window.confirm(
       "هل أنت متأكد؟ سيتم إخفاء حسابك من البحث فورًا، وسيقوم المسؤول بالمراجعة.",
@@ -43,7 +45,9 @@ export function DeleteAccountSection({ onError }: { onError: (msg: string) => vo
     if (!ok) return;
     const res = await fetch("/api/profile/delete-request", { method: "POST" });
     if (res.ok) {
-      window.location.href = "/";
+      // The route signed the session out; refresh so the header follows.
+      router.replace("/login?status=deleted");
+      router.refresh();
     } else {
       onError("لم نتمكن من تسجيل طلب الحذف.");
     }

@@ -31,6 +31,17 @@ export default async function DashboardPage() {
         </p>
       </header>
 
+      {!me.is_admin_approved && !me.is_admin && (
+        <p
+          role="status"
+          className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+        >
+          <strong className="font-semibold">حسابك قيد المراجعة.</strong> يمكنك
+          البحث في الدليل الآن، لكن اسمك لن يظهر للأطباء الآخرين حتى تتحقق
+          الإدارة من ترخيصك.
+        </p>
+      )}
+
       <DashboardSearch specialties={specialties ?? []} featured={featured} />
     </main>
   );

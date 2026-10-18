@@ -16,7 +16,7 @@ import { WorkplaceInputSchema } from "@/lib/workplace";
 const Body = z.object({
   arabic_first_name: z.string().trim().min(2).max(80).optional(),
   arabic_family_name: z.string().trim().min(2).max(80).optional(),
-  email: z.email().optional(),
+  email: z.email().max(254).optional(),
   subspecialty: z.string().trim().max(120).nullable().optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   specialty_ids: z.array(z.uuid()).min(1).max(5).optional(),

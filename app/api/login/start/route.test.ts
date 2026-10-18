@@ -7,6 +7,8 @@ const rateLimit = vi.hoisted(() => vi.fn());
 const verifyTurnstile = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
+const captureException = vi.hoisted(() => vi.fn());
+vi.mock("@sentry/nextjs", () => ({ captureException }));
 vi.mock("@/lib/turnstile", () => ({ verifyTurnstile }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
@@ -112,11 +114,13 @@ describe("POST /api/login/start", () => {
     expect(auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
-  it("reports a failed send as 502", async () => {
+  it("answers a failed send like any other number, and reports it", async () => {
     db.queue("doctors", { data: ACTIVE });
     auth.signInWithOtp.mockResolvedValue({ error: { message: "hook failed" } });
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await call({ phone: "0501234567" });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    expect(captureException).toHaveBeenCalled();
   });
 
   it("skips Supabase Auth under the dev shim", async () => {

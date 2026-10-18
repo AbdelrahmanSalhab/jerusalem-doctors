@@ -3,6 +3,7 @@
 // the pending_signups payload, links specialties, and lets the SSR cookie
 // helper persist the session.
 
+import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { linkAuthUser } from "@/lib/auth/link";
@@ -266,6 +267,15 @@ export const POST = withJsonErrors(async (req: Request) => {
       auto_approved: isAutoApproved,
     },
   });
+
+  if (!isAutoApproved) {
+    // Reaches whoever has a Sentry alert rule on it; the admin nav also
+    // shows the pending count.
+    Sentry.captureMessage("New doctor waiting for approval", {
+      level: "info",
+      tags: { license_status: String(payload.license_verification_status) },
+    });
+  }
 
   return jsonOk({ ok: true, auto_approved: isAutoApproved });
 });

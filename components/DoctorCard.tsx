@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/Avatar";
+import { clinicTelHref } from "@/lib/workplace";
 import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { WorkplaceDetails } from "@/components/WorkplaceDetails";
@@ -86,7 +87,11 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         {doctor.phone_display && (
           <div className="flex items-baseline gap-2">
             <dt className="text-foreground/65">الهاتف:</dt>
-            <dd dir="ltr">{doctor.phone_display}</dd>
+            <dd dir="ltr">
+              <a href={clinicTelHref(doctor.phone_display) ?? undefined} className="hover:underline">
+                {doctor.phone_display}
+              </a>
+            </dd>
           </div>
         )}
         {doctor.email && (

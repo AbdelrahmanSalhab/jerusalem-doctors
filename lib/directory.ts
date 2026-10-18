@@ -56,14 +56,17 @@ export const FEATURED_LABEL: Record<FeaturedKind, string> = {
   graduate: "خريج جديد مميز",
 };
 
-/** `innerSpecialties` turns the specialty embed into an inner join, so a
- *  filter on it drops doctors instead of emptying their list. */
-export function directoryQuery(service: SupabaseClient, innerSpecialties = false) {
+/** `specialtyFilter` adds a second, filter-only embed of doctor_specialties
+ *  (`specialty_filter`, inner-joined): filter on it with
+ *  `.in("specialty_filter.specialty_id", ids)`. The displayed list comes from
+ *  the plain embed, so a card keeps all its specialties. */
+export function directoryQuery(service: SupabaseClient, specialtyFilter = false) {
   return service
     .from("doctors")
     .select(
       `
       id,
+      arabic_full_name,
       arabic_first_name,
       arabic_family_name,
       hebrew_first_name,
@@ -79,10 +82,11 @@ export function directoryQuery(service: SupabaseClient, innerSpecialties = false
       residency_start_year,
       certificates,
       seeking_work,
-      doctor_specialties${innerSpecialties ? "!inner" : ""}(
+      doctor_specialties(
         specialty:specialties(id, name_ar)
       ),
       doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order)
+      ${specialtyFilter ? ",specialty_filter:doctor_specialties!inner(specialty_id)" : ""}
     `,
     )
     .eq("is_active", true)
