@@ -261,8 +261,11 @@ export const POST = withJsonErrors(async (req: Request) => {
     .limit(1)
     .maybeSingle();
   if (dupe.error && dupe.error.code !== "PGRST116") throw dupe.error;
-  // The owner re-entering their own license is not a duplicate.
-  if (dupe.data && dupe.data.id !== ownerId) {
+  // No exception for the phone's owner re-entering their own license: letting
+  // that through would answer 200 where any other phone gets 409, which
+  // confirms the phone is registered (and whose it is, licenses being
+  // public). The owner signs in from /login instead.
+  if (dupe.data) {
     return jsonError(409, {
       error: "duplicate",
       code: "duplicate",

@@ -206,8 +206,9 @@ privacy page promises an admin then completes the deletion. To do that:
    the `delete_requested` entry and when).
 2. Press "حذف نهائي" and confirm. It removes the photo, the login
    (`auth.users`) and the doctors row; workplaces, specialties and license
-   slots cascade. The audit log keeps only `admin_doctor_deleted` with the
-   old id, no personal data.
+   slots cascade. The doctor's own audit rows (delete request with its IP,
+   moderation changes) are deleted too; what remains is one
+   `admin_doctor_deleted` row with the old id and no personal data.
 3. If it reports a failure, press it again: each step is safe to retry.
 
 The button is offered only on suspended rows, and an admin can't delete

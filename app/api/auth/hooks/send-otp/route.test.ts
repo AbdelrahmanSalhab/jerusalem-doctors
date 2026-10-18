@@ -58,6 +58,17 @@ describe("send-otp hook route", () => {
     expect(send).toHaveBeenCalledWith("+972501234567", "123456");
   });
 
+  it("sends nothing while the kill switch is on, even for a signed call", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PHONE_AUTH_DISABLED", "1");
+    const { POST } = await import("./route");
+    const res = await POST(hookRequest(PAYLOAD));
+    vi.unstubAllEnvs();
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("sets a JSON content type on a rejected signature", async () => {
     const { POST } = await import("./route");
     const res = await POST(hookRequest(PAYLOAD, false));

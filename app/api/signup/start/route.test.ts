@@ -243,11 +243,14 @@ describe("POST /api/signup/start: a phone that already has an account", () => {
     });
   });
 
-  it("lets the owner re-enter their own license", async () => {
+  it("answers the owner's own license exactly like an unregistered phone does", async () => {
     licenseHolder = { id: "doc-1" };
-    const r = await start({ license_number: "123456" });
+    const existing = await start({ license_number: "123456" });
+    phoneOwner = null;
+    const fresh = await start({ license_number: "123456" });
     licenseHolder = null;
-    expect(r.status).toBe(200);
+    expect(existing.status).toBe(409);
+    expect(existing).toEqual(fresh);
   });
 
   it("answers another doctor's license exactly like an unregistered phone does", async () => {
