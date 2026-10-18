@@ -4,7 +4,7 @@
 // as a single replace-all set per request — simpler than diffing.
 
 import { z } from "zod";
-import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
@@ -53,8 +53,12 @@ export const PATCH = withJsonErrors(async (req: Request) => {
   let parsed: z.infer<typeof Body>;
   try {
     parsed = Body.parse(await req.json());
-  } catch {
-    return jsonError(400, { error: "invalid_body", code: "invalid_body" });
+  } catch (e) {
+    return jsonError(400, {
+      error: "invalid_body",
+      code: "invalid_body",
+      fields: e instanceof z.ZodError ? zodFields(e) : undefined,
+    });
   }
 
   const stageAfterSave =

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Field, RequiredMark, SeekingWorkCheckbox } from "@/components/FormField";
@@ -157,7 +158,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         // Reset Turnstile so the next retry has a fresh single-use token.
         turnstileRef.current?.reset();
         if (startBody?.fields) setFieldErrors(startBody.fields);
-        setError(startBody?.error ?? "حدث خطأ. الرجاء المحاولة مجددًا.");
+        setError(fieldErrorMessage(startBody?.fields) ?? apiErrorMessage(startBody?.code));
         setSubmitting(false);
         return;
       }

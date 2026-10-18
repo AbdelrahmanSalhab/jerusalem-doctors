@@ -8,7 +8,7 @@
 
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
-import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { ipFromHeaders, jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import {
   type LicenseVerifyResult,
@@ -494,15 +494,6 @@ function licenseStatusToColumn(
     case "name_mismatch":
       return override ? "name_mismatch_overridden" : null;
   }
-}
-
-function zodFields(e: z.ZodError): Record<string, string> {
-  const fields: Record<string, string> = {};
-  for (const issue of e.issues) {
-    const key = issue.path.map(String).join(".") || "_";
-    fields[key] = issue.message;
-  }
-  return fields;
 }
 
 /** Only a طب عام doctor (career_stage null) keeps certificates. */
