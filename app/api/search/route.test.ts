@@ -18,6 +18,10 @@ const SPECIALTIES = [
 /** Every `.in(column, values)` the route issued, per table. */
 const inCalls: { table: string; column: string; values: unknown[] }[] = [];
 
+/** What the doctors query returns, and the limit it was given. */
+let doctorRows: unknown[] = [];
+let doctorLimit: number | undefined;
+
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
 }));
@@ -31,6 +35,7 @@ vi.mock("@/lib/supabase/service", () => ({
     from(table: string) {
       let selected = "";
       const result = () => {
+        if (table === "doctors") return { data: doctorRows, error: null };
         if (table !== "specialties") return { data: [], error: null };
         // The name match (".or(name_ar...)") finds الباطنية itself; the
         // tree lookup selects parent_id and gets the whole list.
@@ -51,7 +56,11 @@ vi.mock("@/lib/supabase/service", () => ({
           return Promise.resolve(result()).then(resolve);
         },
       };
-      for (const m of ["eq", "or", "order", "limit"]) chain[m] = () => chain;
+      chain.limit = (n: number) => {
+        if (table === "doctors") doctorLimit = n;
+        return chain;
+      };
+      for (const m of ["eq", "or", "order"]) chain[m] = () => chain;
       return chain;
     },
   }),
@@ -67,6 +76,7 @@ async function search(params: Record<string, string>) {
 describe("GET /api/search: specialty tree", () => {
   beforeEach(() => {
     inCalls.length = 0;
+    doctorRows = [];
   });
 
   it("filtering by الباطنية includes its subspecialties", async () => {
@@ -89,5 +99,48 @@ describe("GET /api/search: specialty tree", () => {
       (c) => c.table === "doctor_specialties" && c.column === "specialty_id",
     );
     expect(viaSpecialty?.values).toEqual(expect.arrayContaining([INTERNAL, NEPHRO, RHEUM]));
+  });
+});
+
+function doctorRow(i: number) {
+  return {
+    id: `doc-${i}`,
+    arabic_first_name: "طبيب",
+    arabic_family_name: String(i),
+    doctor_specialties: [],
+    doctor_workplaces: [],
+  };
+}
+
+describe("GET /api/search: result cap", () => {
+  beforeEach(() => {
+    doctorRows = [];
+    doctorLimit = undefined;
+  });
+
+  it("asks for one row past the page to know whether more matched", async () => {
+    await search({ q: "طبيب" });
+    expect(doctorLimit).toBe(51);
+  });
+
+  it("50 matches: all returned, not truncated", async () => {
+    doctorRows = Array.from({ length: 50 }, (_, i) => doctorRow(i));
+    const body = await (await search({ q: "طبيب" })).json();
+    expect(body.results).toHaveLength(50);
+    expect(body.count).toBe(50);
+    expect(body.truncated).toBe(false);
+  });
+
+  it("51 matches: first 50 returned, truncated", async () => {
+    doctorRows = Array.from({ length: 51 }, (_, i) => doctorRow(i));
+    const body = await (await search({ q: "طبيب" })).json();
+    expect(body.results).toHaveLength(50);
+    expect(body.count).toBe(50);
+    expect(body.truncated).toBe(true);
+  });
+
+  it("an all-punctuation query is not truncated", async () => {
+    const body = await (await search({ q: "..." })).json();
+    expect(body).toEqual({ results: [], count: 0, truncated: false });
   });
 });
