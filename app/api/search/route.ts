@@ -59,16 +59,17 @@ export const GET = withJsonErrors(async (req: Request) => {
 
   // An internist is stored under their subspecialty only, so a parent
   // (الباطنية) has to match its children too, both here and in the text
-  // search below. The table is ~30 rows; one read covers both.
+  // search below. The table is ~30 rows; one read covers both. Started now,
+  // awaited where needed, so a text search reads it alongside its matches.
   const needsTree = Boolean(parsed.data.specialty_id || qNorm);
-  const specialtyTree = needsTree
-    ? ((await service.from("specialties").select("id, parent_id")).data ?? [])
-    : [];
+  const treeRead = needsTree
+    ? service.from("specialties").select("id, parent_id").then((r) => r.data ?? [])
+    : Promise.resolve([]);
 
   if (parsed.data.specialty_id) {
     query = query.in(
       "doctor_specialties.specialty_id",
-      withSubspecialties(specialtyTree, [parsed.data.specialty_id]),
+      withSubspecialties(await treeRead, [parsed.data.specialty_id]),
     );
   }
 
@@ -87,7 +88,8 @@ export const GET = withJsonErrors(async (req: Request) => {
     // Arabic-only search (Hebrew search disabled by product decision).
     // Specialty + workplace matches live in joined tables, so we pre-resolve
     // their doctor IDs and OR them into the main filter.
-    const [specialtyMatches, workplaceMatches] = await Promise.all([
+    const [specialtyTree, specialtyMatches, workplaceMatches] = await Promise.all([
+      treeRead,
       service
         .from("specialties")
         .select("id")
