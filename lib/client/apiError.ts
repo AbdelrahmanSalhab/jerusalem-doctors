@@ -15,8 +15,6 @@ const MESSAGES: Record<string, string> = {
   exactly_one_primary: "اختر مكان عمل رئيسيًا واحدًا فقط.",
   unauthenticated: "انتهت جلستك. سجّل الدخول من جديد.",
   update_failed: "تعذّر حفظ التغييرات. حاول مجددًا.",
-  specialty_update_failed: "تعذّر حفظ التخصصات. حاول مجددًا.",
-  workplaces_update_failed: "تعذّر حفظ أماكن العمل. حاول مجددًا.",
   internal_error: "حدث خطأ في الخادم. حاول بعد قليل.",
 };
 

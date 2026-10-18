@@ -271,4 +271,22 @@ describe("PATCH /api/profile: one transaction", () => {
     expect(res.status).toBe(500);
     expect(await res.json()).toMatchObject({ code: "update_failed" });
   });
+
+  it("keeps the primary when another workplace has the same name", async () => {
+    await call({
+      workplaces: [
+        { name: "مستشفى المقاصد", workplace_type: "hospital", is_primary: false },
+        { name: "مستشفى المقاصد", workplace_type: "hospital", is_primary: true },
+      ],
+    });
+    const rows = rpcSpy.mock.calls[0][1].p_workplaces as { is_primary: boolean }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].is_primary).toBe(true);
+  });
+
+  it("dedupes specialty ids", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    await call({ specialty_ids: [id, id] });
+    expect(rpcSpy.mock.calls[0][1].p_specialty_ids).toEqual([id]);
+  });
 });

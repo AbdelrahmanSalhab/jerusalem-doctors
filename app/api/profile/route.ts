@@ -129,6 +129,8 @@ export const PATCH = withJsonErrors(async (req: Request) => {
         fields: { workplaces: "يجب أن يكون هناك مكان عمل رئيسي واحد" },
       });
     }
+    // Dedupe by normalized name with the primary first, so a duplicate of the
+    // primary can't knock it out and leave the doctor with none.
     const seen = new Set<string>();
     workplaceRows = parsed.workplaces
       .map((w, i) => ({
@@ -142,6 +144,7 @@ export const PATCH = withJsonErrors(async (req: Request) => {
         is_primary: w.is_primary,
         sort_order: w.is_primary ? 0 : i + 1,
       }))
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
       .filter((w) => {
         if (seen.has(w.name_normalized)) return false;
         seen.add(w.name_normalized);
@@ -155,7 +158,8 @@ export const PATCH = withJsonErrors(async (req: Request) => {
   const { error } = await service.rpc("save_doctor_profile", {
     p_doctor_id: me.id,
     p_updates: updates,
-    p_specialty_ids: parsed.specialty_ids ?? null,
+    // Deduped: a repeated id would hit the link table's key and fail the save.
+    p_specialty_ids: parsed.specialty_ids ? [...new Set(parsed.specialty_ids)] : null,
     p_workplaces: workplaceRows,
   });
   if (error) {
