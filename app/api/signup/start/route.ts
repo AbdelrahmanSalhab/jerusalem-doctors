@@ -41,18 +41,18 @@ const Body = z
     license_number: z.string().min(1),
     // A doctor can be dually licensed (e.g. IL-licensed but also PS
     // certified, or vice versa). Both fields are set together or not at all
-    // — enforced below.
+    //, enforced below.
     secondary_license_region: z.enum(["IL", "PS"]).optional().nullable(),
     secondary_license_number: z.string().trim().max(20).optional().nullable(),
     arabic_first_name: z.string().trim().min(2).max(80),
     arabic_family_name: z.string().trim().min(2).max(80),
-    // Only meaningful when either license is IL — used solely to cross-check
+    // Only meaningful when either license is IL, used solely to cross-check
     // the Israeli MoH registry. PS doctors have no registry to match against.
     hebrew_first_name: z.string().trim().max(80).optional().nullable(),
     hebrew_family_name: z.string().trim().max(80).optional().nullable(),
     specialty_ids: z.array(z.uuid()).min(1).max(5),
     // Self-declared (see lib/careerStage.ts). null == طب عام. Deliberately
-    // no cross-field rules — which stage may pair with which workplace type
+    // no cross-field rules, which stage may pair with which workplace type
     // or specialty is a form-level guide, not a data constraint.
     career_stage: z.enum(CAREER_STAGES).nullable().optional(),
     residency_start_year: z
@@ -65,7 +65,7 @@ const Body = z
     subspecialty: z.string().trim().max(120).optional().nullable(),
     email: z.email().max(254),
     bio: z.string().trim().max(500).optional().nullable(),
-    // Exactly one entry must be is_primary:true when any are given —
+    // Exactly one entry must be is_primary:true when any are given:
     // validated below. Residents may give none (they rotate).
     workplaces: z.array(WorkplaceInputSchema).max(20),
     certificates: CertificatesSchema.optional(),
@@ -176,7 +176,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   // Hebrew name is only meaningful for cross-checking the Israeli MoH
-  // registry — required whenever either license slot is IL.
+  // registry, required whenever either license slot is IL.
   const needsHebrewName = region === "IL" || secondaryRegion === "IL";
   if (needsHebrewName) {
     if (
@@ -204,7 +204,7 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   // MoH cross-check only applies to the Israeli registry. PS-track signups
   // have nothing to check against, so they always fall through to manual
-  // admin review — same outcome as an IL license we can't find. It runs
+  // admin review, same outcome as an IL license we can't find. It runs
   // before the uniqueness check because it decides which serial is stored.
   const primary = await resolveReading(service, primaryReading, names);
   const verified = primary.result;
@@ -219,7 +219,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
   const license = primary.serial;
 
-  // The secondary license is supplementary — we opportunistically cross-check
+  // The secondary license is supplementary, we opportunistically cross-check
   // it against the IL registry when applicable, but it never blocks signup
   // or requires the override flow (only the primary license gates access).
   const secondary = secondaryReading

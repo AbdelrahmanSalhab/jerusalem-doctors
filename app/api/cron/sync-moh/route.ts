@@ -1,10 +1,10 @@
-// GET /api/cron/sync-moh — daily MoH practitioners sync (plan §13).
+// GET /api/cron/sync-moh, daily MoH practitioners sync (plan §13).
 //
 // Auth: header `Authorization: Bearer ${CRON_SECRET}`. Vercel Cron sends
 // this automatically when configured in vercel.json.
 //
 // Behavior: paginate CKAN datastore_search in 1000-row chunks; upsert into
-// `moh_practitioners`; record stats in `audit_logs`. Idempotent — safe to
+// `moh_practitioners`; record stats in `audit_logs`. Idempotent, safe to
 // re-run on failure.
 
 import { NextResponse } from "next/server";
@@ -16,7 +16,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 minutes — full snapshot is ~3MB / 63k rows
+export const maxDuration = 300; // 5 minutes, full snapshot is ~3MB / 63k rows
 
 export const GET = withJsonErrors(async (req: Request) => {
   const denied = verifyCronAuth(req);
@@ -32,7 +32,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     if (batch.length === 0) return;
     // Registry has multiple rows per license (one per specialty cert).
     // Dedupe within the batch so ON CONFLICT doesn't see the same key twice
-    // in a single statement. Cross-batch duplicates are fine — successive
+    // in a single statement. Cross-batch duplicates are fine, successive
     // upserts just overwrite via ON CONFLICT.
     const seen = new Set<number>();
     const deduped = batch.filter((r) => {

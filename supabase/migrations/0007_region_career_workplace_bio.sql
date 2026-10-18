@@ -6,7 +6,7 @@
 -- Context: the MoH license-verification flow (plan §13) only covers the
 -- Israeli registry. Doctors licensed by the Palestinian Ministry of
 -- Health/Medical Council have no equivalent public registry we could find
--- (checked 2026-08-22) — their signups route straight to manual admin
+-- (checked 2026-08-22), their signups route straight to manual admin
 -- review instead of an automated license-number/name cross-check.
 
 alter table public.doctors
@@ -20,12 +20,12 @@ alter table public.doctors
 -- Hebrew name was required for every signup because it was only ever used
 -- to cross-check the Israeli registry. PS-track doctors have nothing to
 -- cross-check against, so forcing a Hebrew name on them is a pure signup
--- blocker with no verification benefit — relax to optional.
+-- blocker with no verification benefit, relax to optional.
 alter table public.doctors
   alter column hebrew_first_name drop not null,
   alter column hebrew_family_name drop not null;
 
--- License numbers are only unique *within* an issuing region — an IL and a
+-- License numbers are only unique *within* an issuing region, an IL and a
 -- PS doctor could coincidentally share the same license number string.
 alter table public.doctors drop constraint if exists doctors_license_number_key;
 alter table public.doctors

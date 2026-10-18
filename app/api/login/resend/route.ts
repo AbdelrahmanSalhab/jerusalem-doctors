@@ -80,7 +80,7 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (found.error && found.error.code !== "PGRST116") throw found.error;
 
-  // Deliberately uniform response — see the enumeration note above.
+  // Deliberately uniform response, see the enumeration note above.
   if (!found.data || !found.data.is_active || !found.data.is_phone_verified) {
     return jsonOk({ ok: true });
   }

@@ -1,4 +1,4 @@
--- 0004_workplaces.sql — add doctor workplaces.
+-- 0004_workplaces.sql, add doctor workplaces.
 -- Apply after 0003. Adds a new table + RLS, no destructive changes.
 
 create table public.doctor_workplaces (

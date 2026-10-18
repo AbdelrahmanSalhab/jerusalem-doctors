@@ -18,7 +18,7 @@ export class InvalidPhoneError extends Error {
  * Israeli local form (`05…`), and inputs with hyphens / spaces. Defaults to
  * country `IL` when no international prefix is present.
  *
- * Throws `InvalidPhoneError` on failure — never returns null. This is the
+ * Throws `InvalidPhoneError` on failure, never returns null. This is the
  * single source of truth for phone format across signup, login, search and
  * the WhatsApp click-to-chat link builder.
  */
@@ -68,8 +68,8 @@ export function formatPhoneDisplay(e164: string): string {
 // This is deliberately NOT enforced inside normalizePhone(): that function is
 // also the source of truth for directory search, profile display and the
 // wa.me click-to-chat links, where existing +970 doctor rows must keep
-// working. Only the auth entry points — the places about to ask Supabase to
-// send a code — call the guards below.
+// working. Only the auth entry points, the places about to ask Supabase to
+// send a code, call the guards below.
 
 /** Israeli mobile in E.164: +972, then a national number of `5` + 8 digits. */
 const IL_MOBILE_E164 = /^\+9725\d{8}$/;
@@ -110,7 +110,7 @@ export function assertSmsDeliverable(e164: string): void {
 
 /**
  * Convert a stored E.164 number to the local form SMS4FREE expects:
- * `+972501234567` → `0501234567`. Validates first — a number we cannot
+ * `+972501234567` → `0501234567`. Validates first, a number we cannot
  * deliver to must never be silently reshaped into one that looks valid.
  */
 export function toSmsRecipient(e164: string): string {

@@ -1,6 +1,6 @@
 "use client";
 
-// Per-route error boundary — caught by Next when a server component or
+// Per-route error boundary, caught by Next when a server component or
 // route handler throws. Stays inside the site shell (header + footer).
 
 import Link from "next/link";

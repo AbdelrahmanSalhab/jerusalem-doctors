@@ -9,7 +9,7 @@ if (dsn) {
     environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? "development",
     tracesSampleRate: 0.1,
     sendDefaultPii: false,
-    // No session replay — keeps bundle smaller and avoids capturing screen
+    // No session replay, keeps bundle smaller and avoids capturing screen
     // content of doctor profiles.
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,

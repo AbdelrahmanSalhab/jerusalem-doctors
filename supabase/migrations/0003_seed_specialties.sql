@@ -1,4 +1,4 @@
--- 0003_seed_specialties.sql — Seed the 29 specialties from spec §17.
+-- 0003_seed_specialties.sql, Seed the 29 specialties from spec §17.
 -- name_ar_normalized values were pre-computed with lib/normalize/arabic.ts so
 -- SQL and JS normalization stay in lockstep. If the JS rules ever change,
 -- regenerate this file; the runtime normalizer is the source of truth.

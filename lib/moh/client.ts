@@ -1,4 +1,4 @@
-// Israel MoH practitioners registry — CKAN client (plan §13).
+// Israel MoH practitioners registry, CKAN client (plan §13).
 //
 // Endpoints:
 //   GET {base}/action/datastore_search?resource_id=...&limit=...&offset=...

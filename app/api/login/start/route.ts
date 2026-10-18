@@ -87,7 +87,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   // Dev-only short-circuit: when USE_DEV_USER=1 we skip Supabase Auth and
-  // just acknowledge — the dev shim provides the session via cookies/env.
+  // just acknowledge, the dev shim provides the session via cookies/env.
   // Hard-blocked in production by lib/auth/session.ts module-load guard.
   if (
     process.env.USE_DEV_USER === "1" &&

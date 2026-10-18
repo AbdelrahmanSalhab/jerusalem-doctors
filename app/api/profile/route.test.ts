@@ -1,5 +1,5 @@
 // Covers the career-stage null semantics on PATCH /api/profile. The three
-// states — key absent, key explicitly null, key set — mean three different
+// states, key absent, key explicitly null, key set, mean three different
 // things to the doctors table, and getting them wrong silently re-labels
 // doctors (see lib/careerStage.ts for why the column stopped being derived).
 
@@ -58,7 +58,7 @@ function doctorUpdate(): Record<string, unknown> | null {
   return call ? (call[1] as Record<string, unknown>) : null;
 }
 
-describe("PATCH /api/profile — career stage", () => {
+describe("PATCH /api/profile, career stage", () => {
   beforeEach(() => {
     updateSpy.mockClear();
   });
@@ -73,7 +73,7 @@ describe("PATCH /api/profile — career stage", () => {
   });
 
   // The guard that stops an unrelated save from labelling a doctor who has
-  // never declared a stage — /profile omits both keys in that case.
+  // never declared a stage, /profile omits both keys in that case.
   it("leaves the column alone when the key is absent", async () => {
     const res = await call({ bio: "نص" });
     expect(res.status).toBe(200);

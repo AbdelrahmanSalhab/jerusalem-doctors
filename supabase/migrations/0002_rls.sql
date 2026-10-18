@@ -1,8 +1,8 @@
--- 0002_rls.sql — Row Level Security policies (plan §6, §9).
+-- 0002_rls.sql, Row Level Security policies (plan §6, §9).
 -- Apply after 0001_init.sql.
 --
 -- Default-deny stance: every table gets RLS enabled, only the listed
--- policies grant access. Service role bypasses RLS automatically — used by
+-- policies grant access. Service role bypasses RLS automatically, used by
 -- API routes for cross-cutting tasks (creating auth users, writing audit
 -- logs, MoH sync, reading pending_signups).
 

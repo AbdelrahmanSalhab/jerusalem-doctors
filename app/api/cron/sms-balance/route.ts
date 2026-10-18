@@ -1,4 +1,4 @@
-// GET /api/cron/sms-balance — prepaid SMS balance watch.
+// GET /api/cron/sms-balance, prepaid SMS balance watch.
 //
 // Auth: header `Authorization: Bearer ${CRON_SECRET}`, same as sync-moh.
 // Vercel Cron sends it automatically per vercel.json.
@@ -37,7 +37,7 @@ export const GET = withJsonErrors(async (req: Request) => {
   try {
     balance = await fetchAvailableSms();
   } catch (err) {
-    // A failing balance check is itself worth knowing about — it usually
+    // A failing balance check is itself worth knowing about, it usually
     // means the credentials broke, which means sends are failing too.
     console.error("[cron/sms-balance] check failed:", (err as Error)?.message);
     Sentry.captureException(err);

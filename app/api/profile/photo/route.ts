@@ -1,4 +1,4 @@
-// POST /api/profile/photo — uploads a profile picture for the signed-in
+// POST /api/profile/photo, uploads a profile picture for the signed-in
 // doctor to Supabase Storage bucket "doctor-photos" and updates the doctor's
 // profile_picture_url.
 //

@@ -154,7 +154,10 @@ function UnmatchedRow({
         <span className="font-medium">{item.name}</span>{" "}
         <span className="tabular-nums text-amber-900/70">({item.count})</span>
       </span>
-      <select className="input w-auto" value={target} onChange={(e) => setTarget(e.target.value)}
+      <select
+        className="max-w-full rounded-md border border-amber-700/40 bg-transparent px-2 py-1.5"
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
         aria-label={`ربط «${item.name}» بمؤسسة`}>
         <option value="">اختر مؤسسة</option>
         {institutions.map((i) => (

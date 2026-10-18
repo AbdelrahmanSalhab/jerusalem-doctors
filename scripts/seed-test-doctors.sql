@@ -1,10 +1,10 @@
 -- Seed six fake doctors with specialties + workplaces for local search testing.
--- Run once in Supabase SQL Editor. Idempotent — safe to re-run (uses
+-- Run once in Supabase SQL Editor. Idempotent, safe to re-run (uses
 -- ON CONFLICT (phone_e164) DO NOTHING for the doctor inserts, and specialty/
 -- workplace links use NOT EXISTS guards).
 
 -- All doctors are inserted as fully approved + visible so they show in search.
--- license_verification_status = 'verified' (synthetic — these are not real
+-- license_verification_status = 'verified' (synthetic, these are not real
 -- licenses; do not deploy this file to production).
 
 do $$
@@ -13,7 +13,7 @@ declare
   s_id uuid;
 begin
   ----------------------------------------------------------------------------
-  -- 1. د. أحمد الخطيب — طب العائلة — مستشفى هداسا عين كارم
+  -- 1. د. أحمد الخطيب, طب العائلة, مستشفى هداسا عين كارم
   ----------------------------------------------------------------------------
   insert into public.doctors (
     phone_e164, phone_display, license_number,
@@ -43,7 +43,7 @@ begin
   on conflict do nothing;
 
   ----------------------------------------------------------------------------
-  -- 2. د. ليلى عبد الرحمن — الأطفال — مستشفى المقاصد
+  -- 2. د. ليلى عبد الرحمن, الأطفال, مستشفى المقاصد
   ----------------------------------------------------------------------------
   insert into public.doctors (
     phone_e164, phone_display, license_number,
@@ -74,7 +74,7 @@ begin
   on conflict do nothing;
 
   ----------------------------------------------------------------------------
-  -- 3. د. محمد أبو سرحان — القلب — مستشفى شعاري تصدق + عيادة خاصة
+  -- 3. د. محمد أبو سرحان, القلب, مستشفى شعاري تصدق + عيادة خاصة
   ----------------------------------------------------------------------------
   insert into public.doctors (
     phone_e164, phone_display, license_number,
@@ -107,7 +107,7 @@ begin
   on conflict do nothing;
 
   ----------------------------------------------------------------------------
-  -- 4. د. سارة بدر — الجلدية + الجراحة التجميلية — عيادة سارة بدر
+  -- 4. د. سارة بدر, الجلدية + الجراحة التجميلية, عيادة سارة بدر
   ----------------------------------------------------------------------------
   insert into public.doctors (
     phone_e164, phone_display, license_number,
@@ -139,7 +139,7 @@ begin
   on conflict do nothing;
 
   ----------------------------------------------------------------------------
-  -- 5. د. خالد عيسى — العظام — مستشفى أوغوستا فكتوريا
+  -- 5. د. خالد عيسى, العظام, مستشفى أوغوستا فكتوريا
   ----------------------------------------------------------------------------
   insert into public.doctors (
     phone_e164, phone_display, license_number,
@@ -169,7 +169,7 @@ begin
   on conflict do nothing;
 
   ----------------------------------------------------------------------------
-  -- 6. د. ميرنا خوري — النسائية والتوليد — مستشفى سانت جوزيف
+  -- 6. د. ميرنا خوري, النسائية والتوليد, مستشفى سانت جوزيف
   ----------------------------------------------------------------------------
   insert into public.doctors (
     phone_e164, phone_display, license_number,

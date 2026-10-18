@@ -1,6 +1,6 @@
 "use client";
 
-// Last-resort error boundary — fires when the root layout itself throws,
+// Last-resort error boundary, fires when the root layout itself throws,
 // so we render our own minimal <html>+<body>. Keeps the user oriented even
 // when the site shell is broken.
 

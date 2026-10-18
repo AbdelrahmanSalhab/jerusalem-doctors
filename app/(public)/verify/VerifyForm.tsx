@@ -114,7 +114,7 @@ export function VerifyForm() {
       // Drop sensitive state and hard-navigate so the server renders the
       // layout from scratch with the new session cookie. router.refresh()
       // only invalidates the current route's RSC cache and races with the
-      // router.replace() — full-page load is the only reliable way to
+      // router.replace(), full-page load is the only reliable way to
       // guarantee the SiteHeader picks up the authenticated session.
       clearHandoff(SS_PHONE);
       clearHandoff(SS_SESSION);

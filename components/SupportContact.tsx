@@ -1,4 +1,4 @@
-// Help/support WhatsApp link for doctors stuck during signup or login —
+// Help/support WhatsApp link for doctors stuck during signup or login:
 // distinct from the developer-credit link in SiteFooter. Renders nothing
 // if NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER isn't configured, so it's a safe
 // no-op until the number is set.

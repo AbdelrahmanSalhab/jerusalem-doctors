@@ -1,9 +1,9 @@
--- 0008_dual_license.sql — allow a doctor to hold licenses from both regions
+-- 0008_dual_license.sql, allow a doctor to hold licenses from both regions
 -- (e.g. IL-licensed but also PS-certified, or vice versa). Apply after 0007.
 --
 -- The secondary license is supplementary: it's format-checked and, when it's
 -- an IL number, opportunistically cross-checked against the MoH registry,
--- but it never gates account approval — only the primary license does.
+-- but it never gates account approval, only the primary license does.
 
 alter table public.doctors
   add column if not exists secondary_license_region text
@@ -20,19 +20,19 @@ alter table public.doctors
   );
 
 -- ---------- cross-slot license uniqueness ----------
--- A doctor now has up to two (region, license_number) pairs — primary and
+-- A doctor now has up to two (region, license_number) pairs, primary and
 -- secondary. A plain unique index on the primary columns and another on the
 -- secondary columns (what an earlier version of this migration did) only
 -- catches primary-vs-primary and secondary-vs-secondary collisions; it does
 -- NOT stop the same license number from being registered as one doctor's
 -- primary and a different doctor's secondary. A SELECT-based check in
--- application code (see app/api/signup/start) can't close that gap either —
+-- application code (see app/api/signup/start) can't close that gap either:
 -- two concurrent signups can both pass the SELECT before either commits.
 --
 -- This mirror table gives every logical (region, license_number) slot a
 -- real row with a real UNIQUE constraint, so Postgres itself serializes
 -- concurrent inserts and the second one gets a genuine unique_violation
--- instead of racing past a check. It's kept in sync by triggers — nothing
+-- instead of racing past a check. It's kept in sync by triggers, nothing
 -- reads or writes it directly except the trigger function below.
 create table public.doctor_license_slots (
   doctor_id      uuid not null references public.doctors(id) on delete cascade,

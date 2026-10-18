@@ -15,7 +15,7 @@ export default async function SignupPage() {
     .order("sort_order");
 
   if (error) {
-    // Migrations not applied yet — surface clearly rather than crashing.
+    // Migrations not applied yet, surface clearly rather than crashing.
     return (
       <main className="mx-auto max-w-xl px-6 py-16">
         <h1 className="mb-4 text-2xl font-bold">دليل أطباء القدس</h1>

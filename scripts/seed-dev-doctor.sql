@@ -5,7 +5,7 @@
 --
 -- The dev doctor exists in the doctors table without a paired auth.users row,
 -- so RLS would normally block access. Pages using `getCurrentDoctor()` go
--- through the service-role client, which bypasses RLS — fine for dev.
+-- through the service-role client, which bypasses RLS, fine for dev.
 
 with new_doctor as (
   insert into public.doctors (

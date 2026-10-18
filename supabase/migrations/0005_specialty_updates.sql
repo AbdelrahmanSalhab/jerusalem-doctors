@@ -1,5 +1,5 @@
--- 0005_specialty_updates.sql — specialty list edits.
--- Apply after 0003 (and 0004). Idempotent — safe to re-run.
+-- 0005_specialty_updates.sql, specialty list edits.
+-- Apply after 0003 (and 0004). Idempotent, safe to re-run.
 --
 -- Changes:
 --   1. الطب العام becomes the first option (sort_order = 0) on signup.

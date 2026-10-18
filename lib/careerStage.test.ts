@@ -183,7 +183,7 @@ describe("findGeneralSpecialtyId", () => {
     ).toBe("g");
   });
 
-  it("returns null when the row is absent — the caller must cope", () => {
+  it("returns null when the row is absent, the caller must cope", () => {
     expect(findGeneralSpecialtyId([other])).toBeNull();
   });
 

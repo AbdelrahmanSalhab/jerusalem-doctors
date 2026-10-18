@@ -1,4 +1,4 @@
--- 0001_init.sql — schema for Jerusalem Doctors Directory MVP.
+-- 0001_init.sql, schema for Jerusalem Doctors Directory MVP.
 -- Apply once to a fresh Supabase project. RLS is enabled in 0002_rls.sql,
 -- specialties seeded in 0003_seed_specialties.sql.
 

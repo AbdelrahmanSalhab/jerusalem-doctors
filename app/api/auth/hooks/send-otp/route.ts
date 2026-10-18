@@ -14,7 +14,7 @@ import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { getOtpSender, OtpProviderError } from "@/lib/otp";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 
-// nodejs is already the default in Next 16, but webhook.ts needs node:crypto —
+// nodejs is already the default in Next 16, but webhook.ts needs node:crypto:
 // pin it so a future default flip to edge can't silently break signing.
 export const runtime = "nodejs";
 
@@ -28,7 +28,7 @@ interface SendSmsHookPayload {
  *
  * Supabase's hook runner inspects the Content-Type of our response and fails
  * the whole OTP request with `hook_payload_invalid_content_type` when it is
- * missing — which `new Response(null, ...)` does not set. The doctor then sees
+ * missing, which `new Response(null, ...)` does not set. The doctor then sees
  * a generic error on /login and /signup and never gets a code, even though the
  * SMS itself went out fine. The body content is irrelevant; the header is not.
  */
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     return hookResponse(200);
   } catch (err) {
     // OtpProviderError messages carry Meta's error code and message, never
-    // the OTP — Meta does not echo it back and we never interpolate it.
+    // the OTP, Meta does not echo it back and we never interpolate it.
     // Log as well as report: Sentry no-ops without a DSN, and a silent
     // delivery failure is the worst possible failure mode here.
     console.error("[send-otp] delivery failed:", (err as Error)?.message);

@@ -5,7 +5,7 @@ should fit in a single tab.
 
 ## At a glance
 
-- **Hosting:** Vercel — `jerusalem-doctors.vercel.app`
+- **Hosting:** Vercel, `jerusalem-doctors.vercel.app`
 - **DB / Auth:** Supabase project `nqpkkxfmfctuodcubgwf`
 - **Source of truth for licenses:** [data.gov.il dataset](https://data.gov.il/api/3/action/package_show?id=2721d62d-d0da-45fd-93ac-5e7809849222)
 - **Logs:** Vercel → Project → Logs (server-side `console.error` + 5xx)
@@ -14,7 +14,7 @@ should fit in a single tab.
 
 ## Common incidents
 
-### Doctors can't sign up — OTP never arrives
+### Doctors can't sign up, OTP never arrives
 
 **How OTP delivery works.** Supabase Auth generates, stores, and verifies the
 code. It does not send it. It POSTs Supabase's **Send SMS Hook** to
@@ -30,12 +30,12 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 
 | Symptom | Likely cause |
 |---|---|
-| `/api/signup/start` returns 502 `otp_send_failed` | Supabase rejected the request before the hook ran — Phone provider off, or the hook returned non-2xx |
+| `/api/signup/start` returns 502 `otp_send_failed` | Supabase rejected the request before the hook ran, Phone provider off, or the hook returned non-2xx |
 | Many `otp_send_failed` at once on signup, or many Sentry `signInWithOtp failed` events tagged `route:login/start` / `route:login/resend` | Supabase's own Auth rate limit (SMS per hour, project-wide) is exhausted. Dashboard → Authentication → Rate Limits; size it for the expected signups per hour. Login never shows this error to the doctor (it would reveal the number is registered); they see the code screen and its "no code?" help, so Sentry is the only signal |
 | `/api/login/start` returns 400 `phone_unsupported` | Not an incident: the number is outside +972 or is a landline. See "Which numbers we can reach" below |
-| Vercel logs show `[send-otp] delivery failed: SMS4FREE send failed (status -N)` | The provider rejected the send — read the status table below |
-| No `[send-otp]` line in Vercel logs at all | Supabase never reached us — wrong hook URL, or the hook is disabled |
-| Hook route returns 401 | Signature mismatch — `SEND_SMS_HOOK_SECRET` in Vercel does not match the secret in Supabase |
+| Vercel logs show `[send-otp] delivery failed: SMS4FREE send failed (status -N)` | The provider rejected the send, read the status table below |
+| No `[send-otp]` line in Vercel logs at all | Supabase never reached us, wrong hook URL, or the hook is disabled |
+| Hook route returns 401 | Signature mismatch, `SEND_SMS_HOOK_SECRET` in Vercel does not match the secret in Supabase |
 
 **Fix:**
 1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
@@ -46,15 +46,15 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 3. Compare the secret shown there against `SEND_SMS_HOOK_SECRET` in Vercel.
    It has the form `v1,whsec_…`; paste it whole.
 4. Check Vercel → Logs for `[send-otp]`. SMS4FREE statuses, all of which
-   arrive inside an HTTP **200** — the body is the real result:
+   arrive inside an HTTP **200**, the body is the real result:
 
    | status | Meaning | What to do |
    |---|---|---|
-   | `> 0` | Accepted, for that many recipients | Nothing — delivery is now the carrier's problem |
+   | `> 0` | Accepted, for that many recipients | Nothing, delivery is now the carrier's problem |
    | `0` | General error | Retried automatically. If it persists, contact SMS4FREE support |
    | `-1` | Bad key / user / password | Check `SMS4FREE_KEY`, `SMS4FREE_USER`, `SMS4FREE_PASS` in Vercel |
    | `-2` | Invalid sender ID | A custom `SMS4FREE_SENDER` needs a purchased package; otherwise it must be the registration number |
-   | `-3` | No recipients | Our bug — the recipient field was empty. Escalate |
+   | `-3` | No recipients | Our bug, the recipient field was empty. Escalate |
    | `-4` | **Out of message balance** | Top up the SMS package. This is the most likely cause of a sudden total outage |
    | `-5` | Message content rejected | Someone edited `lib/otp/message.ts`. Revert |
    | `-6` | Sender not verified | Send one message by hand from the SMS4FREE site to complete first-use verification |
@@ -85,7 +85,7 @@ signup plus a couple of logins each is ~120 messages.
 
 **Which numbers we can reach.** OTP is restricted to Israeli mobiles
 (`+9725XXXXXXXX`). `+970` numbers and landlines are refused at `/signup/start`
-and `/login/start` with `phone_unsupported`, before Supabase issues a code —
+and `/login/start` with `phone_unsupported`, before Supabase issues a code:
 that is deliberate, not a bug. WhatsApp reached `+970` over data; SMS4FREE has
 no confirmed coverage there. Existing `+970` doctor rows still work for
 directory search and click-to-chat; they just cannot log in. Widening this
@@ -95,7 +95,7 @@ in `lib/normalize/phone.ts`.
 **WhatsApp (parked).** `lib/otp/whatsapp_meta.ts` still works and is still
 registered. It is unused because Meta Business Verification could not be
 completed. If that ever changes, `OTP_PROVIDER=whatsapp_meta` plus the
-`META_*` variables switches back with no code change — and removes the +972
+`META_*` variables switches back with no code change, and removes the +972
 restriction, since WhatsApp delivers over data.
 
 **Quick mitigation if delivery is broken:** flip `NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`
@@ -190,13 +190,13 @@ After this, the doctor's next login attempt with the new number works.
 
 `/api/signup/start` rate limits are per-phone (3/hr) and per-IP (30/hr) via Upstash; every limit is in `lib/ratelimit.ts`. The per-IP ones are deliberately loose because a hospital or event Wi-Fi puts many doctors behind one address; the per-phone ones and Turnstile are the real brake. If they're being bypassed:
 
-1. Check Upstash dashboard — confirm the limiter is hitting the right keys.
+1. Check Upstash dashboard, confirm the limiter is hitting the right keys.
 2. Tighten limits in `lib/ratelimit.ts` and redeploy.
 3. As a hard stop, flip `NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`.
 
 ### A signup got through with `license_verification_status = 'not_found'`
 
-By design — these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
+By design, these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
 
 ### A doctor asked to delete their account
 
@@ -290,6 +290,6 @@ select created_at, action, metadata
 
 ## Contacts
 
-- **Developer:** Abdelrahman Salhab — WhatsApp `+972524209156`, [LinkedIn](https://www.linkedin.com/in/abdelrahman-salhab/)
+- **Developer:** Abdelrahman Salhab, WhatsApp `+972524209156`, [LinkedIn](https://www.linkedin.com/in/abdelrahman-salhab/)
 - **Supabase support:** dashboard chat (response in hours, free tier)
 - **Vercel support:** docs + community forum on hobby plan

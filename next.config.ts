@@ -29,7 +29,7 @@ const SUPABASE_HOST = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["10.0.96.15"],
-  // Drop the `x-powered-by: Next.js` response header — minor fingerprint
+  // Drop the `x-powered-by: Next.js` response header, minor fingerprint
   // reduction; closes pentest finding L1.
   poweredByHeader: false,
   images: {

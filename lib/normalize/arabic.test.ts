@@ -72,7 +72,7 @@ describe("normalizeArabic", () => {
     expect(normalizeArabic("Dr. أحمد")).toBe("dr. احمد");
   });
 
-  it("does not transform ة (ta marbuta) — it's tracked separately per spec §9", () => {
+  it("does not transform ة (ta marbuta), it's tracked separately per spec §9", () => {
     expect(normalizeArabic("العائلة")).toBe("العايلة");
   });
 
@@ -85,12 +85,12 @@ describe("normalizeArabic", () => {
 
   it("strips combining marks across the full U+064B-U+065F range", () => {
     // ب + fathatan U+064B, ب + fatha U+064E, ب + shadda U+0651,
-    // ب + sukun U+0652, ب + combining hamza below U+0655 — all five marks vanish.
+    // ب + sukun U+0652, ب + combining hamza below U+0655, all five marks vanish.
     const withMarks = "بًبَبّبْبٕ";
     expect(normalizeArabic(withMarks)).toBe("ببببب");
   });
 
-  it("seeds spec §17 specialty list — hamza variants normalize stably", () => {
+  it("seeds spec §17 specialty list, hamza variants normalize stably", () => {
     expect(normalizeArabic("الأطفال")).toBe("الاطفال");
     expect(normalizeArabic("الأنف والأذن والحنجرة")).toBe(
       "الانف والاذن والحنجرة",

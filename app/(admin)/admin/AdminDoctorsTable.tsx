@@ -106,7 +106,7 @@ export function AdminDoctorsTable({
   ) => patchDoctor(id, { [field]: value });
 
   // Setting a row to طب عام writes career_stage = NULL. Unlike signup it does
-  // not attach the الطب العام specialty — the admin table doesn't manage
+  // not attach the الطب العام specialty, the admin table doesn't manage
   // specialties at all.
   const setStage = (r: Row, stage: Stage) =>
     patchDoctor(r.id, {

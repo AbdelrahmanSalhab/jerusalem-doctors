@@ -34,7 +34,7 @@ function constantTimeEquals(a: string, b: string): boolean {
 /**
  * Verify a Standard Webhooks request.
  *
- * @param rawBody the exact request body bytes as text — NOT a re-serialized
+ * @param rawBody the exact request body bytes as text, NOT a re-serialized
  *   JSON object, which would almost never match byte-for-byte.
  * @param nowMs injectable clock for tests.
  */

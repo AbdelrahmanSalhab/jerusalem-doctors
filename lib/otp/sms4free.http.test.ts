@@ -97,7 +97,7 @@ describe("fetchAvailableSms", () => {
   it("reads the bare number the live endpoint returns", async () => {
     reply = { body: "10", status: 200 };
     await expect(fetchAvailableSms()).resolves.toBe(10);
-    // credentials only — no sender, no recipient
+    // credentials only, no sender, no recipient
     expect(lastRequest).toEqual({ key: "K", user: "0500000000", pass: "P" });
   });
 

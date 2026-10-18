@@ -1,4 +1,4 @@
-// POST /api/auth/logout — kills the Supabase Auth session.
+// POST /api/auth/logout, kills the Supabase Auth session.
 import { jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 

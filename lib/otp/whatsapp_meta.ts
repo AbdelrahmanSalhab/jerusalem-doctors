@@ -18,7 +18,7 @@ type MetaError = {
  * Build the Cloud API request body for an authentication template.
  *
  * The code appears twice on purpose: once in the body, once as the parameter
- * of the copy-code button. Meta requires both for AUTHENTICATION templates —
+ * of the copy-code button. Meta requires both for AUTHENTICATION templates:
  * omitting the button component gets you a 132000 parameter-count mismatch.
  *
  * Exported separately so it can be unit-tested without a network call.
@@ -55,9 +55,9 @@ export function buildAuthTemplatePayload(
  * Direct Meta WhatsApp Cloud API sender.
  *
  * Required env vars:
- *   META_PHONE_NUMBER_ID     — from App > WhatsApp > API Setup (not the number)
- *   META_ACCESS_TOKEN        — permanent System User token
- *   META_AUTH_TEMPLATE_NAME  — approved AUTHENTICATION template, e.g. otp_login_ar
+ *   META_PHONE_NUMBER_ID, from App > WhatsApp > API Setup (not the number)
+ *   META_ACCESS_TOKEN, permanent System User token
+ *   META_AUTH_TEMPLATE_NAME, approved AUTHENTICATION template, e.g. otp_login_ar
  */
 export class WhatsAppMetaOtpSender implements OtpSender {
   readonly name = "whatsapp_meta";
@@ -103,13 +103,13 @@ export class WhatsAppMetaOtpSender implements OtpSender {
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
     } catch (err) {
-      // Network error or timeout — transient, worth a retry.
+      // Network error or timeout, transient, worth a retry.
       throw new OtpProviderError("Meta send failed: network error", false, err);
     }
 
     if (!res.ok) {
       // Never include the response body verbatim beyond Meta's own error
-      // fields — and never the code, which is not echoed back anyway.
+      // fields, and never the code, which is not echoed back anyway.
       let detail = "";
       let metaCode: number | undefined;
       try {

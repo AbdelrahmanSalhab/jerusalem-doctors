@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 const DB_TIMEOUT_MS = 15_000;
 
 /**
- * Service-role client. Bypasses RLS. Server-only — never import from a
+ * Service-role client. Bypasses RLS. Server-only, never import from a
  * Client Component or expose the key to the browser.
  */
 export function createSupabaseServiceClient() {

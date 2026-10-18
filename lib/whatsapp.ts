@@ -1,4 +1,4 @@
-// WhatsApp click-to-chat link builder (spec §15, plan §3 — WhatsApp interaction).
+// WhatsApp click-to-chat link builder (spec §15, plan §3, WhatsApp interaction).
 // Always render via this function so we can change formatting in one place.
 
 const DEFAULT_PREFILLED =

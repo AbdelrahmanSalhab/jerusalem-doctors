@@ -212,8 +212,8 @@ export const POST = withJsonErrors(async (req: Request) => {
     .single();
   if (insert.error) {
     // 23505 = unique_violation. This is the legitimate outcome of a genuine
-    // race — two signups for the same phone/license slipping past the
-    // pre-checks in signup/start at the same moment — not a server bug, so
+    // race, two signups for the same phone/license slipping past the
+    // pre-checks in signup/start at the same moment, not a server bug, so
     // it gets its own code rather than a generic 500.
     if (insert.error.code === "23505") {
       console.warn("[signup/verify] doctor insert race (duplicate)", insert.error);
@@ -232,7 +232,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     );
     if (links.error) {
       console.error("[signup/verify] specialty link failed", links.error);
-      // Continue — admin can fix specialty links later.
+      // Continue, admin can fix specialty links later.
     }
   }
 

@@ -7,7 +7,7 @@ const WHATSAPP_LABEL = "تواصل عبر واتساب";
 
 /**
  * Compact dashboard search row. Shows the same data as DoctorCard, just in
- * a denser horizontal layout — the two views must never disagree about
+ * a denser horizontal layout, the two views must never disagree about
  * what's visible for a given doctor (otherwise users think info is hidden
  * when it isn't).
  */

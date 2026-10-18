@@ -12,7 +12,7 @@ export function LogoutButton({ className }: { className?: string }) {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
-      // Best-effort — proceed to home regardless.
+      // Best-effort, proceed to home regardless.
     }
     router.replace("/");
     router.refresh();

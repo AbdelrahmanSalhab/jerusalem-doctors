@@ -1,11 +1,11 @@
-// Server-side session helpers (plan §7 revised — dev-user shim).
+// Server-side session helpers (plan §7 revised, dev-user shim).
 //
 // Primary path: read the Supabase Auth session from cookies and return the
 // linked doctor row.
 //
 // Dev shim: when `USE_DEV_USER=1` is set (refused in production), return a
 // hardcoded doctor row by id from `DEV_DOCTOR_ID`. The dev doctor must
-// already exist in the DB — see `scripts/seed-dev-doctor.sql`.
+// already exist in the DB, see `scripts/seed-dev-doctor.sql`.
 
 import { redirect } from "next/navigation";
 import { cache } from "react";
@@ -26,7 +26,7 @@ const isDevUserEnabled = () =>
 // Log loudly if USE_DEV_USER is set in production. We don't *throw* here:
 // Next's `next build` sets NODE_ENV=production but still loads .env.local,
 // so a dev's local-only USE_DEV_USER=1 would block builds. The runtime
-// check in isDevUserEnabled() is the actual safety guard — it disables the shim
+// check in isDevUserEnabled() is the actual safety guard, it disables the shim
 // regardless of how USE_DEV_USER is set when NODE_ENV=production.
 if (process.env.USE_DEV_USER === "1" && isProd()) {
   console.warn(
@@ -94,7 +94,7 @@ export async function requireAdmin(): Promise<Doctor> {
   const doctor = await getCurrentDoctor();
   if (!doctor || !doctor.is_admin || !doctor.is_active) {
     const { notFound } = await import("next/navigation");
-    notFound(); // throws — control never returns here
+    notFound(); // throws, control never returns here
   }
   return doctor as Doctor;
 }
