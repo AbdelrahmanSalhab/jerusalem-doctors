@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoUploader } from "./PhotoUploader";
+import { Field } from "@/components/FormField";
+import { SpecialtyPicker } from "@/components/SpecialtyPicker";
+import { WorkplaceEditor } from "@/components/WorkplaceEditor";
 import {
   findGeneralSpecialtyId,
   isValidResidencyYear,
@@ -15,22 +18,21 @@ import {
   workplaceForStage,
 } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
+import type { SpecialtyNode } from "@/lib/specialtyTree";
 import {
+  cleanWorkplaces,
+  emptyWorkplace,
+  missingClinicFields,
   WORKPLACE_TYPE_LABEL,
-  WORKPLACE_TYPES,
+  type WorkplaceEntry,
+  workplaceInfoLine,
   type WorkplaceType,
 } from "@/lib/workplace";
 
 const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
 const WHATSAPP_URL = "https://wa.me/972524209156";
 
-type Specialty = { id: string; name_ar: string; code: string | null };
-type WorkplaceInput = {
-  name: string;
-  workplace_type: WorkplaceType;
-  details: string;
-  is_primary: boolean;
-};
+type Specialty = SpecialtyNode & { code: string | null };
 
 export function ProfileForm({
   doctor,
@@ -45,6 +47,9 @@ export function ProfileForm({
     name: string;
     workplace_type: WorkplaceType;
     details: string | null;
+    address: string | null;
+    hours: string | null;
+    phone: string | null;
     is_primary: boolean;
     sort_order: number;
   }[];
@@ -58,17 +63,20 @@ export function ProfileForm({
   const [specialtyIds, setSpecialtyIds] = useState<string[]>(
     currentSpecialtyIds,
   );
-  const initialWorkplaces: WorkplaceInput[] =
+  const initialWorkplaces: WorkplaceEntry[] =
     currentWorkplaces.length > 0
       ? currentWorkplaces.map((w) => ({
           name: w.name,
           workplace_type: w.workplace_type,
           details: w.details ?? "",
+          address: w.address ?? "",
+          hours: w.hours ?? "",
+          phone: w.phone ?? "",
           is_primary: w.is_primary,
         }))
-      : [{ name: "", workplace_type: "hospital", details: "", is_primary: true }];
+      : [emptyWorkplace(true)];
   const [workplaces, setWorkplaces] =
-    useState<WorkplaceInput[]>(initialWorkplaces);
+    useState<WorkplaceEntry[]>(initialWorkplaces);
   const [photoUrl, setPhotoUrl] = useState<string | null>(
     doctor.profile_picture_url,
   );
@@ -143,72 +151,30 @@ export function ProfileForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const toggleSpecialty = (id: string) =>
-    setSpecialtyIds((s) =>
-      s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
-    );
-
-  const setPrimary = (i: number) =>
-    setWorkplaces((ws) => ws.map((w, j) => ({ ...w, is_primary: j === i })));
-
-  const updateWorkplace = (i: number, patch: Partial<WorkplaceInput>) =>
-    setWorkplaces((ws) =>
-      ws.map((w, j) => (j === i ? { ...w, ...patch } : w)),
-    );
-
-  /** Clears `details` when the new type hides that input — see signup. */
-  const setWorkplaceType = (i: number, workplace_type: WorkplaceType) =>
-    setWorkplaces((ws) =>
-      ws.map((w, j) =>
-        j === i && stage
-          ? workplaceForStage({ ...w, workplace_type }, stage)
-          : { ...w, workplace_type },
-      ),
-    );
-
-  const removeWorkplace = (i: number) =>
-    setWorkplaces((ws) => {
-      const next = ws.filter((_, j) => j !== i);
-      // Ensure at least one entry exists and exactly one is primary.
-      if (next.length === 0) {
-        return [
-          { name: "", workplace_type: "hospital", details: "", is_primary: true },
-        ];
-      }
-      if (!next.some((w) => w.is_primary)) {
-        next[0] = { ...next[0]!, is_primary: true };
-      }
-      return next;
-    });
-
-  const addWorkplace = () =>
-    setWorkplaces((ws) => [
-      ...ws,
-      { name: "", workplace_type: "hospital", details: "", is_primary: false },
-    ]);
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     setSaved(false);
 
-    const cleanedWorkplaces = workplaces
-      .map((w) => ({
-        name: w.name.trim(),
-        workplace_type: w.workplace_type,
-        details: w.details.trim() || null,
-        is_primary: w.is_primary,
-      }))
-      .filter((w) => w.name.length > 0);
+    const cleanedWorkplaces = cleanWorkplaces(workplaces);
 
-    if (cleanedWorkplaces.length === 0) {
+    if (cleanedWorkplaces.length === 0 && !stageOpt?.workplaceOptional) {
       setError("الرجاء إدخال مكان عمل واحد على الأقل.");
       setSaving(false);
       return;
     }
+    if (
+      stageOpt?.showsClinicFields &&
+      workplaces.some((w) => missingClinicFields(w).length > 0)
+    ) {
+      setError("أدخل عنوان العيادة ورقم هاتفها.");
+      setEditingWorkplaces(true);
+      setSaving(false);
+      return;
+    }
     const primaryCount = cleanedWorkplaces.filter((w) => w.is_primary).length;
-    if (primaryCount !== 1) {
+    if (cleanedWorkplaces.length > 0 && primaryCount !== 1) {
       setError("اختر مكان عمل رئيسي واحد فقط.");
       setSaving(false);
       return;
@@ -421,29 +387,16 @@ export function ProfileForm({
           <>
             {showSpecialtyPicker && (
             <Field label="التخصصات (اختر واحدًا أو أكثر)">
-              <div className="grid max-h-64 grid-cols-1 gap-1 overflow-y-auto rounded border border-foreground/15 p-2 sm:grid-cols-2">
-                {visibleSpecialties.map((s) => (
-                  <label
-                    key={s.id}
-                    className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={specialtyIds.includes(s.id)}
-                      onChange={() => toggleSpecialty(s.id)}
-                      disabled={
-                        !specialtyIds.includes(s.id) &&
-                        specialtyIds.length >= 5
-                      }
-                    />
-                    <span>{s.name_ar}</span>
-                  </label>
-                ))}
-              </div>
+              <SpecialtyPicker
+                id="specialty_ids"
+                specialties={visibleSpecialties}
+                selected={specialtyIds}
+                onChange={setSpecialtyIds}
+              />
             </Field>
             )}
             {showSpecialtyPicker && (
-            <Field label="التخصص الفرعي">
+            <Field label="التخصص الدقيق أو مجال الاهتمام">
               <input
                 className="input"
                 value={subspecialty}
@@ -515,66 +468,11 @@ export function ProfileForm({
         }
       >
         {editingWorkplaces ? (
-          <div className="space-y-3">
-            {workplaces.map((wp, i) => (
-              <div key={i} className="space-y-2 rounded border border-foreground/15 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    className="input min-w-0 flex-1"
-                    value={wp.name}
-                    onChange={(e) => updateWorkplace(i, { name: e.target.value })}
-                    placeholder="اسم العيادة أو المستشفى"
-                  />
-                  <label className="flex items-center gap-1.5 text-sm">
-                    <input
-                      type="radio"
-                      name="primary_workplace"
-                      checked={wp.is_primary}
-                      onChange={() => setPrimary(i)}
-                    />
-                    رئيسي
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => removeWorkplace(i)}
-                    className="rounded border border-foreground/20 px-3 text-base hover:bg-foreground/5"
-                    aria-label="حذف"
-                  >
-                    حذف
-                  </button>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                  {(stageOpt?.workplaceTypes ?? WORKPLACE_TYPES).map((t) => (
-                    <label key={t} className="flex items-center gap-1.5">
-                      <input
-                        type="radio"
-                        name={`workplace_type_${i}`}
-                        checked={wp.workplace_type === t}
-                        onChange={() => setWorkplaceType(i, t)}
-                      />
-                      {WORKPLACE_TYPE_LABEL[t]}
-                    </label>
-                  ))}
-                </div>
-                {(stageOpt?.showsWorkplaceDetails ?? true) &&
-                  wp.workplace_type === "clinic" && (
-                  <input
-                    className="input"
-                    value={wp.details}
-                    onChange={(e) => updateWorkplace(i, { details: e.target.value })}
-                    placeholder="عنوان العيادة / أوقات الدوام / رقم الهاتف (اختياري)"
-                  />
-                )}
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addWorkplace}
-              className="rounded border border-dashed border-foreground/30 px-4 py-2 text-base text-foreground/80 hover:bg-foreground/5"
-            >
-              + إضافة مكان عمل
-            </button>
-          </div>
+          <WorkplaceEditor
+            workplaces={workplaces}
+            onChange={setWorkplaces}
+            stage={stage}
+          />
         ) : (
           <ReadOnlyView>
             {workplaces.filter((w) => w.name.trim().length > 0).length === 0 ? (
@@ -594,9 +492,9 @@ export function ProfileForm({
                         {WORKPLACE_TYPE_LABEL[w.workplace_type]}
                       </span>
                       <span>{w.name}</span>
-                      {w.details && (
+                      {workplaceInfoLine(w) && (
                         <span className="text-foreground/60">
-                          ({w.details})
+                          ({workplaceInfoLine(w)})
                         </span>
                       )}
                     </li>
@@ -718,21 +616,6 @@ function EditButton({ onClick }: { onClick: () => void }) {
 function ReadOnlyView({ children }: { children: React.ReactNode }) {
   return (
     <div className="space-y-3 rounded-md border border-foreground/15 bg-foreground/5 p-4">
-      {children}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-base font-medium">{label}</label>
       {children}
     </div>
   );

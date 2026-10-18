@@ -160,3 +160,47 @@ describe("POST /api/signup/start: license resolution", () => {
     });
   });
 });
+
+describe("POST /api/signup/start: workplaces", () => {
+  beforeEach(() => {
+    pendingInserts.length = 0;
+  });
+
+  it("lets a resident sign up without a workplace", async () => {
+    const r = await start({
+      license_number: "23456",
+      career_stage: "resident",
+      residency_start_year: 2023,
+      workplaces: [],
+    });
+    expect(r.status).toBe(200);
+    expect(storedPayload()).toMatchObject({ workplaces: [] });
+  });
+
+  it("still requires a workplace from a specialist", async () => {
+    const r = await start({ license_number: "23456", workplaces: [] });
+    expect(r.status).toBe(400);
+  });
+
+  it("carries a clinic's address, hours and phone into the pending row", async () => {
+    const r = await start({
+      license_number: "23456",
+      workplaces: [
+        {
+          name: "عيادة النور",
+          workplace_type: "clinic",
+          address: "شارع صلاح الدين",
+          hours: "",
+          phone: "٠٢-٦٢٧١٢٣٤",
+          is_primary: true,
+        },
+      ],
+    });
+    expect(r.status).toBe(200);
+    expect((storedPayload().workplaces as unknown[])[0]).toMatchObject({
+      address: "شارع صلاح الدين",
+      hours: null,
+      phone: "02-6271234",
+    });
+  });
+});

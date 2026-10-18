@@ -22,6 +22,10 @@ interface PendingWorkplace {
   name_normalized: string;
   workplace_type: WorkplaceType;
   details: string | null;
+  /** Absent on rows written before 0012 (pending rows live 15 minutes). */
+  address?: string | null;
+  hours?: string | null;
+  phone?: string | null;
   is_primary: boolean;
   sort_order: number;
 }
@@ -210,6 +214,9 @@ export const POST = withJsonErrors(async (req: Request) => {
         name_normalized: w.name_normalized,
         workplace_type: w.workplace_type,
         details: w.details,
+        address: w.address ?? null,
+        hours: w.hours ?? null,
+        phone: w.phone ?? null,
         is_primary: w.is_primary,
         sort_order: w.sort_order,
       })),

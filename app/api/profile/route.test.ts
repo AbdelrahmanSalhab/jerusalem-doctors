@@ -6,13 +6,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updateSpy = vi.fn();
+const insertSpy = vi.fn();
+let me: { id: string; career_stage: "resident" | "specialist" | null } = {
+  id: "doc-1",
+  career_stage: null,
+};
 
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
-  requireDoctor: vi.fn(async () => ({ id: "doc-1" })),
+  requireDoctor: vi.fn(async () => me),
 }));
 
 vi.mock("@/lib/supabase/service", () => ({
@@ -25,7 +30,10 @@ vi.mock("@/lib/supabase/service", () => ({
         },
         eq: async () => ({ error: null }),
         delete: () => chain,
-        insert: async () => ({ error: null }),
+        insert: async (rows: unknown) => {
+          insertSpy(table, rows);
+          return { error: null };
+        },
       };
       return chain;
     },
@@ -114,6 +122,67 @@ describe("PATCH /api/profile — career stage", () => {
 
   it("still rejects an unknown career stage", async () => {
     const res = await call({ career_stage: "attending" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/profile: workplaces", () => {
+  beforeEach(() => {
+    insertSpy.mockClear();
+    me = { id: "doc-1", career_stage: null };
+  });
+
+  const workplaceInsert = () =>
+    insertSpy.mock.calls.find(([table]) => table === "doctor_workplaces")?.[1] as
+      | Record<string, unknown>[]
+      | undefined;
+
+  it("stores a clinic's address, hours and phone", async () => {
+    const res = await call({
+      workplaces: [
+        {
+          name: "عيادة النور",
+          workplace_type: "clinic",
+          address: " شارع صلاح الدين ",
+          hours: "الأحد-الخميس",
+          phone: "02-6271234",
+          is_primary: true,
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(workplaceInsert()?.[0]).toMatchObject({
+      address: "شارع صلاح الدين",
+      hours: "الأحد-الخميس",
+      phone: "02-6271234",
+    });
+  });
+
+  it("rejects an unreadable clinic phone", async () => {
+    const res = await call({
+      workplaces: [
+        { name: "عيادة النور", workplace_type: "clinic", phone: "12", is_primary: true },
+      ],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // A resident rotates, so clearing every workplace is a valid save.
+  it("lets a resident clear their workplaces", async () => {
+    me = { id: "doc-1", career_stage: "resident" };
+    const res = await call({ workplaces: [] });
+    expect(res.status).toBe(200);
+    expect(workplaceInsert()).toBeUndefined();
+  });
+
+  it("also honours a stage declared in the same request", async () => {
+    const res = await call({ career_stage: "resident", residency_start_year: 2022, workplaces: [] });
+    expect(res.status).toBe(200);
+  });
+
+  it("still requires a workplace from everyone else", async () => {
+    me = { id: "doc-1", career_stage: "specialist" };
+    const res = await call({ workplaces: [] });
     expect(res.status).toBe(400);
   });
 });

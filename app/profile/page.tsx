@@ -13,7 +13,7 @@ export default async function ProfilePage() {
     await Promise.all([
       service
         .from("specialties")
-        .select("id, name_ar, code")
+        .select("id, name_ar, code, parent_id")
         .eq("is_active", true)
         .order("sort_order"),
       service
@@ -22,7 +22,7 @@ export default async function ProfilePage() {
         .eq("doctor_id", me.id),
       service
         .from("doctor_workplaces")
-        .select("name, workplace_type, details, is_primary, sort_order")
+        .select("name, workplace_type, details, address, hours, phone, is_primary, sort_order")
         .eq("doctor_id", me.id)
         .order("is_primary", { ascending: false })
         .order("sort_order", { ascending: true }),
@@ -37,14 +37,23 @@ export default async function ProfilePage() {
 
       <ProfileForm
         doctor={me}
-        specialties={(specialties as Pick<Specialty, "id" | "name_ar" | "code">[]) ?? []}
+        specialties={
+          (specialties as Pick<Specialty, "id" | "name_ar" | "code" | "parent_id">[]) ?? []
+        }
         currentSpecialtyIds={(doctorSpecialties ?? []).map(
           (r) => r.specialty_id,
         )}
         currentWorkplaces={
           (workplaces as Pick<
             DoctorWorkplace,
-            "name" | "workplace_type" | "details" | "is_primary" | "sort_order"
+            | "name"
+            | "workplace_type"
+            | "details"
+            | "address"
+            | "hours"
+            | "phone"
+            | "is_primary"
+            | "sort_order"
           >[]) ?? []
         }
       />

@@ -36,8 +36,10 @@ export interface StageOption {
   readonly requiresResidencyStartYear: boolean;
   readonly workplaceTypes: readonly WorkplaceType[];
   readonly defaultWorkplaceType: WorkplaceType;
-  /** Only a specialist's عيادة gets the free-text details/hours line. */
-  readonly showsWorkplaceDetails: boolean;
+  /** Only a specialist's عيادة asks for address, hours and phone. */
+  readonly showsClinicFields: boolean;
+  /** A resident rotates during training, so no fixed workplace is required. */
+  readonly workplaceOptional: boolean;
 }
 
 export const STAGE_OPTIONS: readonly StageOption[] = [
@@ -53,7 +55,8 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     requiresResidencyStartYear: false,
     workplaceTypes: ["hospital", "clinic"],
     defaultWorkplaceType: "clinic",
-    showsWorkplaceDetails: false,
+    showsClinicFields: false,
+    workplaceOptional: false,
   },
   {
     stage: "resident",
@@ -67,7 +70,8 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     requiresResidencyStartYear: true,
     workplaceTypes: ["hospital", "hmo"],
     defaultWorkplaceType: "hospital",
-    showsWorkplaceDetails: false,
+    showsClinicFields: false,
+    workplaceOptional: true,
   },
   {
     stage: "specialist",
@@ -81,7 +85,8 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     requiresResidencyStartYear: false,
     workplaceTypes: ["hospital", "clinic"],
     defaultWorkplaceType: "hospital",
-    showsWorkplaceDetails: true,
+    showsClinicFields: true,
+    workplaceOptional: false,
   },
 ];
 
@@ -141,22 +146,28 @@ export function careerStageBadge(
 
 /**
  * Coerce a workplace to what the stage allows: an illegal type falls back to
- * the stage's default, and `details` is dropped whenever the resulting cell
- * hides that input. Every type change goes through here, which also fixes a
- * standing bug where switching عيادة → مستشفى left the typed clinic hours in
- * state and posted them.
+ * the stage's default, and the clinic fields (address, hours, phone and the
+ * legacy `details`) are dropped whenever the resulting row hides them. Every
+ * type change goes through here, so switching عيادة → مستشفى can't leave
+ * typed clinic hours in state and post them.
  */
 export function workplaceForStage<
-  T extends { workplace_type: WorkplaceType; details: string },
+  T extends { workplace_type: WorkplaceType } & ClinicFields,
 >(w: T, stage: Stage): T {
   const opt = STAGE_BY_KEY[stage];
   const type = opt.workplaceTypes.includes(w.workplace_type)
     ? w.workplace_type
     : opt.defaultWorkplaceType;
-  const keepDetails = opt.showsWorkplaceDetails && type === "clinic";
-  if (type === w.workplace_type && (keepDetails || w.details === "")) return w;
-  return { ...w, workplace_type: type, details: keepDetails ? w.details : "" };
+  const keepClinic = opt.showsClinicFields && type === "clinic";
+  const hasClinic = CLINIC_KEYS.some((k) => w[k] !== "");
+  if (type === w.workplace_type && (keepClinic || !hasClinic)) return w;
+  return keepClinic
+    ? { ...w, workplace_type: type }
+    : { ...w, workplace_type: type, details: "", address: "", hours: "", phone: "" };
 }
+
+type ClinicFields = { details: string; address: string; hours: string; phone: string };
+const CLINIC_KEYS = ["details", "address", "hours", "phone"] as const;
 
 export const GENERAL_SPECIALTY_CODE = "general";
 

@@ -73,32 +73,40 @@ describe("isValidResidencyYear", () => {
 });
 
 describe("workplaceForStage", () => {
-  it("coerces a type the stage doesn't offer, dropping the details", () => {
+  const CLINIC = {
+    workplace_type: "clinic" as const,
+    details: "",
+    address: "شارع صلاح الدين ١٢",
+    hours: "الأحد-الخميس ٩-٥",
+    phone: "02-6271234",
+  };
+  const BLANK = { details: "", address: "", hours: "", phone: "" };
+
+  it("coerces a type the stage doesn't offer, dropping the clinic fields", () => {
     expect(
-      workplaceForStage(
-        { workplace_type: "clinic", details: "أوقات الدوام", is_primary: true },
-        "resident",
-      ),
-    ).toEqual({ workplace_type: "hospital", details: "", is_primary: true });
+      workplaceForStage({ ...CLINIC, details: "قديم", is_primary: true }, "resident"),
+    ).toEqual({ workplace_type: "hospital", ...BLANK, is_primary: true });
   });
 
-  it("keeps a specialist's clinic details", () => {
-    const w = { workplace_type: "clinic" as const, details: "ص ٨-١٢" };
-    expect(workplaceForStage(w, "specialist")).toBe(w);
+  it("keeps a specialist's clinic fields", () => {
+    expect(workplaceForStage(CLINIC, "specialist")).toBe(CLINIC);
   });
 
-  // طب عام and مقيم both hide the details input, so nothing may survive there.
-  it("drops details for stages that hide the input", () => {
+  // طب عام and مقيم both hide the clinic inputs, so nothing may survive there.
+  it("drops clinic fields for stages that hide them", () => {
     for (const stage of ["general", "resident"] as const) {
-      expect(
-        workplaceForStage({ workplace_type: "clinic", details: "x" }, stage)
-          .details,
-      ).toBe("");
+      expect(workplaceForStage(CLINIC, stage)).toMatchObject(BLANK);
     }
   });
 
+  it("drops clinic fields when a specialist switches the row to مستشفى", () => {
+    expect(
+      workplaceForStage({ ...CLINIC, workplace_type: "hospital" }, "specialist"),
+    ).toMatchObject({ workplace_type: "hospital", ...BLANK });
+  });
+
   it("leaves an already-legal workplace untouched", () => {
-    const w = { workplace_type: "hmo" as const, details: "" };
+    const w = { workplace_type: "hmo" as const, ...BLANK };
     expect(workplaceForStage(w, "resident")).toBe(w);
   });
 });
@@ -133,12 +141,18 @@ describe("STAGE_OPTIONS", () => {
     ).toEqual(["resident"]);
   });
 
-  it("shows the details input only where a عيادة can be picked", () => {
-    for (const o of STAGE_OPTIONS) {
-      if (o.showsWorkplaceDetails) expect(o.workplaceTypes).toContain("clinic");
-    }
-    expect(STAGE_BY_KEY.general.showsWorkplaceDetails).toBe(false);
-    expect(STAGE_BY_KEY.resident.showsWorkplaceDetails).toBe(false);
+  it("asks for clinic details only from specialists", () => {
+    expect(
+      STAGE_OPTIONS.filter((o) => o.showsClinicFields).map((o) => o.stage),
+    ).toEqual(["specialist"]);
+    expect(STAGE_BY_KEY.specialist.workplaceTypes).toContain("clinic");
+  });
+
+  // A resident rotates between departments and hospitals during training.
+  it("makes the workplace optional only for residents", () => {
+    expect(
+      STAGE_OPTIONS.filter((o) => o.workplaceOptional).map((o) => o.stage),
+    ).toEqual(["resident"]);
   });
 
   it("hides الطب العام from the two stages that have a picker", () => {

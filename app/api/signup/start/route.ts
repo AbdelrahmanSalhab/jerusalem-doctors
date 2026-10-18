@@ -28,16 +28,9 @@ import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
-import { WORKPLACE_TYPES, type WorkplaceType } from "@/lib/workplace";
+import { type WorkplaceType, WorkplaceInputSchema } from "@/lib/workplace";
 
 const PENDING_TTL_MS = 15 * 60_000;
-
-const WorkplaceInput = z.object({
-  name: z.string().trim().min(2).max(120),
-  workplace_type: z.enum(WORKPLACE_TYPES).default("hospital"),
-  details: z.string().trim().max(300).optional().nullable(),
-  is_primary: z.boolean(),
-});
 
 const Body = z
   .object({
@@ -70,8 +63,9 @@ const Body = z
     subspecialty: z.string().trim().optional().nullable(),
     email: z.email(),
     bio: z.string().trim().max(500).optional().nullable(),
-    // Exactly one entry must be is_primary:true — validated below.
-    workplaces: z.array(WorkplaceInput).min(1).max(20),
+    // Exactly one entry must be is_primary:true when any are given —
+    // validated below. Residents may give none (they rotate).
+    workplaces: z.array(WorkplaceInputSchema).max(20),
     consent: z.literal(true),
     turnstile_token: z.string().optional(),
     // Soft-match override flow: client confirms registry name; we record it.
@@ -84,6 +78,10 @@ const Body = z
   .refine((b) => b.secondary_license_region !== b.license_region, {
     message: "الترخيص الإضافي يجب أن يكون من الجهة الأخرى",
     path: ["secondary_license_region"],
+  })
+  .refine((b) => b.career_stage === "resident" || b.workplaces.length > 0, {
+    message: "أدخل مكان عمل واحدًا على الأقل",
+    path: ["workplaces"],
   });
 
 export const POST = withJsonErrors(async (req: Request) => {
@@ -281,9 +279,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     ? normalizeArabic(parsed.subspecialty)
     : null;
 
-  // Exactly one workplace must be primary.
+  // Exactly one workplace must be primary (when there are any).
   const primaryCount = parsed.workplaces.filter((w) => w.is_primary).length;
-  if (primaryCount !== 1) {
+  if (parsed.workplaces.length > 0 && primaryCount !== 1) {
     return jsonError(400, {
       error: "invalid_body",
       code: "invalid_body",
@@ -298,6 +296,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     name_normalized: string;
     workplace_type: WorkplaceType;
     details: string | null;
+    address: string | null;
+    hours: string | null;
+    phone: string | null;
     is_primary: boolean;
     sort_order: number;
   }[] = [];
@@ -312,7 +313,10 @@ export const POST = withJsonErrors(async (req: Request) => {
       name: w.name,
       name_normalized: norm,
       workplace_type: w.workplace_type,
-      details: w.details?.trim() || null,
+      details: w.details,
+      address: w.address,
+      hours: w.hours,
+      phone: w.phone,
       is_primary: w.is_primary,
       sort_order: i,
     });

@@ -6,10 +6,12 @@
 // look out of place.
 
 import { useEffect, useRef, useState } from "react";
+import { groupSpecialties } from "@/lib/specialtyTree";
 
 interface Option {
   id: string;
   name_ar: string;
+  parent_id: string | null;
 }
 
 const ALL = "كل التخصصات";
@@ -77,14 +79,25 @@ export function SpecialtyFilter({
             selected={value === ""}
             onPick={() => pick("")}
           />
-          {options.map((o) => (
+          {/* A parent (الباطنية) matches its subspecialties too; they follow
+              it, indented. */}
+          {groupSpecialties(options).flatMap((g) => [
             <Item
-              key={o.id}
-              label={o.name_ar}
-              selected={value === o.id}
-              onPick={() => pick(o.id)}
-            />
-          ))}
+              key={g.parent.id}
+              label={g.parent.name_ar}
+              selected={value === g.parent.id}
+              onPick={() => pick(g.parent.id)}
+            />,
+            ...g.children.map((c) => (
+              <Item
+                key={c.id}
+                label={c.name_ar}
+                nested
+                selected={value === c.id}
+                onPick={() => pick(c.id)}
+              />
+            )),
+          ])}
         </ul>
       )}
     </div>
@@ -94,10 +107,12 @@ export function SpecialtyFilter({
 function Item({
   label,
   selected,
+  nested,
   onPick,
 }: {
   label: string;
   selected: boolean;
+  nested?: boolean;
   onPick: () => void;
 }) {
   return (
@@ -107,6 +122,7 @@ function Item({
       onClick={onPick}
       className={
         "cursor-pointer px-3 py-2.5 text-base hover:bg-foreground/5 " +
+        (nested ? "ps-8 text-foreground/85 " : "") +
         (selected ? "bg-foreground/10 font-medium" : "")
       }
     >

@@ -6,7 +6,7 @@ import { DoctorRow } from "@/components/DoctorRow";
 import { SpecialtyFilter } from "@/components/SpecialtyFilter";
 import type { SearchHit } from "@/app/api/search/route";
 
-type Specialty = { id: string; name_ar: string };
+type Specialty = { id: string; name_ar: string; parent_id: string | null };
 type SearchState =
   | { status: "idle" }
   | { status: "loading" }

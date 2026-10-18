@@ -10,7 +10,7 @@ import { normalizeArabic } from "@/lib/normalize/arabic";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { WORKPLACE_TYPES } from "@/lib/workplace";
+import { WorkplaceInputSchema } from "@/lib/workplace";
 
 const Body = z.object({
   arabic_first_name: z.string().trim().min(2).max(80).optional(),
@@ -30,18 +30,9 @@ const Body = z.object({
     .max(2100)
     .nullable()
     .optional(),
-  workplaces: z
-    .array(
-      z.object({
-        name: z.string().trim().min(2).max(120),
-        workplace_type: z.enum(WORKPLACE_TYPES).default("hospital"),
-        details: z.string().trim().max(300).nullable().optional(),
-        is_primary: z.boolean(),
-      }),
-    )
-    .min(1)
-    .max(20)
-    .optional(),
+  // Replace-all. Empty is only valid for a resident (checked below, since
+  // the stage may come from this request or from the stored row).
+  workplaces: z.array(WorkplaceInputSchema).max(20).optional(),
 });
 
 export const PATCH = withJsonErrors(async (req: Request) => {
@@ -60,6 +51,16 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     parsed = Body.parse(await req.json());
   } catch {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
+  }
+
+  const stageAfterSave =
+    parsed.career_stage !== undefined ? parsed.career_stage : me.career_stage;
+  if (parsed.workplaces?.length === 0 && stageAfterSave !== "resident") {
+    return jsonError(400, {
+      error: "invalid_body",
+      code: "invalid_body",
+      fields: { workplaces: "أدخل مكان عمل واحدًا على الأقل" },
+    });
   }
 
   const service = createSupabaseServiceClient();
@@ -133,9 +134,9 @@ export const PATCH = withJsonErrors(async (req: Request) => {
   }
 
   if (parsed.workplaces) {
-    // Validate exactly one primary.
+    // Validate exactly one primary (when there are any).
     const primaries = parsed.workplaces.filter((w) => w.is_primary).length;
-    if (primaries !== 1) {
+    if (parsed.workplaces.length > 0 && primaries !== 1) {
       return jsonError(400, {
         error: "exactly_one_primary",
         code: "exactly_one_primary",
@@ -150,7 +151,10 @@ export const PATCH = withJsonErrors(async (req: Request) => {
         name: w.name,
         name_normalized: normalizeArabic(w.name),
         workplace_type: w.workplace_type,
-        details: w.details?.trim() || null,
+        details: w.details,
+        address: w.address,
+        hours: w.hours,
+        phone: w.phone,
         is_primary: w.is_primary,
         sort_order: w.is_primary ? 0 : i + 1,
       }))
@@ -161,7 +165,9 @@ export const PATCH = withJsonErrors(async (req: Request) => {
       });
 
     await service.from("doctor_workplaces").delete().eq("doctor_id", me.id);
-    const r = await service.from("doctor_workplaces").insert(rows);
+    const r = rows.length
+      ? await service.from("doctor_workplaces").insert(rows)
+      : { error: null };
     if (r.error) {
       console.error("[profile.patch] workplaces replace failed", r.error);
       return jsonError(500, {
