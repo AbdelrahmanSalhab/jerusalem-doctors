@@ -6,7 +6,7 @@ import { db, jsonRequest } from "@/test/fakeSupabase";
 
 const { requireAdmin, relinkWorkplaces } = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
-  relinkWorkplaces: vi.fn(async () => ({ changed: 3, unmatched: [] })),
+  relinkWorkplaces: vi.fn(async () => ({ changed: 3, unmatched: [] as { name: string; count: number }[] })),
 }));
 vi.mock("@/lib/auth/session", () => ({ requireAdmin }));
 vi.mock("@/lib/institutions", async (orig) => ({
@@ -61,6 +61,15 @@ describe("admin institutions API", () => {
     expect(res.status).toBe(200);
     expect(db.argsOf("institutions", "update")[0][0]).toEqual({ aliases: ["شعري تسيدك"] });
     expect(relinkWorkplaces).toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({ still_unlinked: false });
+  });
+
+  it("says when a claimed name still didn't link", async () => {
+    relinkWorkplaces.mockResolvedValueOnce({ changed: 0, unmatched: [{ name: "مقاصد", count: 1 }] });
+    db.queue("institutions", { data: { aliases: [] } }, {});
+    const { PATCH } = await import("./[id]/route");
+    const res = await PATCH(jsonRequest("/api/admin/institutions/inst-1", { add_alias: "مقاصد" }), ctx);
+    expect(await res.json()).toMatchObject({ still_unlinked: true });
   });
 
   it("deletes, re-links, and 404s an unknown id", async () => {
