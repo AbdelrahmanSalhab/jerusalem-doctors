@@ -72,7 +72,11 @@ export function SpecialtyFilter({
       {open && (
         <ul
           role="listbox"
-          className="absolute z-20 mt-1 max-h-[60vh] w-full min-w-56 overflow-y-auto rounded-md border border-line bg-surface py-1 shadow-lg"
+          // Anchored to the box's left edge (end-0 in RTL) so a list wider
+          // than the box grows toward the middle of the screen; the box sits
+          // at the left of the search row on a phone, and growing the other
+          // way pushed the list, and the page, past the screen edge.
+          className="absolute end-0 z-20 mt-1 max-h-[60vh] w-max min-w-full max-w-[calc(100vw-2rem)] overflow-y-auto rounded-md border border-line bg-surface py-1 shadow-lg"
         >
           <Item
             label={ALL}
