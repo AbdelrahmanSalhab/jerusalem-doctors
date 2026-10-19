@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
+import { NavTabs } from "@/components/NavTabs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -28,87 +29,64 @@ export async function SiteHeader() {
   const doctor = current?.is_active ? current : null;
   const pending = doctor?.is_admin ? await countPending().catch(() => 0) : 0;
 
+  const button = "rounded-md border border-line px-2.5 py-1.5 text-sm hover:bg-foreground/5 sm:px-3";
   return (
-    <header className="border-b border-foreground/10">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:gap-3 sm:px-6">
-        <Link
-          href="/"
-          className="flex shrink-0 items-center gap-2 hover:opacity-90 sm:gap-3"
-        >
+    <header className="border-b border-line bg-surface">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 sm:px-6">
+        <Link href="/" className="flex min-w-0 items-center gap-2 hover:opacity-90 sm:gap-3">
           {/* The logo is a JPEG on white, so it sits on a deliberate white
               badge rather than as a white square on the dark theme. */}
-          <span className="rounded-lg bg-white p-1 shadow-sm ring-1 ring-line">
+          <span className="shrink-0 rounded-lg bg-white p-1 shadow-sm ring-1 ring-line">
             <Image
               src="/logo.jpeg"
               alt={ORG_NAME_AR}
               width={64}
               height={64}
               priority
-              className="h-10 w-10 object-contain sm:h-14 sm:w-14 md:h-16 md:w-16"
+              className="h-9 w-9 object-contain sm:h-12 sm:w-12"
             />
           </span>
-          {/* Logo image already includes the org name; on mobile we drop the
-              redundant text label to keep the header on one line. */}
-          <span className="hidden text-lg font-semibold leading-tight sm:inline md:text-xl">
+          {/* The logo already carries the name; on a phone the text would
+              crowd the controls. */}
+          <span className="hidden truncate text-lg font-semibold leading-tight sm:inline">
             {ORG_NAME_AR}
           </span>
         </Link>
 
-        <nav className="flex shrink-0 items-center gap-1.5 text-sm sm:gap-2 md:text-base">
-          {doctor ? (
-            <>
-              <Link
-                href="/dashboard"
-                className="rounded-md px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
-              >
-                لوحة البحث
-              </Link>
-              <Link
-                href="/profile"
-                className="rounded-md px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
-              >
-                ملفي
-              </Link>
-              {doctor.is_admin && (
-                <Link
-                  href="/admin"
-                  className="rounded-md px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
-                >
-                  الإدارة
-                  {pending > 0 && (
-                    <span
-                      className="ms-1.5 rounded-full bg-warn-solid px-1.5 text-xs font-semibold text-white"
-                      aria-label={`${pending} بانتظار المراجعة`}
-                    >
-                      {pending}
-                    </span>
-                  )}
-                </Link>
-              )}
-              <LogoutButton className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3" />
-            </>
-          ) : current ? (
-            // Deactivated but still signed in: the only useful control.
-            <LogoutButton className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3" />
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <ThemeToggle className="rounded-md px-2 py-1.5 text-sm text-muted hover:bg-foreground/5 hover:text-foreground" />
+          {current ? (
+            // Signed in (or deactivated with a session left): logging out is
+            // the only account control the header needs.
+            <LogoutButton className={button} />
           ) : (
             <>
-              <Link
-                href="/login"
-                className="rounded-md border border-foreground/20 px-2.5 py-1.5 hover:bg-foreground/5 sm:px-3"
-              >
+              <Link href="/login" className={button}>
                 تسجيل الدخول
               </Link>
               <Link
                 href="/signup"
-                className="rounded-md bg-primary px-2.5 py-1.5 text-primary-fg hover:opacity-90 sm:px-3"
+                className="rounded-md bg-primary px-2.5 py-1.5 text-sm text-primary-fg hover:opacity-90 sm:px-3"
               >
                 إنشاء حساب
               </Link>
             </>
           )}
-          <ThemeToggle className="rounded-md px-2 py-1.5 text-foreground/80 hover:bg-foreground/5" />
-        </nav>
+        </div>
       </div>
+
+      {doctor && (
+        <div className="mx-auto max-w-5xl px-2 sm:px-4">
+          <NavTabs
+            label="أقسام الموقع"
+            tabs={[
+              { href: "/dashboard", label: "البحث عن طبيب" },
+              { href: "/profile", label: "ملفي" },
+              ...(doctor.is_admin ? [{ href: "/admin", label: "الإدارة", badge: pending }] : []),
+            ]}
+          />
+        </div>
+      )}
     </header>
   );
 }

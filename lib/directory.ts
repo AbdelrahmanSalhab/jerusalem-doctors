@@ -189,6 +189,20 @@ export interface FeaturedDoctors {
   graduates: SearchHit[];
 }
 
+/** How many doctors the directory lists (same visibility as search), or
+ *  null when the count can't be read. */
+export async function countListed(service: SupabaseClient): Promise<number | null> {
+  const { count, error } = await service
+    .from("doctors")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true)
+    .eq("is_visible", true)
+    .eq("is_phone_verified", true)
+    .eq("is_admin_approved", true)
+    .eq("consent_directory_use", true);
+  return error ? null : count;
+}
+
 /** A failed read hides the sections rather than failing the dashboard. */
 export async function fetchFeatured(service: SupabaseClient): Promise<FeaturedDoctors> {
   const [doctor, graduates] = await Promise.all([

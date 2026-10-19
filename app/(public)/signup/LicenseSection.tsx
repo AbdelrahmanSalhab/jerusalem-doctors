@@ -36,7 +36,7 @@ export function LicenseSection({
           className="input"
           value={form.phone}
           onChange={(e) => update("phone", cleanPhone(e.target.value))}
-          placeholder="0501234567"
+          placeholder="05XXXXXXXX"
         />
       </Field>
 

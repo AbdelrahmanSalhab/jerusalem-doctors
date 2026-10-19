@@ -384,13 +384,17 @@ export function ProfileForm({
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
-      >
-        {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
-      </button>
+      {/* Stays at the bottom of the screen while the profile scrolls past, so
+          saving never means hunting for the button mid-page. */}
+      <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-background/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-lg sm:border">
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-md bg-primary px-6 py-3 font-semibold text-primary-fg disabled:opacity-50"
+        >
+          {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
+        </button>
+      </div>
 
       <HelpSection />
 
