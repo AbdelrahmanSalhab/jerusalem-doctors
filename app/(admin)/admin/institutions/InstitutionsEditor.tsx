@@ -4,6 +4,7 @@
 // no institution matches yet (each as a new spelling of an existing one, or
 // as a new institution).
 
+import { countOf, DOCTORS } from "@/lib/arabicCount";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { InputStyles } from "@/components/InputStyles";
@@ -250,7 +251,7 @@ function InstitutionRow({
         ) : (
           <details className="text-muted">
             <summary className="cursor-pointer tabular-nums hover:text-foreground">
-              {doctors.length === 1 ? "طبيب واحد" : `${doctors.length} أطباء`}
+              {countOf(doctors.length, DOCTORS)}
             </summary>
             <ul className="mt-1 list-disc ps-5 text-foreground">
               {doctors.map((d) => (

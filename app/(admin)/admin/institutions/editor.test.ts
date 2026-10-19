@@ -29,7 +29,7 @@ describe("InstitutionsEditor", () => {
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html.indexOf("كلاليت")).toBeLessThan(html.lastIndexOf("مكابي"));
-    expect(html).toContain("2 أطباء");
+    expect(html).toContain("طبيبان");
     expect(html).toContain("ليلى الخطيب");
     expect(html).toContain("لا أطباء");
     expect(html).toContain('<optgroup label="صناديق المرضى">');

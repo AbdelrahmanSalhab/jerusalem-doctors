@@ -209,17 +209,23 @@ export async function institutionUsage(service: SupabaseClient): Promise<{
   for (let i = 0; i < ids.length; i += 150) {
     const { data, error } = await service
       .from("doctors")
-      .select("id, arabic_first_name, arabic_family_name")
+      .select("id, arabic_first_name, arabic_family_name, is_admin, is_visible")
       .in("id", ids.slice(i, i + 150));
     if (error) throw error;
-    for (const d of data ?? []) names.set(d.id, `${d.arabic_first_name} ${d.arabic_family_name}`);
+    for (const d of data ?? []) {
+      // Staff accounts (admin, hidden from the directory) aren't doctors to
+      // count, same as on the stats page.
+      if (d.is_admin && !d.is_visible) continue;
+      names.set(d.id, `${d.arabic_first_name} ${d.arabic_family_name}`);
+    }
   }
   return {
     doctors: Object.fromEntries(
       [...perInstitution].map(([inst, set]) => [
         inst,
         [...set]
-          .map((id) => ({ id, name: names.get(id) ?? "?" }))
+          .filter((id) => names.has(id))
+          .map((id) => ({ id, name: names.get(id)! }))
           .sort((a, b) => a.name.localeCompare(b.name, "ar")),
       ]),
     ),
