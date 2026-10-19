@@ -27,7 +27,7 @@ const SAMPLE: AdminStats = {
   },
   usage: {
     searchers_7d: 15, searches_7d: 140, filter_empty_7d: 6, signup_started_7d: 15, login_code_sent_7d: 50,
-    login_succeeded_7d: 44, login_unregistered_7d: 7, login_send_failed_24h: 0, since: "2026-10-19T00:00:00Z",
+    login_succeeded_7d: 44, login_unregistered_7d: 7, login_send_failed_24h: 0, since: "2026-09-01T00:00:00Z",
   },
   signup_completed_7d: 12,
   empty_specialties: [{ name: "القلب", count: 4 }],
@@ -53,7 +53,7 @@ describe("/admin/stats", () => {
     expect(html).toContain("نجحت");
     expect(html).toContain("كلاليت");
     expect(html).toContain("رسائل واتساب");
-    expect(html).toContain("مع 22 زميلًا مختلفًا");
+    expect(html).toContain("مع 22 زميلًا");
     expect(html).toContain("حساب مريب");
     expect(html).toContain("/admin/institutions");
   });
@@ -66,5 +66,15 @@ describe("/admin/stats with no activity yet", () => {
       DailyBars({ label: "أطباء بحثوا", days: [{ day: "2026-10-18", value: 0 }, { day: "2026-10-19", value: 0 }] }),
     );
     expect(html).toContain("أعلى يوم 0");
+  });
+});
+
+describe("/admin/stats in the first week of counting", () => {
+  it("hides the signup completion share until starts cover 7 days", async () => {
+    const { default: Page } = await import("./page");
+    SAMPLE.usage.since = new Date().toISOString();
+    const html = renderToStaticMarkup(await Page());
+    SAMPLE.usage.since = "2026-09-01T00:00:00Z";
+    expect(html).not.toContain("ممن بدأوا");
   });
 });

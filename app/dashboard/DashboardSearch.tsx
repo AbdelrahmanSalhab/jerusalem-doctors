@@ -1,5 +1,6 @@
 "use client";
 
+import { countOf, DOCTORS } from "@/lib/arabicCount";
 import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
@@ -122,7 +123,7 @@ export function DashboardSearch({
         <div className="flex flex-col gap-2">
           {listed !== null && (
             <p className="text-sm text-muted">
-              <span className="font-semibold text-foreground tabular-nums">{listed}</span> طبيبًا في الدليل. تصفّح حسب التخصص:
+              <span className="font-semibold text-foreground">{countOf(listed, DOCTORS)}</span> في الدليل. تصفّح حسب التخصص:
             </p>
           )}
           <ul className="flex flex-wrap gap-2">

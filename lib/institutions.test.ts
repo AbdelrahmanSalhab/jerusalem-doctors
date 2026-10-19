@@ -118,7 +118,7 @@ describe("relinkWorkplaces", () => {
 });
 
 describe("institutionUsage", () => {
-  it("lists each institution's doctors by name, and the unlinked hospital and fund names", async () => {
+  it("lists each institution's doctors by name (staff accounts left out), and the unlinked names", async () => {
     const { db } = await import("@/test/fakeSupabase");
     const { institutionUsage } = await import("./institutions");
     db.reset();
@@ -127,6 +127,7 @@ describe("institutionUsage", () => {
         { doctor_id: "d1", name: "كلاليت", workplace_type: "clinic", institution_id: "clalit" },
         { doctor_id: "d2", name: "كلاليت الشيخ جراح", workplace_type: "clinic", institution_id: "clalit" },
         { doctor_id: "d1", name: "كلاليت بيت حنينا", workplace_type: "clinic", institution_id: "clalit" },
+        { doctor_id: "staff", name: "كلاليت", workplace_type: "clinic", institution_id: "clalit" },
         { doctor_id: "d3", name: "القدس", workplace_type: "hospital", institution_id: null },
         { doctor_id: "d3", name: "عيادة خاصة", workplace_type: "clinic", institution_id: null },
       ],
@@ -135,6 +136,7 @@ describe("institutionUsage", () => {
       data: [
         { id: "d1", arabic_first_name: "ليلى", arabic_family_name: "الخطيب" },
         { id: "d2", arabic_first_name: "أحمد", arabic_family_name: "سلهب" },
+        { id: "staff", arabic_first_name: "إدارة", arabic_family_name: "الموقع", is_admin: true, is_visible: false },
       ],
     });
     const usage = await institutionUsage(db.client as never);

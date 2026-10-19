@@ -1,4 +1,5 @@
 import { daysSince, fetchAdminStats, pct } from "@/lib/adminStats";
+import { COLLEAGUES_GEN, countOf, daysAgoText } from "@/lib/arabicCount";
 import { requireAdmin } from "@/lib/auth/session";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -71,7 +72,7 @@ export default async function AdminStatsPage() {
             />
             <Attention
               count={a.pending}
-              text={`بانتظار الموافقة${pendingDays ? `، أقدمهم منذ ${pendingDays} يوم` : ""}.`}
+              text={`بانتظار الموافقة${pendingDays !== null ? `، أقدمهم ${daysAgoText(pendingDays)}` : ""}.`}
               href="/admin?status=pending"
             />
             <Attention
@@ -86,7 +87,7 @@ export default async function AdminStatsPage() {
             />
             <Attention
               count={a.deletion_requests}
-              text={`طلب حذف ينتظر الإتمام${deletionDays ? `، أقدمها منذ ${deletionDays} يوم` : ""}.`}
+              text={`طلب حذف ينتظر الإتمام${deletionDays !== null ? `، أقدمها ${daysAgoText(deletionDays)}` : ""}.`}
               href="/admin?status=suspended"
             />
             <Attention
@@ -140,7 +141,7 @@ export default async function AdminStatsPage() {
           <Tile
             label="أطباء تواصلوا"
             value={c.contacters_7d}
-            sub={`مع ${c.contacted_7d} زميلًا مختلفًا`}
+            sub={`مع ${countOf(c.contacted_7d, COLLEAGUES_GEN)}`}
           />
         </TileGrid>
         <DailyBars label="ضغطات تواصل" days={s.daily.map((x) => ({ day: x.day, value: x.contacts }))} />
@@ -158,7 +159,13 @@ export default async function AdminStatsPage() {
           <Tile
             label="أكملوا الرمز"
             value={s.signup_completed_7d}
-            sub={u.signup_started_7d ? `${pct(s.signup_completed_7d, u.signup_started_7d)} ممن بدأوا` : undefined}
+            sub={
+              // Starts are counted only since usage tracking began; until it
+              // covers the full 7 days the share would exceed 100%.
+              u.signup_started_7d && (daysSince(u.since) ?? 0) >= 7
+                ? `${pct(s.signup_completed_7d, u.signup_started_7d)} ممن بدأوا`
+                : undefined
+            }
           />
           <Tile label="رموز دخول أُرسلت" value={u.login_code_sent_7d} />
           <Tile
@@ -276,7 +283,7 @@ export default async function AdminStatsPage() {
           <Tile
             label="آخر مزامنة لسجل الوزارة"
             value={s.moh_sync ? (s.moh_sync.action === "moh_sync_completed" ? "نجحت" : "فشلت") : "لا يوجد"}
-            sub={s.moh_sync ? `منذ ${daysSince(s.moh_sync.at)} يوم` : undefined}
+            sub={s.moh_sync ? daysAgoText(daysSince(s.moh_sync.at) ?? 0) : undefined}
             tone={s.moh_sync?.action === "moh_sync_failed" ? "warn" : "plain"}
           />
         </TileGrid>
