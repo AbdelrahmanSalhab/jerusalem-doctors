@@ -22,12 +22,12 @@ export default async function LoginPage({
         أدخل رقم هاتفك المسجّل، وسيتم إرسال رمز التحقق في رسالة نصية (SMS).
       </p>
       {isPhoneAuthDisabled() && (
-        <section className="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm">
+        <section className="mb-4 rounded border border-warn-line bg-warn-bg p-4 text-sm">
           <p>تسجيل الدخول قيد الإعداد حاليًا. سيُفعّل قريبًا.</p>
         </section>
       )}
       {notice && (
-        <p role="status" className="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm">
+        <p role="status" className="mb-4 rounded border border-warn-line bg-warn-bg p-4 text-sm">
           {notice}
         </p>
       )}

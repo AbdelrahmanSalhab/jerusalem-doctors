@@ -13,7 +13,7 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
   const otherWps = doctor.workplaces.filter((w) => !w.is_primary);
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-foreground/15 bg-background p-5 shadow-sm">
+    <article className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-5 shadow-sm">
       <header className="flex items-center gap-3">
         <Avatar
           url={doctor.profile_picture_url}
@@ -34,12 +34,12 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
                 </li>
               ))}
               {doctor.career_stage && (
-                <li className="rounded-full border border-sky-300/60 bg-sky-50/60 px-2 py-0.5 text-xs text-sky-900 dark:bg-sky-900/20 dark:text-sky-100">
+                <li className="rounded-full border border-info-line bg-info-bg px-2 py-0.5 text-xs text-info">
                   {careerStageBadge(doctor.career_stage, doctor.residency_start_year)}
                 </li>
               )}
               {doctor.seeking_work && (
-                <li className="rounded-full border border-emerald-300/60 bg-emerald-50/60 px-2 py-0.5 text-xs text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-100">
+                <li className="rounded-full border border-success-line bg-success-bg px-2 py-0.5 text-xs text-success">
                   {SEEKING_WORK_LABEL}
                 </li>
               )}

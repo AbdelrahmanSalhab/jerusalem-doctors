@@ -42,17 +42,17 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
               </li>
             ))}
             {doctor.subspecialty && (
-              <li className="rounded-full border border-amber-300/60 bg-amber-50/60 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+              <li className="rounded-full border border-warn-line bg-warn-bg px-2 py-0.5 text-xs text-warn">
                 {doctor.subspecialty}
               </li>
             )}
             {doctor.career_stage && (
-              <li className="rounded-full border border-sky-300/60 bg-sky-50/60 px-2 py-0.5 text-xs text-sky-900 dark:bg-sky-900/20 dark:text-sky-100">
+              <li className="rounded-full border border-info-line bg-info-bg px-2 py-0.5 text-xs text-info">
                 {careerStageBadge(doctor.career_stage, doctor.residency_start_year)}
               </li>
             )}
             {doctor.seeking_work && (
-              <li className="rounded-full border border-emerald-300/60 bg-emerald-50/60 px-2 py-0.5 text-xs text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-100">
+              <li className="rounded-full border border-success-line bg-success-bg px-2 py-0.5 text-xs text-success">
                 {SEEKING_WORK_LABEL}
               </li>
             )}

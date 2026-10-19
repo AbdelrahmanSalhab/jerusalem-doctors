@@ -267,7 +267,7 @@ export function ProfileForm({
               </Field>
             )}
             {stageChanged && stageOpt?.autoAttachesGeneralSpecialty && (
-              <p className="rounded border border-amber-300/60 bg-amber-50/60 p-3 text-sm text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+              <p className="rounded border border-warn-line bg-warn-bg p-3 text-sm text-warn">
                 اختيار «طب عام» يستبدل تخصصاتك المحفوظة بـ«الطب العام» عند
                 الحفظ.
               </p>
@@ -366,7 +366,7 @@ export function ProfileForm({
           </ReadOnlyView>
         )}
         {clinicsMissingDetails(stageOpt, workplaces).length > 0 && (
-          <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="mt-3 rounded border border-warn-line bg-warn-bg p-3 text-sm text-warn">
             أضف عنوان وهاتف {clinicsMissingDetails(stageOpt, workplaces).join("، ")} ليتمكّن
             الزملاء من الوصول إلى عيادتك والاتصال بها مباشرة.
           </p>
@@ -374,12 +374,12 @@ export function ProfileForm({
       </Section>
 
       {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
         </p>
       )}
       {saved && (
-        <p className="rounded border border-green-300 bg-green-50 p-3 text-sm text-green-800">
+        <p className="rounded border border-success-line bg-success-bg p-3 text-sm text-success">
           تم حفظ التعديلات.
         </p>
       )}
@@ -387,7 +387,7 @@ export function ProfileForm({
       <button
         type="submit"
         disabled={saving}
-        className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
       >
         {saving ? "جارٍ الحفظ..." : "حفظ التعديلات"}
       </button>

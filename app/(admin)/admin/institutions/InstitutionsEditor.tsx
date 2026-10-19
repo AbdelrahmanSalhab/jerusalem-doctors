@@ -62,7 +62,7 @@ export function InstitutionsEditor({
     <div className="flex flex-col gap-8">
       <InputStyles />
       {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -74,7 +74,7 @@ export function InstitutionsEditor({
         {unmatched.length === 0 ? (
           <p className="text-sm text-foreground/60">كل المستشفيات وصناديق المرضى مربوطة.</p>
         ) : (
-          <ul className="divide-y divide-foreground/10 rounded-lg border border-amber-300 bg-amber-50 text-amber-950">
+          <ul className="divide-y divide-foreground/10 rounded-lg border border-warn-line bg-warn-bg text-warn">
             {unmatched.map((u) => (
               <UnmatchedRow
                 key={u.name}
@@ -106,7 +106,7 @@ export function InstitutionsEditor({
         <textarea id="new-aliases" className="input min-h-16" placeholder="طرق كتابة أخرى، مفصولة بفاصلة"
           value={draft.aliases} onChange={(e) => setDraft({ ...draft, aliases: e.target.value })} />
         <button type="button" disabled={pending || draft.name_ar.trim().length < 2} onClick={add}
-          className="self-start rounded-md bg-foreground px-4 py-2 text-background disabled:opacity-50">
+          className="self-start rounded-md bg-primary px-4 py-2 text-primary-fg disabled:opacity-50">
           إضافة
         </button>
       </section>
@@ -152,10 +152,10 @@ function UnmatchedRow({
     <li className="flex flex-wrap items-center gap-2 p-3 text-sm">
       <span className="min-w-0 flex-1">
         <span className="font-medium">{item.name}</span>{" "}
-        <span className="tabular-nums text-amber-900/70">({item.count})</span>
+        <span className="tabular-nums text-warn">({item.count})</span>
       </span>
       <select
-        className="max-w-full rounded-md border border-amber-700/40 bg-transparent px-2 py-1.5"
+        className="max-w-full rounded-md border border-warn-line bg-transparent px-2 py-1.5"
         value={target}
         onChange={(e) => setTarget(e.target.value)}
         aria-label={`ربط «${item.name}» بمؤسسة`}>
@@ -165,7 +165,7 @@ function UnmatchedRow({
         ))}
       </select>
       <button type="button" disabled={disabled || !target} onClick={() => onClaim(target)}
-        className="rounded border border-amber-700 px-3 py-1 disabled:opacity-50">
+        className="rounded border border-warn-line px-3 py-1 disabled:opacity-50">
         ربط كطريقة كتابة
       </button>
       <button type="button" disabled={disabled} onClick={onNew} className="rounded px-3 py-1 underline">
@@ -204,11 +204,11 @@ function InstitutionRow({
         <span className="rounded-full bg-foreground/10 px-2 text-xs">{INSTITUTION_KIND_LABEL[institution.kind]}</span>
         <span className="tabular-nums text-foreground/60">{doctors} طبيب</span>
         {institution.aliases.length > 0 && (
-          <span className="w-full text-xs text-foreground/55">تُكتب أيضًا: {institution.aliases.join("، ")}</span>
+          <span className="w-full text-xs text-muted">تُكتب أيضًا: {institution.aliases.join("، ")}</span>
         )}
         <span className="ms-auto flex gap-2">
           <button type="button" className="underline" onClick={() => setEditing(true)}>تعديل</button>
-          <button type="button" className="text-red-700 underline" disabled={disabled} onClick={onDelete}>حذف</button>
+          <button type="button" className="text-danger underline" disabled={disabled} onClick={onDelete}>حذف</button>
         </span>
       </li>
     );
@@ -231,7 +231,7 @@ function InstitutionRow({
       <textarea className="input min-h-16" value={form.aliases} aria-label="طرق كتابة أخرى"
         onChange={(e) => setForm({ ...form, aliases: e.target.value })} />
       <div className="flex gap-2">
-        <button type="button" disabled={disabled} className="rounded-md bg-foreground px-3 py-1.5 text-background disabled:opacity-50"
+        <button type="button" disabled={disabled} className="rounded-md bg-primary px-3 py-1.5 text-primary-fg disabled:opacity-50"
           onClick={async () => {
             const ok = await onSave({
               name_ar: form.name_ar,

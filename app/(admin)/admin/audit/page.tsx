@@ -20,7 +20,7 @@ export default async function AdminAuditPage() {
     <main className="space-y-4">
       <h1 className="text-2xl font-bold">سجل النشاط</h1>
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error.message}
         </p>
       )}

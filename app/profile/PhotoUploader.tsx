@@ -81,7 +81,7 @@ export function PhotoUploader({
         <p className="text-xs text-foreground/60">
           JPG أو PNG أو WebP، بحد أقصى 2 ميغابايت
         </p>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         <input
           ref={inputRef}
           type="file"

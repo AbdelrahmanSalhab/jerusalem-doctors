@@ -315,7 +315,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             stage={form.stage}
           />
           {fieldError("workplaces") && (
-            <p className="mt-1 text-sm text-red-600">{fieldError("workplaces")}</p>
+            <p className="mt-1 text-sm text-danger">{fieldError("workplaces")}</p>
           )}
         </Section>
       )}
@@ -332,7 +332,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       />
 
       {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -342,7 +342,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       <button
         type="submit"
         disabled={submitting || missing.length > 0}
-        className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
       >
         {submitting
           ? "جارٍ الإرسال..."

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -34,14 +35,18 @@ export async function SiteHeader() {
           href="/"
           className="flex shrink-0 items-center gap-2 hover:opacity-90 sm:gap-3"
         >
-          <Image
-            src="/logo.jpeg"
-            alt={ORG_NAME_AR}
-            width={64}
-            height={64}
-            priority
-            className="h-12 w-12 rounded-md object-contain sm:h-16 sm:w-16 md:h-20 md:w-20"
-          />
+          {/* The logo is a JPEG on white, so it sits on a deliberate white
+              badge rather than as a white square on the dark theme. */}
+          <span className="rounded-lg bg-white p-1 shadow-sm ring-1 ring-line">
+            <Image
+              src="/logo.jpeg"
+              alt={ORG_NAME_AR}
+              width={64}
+              height={64}
+              priority
+              className="h-10 w-10 object-contain sm:h-14 sm:w-14 md:h-16 md:w-16"
+            />
+          </span>
           {/* Logo image already includes the org name; on mobile we drop the
               redundant text label to keep the header on one line. */}
           <span className="hidden text-lg font-semibold leading-tight sm:inline md:text-xl">
@@ -72,7 +77,7 @@ export async function SiteHeader() {
                   الإدارة
                   {pending > 0 && (
                     <span
-                      className="ms-1.5 rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white"
+                      className="ms-1.5 rounded-full bg-warn-solid px-1.5 text-xs font-semibold text-white"
                       aria-label={`${pending} بانتظار المراجعة`}
                     >
                       {pending}
@@ -95,12 +100,13 @@ export async function SiteHeader() {
               </Link>
               <Link
                 href="/signup"
-                className="rounded-md bg-foreground px-2.5 py-1.5 text-background hover:opacity-90 sm:px-3"
+                className="rounded-md bg-primary px-2.5 py-1.5 text-primary-fg hover:opacity-90 sm:px-3"
               >
                 إنشاء حساب
               </Link>
             </>
           )}
+          <ThemeToggle className="rounded-md px-2 py-1.5 text-foreground/80 hover:bg-foreground/5" />
         </nav>
       </div>
     </header>

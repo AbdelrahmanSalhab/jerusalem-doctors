@@ -1,13 +1,16 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
-import { Noto_Naskh_Arabic } from "next/font/google";
+import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
-const naskh = Noto_Naskh_Arabic({
+// A sans with both Arabic and Latin, so phone numbers, emails and English
+// words match the Arabic instead of falling back to a serif.
+const plex = IBM_Plex_Sans_Arabic({
   variable: "--font-arabic",
-  subsets: ["arabic"],
+  subsets: ["arabic", "latin"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
@@ -25,8 +28,13 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
-      className={`${naskh.variable} h-full antialiased`}
+      className={`${plex.variable} h-full antialiased`}
+      // data-theme is set by the boot script before React hydrates.
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col font-arabic overflow-x-hidden">
         <SiteHeader />
         <div className="flex-1">{children}</div>

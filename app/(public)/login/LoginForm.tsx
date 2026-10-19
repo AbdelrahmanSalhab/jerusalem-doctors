@@ -140,7 +140,7 @@ export function LoginForm() {
       />
 
       {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -148,7 +148,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={submitting || !phone.trim()}
-        className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
       >
         {submitting ? "جارٍ الإرسال..." : "إرسال رمز التحقق"}
       </button>

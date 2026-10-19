@@ -46,7 +46,7 @@ export function Tile({
   );
   const cls =
     "flex flex-col gap-0.5 rounded-lg border p-3 " +
-    (tone === "warn" ? "border-amber-300 bg-amber-50 text-amber-950" : "border-foreground/15");
+    (tone === "warn" ? "border-warn-line bg-warn-bg text-warn" : "border-line bg-surface");
   return href ? (
     <Link href={href} className={cls + " hover:border-foreground/40"}>
       {body}
@@ -123,7 +123,7 @@ export function DailyBars({
           />
         ))}
       </div>
-      <div className="flex justify-between text-xs text-foreground/55" dir="ltr">
+      <div className="flex justify-between text-xs text-muted" dir="ltr">
         <span>{days[0]?.day}</span>
         <span>{days.at(-1)?.day}</span>
       </div>
@@ -143,7 +143,7 @@ export function Attention({
 }) {
   if (count === 0) return null;
   return (
-    <li className="flex items-baseline justify-between gap-3 border-b border-amber-200 py-2 last:border-b-0">
+    <li className="flex items-baseline justify-between gap-3 border-b border-warn-line py-2 last:border-b-0">
       <span>
         <span className="me-2 font-bold tabular-nums">{count}</span>
         {text}

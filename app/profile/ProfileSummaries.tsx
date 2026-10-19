@@ -22,14 +22,14 @@ export function FixedInfoSection({ doctor }: { doctor: Doctor }) {
       <Locked label="رقم الهاتف">{doctor.phone_e164}</Locked>
       <Locked label="رقم الترخيص">
         {doctor.license_number}{" "}
-        <span className="text-foreground/50">
+        <span className="text-muted">
           ({regionLabel(doctor.license_region)})
         </span>
       </Locked>
       {doctor.secondary_license_number && (
         <Locked label="ترخيص إضافي">
           {doctor.secondary_license_number}{" "}
-          <span className="text-foreground/50">
+          <span className="text-muted">
             ({regionLabel(doctor.secondary_license_region)})
           </span>
         </Locked>
@@ -58,7 +58,7 @@ function Chips({ items }: { items: { key: string; label: string }[] }) {
   );
 }
 
-const unset = <span className="text-foreground/40">غير محدد</span>;
+const unset = <span className="text-muted">غير محدد</span>;
 
 export function StageSummary({
   stageOpt,
@@ -101,7 +101,7 @@ export function SpecialtiesSummary({
       <div>
         <div className="mb-1 text-sm text-foreground/65">التخصصات</div>
         {specialtyIds.length === 0 ? (
-          <span className="text-foreground/40">لا يوجد</span>
+          <span className="text-muted">لا يوجد</span>
         ) : (
           <Chips
             items={specialties
@@ -122,7 +122,7 @@ export function SpecialtiesSummary({
         <div>
           <div className="mb-1 text-sm text-foreground/65">شهادات إضافية</div>
           {filledCertificates.length === 0 ? (
-            <span className="text-foreground/40">لا يوجد</span>
+            <span className="text-muted">لا يوجد</span>
           ) : (
             <Chips items={filledCertificates.map((c) => ({ key: c, label: c }))} />
           )}
@@ -139,7 +139,7 @@ export function SpecialtiesSummary({
 export function WorkplacesSummary({ workplaces }: { workplaces: WorkplaceEntry[] }) {
   const named = workplaces.filter((w) => w.name.trim().length > 0);
   if (named.length === 0) {
-    return <span className="text-foreground/40">لا يوجد</span>;
+    return <span className="text-muted">لا يوجد</span>;
   }
   return (
     <ul className="space-y-1">

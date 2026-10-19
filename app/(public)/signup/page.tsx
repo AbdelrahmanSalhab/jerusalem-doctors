@@ -19,7 +19,7 @@ export default async function SignupPage() {
     return (
       <main className="mx-auto max-w-xl px-6 py-16">
         <h1 className="mb-4 text-2xl font-bold">دليل أطباء القدس</h1>
-        <p className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+        <p className="rounded border border-danger-line bg-danger-bg p-4 text-sm text-danger">
           تعذّر تحميل قائمة التخصصات. الرجاء المحاولة لاحقًا.
         </p>
       </main>
@@ -38,7 +38,7 @@ export default async function SignupPage() {
       </p>
 
       {isPhoneAuthDisabled() && (
-        <section className="mb-6 rounded border border-amber-300 bg-amber-50 p-4 text-sm">
+        <section className="mb-6 rounded border border-warn-line bg-warn-bg p-4 text-sm">
           <p>
             تسجيل الحسابات قيد الإعداد حاليًا. النموذج سيُفعّل قريبًا. شكرًا
             لصبركم.

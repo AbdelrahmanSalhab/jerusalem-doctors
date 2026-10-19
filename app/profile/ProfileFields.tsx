@@ -12,7 +12,7 @@ export function Section({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="space-y-4 rounded-lg border border-foreground/15 p-5">
+    <section className="space-y-4 rounded-lg border border-line bg-surface p-5">
       <div className="flex items-center justify-between gap-2 border-b border-foreground/10 pb-2">
         <h2 className="text-lg font-bold">{title}</h2>
         {action}
@@ -95,7 +95,7 @@ export function LockableField({
             dir={dir}
           >
             {value || (
-              <span className="text-foreground/40">غير محدد</span>
+              <span className="text-muted">غير محدد</span>
             )}
           </div>
           <button

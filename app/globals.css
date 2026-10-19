@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
+/*
+ * Theme. Every colour on the site comes from these tokens, defined once for
+ * light and once for dark. The theme is the device's setting unless the
+ * visitor picks one (ThemeToggle); an inline script in the layout sets
+ * <html data-theme> before the first paint, so `dark:` classes and these
+ * tokens follow the choice without a flash.
+ *
+ * Status colours (warn, info, success, danger) are by meaning, not hue, so a
+ * notice reads right on either background.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Neutrals with a slight green bias toward the logo. */
+  --background: #f6f7f4;
+  --surface: #ffffff;
+  --foreground: #1b201d;
+  --muted: #5b6660;
+  --line: #dde2dc;
+
+  /* Actions are monochrome (chosen over logo green and teal); the logo
+     keeps its own colours. */
+  --primary: #1b201d;
+  --primary-fg: #ffffff;
+  --accent: #1b201d;
+
+  --warn-bg: #fdf4e0;
+  --warn-fg: #774706;
+  --warn-line: #eecf8c;
+  --warn-solid: #c97a04;
+  --info-bg: #e7f2fa;
+  --info-fg: #0f4a72;
+  --info-line: #b3d4ec;
+  --success-bg: #e6f4eb;
+  --success-fg: #16603a;
+  --success-line: #a8dbbb;
+  --danger-bg: #fcebe9;
+  --danger-fg: #981c1c;
+  --danger-line: #f1b2ab;
+  --danger-solid: #c42727;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --background: #0e1210;
+  --surface: #161c19;
+  --foreground: #e7ece9;
+  --muted: #a2ada7;
+  --line: #2a322e;
+
+  --primary: #e7ece9;
+  --primary-fg: #0e1210;
+  --accent: #e7ece9;
+
+  --warn-bg: #2a2110;
+  --warn-fg: #f2cd7d;
+  --warn-line: #5a4416;
+  --warn-solid: #d98a0b;
+  --info-bg: #0f2130;
+  --info-fg: #9fcff0;
+  --info-line: #24455c;
+  --success-bg: #0f251a;
+  --success-fg: #8edbab;
+  --success-line: #244f38;
+  --danger-bg: #2c1414;
+  --danger-fg: #f4a2a2;
+  --danger-line: #5c2424;
+  --danger-solid: #d63a3a;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent: var(--accent);
+  --color-warn: var(--warn-fg);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-line: var(--warn-line);
+  --color-warn-solid: var(--warn-solid);
+  --color-info: var(--info-fg);
+  --color-info-bg: var(--info-bg);
+  --color-info-line: var(--info-line);
+  --color-success: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-success-line: var(--success-line);
+  --color-danger: var(--danger-fg);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-line: var(--danger-line);
+  --color-danger-solid: var(--danger-solid);
   --font-arabic: var(--font-arabic);
   --font-sans: var(--font-arabic);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-arabic), system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
