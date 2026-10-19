@@ -17,7 +17,7 @@ export function MissingFieldsNotice({ missing }: { missing: readonly MissingFiel
 
   return (
     <div
-      className="rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+      className="rounded border border-warn-line bg-warn-bg p-4 text-sm text-warn"
     >
       <p className="mb-2 font-medium">أكمل الحقول التالية لتفعيل زر التسجيل:</p>
       <ul className="flex flex-wrap gap-2">
@@ -26,7 +26,7 @@ export function MissingFieldsNotice({ missing }: { missing: readonly MissingFiel
             <button
               type="button"
               onClick={() => focus(m.key)}
-              className="rounded-full border border-amber-400 px-3 py-1 underline-offset-2 hover:underline dark:border-amber-600"
+              className="rounded-full border border-warn-line px-3 py-1 underline-offset-2 hover:underline"
             >
               {m.label}
             </button>

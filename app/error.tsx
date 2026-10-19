@@ -25,7 +25,7 @@ export default function ErrorPage({
         الرئيسية.
       </p>
       {error.digest && (
-        <p className="text-xs text-foreground/50" dir="ltr">
+        <p className="text-xs text-muted" dir="ltr">
           رقم الخطأ: {error.digest}
         </p>
       )}
@@ -33,7 +33,7 @@ export default function ErrorPage({
         <button
           type="button"
           onClick={() => reset()}
-          className="rounded-md bg-foreground px-5 py-2.5 text-background hover:opacity-90"
+          className="rounded-md bg-primary px-5 py-2.5 text-primary-fg hover:opacity-90"
         >
           إعادة المحاولة
         </button>

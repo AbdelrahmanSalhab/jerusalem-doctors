@@ -3,32 +3,20 @@ const WHATSAPP_URL = "https://wa.me/972524209156";
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-foreground/10">
-      <div className="mx-auto max-w-5xl px-6 py-4 text-center text-sm text-foreground/70">
-        <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-          <span>تطوير الموقع:</span>
-          <span className="font-medium text-foreground">عبدالرحمن سلهب</span>
-          <span aria-hidden="true">·</span>
-          <a
-            href={LINKEDIN_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
-          >
-            LinkedIn
-          </a>
-          <span aria-hidden="true">·</span>
-          <a
-            href={WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
-          >
-            WhatsApp
-          </a>
-          <span aria-hidden="true">·</span>
-          <a href="/privacy" className="hover:underline">
+    <footer className="mt-auto border-t border-line">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-4 text-sm text-muted">
+        <nav className="flex flex-wrap gap-x-4 gap-y-1">
+          <a href="/privacy" className="hover:text-foreground hover:underline">
             الخصوصية
+          </a>
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+            مساعدة عبر واتساب
+          </a>
+        </nav>
+        <p className="text-xs">
+          تطوير:{" "}
+          <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+            عبدالرحمن سلهب
           </a>
         </p>
       </div>

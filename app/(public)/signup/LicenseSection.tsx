@@ -131,7 +131,7 @@ export function LicenseSection({
           />
         )}
         {fieldError("secondary_license_number") && (
-          <p className="mt-1 text-sm text-red-600">
+          <p className="mt-1 text-sm text-danger">
             {fieldError("secondary_license_number")}
           </p>
         )}

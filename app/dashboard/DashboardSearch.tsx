@@ -174,7 +174,7 @@ function ResultsRegion({
 
   if (state.status === "error") {
     return (
-      <p role="alert" className="rounded border border-red-300 bg-red-50 p-4 text-center text-red-800">
+      <p role="alert" className="rounded border border-danger-line bg-danger-bg p-4 text-center text-danger">
         {state.message}
       </p>
     );
@@ -207,7 +207,7 @@ function ResultsRegion({
             className={
               "px-3 py-1.5 " +
               (view === "cards"
-                ? "bg-foreground text-background"
+                ? "bg-primary text-primary-fg"
                 : "hover:bg-foreground/5")
             }
           >
@@ -221,7 +221,7 @@ function ResultsRegion({
             className={
               "px-3 py-1.5 border-r border-foreground/20 " +
               (view === "rows"
-                ? "bg-foreground text-background"
+                ? "bg-primary text-primary-fg"
                 : "hover:bg-foreground/5")
             }
           >

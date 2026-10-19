@@ -71,11 +71,11 @@ export function NameSection({
       )}
 
       {fieldError("hebrew_full_name") && (
-        <p className="text-sm text-red-600">{fieldError("hebrew_full_name")}</p>
+        <p className="text-sm text-danger">{fieldError("hebrew_full_name")}</p>
       )}
 
       {registryName && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-4 text-base">
+        <div className="rounded border border-warn-line bg-warn-bg p-4 text-base">
           <p className="mb-2">
             الاسم في سجل وزارة الصحة لرقم الترخيص هذا هو:{" "}
             <strong dir="auto">

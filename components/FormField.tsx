@@ -24,14 +24,14 @@ export function Field({
         {required && <RequiredMark />}
       </label>
       {children}
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-sm text-danger">{error}</p>}
     </div>
   );
 }
 
 export function RequiredMark() {
   return (
-    <span aria-hidden="true" className="ms-1 text-red-600">
+    <span aria-hidden="true" className="ms-1 text-danger">
       *
     </span>
   );

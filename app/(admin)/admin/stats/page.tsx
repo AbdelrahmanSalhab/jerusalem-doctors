@@ -50,7 +50,7 @@ export default async function AdminStatsPage() {
         {attentionTotal === 0 ? (
           <p className="rounded-lg border border-foreground/15 p-3 text-sm">لا شيء ينتظر. كل شيء على ما يرام.</p>
         ) : (
-          <ul className="rounded-lg border border-amber-300 bg-amber-50 px-4 text-amber-950">
+          <ul className="rounded-lg border border-warn-line bg-warn-bg px-4 text-warn">
             {sms !== null && sms < LOW_SMS && (
               <Attention count={sms} text="رسالة SMS متبقية فقط في الرصيد. اشحن قبل أن يتوقف التسجيل والدخول." />
             )}

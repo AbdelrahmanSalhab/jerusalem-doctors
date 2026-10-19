@@ -188,7 +188,7 @@ export function VerifyForm() {
       />
 
       {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
         </p>
       )}
@@ -196,7 +196,7 @@ export function VerifyForm() {
       <button
         type="submit"
         disabled={submitting || code.length < 4}
-        className="w-full rounded-md bg-foreground px-6 py-3 text-background disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
       >
         {submitting ? "جارٍ التحقق..." : "تأكيد"}
       </button>
@@ -231,7 +231,7 @@ export function VerifyForm() {
       {mode === "login" && waitedLong && (
         <div
           role="status"
-          className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+          className="space-y-3 rounded-md border border-warn-line bg-warn-bg p-4 text-sm text-warn"
         >
           <p className="font-medium">لم يصلك الرمز بعد؟</p>
           <p>
@@ -253,7 +253,7 @@ export function VerifyForm() {
           </ul>
           <Link
             href="/signup"
-            className="block w-full rounded-md bg-foreground px-6 py-2 text-center text-background"
+            className="block w-full rounded-md bg-primary px-6 py-2 text-center text-primary-fg"
           >
             إنشاء حساب جديد
           </Link>

@@ -35,7 +35,7 @@ export function PublicSearchBar() {
         <button
           type="button"
           onClick={block}
-          className="rounded-md bg-foreground px-5 py-3 text-background hover:opacity-90 md:px-7 md:py-4 md:text-lg"
+          className="rounded-md bg-primary px-5 py-3 text-primary-fg hover:opacity-90 md:px-7 md:py-4 md:text-lg"
         >
           بحث
         </button>
@@ -67,7 +67,7 @@ export function PublicSearchBar() {
               </Link>
               <Link
                 href="/signup"
-                className="flex-1 rounded-md bg-foreground px-4 py-2 text-center text-background hover:opacity-90"
+                className="flex-1 rounded-md bg-primary px-4 py-2 text-center text-primary-fg hover:opacity-90"
               >
                 إنشاء حساب جديد
               </Link>

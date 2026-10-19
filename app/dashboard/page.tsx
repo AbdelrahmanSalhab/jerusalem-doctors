@@ -44,7 +44,7 @@ export default async function DashboardPage() {
       {!me.is_admin_approved && !me.is_admin && (
         <p
           role="status"
-          className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+          className="rounded-md border border-warn-line bg-warn-bg p-4 text-sm text-warn"
         >
           <strong className="font-semibold">حسابك قيد المراجعة.</strong> يمكنك
           البحث في الدليل الآن، لكن اسمك لن يظهر للأطباء الآخرين حتى تتحقق
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
       {gaps.length > 0 && (
         <section
           aria-label="أكمل ملفك"
-          className="flex flex-col gap-2 rounded-md border border-sky-300 bg-sky-50 p-4 text-sm text-sky-950 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-2 rounded-md border border-info-line bg-info-bg p-4 text-sm text-info sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <p className="font-semibold">أكمل ملفك ليسهل على الزملاء الوصول إليك</p>
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
           </div>
           <Link
             href="/profile"
-            className="shrink-0 rounded-md bg-sky-900 px-4 py-2 text-center text-white hover:opacity-90"
+            className="shrink-0 rounded-md bg-primary px-4 py-2 text-center text-primary-fg hover:opacity-90"
           >
             إكمال الملف
           </Link>

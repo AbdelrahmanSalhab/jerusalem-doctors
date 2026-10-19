@@ -12,7 +12,7 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-foreground/15 p-5 space-y-4">
+    <section className="space-y-4 rounded-lg border border-line bg-surface p-5">
       <h2 className="border-b border-foreground/10 pb-2 text-lg font-bold">
         {title}
         {required && <RequiredMark />}

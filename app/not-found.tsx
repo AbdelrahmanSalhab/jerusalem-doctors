@@ -11,7 +11,7 @@ export default function NotFound() {
       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
         <Link
           href="/"
-          className="rounded-md bg-foreground px-5 py-2.5 text-background hover:opacity-90"
+          className="rounded-md bg-primary px-5 py-2.5 text-primary-fg hover:opacity-90"
         >
           العودة إلى الرئيسية
         </Link>

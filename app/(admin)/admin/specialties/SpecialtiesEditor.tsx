@@ -83,7 +83,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                       "rounded border px-2.5 py-1 text-sm " +
                       (r.is_active
                         ? "border-foreground/20 hover:bg-foreground/5"
-                        : "border-amber-400 bg-amber-50 text-amber-800 hover:bg-amber-100")
+                        : "border-warn-line bg-warn-bg text-warn hover:bg-warn-bg")
                     }
                   >
                     {r.is_active ? "نشط" : "معطّل"}
@@ -155,7 +155,7 @@ function NewSpecialtyRow() {
       <button
         type="submit"
         disabled={pending || !nameAr.trim()}
-        className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background disabled:opacity-50"
+        className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-fg disabled:opacity-50"
       >
         إضافة
       </button>

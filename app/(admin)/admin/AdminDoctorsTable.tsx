@@ -126,7 +126,7 @@ export function AdminDoctorsTable({
               className={
                 "px-3 py-1.5 text-sm border-r border-foreground/20 last:border-r-0 " +
                 (currentStatus === s
-                  ? "bg-foreground text-background"
+                  ? "bg-primary text-primary-fg"
                   : "hover:bg-foreground/5")
               }
             >
@@ -191,11 +191,11 @@ export function AdminDoctorsTable({
                 </td>
                 <td className="p-3 text-center" dir="ltr">
                   {r.license_number}{" "}
-                  <span className="text-foreground/50">
+                  <span className="text-muted">
                     ({r.license_region === "IL" ? "IL" : "PS"})
                   </span>
                   {r.secondary_license_number && (
-                    <div className="text-foreground/50">
+                    <div className="text-muted">
                       +{r.secondary_license_number} ({r.secondary_license_region}
                       {" · "}
                       {statusLabels[r.secondary_license_verification_status ?? ""] ??
@@ -209,8 +209,8 @@ export function AdminDoctorsTable({
                     className={
                       "inline-block rounded-full px-2.5 py-0.5 text-sm " +
                       (r.license_verification_status === "verified"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800")
+                        ? "bg-success-bg text-success"
+                        : "bg-warn-bg text-warn")
                     }
                   >
                     {statusLabels[r.license_verification_status ?? ""] ??
@@ -228,7 +228,7 @@ export function AdminDoctorsTable({
                         className={
                           "border-r border-foreground/20 px-2 py-1 text-sm last:border-r-0 " +
                           (stageFromCareerStage(r.career_stage) === o.stage
-                            ? "bg-foreground text-background"
+                            ? "bg-primary text-primary-fg"
                             : "hover:bg-foreground/5")
                         }
                       >
@@ -273,7 +273,7 @@ export function AdminDoctorsTable({
                     ))}
                   </select>
                   {r.featured === "graduate" && !r.seeking_work && (
-                    <div className="mt-1 text-xs text-amber-700">
+                    <div className="mt-1 text-xs text-warn">
                       لا يظهر: لم يفعّل &quot;أبحث عن فرصة عمل&quot;
                     </div>
                   )}
@@ -290,7 +290,7 @@ export function AdminDoctorsTable({
                         "rounded border px-2.5 py-1 text-sm " +
                         (r.is_admin_approved
                           ? "border-foreground/20 hover:bg-foreground/5"
-                          : "border-green-500 bg-green-50 text-green-800 hover:bg-green-100")
+                          : "border-success-line bg-success-bg text-success hover:bg-success-bg")
                       }
                     >
                       {r.is_admin_approved ? "إلغاء التفعيل" : "تفعيل"}
@@ -302,7 +302,7 @@ export function AdminDoctorsTable({
                       className={
                         "rounded border px-2.5 py-1 text-sm " +
                         (r.is_active
-                          ? "border-red-400 text-red-700 hover:bg-red-50"
+                          ? "border-danger-line text-danger hover:bg-danger-bg"
                           : "border-foreground/20 hover:bg-foreground/5")
                       }
                     >
@@ -313,7 +313,7 @@ export function AdminDoctorsTable({
                         type="button"
                         disabled={pending || deletingId !== null}
                         onClick={() => deleteDoctor(r)}
-                        className="rounded border border-red-600 bg-red-600 px-2.5 py-1 text-sm text-white hover:bg-red-700"
+                        className="rounded border border-danger-solid bg-danger-solid px-2.5 py-1 text-sm text-white hover:opacity-90"
                       >
                         حذف نهائي
                       </button>
