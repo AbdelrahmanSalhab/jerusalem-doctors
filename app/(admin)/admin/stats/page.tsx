@@ -32,7 +32,10 @@ export default async function AdminStatsPage() {
   const deletionDays = daysSince(a.deletion_oldest);
   const hospitals = s.institutions.filter((i) => i.kind === "hospital").slice(0, 10);
   const funds = s.institutions.filter((i) => i.kind !== "hospital");
+  const c = s.contacts;
+  const contactsTotal = c.whatsapp_7d + c.call_7d + c.save_7d;
   const attentionTotal =
+    s.heavy_contacters.length +
     a.pending + a.deletion_requests + a.clinics_missing_details + u.login_send_failed_24h +
     a.unmatched_workplaces +
     (sms !== null && sms < LOW_SMS ? 1 : 0);
@@ -54,6 +57,14 @@ export default async function AdminStatsPage() {
             {sms !== null && sms < LOW_SMS && (
               <Attention count={sms} text="رسالة SMS متبقية فقط في الرصيد. اشحن قبل أن يتوقف التسجيل والدخول." />
             )}
+            {s.heavy_contacters.map((h) => (
+              <Attention
+                key={h.name}
+                count={h.count}
+                text={`طبيبًا مختلفًا تواصل معهم «${h.name}» خلال 24 ساعة. قد يكون نسخًا للدليل؛ راجع الحساب.`}
+                href="/admin?status=all"
+              />
+            ))}
             <Attention
               count={u.login_send_failed_24h}
               text="رمز دخول فشل إرساله في آخر 24 ساعة (راجع Sentry ورصيد SMS)."
@@ -116,6 +127,26 @@ export default async function AdminStatsPage() {
           <Tile label="لم يدخلوا أبدًا" value={s.activity.never} sub={pct(s.activity.never, d.total)} />
         </TileGrid>
         <DailyBars label="أطباء بحثوا" days={s.daily.map((x) => ({ day: x.day, value: x.searchers }))} />
+      </Section>
+
+      <Section
+        title="التواصل (آخر 7 أيام)"
+        note="ضغطات واتساب والاتصال والإضافة لجهات الاتصال على بطاقات الأطباء: المقياس الحقيقي لفائدة الدليل."
+      >
+        <TileGrid>
+          <Tile label="رسائل واتساب" value={c.whatsapp_7d} />
+          <Tile label="اتصالات" value={c.call_7d} />
+          <Tile label="أُضيفوا لجهات الاتصال" value={c.save_7d} />
+          <Tile
+            label="أطباء تواصلوا"
+            value={c.contacters_7d}
+            sub={`مع ${c.contacted_7d} زميلًا مختلفًا`}
+          />
+        </TileGrid>
+        <DailyBars label="ضغطات تواصل" days={s.daily.map((x) => ({ day: x.day, value: x.contacts }))} />
+        {contactsTotal === 0 && (
+          <p className="text-sm text-muted">يبدأ العدّ من الآن؛ تظهر الأرقام مع أول ضغطة.</p>
+        )}
       </Section>
 
       <Section

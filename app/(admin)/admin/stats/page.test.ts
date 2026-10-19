@@ -14,7 +14,9 @@ const SAMPLE: AdminStats = {
   stage: { general: 10, resident: 12, specialist: 18 },
   license: { il_only: 25, ps_only: 9, both: 6, verified: 30, soft_match: 2, not_found: 7, mismatch_overridden: 1 },
   activity: { active_7d: 20, active_30d: 33, never: 3 },
-  daily: Array.from({ length: 30 }, (_, i) => ({ day: `2026-09-${String(i + 1).padStart(2, "0")}`, signups: i % 4, searchers: i % 6 })),
+  daily: Array.from({ length: 30 }, (_, i) => ({ day: `2026-09-${String(i + 1).padStart(2, "0")}`, signups: i % 4, searchers: i % 6, contacts: i % 3 })),
+  contacts: { whatsapp_7d: 31, call_7d: 12, save_7d: 5, contacters_7d: 14, contacted_7d: 22 },
+  heavy_contacters: [{ name: "حساب مريب", count: 27 }],
   domains: [{ name: "الباطنية", count: 9 }, { name: "طب الأطفال", count: 6 }],
   workplace_types: { hospital: 28, clinic: 14, hmo: 6 },
   institutions: [{ name: "المقاصد", kind: "hospital", count: 11 }, { name: "كلاليت", kind: "hmo", count: 14 }],
@@ -50,6 +52,9 @@ describe("/admin/stats", () => {
     expect(html).toContain("القلب");
     expect(html).toContain("نجحت");
     expect(html).toContain("كلاليت");
+    expect(html).toContain("رسائل واتساب");
+    expect(html).toContain("مع 22 زميلًا مختلفًا");
+    expect(html).toContain("حساب مريب");
     expect(html).toContain("/admin/institutions");
   });
 });

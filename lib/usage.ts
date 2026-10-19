@@ -13,7 +13,10 @@ export type UsageKind =
   | "login_code_sent"
   | "login_unregistered"
   | "login_send_failed"
-  | "login_succeeded";
+  | "login_succeeded"
+  | "contact_call"
+  | "contact_whatsapp"
+  | "contact_save";
 
 export async function recordEvent(
   service: SupabaseClient,
