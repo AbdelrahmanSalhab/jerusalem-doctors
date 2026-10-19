@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
-import { NavTabs } from "@/components/NavTabs";
+import { AccountMenu } from "@/components/AccountMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -16,7 +16,8 @@ async function countPending(): Promise<number> {
   return error ? 0 : (count ?? 0);
 }
 
-export const ORG_NAME_AR = "تجمّع أطباء العائلة المقدسي";
+/** What the site calls itself everywhere: header, logo alt, page titles. */
+export const SITE_NAME_AR = "دليل أطباء القدس";
 
 /**
  * Site-wide header with logo, organization name, and auth controls.
@@ -39,25 +40,30 @@ export async function SiteHeader() {
           <span className="shrink-0 rounded-lg bg-white p-1 shadow-sm ring-1 ring-line">
             <Image
               src="/logo.jpeg"
-              alt={ORG_NAME_AR}
+              alt={SITE_NAME_AR}
               width={64}
               height={64}
               priority
               className="h-9 w-9 object-contain sm:h-12 sm:w-12"
             />
           </span>
-          {/* The logo already carries the name; on a phone the text would
-              crowd the controls. */}
-          <span className="hidden truncate text-lg font-semibold leading-tight sm:inline">
-            {ORG_NAME_AR}
+          <span className="truncate text-base font-semibold leading-tight sm:text-lg">
+            {SITE_NAME_AR}
           </span>
         </Link>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <ThemeToggle className="rounded-md px-2 py-1.5 text-sm text-muted hover:bg-foreground/5 hover:text-foreground" />
-          {current ? (
-            // Signed in (or deactivated with a session left): logging out is
-            // the only account control the header needs.
+          {doctor ? (
+            <AccountMenu
+              photoUrl={doctor.profile_picture_url}
+              firstName={doctor.arabic_first_name}
+              isAdmin={doctor.is_admin}
+              pending={pending}
+            />
+          ) : current ? (
+            // A deactivated doctor still holding a session: every page sends
+            // them to /login, so logging out is all the header can offer.
             <LogoutButton className={button} />
           ) : (
             <>
@@ -74,19 +80,6 @@ export async function SiteHeader() {
           )}
         </div>
       </div>
-
-      {doctor && (
-        <div className="mx-auto max-w-5xl px-2 sm:px-4">
-          <NavTabs
-            label="أقسام الموقع"
-            tabs={[
-              { href: "/dashboard", label: "البحث عن طبيب" },
-              { href: "/profile", label: "ملفي" },
-              ...(doctor.is_admin ? [{ href: "/admin", label: "الإدارة", badge: pending }] : []),
-            ]}
-          />
-        </div>
-      )}
     </header>
   );
 }

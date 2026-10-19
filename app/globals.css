@@ -45,14 +45,14 @@
 }
 
 :root[data-theme="dark"] {
-  --background: #0e1210;
-  --surface: #161c19;
+  --background: #0b0f0d;
+  --surface: #212b27;
   --foreground: #e7ece9;
-  --muted: #a2ada7;
-  --line: #2a322e;
+  --muted: #a4afa9;
+  --line: #3a453f;
 
   --primary: #e7ece9;
-  --primary-fg: #0e1210;
+  --primary-fg: #0b0f0d;
   --accent: #e7ece9;
 
   --warn-bg: #2a2110;
