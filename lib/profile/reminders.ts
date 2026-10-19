@@ -6,6 +6,7 @@ import { missingClinicFields, type WorkplaceType } from "@/lib/workplace";
 interface ReminderDoctor {
   career_stage: "resident" | "specialist" | null;
   profile_picture_url: string | null;
+  certificates?: string[] | null;
 }
 
 interface ReminderWorkplace {
@@ -33,5 +34,8 @@ export function profileGaps(doctor: ReminderDoctor, workplaces: ReminderWorkplac
     }
   }
   if (!doctor.profile_picture_url) gaps.push("أضف صورة شخصية ليتعرّف عليك الزملاء.");
+  if (!doctor.certificates?.length) {
+    gaps.push("أضف الخدمات والإجراءات التي تقدّمها، ليجدك الزملاء حين يبحثون عنها.");
+  }
   return gaps;
 }

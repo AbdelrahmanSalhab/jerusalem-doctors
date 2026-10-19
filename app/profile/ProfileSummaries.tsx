@@ -120,7 +120,7 @@ export function SpecialtiesSummary({
       )}
       {showCertificates && (
         <div>
-          <div className="mb-1 text-sm text-foreground/65">شهادات إضافية</div>
+          <div className="mb-1 text-sm text-foreground/65">الخدمات والشهادات</div>
           {filledCertificates.length === 0 ? (
             <span className="text-muted">لا يوجد</span>
           ) : (

@@ -1,6 +1,6 @@
 "use client";
 
-// Extra certificates a طب عام doctor holds, one per row. Blank rows are
+// Services, procedures and certificates a doctor lists, one per row. Blank rows are
 // dropped server-side (lib/certificates.ts), so no row needs validating here.
 
 import { CERTIFICATE_MAX_LENGTH, CERTIFICATES_MAX } from "@/lib/certificates";
@@ -23,7 +23,7 @@ export function CertificatesEditor({
         <div key={i} className="flex gap-2">
           <input
             id={i === 0 ? id : `${id}_${i}`}
-            aria-label={`شهادة ${i + 1}`}
+            aria-label={`خدمة أو شهادة ${i + 1}`}
             className="input flex-1"
             maxLength={CERTIFICATE_MAX_LENGTH}
             value={cert}

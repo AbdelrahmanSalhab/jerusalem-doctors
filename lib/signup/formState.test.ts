@@ -49,11 +49,11 @@ describe("applyStage", () => {
     expect(applyStage(base, "general", null).specialty_ids).toEqual([]);
   });
 
-  it("resident drops الطب العام and certificates, keeps the year", () => {
+  it("resident drops الطب العام, keeps services and the year", () => {
     const next = applyStage(base, "resident", GENERAL);
     expect(next.specialty_ids).toEqual(["s1"]);
     expect(next.subspecialty).toBe("hand");
-    expect(next.certificates).toEqual([]);
+    expect(next.certificates).toEqual(["ACLS"]);
     expect(next.residency_start_year).toBe("2020");
   });
 

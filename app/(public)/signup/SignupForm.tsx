@@ -279,9 +279,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </Section>
 
         {stageOpt?.showsCertificates && (
-          <Section title="شهادات إضافية (اختياري)">
+          <Section title="الخدمات والشهادات (اختياري)">
             <Field
-              label="تظهر على بطاقتك بدل «الطب العام»"
+              label={form.stage === "general" ? "شهادات وخدمات (تظهر على بطاقتك بدل «الطب العام»)" : "الخدمات والإجراءات التي تقدّمها، مثلًا: تنظير القولون، حقن العين"}
               htmlFor="certificates"
             >
               <CertificatesEditor

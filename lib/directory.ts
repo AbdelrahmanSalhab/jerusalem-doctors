@@ -26,8 +26,11 @@ export interface SearchHit {
   license_number: string;
   /** Null only when the column itself is unset; the directory always shows it. */
   phone_display: string | null;
-  /** Drives the WhatsApp button on the card. */
+  /** Drives the WhatsApp button on the card. No prefilled text: the card
+   *  adds the viewer's own introduction (lib/contactIntro.ts). */
   whatsapp_url: string | null;
+  /** For "add to contacts". */
+  phone_e164: string | null;
   email: string | null;
   subspecialty: string | null;
   bio: string | null;
@@ -159,7 +162,8 @@ function toSearchHit(d: DirectoryRow): SearchHit {
     phone_display: d.phone_display,
     // buildWhatsAppLink throws on an empty string; one malformed row must
     // not fail the whole response.
-    whatsapp_url: d.phone_e164 ? buildWhatsAppLink(d.phone_e164) : null,
+    whatsapp_url: d.phone_e164 ? buildWhatsAppLink(d.phone_e164, "") : null,
+    phone_e164: d.phone_e164,
     email: d.email,
     subspecialty: d.subspecialty,
     bio: d.bio,
@@ -171,6 +175,12 @@ function toSearchHit(d: DirectoryRow): SearchHit {
     workplaces,
     profile_picture_url: d.profile_picture_url ?? null,
   };
+}
+
+/** Services and certificates a card lists on their own line; a طب عام
+ *  doctor's appear as chips instead (cardChips). */
+export function cardServices(d: Pick<SearchHit, "career_stage" | "certificates">): string[] {
+  return d.career_stage === null ? [] : d.certificates;
 }
 
 /** What a card shows as its chips: a طب عام doctor's certificates replace

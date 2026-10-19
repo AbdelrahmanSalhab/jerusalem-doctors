@@ -40,7 +40,7 @@ export interface StageOption {
   readonly showsClinicFields: boolean;
   /** A resident rotates during training, so no fixed workplace is required. */
   readonly workplaceOptional: boolean;
-  /** طب عام lists extra certificates in place of a specialty (0013). */
+  /** Services, procedures and certificates (lib/certificates.ts); every stage. */
   readonly showsCertificates: boolean;
 }
 
@@ -75,7 +75,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     defaultWorkplaceType: "hospital",
     showsClinicFields: false,
     workplaceOptional: true,
-    showsCertificates: false,
+    showsCertificates: true,
   },
   {
     stage: "specialist",
@@ -91,7 +91,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     defaultWorkplaceType: "hospital",
     showsClinicFields: true,
     workplaceOptional: false,
-    showsCertificates: false,
+    showsCertificates: true,
   },
 ];
 

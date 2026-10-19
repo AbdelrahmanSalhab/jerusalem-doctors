@@ -380,7 +380,7 @@ export const POST = withJsonErrors(async (req: Request) => {
       bio: parsed.bio?.trim() || null,
       career_stage: parsed.career_stage ?? null,
       residency_start_year: parsed.residency_start_year ?? null,
-      ...certificateFields(parsed.career_stage ? [] : (parsed.certificates ?? [])),
+      ...certificateFields(parsed.certificates ?? []),
       seeking_work: parsed.seeking_work ?? false,
 
       specialty_ids: parsed.specialty_ids,
@@ -502,7 +502,7 @@ function licenseStatusToColumn(
   }
 }
 
-/** Only a طب عام doctor (career_stage null) keeps certificates. */
+/** Services and certificates, with their search key. */
 function certificateFields(certificates: string[]) {
   return { certificates, certificates_normalized: certificatesNormalized(certificates) };
 }

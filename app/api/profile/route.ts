@@ -111,7 +111,7 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     updates.residency_start_year = parsed.residency_start_year;
   }
   if (parsed.certificates !== undefined) {
-    const certificates = stageAfterSave === null ? parsed.certificates : [];
+    const certificates = parsed.certificates;
     updates.certificates = certificates;
     updates.certificates_normalized = certificatesNormalized(certificates);
   }

@@ -312,7 +312,10 @@ export function ProfileForm({
             </Field>
             )}
             {stageOpt?.showsCertificates && (
-              <Field label="شهادات إضافية (تظهر على بطاقتك بدل «الطب العام»)" htmlFor="certificates">
+              <Field
+                label={stage === "general" ? "شهادات وخدمات (تظهر على بطاقتك بدل «الطب العام»)" : "الخدمات والإجراءات التي تقدّمها، مثلًا: تنظير القولون، حقن العين"}
+                htmlFor="certificates"
+              >
                 <CertificatesEditor
                   id="certificates"
                   value={certificates}

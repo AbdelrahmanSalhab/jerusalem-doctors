@@ -205,17 +205,17 @@ describe("PATCH /api/profile: certificates and seeking work", () => {
     });
   });
 
-  it("drops certificates for any other stage", async () => {
-    const res = await call({ career_stage: "specialist", certificates: ["ACLS"] });
+  it("keeps a specialist's services, searchable", async () => {
+    const res = await call({ career_stage: "specialist", certificates: ["تنظير القولون", "حقن العين"] });
     expect(res.status).toBe(200);
     expect(doctorUpdate()).toMatchObject({
-      certificates: [],
-      certificates_normalized: null,
+      certificates: ["تنظير القولون", "حقن العين"],
+      certificates_normalized: "تنظير القولون حقن العين",
     });
   });
 
-  it("rejects more than 5 certificates", async () => {
-    const res = await call({ certificates: ["a", "b", "c", "d", "e", "f"] });
+  it("rejects more than 10 services", async () => {
+    const res = await call({ certificates: ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"] });
     expect(res.status).toBe(400);
   });
 

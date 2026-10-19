@@ -1,10 +1,13 @@
-// Extra certificates a طب عام doctor can list (0013). Cards show them in
-// place of the الطب العام chip; certificates_normalized feeds the search.
+// What a doctor lists beyond their specialty: services and procedures they
+// do ("تنظير القولون", "حقن العين") and certificates ("ACLS"). Every stage can
+// list them; certificates_normalized feeds the search, so a colleague can
+// find "who does colonoscopies". For a طب عام doctor they replace the shared
+// الطب العام chip on the card (0013).
 
 import { z } from "zod";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 
-export const CERTIFICATES_MAX = 5;
+export const CERTIFICATES_MAX = 10;
 export const CERTIFICATE_MAX_LENGTH = 80;
 
 /** Trims, drops blanks and repeats. Blank rows are what an untouched
