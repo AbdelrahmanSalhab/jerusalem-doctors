@@ -20,7 +20,6 @@ type ContactDoctor = Pick<
   | "whatsapp_url"
   | "email"
   | "specialties"
-  | "license_number"
   | "workplaces"
 >;
 

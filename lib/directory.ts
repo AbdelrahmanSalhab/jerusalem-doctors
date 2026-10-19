@@ -23,7 +23,6 @@ export interface SearchHit {
   arabic_family_name: string;
   hebrew_first_name: string | null;
   hebrew_family_name: string | null;
-  license_number: string;
   /** Null only when the column itself is unset; the directory always shows it. */
   phone_display: string | null;
   /** Drives the WhatsApp button on the card. No prefilled text: the card
@@ -74,7 +73,6 @@ export function directoryQuery(service: SupabaseClient, specialtyFilter = false)
       arabic_family_name,
       hebrew_first_name,
       hebrew_family_name,
-      license_number,
       phone_display,
       phone_e164,
       profile_picture_url,
@@ -105,7 +103,6 @@ interface DirectoryRow {
   arabic_family_name: string;
   hebrew_first_name: string | null;
   hebrew_family_name: string | null;
-  license_number: string;
   phone_display: string | null;
   phone_e164: string | null;
   profile_picture_url: string | null;
@@ -158,7 +155,6 @@ function toSearchHit(d: DirectoryRow): SearchHit {
     arabic_family_name: d.arabic_family_name,
     hebrew_first_name: d.hebrew_first_name,
     hebrew_family_name: d.hebrew_family_name,
-    license_number: d.license_number,
     phone_display: d.phone_display,
     // buildWhatsAppLink throws on an empty string; one malformed row must
     // not fail the whole response.

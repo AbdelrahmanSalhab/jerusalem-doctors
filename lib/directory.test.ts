@@ -35,6 +35,11 @@ describe("toSearchHits", () => {
     expect(hit.specialties).toEqual(["الطب العام"]);
   });
 
+  it("never passes the license number on to the browser", () => {
+    const [hit] = toSearchHits([ROW]);
+    expect(JSON.stringify(hit)).not.toContain("123456");
+  });
+
   it("returns [] for no data", () => {
     expect(toSearchHits(null)).toEqual([]);
   });
