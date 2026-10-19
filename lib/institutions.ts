@@ -60,11 +60,17 @@ export function matchInstitution(
   if (exactHits.length === 1) return exactHits[0].id;
 
   const key = ` ${exact} `;
-  const hits = institutions.filter(
-    (i) =>
-      (i.kind !== "hospital" || workplaceType === "hospital") &&
-      keysOf(i).some((k) => key.includes(k)),
-  );
+  const matched = institutions
+    .filter((i) => i.kind !== "hospital" || workplaceType === "hospital")
+    .map((i) => ({ i, all: keysOf(i), keys: keysOf(i).filter((k) => key.includes(k)) }))
+    .filter((m) => m.keys.length > 0);
+  // The most specific wins: plain "هداسا" (both campuses) gives way to
+  // another match whose own names contain what it matched on ("هداسا جبل
+  // المشارف" for "هداسا هار هتسوفيم"). Unrelated matches ("لؤوميت و مكابي")
+  // both survive and stay ambiguous.
+  const hits = matched
+    .filter((m) => !matched.some((o) => o !== m && m.keys.every((k) => o.all.some((ok) => ok !== k && ok.includes(k)))))
+    .map((m) => m.i);
   if (hits.length === 1) return hits[0].id;
   // A hospital-type workplace naming both its hospital and the fund that
   // runs it ("مسجات لداخ موحيدت") belongs to the hospital.
@@ -174,7 +180,8 @@ export async function relinkDoctor(service: SupabaseClient, doctorId: string): P
  * and fund names no institution claims (with how many doctors use each).
  */
 export async function institutionUsage(service: SupabaseClient): Promise<{
-  doctors: Record<string, number>;
+  /** Doctors per institution, by name, for "who works here". */
+  doctors: Record<string, { id: string; name: string }[]>;
   unmatched: { name: string; count: number }[];
 }> {
   const rows: { doctor_id: string; name: string; workplace_type: WorkplaceType; institution_id: string | null }[] = [];
@@ -197,8 +204,25 @@ export async function institutionUsage(service: SupabaseClient): Promise<{
       unmatched.set(r.name, (unmatched.get(r.name) ?? 0) + 1);
     }
   }
+  const ids = [...new Set([...perInstitution.values()].flatMap((s) => [...s]))];
+  const names = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await service
+      .from("doctors")
+      .select("id, arabic_first_name, arabic_family_name")
+      .in("id", ids.slice(i, i + 150));
+    if (error) throw error;
+    for (const d of data ?? []) names.set(d.id, `${d.arabic_first_name} ${d.arabic_family_name}`);
+  }
   return {
-    doctors: Object.fromEntries([...perInstitution].map(([id, set]) => [id, set.size])),
+    doctors: Object.fromEntries(
+      [...perInstitution].map(([inst, set]) => [
+        inst,
+        [...set]
+          .map((id) => ({ id, name: names.get(id) ?? "?" }))
+          .sort((a, b) => a.name.localeCompare(b.name, "ar")),
+      ]),
+    ),
     unmatched: [...unmatched.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
