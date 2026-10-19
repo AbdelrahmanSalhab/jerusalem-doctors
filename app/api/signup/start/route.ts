@@ -83,7 +83,8 @@ const Body = z
     message: "الترخيص الإضافي يجب أن يكون من الجهة الأخرى",
     path: ["secondary_license_region"],
   })
-  .refine((b) => b.career_stage === "resident" || b.workplaces.length > 0, {
+  // Residents rotate; a doctor looking for work may have none yet.
+  .refine((b) => b.career_stage === "resident" || b.seeking_work || b.workplaces.length > 0, {
     message: "أدخل مكان عمل واحدًا على الأقل",
     path: ["workplaces"],
   });

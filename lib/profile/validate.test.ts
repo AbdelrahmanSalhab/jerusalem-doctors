@@ -14,6 +14,7 @@ const ok = {
   workplaces: [row()],
   specialtyIds: ["s1"],
   residencyStartYear: "",
+  seekingWork: false,
 };
 
 describe("profileFormError", () => {
@@ -33,6 +34,10 @@ describe("profileFormError", () => {
         residencyStartYear: "2020",
       }),
     ).toBeNull();
+  });
+
+  it("lets a doctor looking for work leave the workplace empty", () => {
+    expect(profileFormError({ ...ok, workplaces: [emptyWorkplace(true)], seekingWork: true })).toBeNull();
   });
 
   it("saves a specialist's clinic without its address and phone", () => {

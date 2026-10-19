@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updateSpy = vi.fn();
 const insertSpy = vi.fn();
-let me: { id: string; career_stage: "resident" | "specialist" | null } = {
+let me: { id: string; career_stage: "resident" | "specialist" | null; seeking_work?: boolean } = {
   id: "doc-1",
   career_stage: null,
 };
@@ -184,6 +184,15 @@ describe("PATCH /api/profile: workplaces", () => {
     me = { id: "doc-1", career_stage: "specialist" };
     const res = await call({ workplaces: [] });
     expect(res.status).toBe(400);
+  });
+
+  it("lets a doctor looking for work clear their workplaces", async () => {
+    me = { id: "doc-1", career_stage: "specialist", seeking_work: true };
+    expect((await call({ workplaces: [] })).status).toBe(200);
+    me = { id: "doc-1", career_stage: "specialist", seeking_work: false };
+    expect((await call({ seeking_work: true, workplaces: [] })).status).toBe(200);
+    me = { id: "doc-1", career_stage: "specialist", seeking_work: true };
+    expect((await call({ seeking_work: false, workplaces: [] })).status).toBe(400);
   });
 });
 

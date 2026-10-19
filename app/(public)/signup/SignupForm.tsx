@@ -337,8 +337,14 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
       {stageOpt && (
         <Section
-          title={stageOpt.workplaceOptional ? "مكان التدريب الحالي (اختياري)" : "مكان العمل"}
-          required={!stageOpt.workplaceOptional}
+          title={
+            stageOpt.workplaceOptional
+              ? "مكان التدريب الحالي (اختياري)"
+              : form.seeking_work
+                ? "مكان العمل (اختياري)"
+                : "مكان العمل"
+          }
+          required={!stageOpt.workplaceOptional && !form.seeking_work}
         >
           {stageOpt.workplaceOptional && (
             <p className="text-sm text-foreground/65">
@@ -346,10 +352,16 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
               التخصص، وتعديله لاحقًا من ملفك.
             </p>
           )}
+          {!stageOpt.workplaceOptional && form.seeking_work && (
+            <p className="text-sm text-foreground/65">
+              يمكنك تركه فارغًا ما دمت تبحث عن عمل، وإضافته من ملفك حين تبدأ.
+            </p>
+          )}
           <WorkplaceEditor
             workplaces={form.workplaces}
             onChange={(next) => update("workplaces", next)}
             stage={form.stage}
+            optional={form.seeking_work}
           />
           {fieldError("workplaces") && (
             <p className="mt-1 text-sm text-danger">{fieldError("workplaces")}</p>
