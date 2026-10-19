@@ -123,11 +123,11 @@ export function DashboardSearch({
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="اكتب اسم الطبيب أو التخصص..."
+          placeholder="ابحث عن طبيب أو تخصص"
           className="min-w-0 flex-1 rounded-md border border-line bg-surface px-4 py-3 text-base"
           aria-label="بحث"
         />
-        <div className="w-32 shrink-0 sm:w-56">
+        <div className="min-w-0 max-w-[50%] shrink-0 sm:w-56 sm:max-w-none">
           <SpecialtyFilter
             options={specialties}
             value={specialtyId}

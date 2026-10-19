@@ -59,7 +59,7 @@ export function SpecialtyFilter({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded-md border border-foreground/20 bg-transparent px-3 py-3 text-base hover:bg-foreground/5"
+        className="flex w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-foreground/20 bg-transparent px-3 py-3 text-base hover:bg-foreground/5"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
