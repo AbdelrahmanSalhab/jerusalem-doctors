@@ -199,6 +199,11 @@ describe("POST /api/signup/start: workplaces", () => {
     expect(r.status).toBe(400);
   });
 
+  it("lets a doctor looking for work sign up without a workplace", async () => {
+    const r = await start({ license_number: "23456", seeking_work: true, workplaces: [] });
+    expect(r.status).toBe(200);
+  });
+
   it("carries a clinic's address, hours and phone into the pending row", async () => {
     const r = await start({
       license_number: "23456",

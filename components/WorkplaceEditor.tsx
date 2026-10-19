@@ -55,11 +55,14 @@ export function WorkplaceEditor({
   workplaces,
   onChange,
   stage,
+  optional = false,
 }: {
   workplaces: readonly WorkplaceEntry[];
   onChange: (next: WorkplaceEntry[]) => void;
   /** null: a legacy profile that never declared a stage; nothing is coerced. */
   stage: Stage | null;
+  /** The doctor is looking for work, so no workplace is required. */
+  optional?: boolean;
 }) {
   const [known, setKnown] = useState<Suggestion[]>([]);
   useEffect(() => {
@@ -123,7 +126,7 @@ export function WorkplaceEditor({
               <input
                 id={id("name")}
                 aria-label="اسم مكان العمل"
-                required={i === 0 && !opt?.workplaceOptional}
+                required={i === 0 && !opt?.workplaceOptional && !optional}
                 className="input flex-1"
                 // Suggests the institutions list; anything else can still be typed.
                 list={wp.workplace_type === "hospital" ? "institutions-hospital" : "institutions-other"}

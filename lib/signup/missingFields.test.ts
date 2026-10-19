@@ -18,6 +18,7 @@ const EMPTY: SignupFields = {
   residency_start_year: "",
   specialty_ids: [],
   email: "",
+  seeking_work: false,
   workplaces: [WP],
   consent: false,
 };
@@ -96,6 +97,10 @@ describe("getMissingFields", () => {
   it("asks for a specialty and a workplace once a stage is picked", () => {
     const f = { ...COMPLETE, specialty_ids: [], workplaces: [WP] };
     expect(keys(f)).toEqual(["specialty_ids", "workplace_0_name"]);
+  });
+
+  it("does not ask a doctor looking for work for a workplace", () => {
+    expect(keys({ ...COMPLETE, seeking_work: true, workplaces: [WP] })).toEqual([]);
   });
 
   it("lets a specialist sign up before filling a clinic's address and phone", () => {

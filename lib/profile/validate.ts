@@ -20,9 +20,10 @@ export function profileFormError(f: {
   workplaces: readonly WorkplaceEntry[];
   specialtyIds: readonly string[];
   residencyStartYear: string;
+  seekingWork: boolean;
 }): ProfileCheck | null {
   const cleaned = cleanWorkplaces(f.workplaces);
-  if (cleaned.length === 0 && !f.stageOpt?.workplaceOptional) {
+  if (cleaned.length === 0 && !f.stageOpt?.workplaceOptional && !f.seekingWork) {
     return { message: "الرجاء إدخال مكان عمل واحد على الأقل." };
   }
   if (f.workplaces.some(hasInvalidClinicPhone)) {

@@ -64,7 +64,8 @@ export const PATCH = withJsonErrors(async (req: Request) => {
 
   const stageAfterSave =
     parsed.career_stage !== undefined ? parsed.career_stage : me.career_stage;
-  if (parsed.workplaces?.length === 0 && stageAfterSave !== "resident") {
+  const seekingAfterSave = parsed.seeking_work ?? me.seeking_work;
+  if (parsed.workplaces?.length === 0 && stageAfterSave !== "resident" && !seekingAfterSave) {
     return jsonError(400, {
       error: "invalid_body",
       code: "invalid_body",

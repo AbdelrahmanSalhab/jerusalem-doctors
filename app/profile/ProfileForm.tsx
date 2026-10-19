@@ -153,6 +153,7 @@ export function ProfileForm({
       workplaces,
       specialtyIds,
       residencyStartYear,
+      seekingWork,
     });
     if (problem) {
       setError(problem.message);
@@ -362,6 +363,7 @@ export function ProfileForm({
             workplaces={workplaces}
             onChange={setWorkplaces}
             stage={stage}
+            optional={seekingWork}
           />
         ) : (
           <ReadOnlyView>
