@@ -34,6 +34,7 @@ import {
   OTHER_REGION,
 } from "@/lib/signup/formState";
 import { getMissingFields, needsHebrewName } from "@/lib/signup/missingFields";
+import { firstStepOf, SIGNUP_STEPS, stepOfField } from "@/lib/signup/steps";
 import type { SpecialtyNode } from "@/lib/specialtyTree";
 import { ConsentSection } from "./ConsentSection";
 import { LicenseSection } from "./LicenseSection";
@@ -48,6 +49,17 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [step, setStep] = useState(0);
+  const goTo = (n: number) => {
+    setStep(n);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  /** Field errors from the server, shown on the step that holds them. */
+  const showFieldErrors = (fields: Record<string, string>) => {
+    setFieldErrors(fields);
+    const s = firstStepOf(Object.keys(fields));
+    if (s !== null) goTo(s);
+  };
   const [submitting, setSubmitting] = useState(false);
   const [overrideMismatch, setOverrideMismatch] = useState(false);
   const [registryName, setRegistryName] = useState<{
@@ -83,6 +95,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       : specialties;
 
   const missing = getMissingFields(form);
+  const missingHere = missing.filter((m) => stepOfField(m.key) === step);
+  const lastStep = step === SIGNUP_STEPS.length - 1;
   const hebrewRequired = needsHebrewName(form);
 
   const applyStage = (next: Stage) =>
@@ -90,6 +104,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Enter on an earlier step moves on rather than submitting.
+    if (!lastStep) {
+      if (missingHere.length === 0) goTo(step + 1);
+      return;
+    }
     if (missing.length > 0) return;
     setError(null);
     setFieldErrors({});
@@ -105,7 +124,18 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       // The MoH cross-check only covers the Israeli registry, PS-track
       // signups have nothing to check against, so they skip straight to
       // /start and land in admin review either way.
+      // The check starts when the last step appears, so a quick submit can
+      // arrive before its token; wait for it rather than send an empty one.
       let freshToken = turnstileToken;
+      if (!freshToken) {
+        try {
+          freshToken = (await turnstileRef.current?.getToken(15_000)) ?? "";
+        } catch {
+          setError("لم يكتمل التحقق من المتصفح. تأكد من الاتصال وأعد المحاولة.");
+          setSubmitting(false);
+          return;
+        }
+      }
       if (form.license_region === "IL") {
         // Step 1: license cross-check (skip silently on transient failures)
         const lic = await fetch("/api/signup/check-license", {
@@ -115,7 +145,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             license_number: form.license_number,
             hebrew_first_name: form.hebrew_first_name,
             hebrew_family_name: form.hebrew_family_name,
-            turnstile_token: turnstileToken,
+            turnstile_token: freshToken,
           }),
         }).then((r) => r.json());
 
@@ -124,7 +154,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             first: lic.registry_first_name,
             family: lic.registry_family_name,
           });
-          setFieldErrors({
+          showFieldErrors({
             hebrew_full_name:
               "الاسم العبري لا يطابق سجل وزارة الصحة. تحقق من الكتابة كما تظهر على رخصتك.",
           });
@@ -157,7 +187,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       if (!start.ok) {
         // Reset Turnstile so the next retry has a fresh single-use token.
         turnstileRef.current?.reset();
-        if (startBody?.fields) setFieldErrors(startBody.fields);
+        if (startBody?.fields) showFieldErrors(startBody.fields);
         setError(fieldErrorMessage(startBody?.fields) ?? apiErrorMessage(startBody?.code));
         setSubmitting(false);
         return;
@@ -185,75 +215,82 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-8 sm:gap-6">
-      <p className="text-sm text-foreground/70">
+      <StepProgress step={step} />
+      <p className="text-sm text-muted">
         الحقول المشار إليها بـ
         <RequiredMark /> إلزامية.
       </p>
 
-      <LicenseSection
-        form={form}
-        update={update}
-        setRegion={setRegion}
-        fieldError={fieldError}
-      />
-
-      <NameSection
-        form={form}
-        update={update}
-        hebrewRequired={hebrewRequired}
-        fieldError={fieldError}
-        registryName={registryName}
-        overrideMismatch={overrideMismatch}
-        setOverrideMismatch={setOverrideMismatch}
-      />
-
-      <Section title="المرحلة المهنية">
-        <Field label="اختر ما ينطبق عليك" required error={fieldError("career_stage")}>
-          <StageRadios id="stage" value={form.stage} onChange={applyStage} />
-        </Field>
-
-        {stageOpt?.requiresResidencyStartYear && (
-          <Field
-            label="سنة بداية التخصص"
-            htmlFor="residency_start_year"
-            required
-            error={fieldError("residency_start_year")}
-          >
-            <input
-              id="residency_start_year"
-              className="input"
-              type="number"
-              inputMode="numeric"
-              dir="ltr"
-              required
-              min={RESIDENCY_YEAR_MIN}
-              max={residencyYearMax()}
-              value={form.residency_start_year}
-              onChange={(e) => update("residency_start_year", e.target.value)}
-              placeholder={String(residencyYearMax())}
-            />
-          </Field>
-        )}
-
-        <SeekingWorkCheckbox
-          checked={form.seeking_work}
-          onChange={(v) => update("seeking_work", v)}
+      {step === 0 && (
+        <LicenseSection
+          form={form}
+          update={update}
+          setRegion={setRegion}
+          fieldError={fieldError}
         />
-      </Section>
+      )}
 
-      {stageOpt?.showsCertificates && (
-        <Section title="شهادات إضافية (اختياري)">
-          <Field
-            label="تظهر على بطاقتك بدل «الطب العام»"
-            htmlFor="certificates"
-          >
-            <CertificatesEditor
-              id="certificates"
-              value={form.certificates}
-              onChange={(v) => update("certificates", v)}
-            />
+      {step === 1 && (
+        <NameSection
+          form={form}
+          update={update}
+          hebrewRequired={hebrewRequired}
+          fieldError={fieldError}
+          registryName={registryName}
+          overrideMismatch={overrideMismatch}
+          setOverrideMismatch={setOverrideMismatch}
+        />
+      )}
+
+      {lastStep && (
+        <>
+        <Section title="المرحلة المهنية">
+          <Field label="اختر ما ينطبق عليك" required error={fieldError("career_stage")}>
+            <StageRadios id="stage" value={form.stage} onChange={applyStage} />
           </Field>
+
+          {stageOpt?.requiresResidencyStartYear && (
+            <Field
+              label="سنة بداية التخصص"
+              htmlFor="residency_start_year"
+              required
+              error={fieldError("residency_start_year")}
+            >
+              <input
+                id="residency_start_year"
+                className="input"
+                type="number"
+                inputMode="numeric"
+                dir="ltr"
+                required
+                min={RESIDENCY_YEAR_MIN}
+                max={residencyYearMax()}
+                value={form.residency_start_year}
+                onChange={(e) => update("residency_start_year", e.target.value)}
+                placeholder={String(residencyYearMax())}
+              />
+            </Field>
+          )}
+
+          <SeekingWorkCheckbox
+            checked={form.seeking_work}
+            onChange={(v) => update("seeking_work", v)}
+          />
         </Section>
+
+        {stageOpt?.showsCertificates && (
+          <Section title="شهادات إضافية (اختياري)">
+            <Field
+              label="تظهر على بطاقتك بدل «الطب العام»"
+              htmlFor="certificates"
+            >
+              <CertificatesEditor
+                id="certificates"
+                value={form.certificates}
+                onChange={(v) => update("certificates", v)}
+              />
+            </Field>
+          </Section>
       )}
 
       {showSpecialtyPicker && (
@@ -330,6 +367,8 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         onToken={handleTurnstileToken}
         action="signup"
       />
+      </>
+      )}
 
       {error && (
         <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
@@ -337,17 +376,30 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         </p>
       )}
 
-      <MissingFieldsNotice missing={missing} />
+      <MissingFieldsNotice missing={missingHere} />
 
-      <button
-        type="submit"
-        disabled={submitting || missing.length > 0}
-        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
-      >
-        {submitting
-          ? "جارٍ الإرسال..."
-          : "تسجيل وإرسال رمز التحقق برسالة نصية"}
-      </button>
+      <div className="flex gap-3">
+        {step > 0 && (
+          <button
+            type="button"
+            onClick={() => goTo(step - 1)}
+            className="rounded-md border border-line bg-surface px-5 py-3 hover:bg-foreground/5"
+          >
+            رجوع
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={submitting || missingHere.length > 0}
+          className="flex-1 rounded-md bg-primary px-6 py-3 font-semibold text-primary-fg disabled:opacity-50"
+        >
+          {!lastStep
+            ? "التالي"
+            : submitting
+              ? "جارٍ الإرسال..."
+              : "تسجيل وإرسال رمز التحقق برسالة نصية"}
+        </button>
+      </div>
 
       <p className="text-center text-base text-foreground/70">
         لديك حساب بالفعل؟{" "}
@@ -358,5 +410,24 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
 
       <InputStyles />
     </form>
+  );
+}
+
+/** "الخطوة 2 من 3" with the three step names, the current one marked. */
+function StepProgress({ step }: { step: number }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-muted">
+        الخطوة {step + 1} من {SIGNUP_STEPS.length}
+      </p>
+      <ol className="grid grid-cols-3 gap-2" aria-label="خطوات التسجيل">
+        {SIGNUP_STEPS.map((name, i) => (
+          <li key={name} aria-current={i === step ? "step" : undefined} className="flex flex-col gap-1.5">
+            <span className={"h-1.5 rounded-full " + (i <= step ? "bg-primary" : "bg-line")} />
+            <span className={"text-xs " + (i === step ? "font-semibold text-foreground" : "text-muted")}>{name}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
