@@ -52,8 +52,8 @@ export const FEATURED_GRADUATES_MAX = 6;
 export const FEATURED_KINDS = ["doctor", "graduate"] as const;
 export type FeaturedKind = (typeof FEATURED_KINDS)[number];
 export const FEATURED_LABEL: Record<FeaturedKind, string> = {
-  doctor: "طبيب مميز",
-  graduate: "خريج جديد مميز",
+  doctor: "طبيب نفتخر به",
+  graduate: "طبيب مميز يبحث عن عمل",
 };
 
 /** `specialtyFilter` adds a second, filter-only embed of doctor_specialties
