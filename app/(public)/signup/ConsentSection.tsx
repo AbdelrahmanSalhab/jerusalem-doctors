@@ -1,3 +1,5 @@
+
+import { OPTION_CARD, OPTION_INPUT } from "@/components/FormField";
 import { Section } from "./SignupFields";
 
 export function ConsentSection({
@@ -18,14 +20,14 @@ export function ConsentSection({
         </p>
       </div>
 
-      <label className="flex items-start gap-3 rounded border border-foreground/15 p-3 text-base">
+      <label className={OPTION_CARD}>
         <input
           id="consent"
           type="checkbox"
           required
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="mt-1"
+          className={OPTION_INPUT}
         />
         <span>
           أوافق على ما ورد أعلاه، وأؤكد أنني طبيب وأن المعلومات المدخلة

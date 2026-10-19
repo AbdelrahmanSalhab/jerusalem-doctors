@@ -1,6 +1,6 @@
 // Phone, licenses and email: the first section of the signup form.
 
-import { Field } from "@/components/FormField";
+import { Field, OPTION_CARD, OPTION_INPUT } from "@/components/FormField";
 import {
   cleanLicense,
   cleanPhone,
@@ -41,20 +41,22 @@ export function LicenseSection({
       </Field>
 
       <Field label="جهة الترخيص" required>
-        <div className="flex gap-4">
-          <label className="flex items-center gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className={OPTION_CARD}>
             <input
               type="radio"
               name="license_region"
+              className={OPTION_INPUT}
               checked={form.license_region === "IL"}
               onChange={() => setRegion("IL")}
             />
             <span>ترخيص إسرائيلي (وزارة الصحة)</span>
           </label>
-          <label className="flex items-center gap-2">
+          <label className={OPTION_CARD}>
             <input
               type="radio"
               name="license_region"
+              className={OPTION_INPUT}
               checked={form.license_region === "PS"}
               onChange={() => setRegion("PS")}
             />
@@ -96,9 +98,10 @@ export function LicenseSection({
         htmlFor="secondary_license_number"
         required={form.has_secondary_license}
       >
-        <label className="flex items-center gap-2 text-sm">
+        <label className={OPTION_CARD}>
           <input
             type="checkbox"
+            className={OPTION_INPUT}
             checked={form.has_secondary_license}
             onChange={(e) => update("has_secondary_license", e.target.checked)}
           />
