@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth/session";
-import { auditDetail, auditTime, auditTitle } from "@/lib/auditText";
+import Link from "next/link";
+import { auditDetail, auditFields, auditTime, auditTimeFull, auditTitle } from "@/lib/auditText";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -51,39 +52,90 @@ export default async function AdminAuditPage() {
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-        <table className="w-full min-w-[44rem] text-sm">
-          <thead className="bg-foreground/5 text-muted">
-            <tr>
-              <th className="p-3 text-start font-medium">الوقت</th>
-              <th className="p-3 text-start font-medium">الحدث</th>
-              <th className="p-3 text-start font-medium">بواسطة</th>
-              <th className="p-3 text-start font-medium">الطبيب</th>
-              <th className="p-3 text-start font-medium">التفاصيل</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-line align-top">
-                <td className="whitespace-nowrap p-3 tabular-nums text-muted" dir="ltr">
-                  {auditTime(r.created_at)}
-                </td>
-                <td className="whitespace-nowrap p-3 font-semibold">{auditTitle(r.action)}</td>
-                <td className="p-3">{who(r.actor_doctor_id, "النظام")}</td>
-                <td className="p-3">{r.target_doctor_id ? who(r.target_doctor_id, "") : "-"}</td>
-                <td className="p-3 text-muted">{auditDetail(r, institutionName)}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="p-6 text-center text-muted">
-                  لا أحداث.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
+        <li
+          aria-hidden="true"
+          className="hidden gap-3 bg-foreground/5 px-4 py-2.5 text-sm text-muted md:grid md:grid-cols-[8.5rem_10rem_1fr_1fr_2fr]"
+        >
+          <span>الوقت</span>
+          <span>الحدث</span>
+          <span>بواسطة</span>
+          <span>الطبيب</span>
+          <span>التفاصيل</span>
+        </li>
+        {rows.map((r) => {
+          const doctor = r.target_doctor_id ? who(r.target_doctor_id, "") : "";
+          const fields = auditFields(r, institutionName);
+          return (
+            <li key={r.id}>
+              {/* Click a row to see everything the entry kept. */}
+              <details className="group">
+                <summary className="grid cursor-pointer list-none grid-cols-1 gap-1 px-4 py-3 text-sm hover:bg-foreground/5 md:grid-cols-[8.5rem_10rem_1fr_1fr_2fr] md:gap-3 [&::-webkit-details-marker]:hidden">
+                  <span className="tabular-nums text-muted" dir="ltr">
+                    <span aria-hidden="true" className="me-1 inline-block transition-transform group-open:rotate-90">
+                      ›
+                    </span>
+                    {auditTime(r.created_at)}
+                  </span>
+                  <span className="font-semibold">{auditTitle(r.action)}</span>
+                  <span>
+                    <span className="text-muted md:hidden">بواسطة: </span>
+                    {who(r.actor_doctor_id, "النظام")}
+                  </span>
+                  <span>
+                    <span className="text-muted md:hidden">الطبيب: </span>
+                    {doctor || "-"}
+                  </span>
+                  <span className="text-muted">{auditDetail(r, institutionName)}</span>
+                </summary>
+
+                <div className="flex flex-col gap-3 border-t border-line bg-background/60 px-4 py-4 text-sm">
+                  <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1.5">
+                    <dt className="text-muted">الوقت الدقيق</dt>
+                    <dd className="tabular-nums" dir="ltr">
+                      {auditTimeFull(r.created_at)}
+                    </dd>
+                    <dt className="text-muted">الحدث</dt>
+                    <dd>{auditTitle(r.action)}</dd>
+                    {fields.map((f) => (
+                      <div key={f.label} className="contents">
+                        <dt className="text-muted">{f.label}</dt>
+                        <dd dir={f.ltr ? "ltr" : undefined} className={f.ltr ? "break-all font-mono text-xs" : ""}>
+                          {f.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+
+                  {doctor && doctor !== "حساب محذوف" && (
+                    <Link
+                      href={`/admin?status=all&q=${encodeURIComponent(doctor)}`}
+                      className="self-start rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5"
+                    >
+                      فتح الطبيب في قائمة الأطباء
+                    </Link>
+                  )}
+
+                  <details className="text-xs text-muted">
+                    <summary className="cursor-pointer">للمطوّرين</summary>
+                    <dl className="mt-2 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1" dir="ltr">
+                      <dt>action</dt>
+                      <dd className="font-mono">{r.action}</dd>
+                      <dt>entry</dt>
+                      <dd className="break-all font-mono">{r.id}</dd>
+                      <dt>actor</dt>
+                      <dd className="break-all font-mono">{r.actor_doctor_id ?? "-"}</dd>
+                      <dt>target</dt>
+                      <dd className="break-all font-mono">{r.target_doctor_id ?? "-"}</dd>
+                    </dl>
+                  </details>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+        {rows.length === 0 && <li className="p-6 text-center text-muted">لا أحداث.</li>}
+      </ul>
     </main>
   );
 }
