@@ -19,7 +19,7 @@ export function MissingFieldsNotice({ missing }: { missing: readonly MissingFiel
     <div
       className="rounded border border-warn-line bg-warn-bg p-4 text-sm text-warn"
     >
-      <p className="mb-2 font-medium">أكمل الحقول التالية لتفعيل زر التسجيل:</p>
+      <p className="mb-2 font-medium">أكمل الحقول التالية للمتابعة:</p>
       <ul className="flex flex-wrap gap-2">
         {missing.map((m) => (
           <li key={m.key}>
