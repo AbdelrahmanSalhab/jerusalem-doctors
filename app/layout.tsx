@@ -1,16 +1,23 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_Arabic } from "next/font/google";
+import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
-// A sans with both Arabic and Latin, so phone numbers, emails and English
-// words match the Arabic instead of falling back to a serif.
+// One family for both scripts: IBM Plex Sans for Latin (phone numbers,
+// emails, English words) and its Arabic sister for Arabic. The Latin face
+// comes first and covers only Latin, so the browser picks per character.
+const plexLatin = IBM_Plex_Sans({
+  variable: "--font-latin",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
 const plex = IBM_Plex_Sans_Arabic({
   variable: "--font-arabic",
-  subsets: ["arabic", "latin"],
+  subsets: ["arabic"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
 });
@@ -28,14 +35,14 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
-      className={`${plex.variable} h-full antialiased`}
+      className={`${plexLatin.variable} ${plex.variable} h-full antialiased`}
       // data-theme is set by the boot script before React hydrates.
       suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col font-arabic overflow-x-hidden">
+      <body className="min-h-full flex flex-col font-sans overflow-x-hidden">
         <SiteHeader />
         <div className="flex-1">{children}</div>
         <SiteFooter />

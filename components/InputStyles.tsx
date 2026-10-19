@@ -14,8 +14,9 @@ export function InputStyles() {
         background: transparent;
       }
       .input:focus {
-        outline: 2px solid currentColor;
-        outline-offset: 1px;
+        outline: none;
+        border-color: var(--foreground);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--foreground) 14%, transparent);
       }
     `}</style>
   );

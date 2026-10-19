@@ -129,7 +129,7 @@ export function LoginForm() {
           className="w-full rounded-md border border-foreground/20 px-3 py-2.5"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value)}
-          placeholder="0501234567"
+          placeholder="05XXXXXXXX"
         />
       </div>
 

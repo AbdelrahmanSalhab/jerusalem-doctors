@@ -1,10 +1,11 @@
 import { Avatar } from "@/components/Avatar";
+import { ContactButtons } from "@/components/ContactButtons";
 import { clinicTelHref } from "@/lib/workplace";
 import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { WorkplaceDetails } from "@/components/WorkplaceDetails";
 
-const WHATSAPP_LABEL = "تواصل عبر واتساب";
+
 
 export function DoctorCard({ doctor }: { doctor: SearchHit }) {
   const name = `${doctor.arabic_first_name} ${doctor.arabic_family_name}`;
@@ -104,16 +105,7 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         )}
       </dl>
 
-      {doctor.whatsapp_url && (
-        <a
-          href={doctor.whatsapp_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-1 inline-flex items-center justify-center rounded-md bg-[#25d366] px-4 py-2.5 font-medium text-white hover:opacity-90"
-        >
-          {WHATSAPP_LABEL}
-        </a>
-      )}
+      <ContactButtons doctor={doctor} />
     </article>
   );
 }

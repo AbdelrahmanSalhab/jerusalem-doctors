@@ -1,9 +1,10 @@
 import { Avatar } from "@/components/Avatar";
+import { ContactButtons } from "@/components/ContactButtons";
 import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { workplaceInfoLine, clinicTelHref } from "@/lib/workplace";
 
-const WHATSAPP_LABEL = "تواصل عبر واتساب";
+
 
 /**
  * Compact dashboard search row. Shows the same data as DoctorCard, just in
@@ -103,16 +104,7 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
         </div>
       </div>
 
-      {doctor.whatsapp_url && (
-        <a
-          href={doctor.whatsapp_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center justify-center rounded-md bg-[#25d366] px-4 py-2 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90 sm:py-2.5 sm:text-base"
-        >
-          {WHATSAPP_LABEL}
-        </a>
-      )}
+      <ContactButtons doctor={doctor} compact />
     </article>
   );
 }

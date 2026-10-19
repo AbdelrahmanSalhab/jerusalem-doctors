@@ -95,17 +95,29 @@
   --color-danger-bg: var(--danger-bg);
   --color-danger-line: var(--danger-line);
   --color-danger-solid: var(--danger-solid);
-  --font-arabic: var(--font-arabic);
-  --font-sans: var(--font-arabic);
+  /* The two faces by name (next/font loads them). Not via the next/font
+     variables: each also lists a generated "Fallback" face that is plain
+     Arial for every character, which would draw Arabic before the Arabic
+     face is reached. Latin face first: it covers Latin only. */
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-arabic), system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Fields get one soft ring instead of an outline stacked on their border. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--foreground) 14%, transparent);
 }

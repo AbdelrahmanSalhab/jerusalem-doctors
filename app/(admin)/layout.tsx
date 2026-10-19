@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { NavTabs } from "@/components/NavTabs";
 import { requireAdmin } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -14,38 +14,18 @@ export default async function AdminLayout({
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-      <nav className="mb-6 flex flex-wrap gap-2 border-b border-foreground/10 pb-3 text-sm">
-        <Link
-          href="/admin"
-          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
-        >
-          الأطباء
-        </Link>
-        <Link
-          href="/admin/stats"
-          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
-        >
-          الإحصائيات
-        </Link>
-        <Link
-          href="/admin/specialties"
-          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
-        >
-          التخصصات
-        </Link>
-        <Link
-          href="/admin/institutions"
-          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
-        >
-          المستشفيات
-        </Link>
-        <Link
-          href="/admin/audit"
-          className="rounded-md px-3 py-1.5 hover:bg-foreground/5"
-        >
-          سجل النشاط
-        </Link>
-      </nav>
+      <div className="mb-6 border-b border-line">
+        <NavTabs
+          label="أقسام الإدارة"
+          tabs={[
+            { href: "/admin", label: "الأطباء", exact: true },
+            { href: "/admin/stats", label: "الإحصائيات" },
+            { href: "/admin/institutions", label: "المستشفيات" },
+            { href: "/admin/specialties", label: "التخصصات" },
+            { href: "/admin/audit", label: "سجل النشاط" },
+          ]}
+        />
+      </div>
       {children}
     </div>
   );

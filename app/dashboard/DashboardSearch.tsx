@@ -21,9 +21,12 @@ const VIEW_STORAGE_KEY = "search:view";
 export function DashboardSearch({
   specialties,
   featured,
+  listed,
 }: {
   specialties: Specialty[];
   featured: FeaturedDoctors;
+  /** Doctors in the directory, for the line under the search box. */
+  listed: number | null;
 }) {
   const [q, setQ] = useState("");
   const [specialtyId, setSpecialtyId] = useState<string>("");
@@ -103,9 +106,8 @@ export function DashboardSearch({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="اكتب اسم الطبيب أو التخصص..."
-          className="min-w-0 flex-1 rounded-md border border-foreground/20 bg-transparent px-4 py-3 text-base outline-none focus:border-foreground"
+          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-4 py-3 text-base"
           aria-label="بحث"
-          autoFocus
         />
         <div className="sm:w-56">
           <SpecialtyFilter
@@ -115,6 +117,31 @@ export function DashboardSearch({
           />
         </div>
       </div>
+
+      {!q.trim() && !specialtyId && (
+        <div className="flex flex-col gap-2">
+          {listed !== null && (
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-foreground tabular-nums">{listed}</span> طبيبًا في الدليل. تصفّح حسب التخصص:
+            </p>
+          )}
+          <ul className="flex flex-wrap gap-2">
+            {specialties
+              .filter((s) => s.parent_id === null)
+              .map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSpecialtyId(s.id)}
+                    className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-foreground/40"
+                  >
+                    {s.name_ar}
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
 
       <ResultsRegion
         state={!q.trim() && !specialtyId ? { status: "idle" } : state}

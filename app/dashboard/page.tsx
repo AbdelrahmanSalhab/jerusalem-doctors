@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
-import { fetchFeatured } from "@/lib/directory";
+import { countListed, fetchFeatured } from "@/lib/directory";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -18,9 +18,10 @@ export default async function DashboardPage() {
       .eq("is_active", true)
       .order("sort_order"),
     fetchFeatured(service),
+    countListed(service),
   ]);
   const me = await requireDoctor();
-  const [[{ data: specialties }, featured], { data: myWorkplaces }] = await Promise.all([
+  const [[{ data: specialties }, featured, listed], { data: myWorkplaces }] = await Promise.all([
     reads,
     service
       .from("doctor_workplaces")
@@ -74,7 +75,7 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      <DashboardSearch specialties={specialties ?? []} featured={featured} />
+      <DashboardSearch specialties={specialties ?? []} featured={featured} listed={listed} />
     </main>
   );
 }
