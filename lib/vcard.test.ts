@@ -7,7 +7,6 @@ const doc = {
   phone_e164: "+972528697375",
   email: "layla@example.com",
   specialties: ["الباطنية", "القلب"],
-  license_number: "189371",
   workplaces: [
     { name: "عيادة النور", workplace_type: "clinic" as const, details: null, address: null, hours: null, phone: "02-6271234", is_primary: false },
     { name: "المقاصد", workplace_type: "hospital" as const, details: null, address: null, hours: null, phone: null, is_primary: true },
@@ -15,7 +14,7 @@ const doc = {
 };
 
 describe("doctorVCard", () => {
-  it("carries name, phones, email, workplace, specialties and licence", () => {
+  it("carries name, phones, email, workplace and specialties", () => {
     const v = doctorVCard(doc);
     expect(v.startsWith("BEGIN:VCARD\r\nVERSION:3.0\r\n")).toBe(true);
     expect(v).toContain("FN;CHARSET=UTF-8:د. ليلى الخطيب");
@@ -23,7 +22,8 @@ describe("doctorVCard", () => {
     expect(v).toContain("TEL;TYPE=WORK:02-6271234");
     expect(v).toContain("ORG;CHARSET=UTF-8:المقاصد");
     expect(v).toContain("TITLE;CHARSET=UTF-8:الباطنية، القلب");
-    expect(v).toContain("ترخيص 189371");
+    // The license number is not for every colleague's address book.
+    expect(v).not.toContain("ترخيص");
     expect(v.trim().endsWith("END:VCARD")).toBe(true);
   });
 

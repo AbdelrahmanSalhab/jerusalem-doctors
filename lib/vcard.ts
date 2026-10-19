@@ -17,7 +17,6 @@ export function doctorVCard(
     | "phone_e164"
     | "email"
     | "specialties"
-    | "license_number"
     | "workplaces"
   >,
 ): string {
@@ -34,7 +33,7 @@ export function doctorVCard(
     d.email && `EMAIL:${esc(d.email)}`,
     primary && `ORG;CHARSET=UTF-8:${esc(primary.name)}`,
     d.specialties.length > 0 && `TITLE;CHARSET=UTF-8:${esc(d.specialties.join("، "))}`,
-    `NOTE;CHARSET=UTF-8:${esc(`دليل أطباء القدس · ترخيص ${d.license_number}`)}`,
+    "NOTE;CHARSET=UTF-8:دليل أطباء القدس",
     "END:VCARD",
   ];
   return lines.filter(Boolean).join("\r\n") + "\r\n";
