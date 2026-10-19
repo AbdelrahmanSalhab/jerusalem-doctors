@@ -108,3 +108,76 @@ export function auditTime(iso: string): string {
     .format(new Date(iso))
     .replace(",", "");
 }
+
+const FIELD_LABEL: Record<string, string> = {
+  auto_approved: "موافقة تلقائية",
+  license_status: "نتيجة التحقق من الترخيص",
+  is_admin_approved: "مفعّل",
+  is_active: "نشط",
+  is_visible: "ظاهر في الدليل",
+  career_stage: "المرحلة المهنية",
+  residency_start_year: "سنة بداية التخصص",
+  featured: "العرض في لوحة البحث",
+  name_ar: "الاسم",
+  name_he: "الاسم بالعبرية",
+  kind: "النوع",
+  aliases: "طرق الكتابة",
+  linked: "أماكن عمل مربوطة",
+  relinked: "أماكن عمل أُعيد ربطها",
+  changed: "أماكن عمل تغيّر ربطها",
+  unmatched: "أسماء غير مربوطة",
+  rows_upserted: "سجلات محدَّثة",
+  duration_ms: "المدة",
+  error: "الخطأ",
+  id: "المؤسسة",
+  deleted_doctor_id: "رقم الحساب المحذوف",
+};
+
+/** Kept for the record but never shown to admins. */
+const HIDDEN_FIELDS = new Set(["ip"]);
+
+const KIND: Record<string, string> = { hospital: "مستشفى", hmo: "صندوق مرضى", clinic_network: "شبكة عيادات" };
+
+export interface AuditField {
+  label: string;
+  value: string;
+  /** Ids and technical values read left to right. */
+  ltr?: boolean;
+}
+
+/** Everything an entry stored, labelled in Arabic, for the expanded view. */
+export function auditFields(row: AuditRow, institutionName: (id: string) => string | undefined): AuditField[] {
+  return Object.entries(row.metadata ?? {})
+    .filter(([k]) => !HIDDEN_FIELDS.has(k))
+    .map(([k, v]): AuditField => {
+      const label = FIELD_LABEL[k] ?? k;
+      if (typeof v === "boolean") return { label, value: v ? "نعم" : "لا" };
+      if (v === null || v === undefined || v === "") return { label, value: "لا شيء" };
+      if (Array.isArray(v)) return { label, value: v.join("، ") || "لا شيء" };
+      if (k === "license_status") return { label, value: LICENSE_STATUS[String(v)] ?? String(v) };
+      if (k === "career_stage") return { label, value: STAGE[String(v)] ?? String(v) };
+      if (k === "featured") return { label, value: FEATURED_LABEL[v as FeaturedKind] ?? String(v) };
+      if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };
+      if (k === "duration_ms" && typeof v === "number") return { label, value: `${Math.round(v / 1000)} ثانية` };
+      if (k === "id") return { label, value: institutionName(String(v)) ?? String(v), ltr: !institutionName(String(v)) };
+      if (k === "error" || k.endsWith("_id")) return { label, value: String(v), ltr: true };
+      if (typeof v === "object") return { label, value: JSON.stringify(v), ltr: true };
+      return { label, value: String(v) };
+    });
+}
+
+/** "19/10/2026 11:53:17" in Jerusalem time, for the expanded view. */
+export function auditTimeFull(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Jerusalem",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+    .format(new Date(iso))
+    .replace(",", "");
+}

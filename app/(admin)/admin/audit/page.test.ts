@@ -44,7 +44,11 @@ describe("/admin/audit", () => {
     expect(html).toContain("حساب محذوف");
     expect(html).toContain("النظام");
     expect(html).toContain("19/10/2026 11:53");
-    expect(html).not.toContain("signup_verified");
+    // Codes and ids only inside the collapsed developer section.
+    expect(html.indexOf("signup_verified")).toBeGreaterThan(html.indexOf("للمطوّرين"));
+    expect(html).toContain("الوقت الدقيق");
+    expect(html).toContain("19/10/2026 11:53:17");
+    expect(html).toContain("فتح الطبيب في قائمة الأطباء");
     expect(html).not.toContain("9.9.9.9");
     expect(html).not.toContain("auto_approved");
   });

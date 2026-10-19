@@ -38,3 +38,25 @@ describe("audit log text", () => {
     expect(auditTime("2026-10-19T08:53:17Z")).toBe("19/10/2026 11:53");
   });
 });
+
+describe("audit entry details", () => {
+  it("labels every stored field in Arabic and hides the IP", async () => {
+    const { auditFields } = await import("./auditText");
+    const fields = auditFields(
+      { action: "delete_requested", metadata: { ip: "1.2.3.4", auto_approved: false, license_status: "soft_match", aliases: ["أ", "ب"], duration_ms: 41000, id: "i1" } },
+      (id) => (id === "i1" ? "المقاصد" : undefined),
+    );
+    expect(fields).toEqual([
+      { label: "موافقة تلقائية", value: "لا" },
+      { label: "نتيجة التحقق من الترخيص", value: "تطابق تقريبي مع السجل" },
+      { label: "طرق الكتابة", value: "أ، ب" },
+      { label: "المدة", value: "41 ثانية" },
+      { label: "المؤسسة", value: "المقاصد", ltr: false },
+    ]);
+  });
+
+  it("shows seconds in the full time", async () => {
+    const { auditTimeFull } = await import("./auditText");
+    expect(auditTimeFull("2026-10-19T08:53:17Z")).toBe("19/10/2026 11:53:17");
+  });
+});
