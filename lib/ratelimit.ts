@@ -36,6 +36,10 @@ export const RATE_LIMITS = {
   search: { limit: 30, window: "1 m" },
   contactClick: { limit: 60, window: "1 m" },
   profilePatch: { limit: 10, window: "1 h" },
+  // An admin re-checking licences against the ministry registry. Generous,
+  // but a loop in the panel must not hammer data.gov.il.
+  adminLicenseCheck: { limit: 60, window: "1 h" },
+  adminLicenseSave: { limit: 30, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;

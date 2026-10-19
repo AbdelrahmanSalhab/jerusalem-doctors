@@ -4,6 +4,7 @@
 // "تطابق جزئي" or "غير موجود في السجل" and had no way to find out what it
 // meant for this particular doctor, which made the queue a guessing game.
 
+import { LicenseCheckPanel } from "./LicenseCheckPanel";
 import type { LicenseSlotDetail } from "@/lib/admin/doctorDetail";
 import { licenseDisplay, toneChip } from "@/lib/licenseStatus";
 
@@ -16,7 +17,7 @@ const TONE_BOX: Record<string, string> = {
   neutral: "border-line bg-background/60",
 };
 
-export function LicenseSection({ slot }: { doctorId: string; slot: LicenseSlotDetail }) {
+export function LicenseSection({ doctorId, slot }: { doctorId: string; slot: LicenseSlotDetail }) {
   const chip = licenseDisplay({ status: slot.status, region: slot.region });
   const e = slot.explanation;
 
@@ -49,6 +50,8 @@ export function LicenseSection({ slot }: { doctorId: string; slot: LicenseSlotDe
           <p className="text-xs text-muted">محسوبة الآن من نسخة السجل الحالية، لا من نتيجة وقت التسجيل.</p>
         )}
       </div>
+
+      <LicenseCheckPanel doctorId={doctorId} slot={slot.slot} region={slot.region} storedNumber={slot.number} />
     </div>
   );
 }

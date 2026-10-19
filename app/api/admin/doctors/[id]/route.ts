@@ -11,7 +11,7 @@ import { z } from "zod";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { FEATURED_KINDS } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
-import { requireAdmin } from "@/lib/auth/session";
+import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { allPhotoPaths, PHOTO_BUCKET } from "@/lib/photo";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
@@ -195,11 +195,3 @@ export const DELETE = withJsonErrors(async (
 
   return jsonOk({ ok: true });
 });
-
-async function requireAdminOrNull() {
-  try {
-    return await requireAdmin();
-  } catch {
-    return null;
-  }
-}
