@@ -4,63 +4,8 @@
 import Link from "next/link";
 import { type NamedCount, pct } from "@/lib/adminStats";
 
-export function Section({
-  title,
-  note,
-  children,
-}: {
-  title: string;
-  note?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {note && <p className="text-sm text-foreground/60">{note}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
+export { Section, Tile, TileGrid } from "@/components/AdminParts";
 
-export function Tile({
-  label,
-  value,
-  sub,
-  href,
-  tone = "plain",
-}: {
-  label: string;
-  value: number | string;
-  sub?: string;
-  href?: string;
-  tone?: "plain" | "warn";
-}) {
-  const body = (
-    <>
-      <span className="text-sm text-foreground/65">{label}</span>
-      <span className="text-2xl font-bold tabular-nums">{value}</span>
-      {sub && <span className="text-xs text-foreground/60">{sub}</span>}
-    </>
-  );
-  const cls =
-    "flex flex-col gap-0.5 rounded-lg border p-3 " +
-    (tone === "warn" ? "border-warn-line bg-warn-bg text-warn" : "border-line bg-surface");
-  return href ? (
-    <Link href={href} className={cls + " hover:border-foreground/40"}>
-      {body}
-    </Link>
-  ) : (
-    <div className={cls}>{body}</div>
-  );
-}
-
-export function TileGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{children}</div>;
-}
-
-/** Rows of label, count, share of `total`, and a bar to scale. */
 export function BarList({
   items,
   total,
@@ -71,7 +16,7 @@ export function BarList({
   empty?: string;
 }) {
   if (items.length === 0 || total === 0) {
-    return <p className="text-sm text-foreground/60">{empty}</p>;
+    return <p className="text-sm text-muted">{empty}</p>;
   }
   return (
     <ul className="flex flex-col gap-2">
@@ -86,7 +31,7 @@ export function BarList({
               style={{ width: `${Math.min(100, (it.count * 100) / total)}%` }}
             />
           </span>
-          <span className="tabular-nums text-foreground/75">
+          <span className="tabular-nums text-muted">
             {it.count} · {pct(it.count, total)}
           </span>
         </li>
@@ -109,7 +54,7 @@ export function DailyBars({
   const total = days.reduce((n, d) => n + d.value, 0);
   return (
     <figure className="flex flex-col gap-2">
-      <figcaption className="text-sm text-foreground/65">
+      <figcaption className="text-sm text-muted">
         {label}: <span className="tabular-nums font-semibold text-foreground">{total}</span> في 30 يومًا
         (أعلى يوم {peak})
       </figcaption>

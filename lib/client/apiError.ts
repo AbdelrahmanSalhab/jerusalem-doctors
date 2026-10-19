@@ -15,6 +15,16 @@ const MESSAGES: Record<string, string> = {
   exactly_one_primary: "اختر مكان عمل رئيسيًا واحدًا فقط.",
   unauthenticated: "انتهت جلستك. سجّل الدخول من جديد.",
   update_failed: "تعذّر حفظ التغييرات. حاول مجددًا.",
+  not_found: "لم نجد هذا الحساب. ربما حُذف.",
+  no_fields: "لا يوجد تغيير لحفظه.",
+  approval_reason_required: "اكتب سبب قبول هذا الطبيب؛ ترخيصه ليس مطابقًا لسجل الوزارة.",
+  still_active: "أغلق الحساب أولًا؛ الحذف النهائي متاح للحسابات المغلقة فقط.",
+  cannot_delete_self: "لا يمكنك حذف حسابك أنت.",
+  delete_failed: "تعذّر الحذف. حاول مجددًا.",
+  moh_unavailable: "تعذّر الوصول إلى سجل وزارة الصحة الآن (data.gov.il). هذا انقطاع مؤقت ولا يعني أن الرقم غير موجود. حاول بعد قليل.",
+  duplicate_license: "رقم الترخيص مسجَّل مسبقًا لطبيب آخر. لا يمكن أن يحمل رقمًا واحدًا طبيبان.",
+  result_changed: "تغيّرت نتيجة البحث. راجع النتيجة الجديدة ثم احفظ.",
+  name_mismatch: "الرقم يخصّ اسمًا آخر في السجل. تأكد من الرقم قبل الحفظ.",
   internal_error: "حدث خطأ في الخادم. حاول بعد قليل.",
 };
 
@@ -25,6 +35,7 @@ export function apiErrorMessage(code: unknown, fallback = "حدث خطأ. الر
 const FIELD_LABELS: Record<string, string> = {
   phone: "رقم الهاتف",
   license_number: "رقم الترخيص",
+  approval_reason: "سبب القبول",
   secondary_license_number: "رقم الترخيص الإضافي",
   secondary_license_region: "جهة الترخيص الإضافي",
   hebrew_full_name: "الاسم بالعبرية",

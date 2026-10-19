@@ -98,10 +98,10 @@ export function InstitutionsEditor({
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">
-          أسماء غير مربوطة <span className="tabular-nums text-foreground/60">({unmatched.length})</span>
+          أسماء غير مربوطة <span className="tabular-nums text-muted">({unmatched.length})</span>
         </h2>
         {unmatched.length === 0 ? (
-          <p className="text-sm text-foreground/60">كل المستشفيات وصناديق المرضى مربوطة.</p>
+          <p className="text-sm text-muted">كل المستشفيات وصناديق المرضى مربوطة.</p>
         ) : (
           <ul className="divide-y divide-foreground/10 rounded-lg border border-warn-line bg-warn-bg text-warn">
             {unmatched.map((u) => (
@@ -143,7 +143,7 @@ export function InstitutionsEditor({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">القائمة <span className="tabular-nums text-foreground/60">({institutions.length})</span></h2>
+        <h2 className="text-lg font-semibold">القائمة <span className="tabular-nums text-muted">({institutions.length})</span></h2>
         {INSTITUTION_KINDS.map((kind) => {
           const group = institutions.filter((i) => i.kind === kind);
           if (group.length === 0) return null;
@@ -244,7 +244,7 @@ function InstitutionRow({
     return (
       <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 p-3 text-sm">
         <span className="font-medium">{institution.name_ar}</span>
-        {institution.name_he && <span className="text-foreground/60">{institution.name_he}</span>}
+        {institution.name_he && <span className="text-muted">{institution.name_he}</span>}
         <span className="rounded-full bg-foreground/10 px-2 text-xs">{INSTITUTION_KIND_LABEL[institution.kind]}</span>
         {doctors.length === 0 ? (
           <span className="tabular-nums text-muted">لا أطباء</span>

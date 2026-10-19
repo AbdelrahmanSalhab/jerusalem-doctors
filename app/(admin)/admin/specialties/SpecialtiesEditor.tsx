@@ -29,7 +29,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
     <div className="space-y-4">
       <NewSpecialtyRow />
 
-      <div className="overflow-x-auto rounded-lg border border-foreground/15">
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-base">
           <thead className="bg-foreground/5">
             <tr>
@@ -50,28 +50,28 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                     onBlur={(e) =>
                       update(r.id, { sort_order: Number(e.target.value) })
                     }
-                    className="w-16 rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
+                    className="w-16 rounded border border-line bg-transparent px-2 py-1 text-center"
                   />
                 </td>
                 <td className="p-3 text-center">
                   <input
                     defaultValue={r.name_ar}
                     onBlur={(e) => update(r.id, { name_ar: e.target.value })}
-                    className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
+                    className="rounded border border-line bg-transparent px-2 py-1 text-center"
                   />
                 </td>
                 <td className="p-3 text-center" dir="auto">
                   <input
                     defaultValue={r.name_he ?? ""}
                     onBlur={(e) => update(r.id, { name_he: e.target.value })}
-                    className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
+                    className="rounded border border-line bg-transparent px-2 py-1 text-center"
                   />
                 </td>
                 <td className="p-3 text-center" dir="ltr">
                   <input
                     defaultValue={r.name_en ?? ""}
                     onBlur={(e) => update(r.id, { name_en: e.target.value })}
-                    className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-center"
+                    className="rounded border border-line bg-transparent px-2 py-1 text-center"
                   />
                 </td>
                 <td className="p-3 text-center">
@@ -82,7 +82,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                     className={
                       "rounded border px-2.5 py-1 text-sm " +
                       (r.is_active
-                        ? "border-foreground/20 hover:bg-foreground/5"
+                        ? "border-line hover:bg-foreground/5"
                         : "border-warn-line bg-warn-bg text-warn hover:bg-warn-bg")
                     }
                   >
@@ -128,14 +128,14 @@ function NewSpecialtyRow() {
   return (
     <form
       onSubmit={submit}
-      className="flex flex-wrap items-end gap-2 rounded-lg border border-foreground/15 p-3"
+      className="flex flex-wrap items-end gap-2 rounded-lg border border-line p-3"
     >
       <label className="text-sm font-medium">إضافة تخصص جديد:</label>
       <input
         placeholder="بالعربية"
         value={nameAr}
         onChange={(e) => setNameAr(e.target.value)}
-        className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-sm"
+        className="rounded border border-line bg-transparent px-2 py-1 text-sm"
         required
       />
       <input
@@ -143,14 +143,14 @@ function NewSpecialtyRow() {
         dir="auto"
         value={nameHe}
         onChange={(e) => setNameHe(e.target.value)}
-        className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-sm"
+        className="rounded border border-line bg-transparent px-2 py-1 text-sm"
       />
       <input
         placeholder="English"
         dir="ltr"
         value={nameEn}
         onChange={(e) => setNameEn(e.target.value)}
-        className="rounded border border-foreground/15 bg-transparent px-2 py-1 text-sm"
+        className="rounded border border-line bg-transparent px-2 py-1 text-sm"
       />
       <button
         type="submit"
