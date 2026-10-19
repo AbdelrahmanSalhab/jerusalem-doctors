@@ -3,18 +3,12 @@
 // database; this is only how /admin/audit shows them.
 
 import { FEATURED_LABEL, type FeaturedKind } from "@/lib/directory";
+import { isLicenseStatus, licenseStatusSentence, UNCHECKED_SENTENCE } from "@/lib/licenseStatus";
 
 export interface AuditRow {
   action: string;
   metadata: Record<string, unknown> | null;
 }
-
-const LICENSE_STATUS: Record<string, string> = {
-  verified: "الترخيص مطابق لسجل الوزارة",
-  soft_match: "تطابق تقريبي مع السجل",
-  not_found: "الترخيص غير موجود في السجل",
-  name_mismatch_overridden: "الاسم لا يطابق السجل (تجاوزه الطبيب)",
-};
 
 const STAGE: Record<string, string> = { resident: "طبيب مقيم", specialist: "طبيب أخصائي" };
 
@@ -23,6 +17,8 @@ const TITLE: Record<string, string> = {
   delete_requested: "طلب حذف حساب",
   admin_doctor_updated: "تعديل من الإدارة",
   admin_doctor_deleted: "حذف نهائي لحساب",
+  admin_license_rechecked: "إعادة فحص الترخيص",
+  admin_license_corrected: "تصحيح رقم الترخيص",
   institution_created: "إضافة مؤسسة",
   institution_updated: "تعديل مؤسسة",
   institution_deleted: "حذف مؤسسة",
@@ -40,15 +36,36 @@ const quote = (s: unknown) => `«${String(s)}»`;
 /** What an admin changed on a doctor, one phrase per field. */
 function doctorChanges(m: Record<string, unknown>): string[] {
   const out: string[] = [];
-  if ("is_admin_approved" in m) out.push(m.is_admin_approved ? "فُعّل الحساب" : "أُلغي التفعيل");
-  if ("is_active" in m) out.push(m.is_active ? "أُعيد تنشيط الحساب" : "عُلّق الحساب");
+  // Worded like the three switches on /admin, where "قبول العضوية" (the gate
+  // into the directory) and "الحساب" (open or closed) used to read as the
+  // same word and left admins guessing which one they had just pressed.
+  if ("is_admin_approved" in m) out.push(m.is_admin_approved ? "قُبلت العضوية" : "سُحب قبول العضوية");
+  if ("is_active" in m) out.push(m.is_active ? "فُتح الحساب" : "أُغلق الحساب");
   if ("is_visible" in m) out.push(m.is_visible ? "أُظهر في الدليل" : "أُخفي من الدليل");
   if ("career_stage" in m) out.push(`المرحلة: ${m.career_stage ? STAGE[String(m.career_stage)] ?? m.career_stage : "طب عام"}`);
   if (m.residency_start_year) out.push(`بداية التخصص: ${m.residency_start_year}`);
   if ("featured" in m) {
     out.push(m.featured ? `عُرض في «${FEATURED_LABEL[m.featured as FeaturedKind] ?? m.featured}»` : "أُزيل من المعروضين");
   }
+  if (m.approval_reason) out.push(`السبب: ${quote(m.approval_reason)}`);
   return out;
+}
+
+/** An admin re-checking or correcting a licence number. */
+function licenseCheckDetail(m: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (m.slot === "secondary") parts.push("الترخيص الإضافي");
+  if (m.license_number_before && m.license_number_before !== m.license_number_after) {
+    parts.push(`الرقم: ${quote(m.license_number_before)} ← ${quote(m.license_number_after)}`);
+  } else if (m.license_number) {
+    parts.push(`الرقم: ${quote(m.license_number)}`);
+  }
+  const before = isLicenseStatus(m.license_status_before) ? licenseStatusSentence(m.license_status_before) : null;
+  const after = isLicenseStatus(m.license_status_after) ? licenseStatusSentence(m.license_status_after) : null;
+  if (after && before !== after) parts.push(`${before ?? UNCHECKED_SENTENCE} ← ${after}`);
+  else if (after) parts.push(after);
+  if (m.reason) parts.push(`السبب: ${quote(m.reason)}`);
+  return parts.join(" · ");
 }
 
 /**
@@ -59,7 +76,7 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
   const m = row.metadata ?? {};
   switch (row.action) {
     case "signup_verified": {
-      const status = LICENSE_STATUS[String(m.license_status)] ?? "";
+      const status = isLicenseStatus(m.license_status) ? licenseStatusSentence(m.license_status) : "";
       const approval = m.auto_approved ? "فُعّل تلقائيًا" : "بانتظار موافقة الإدارة";
       return [approval, status].filter(Boolean).join(" · ");
     }
@@ -69,6 +86,9 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       return doctorChanges(m).join(" · ");
     case "admin_doctor_deleted":
       return "حُذفت بياناته وصورته وحساب دخوله";
+    case "admin_license_rechecked":
+    case "admin_license_corrected":
+      return licenseCheckDetail(m);
     case "institution_created":
       return [quote(m.name_ar), typeof m.linked === "number" ? `أماكن عمل مربوطة: ${m.linked}` : ""]
         .filter(Boolean)
@@ -112,9 +132,25 @@ export function auditTime(iso: string): string {
 const FIELD_LABEL: Record<string, string> = {
   auto_approved: "موافقة تلقائية",
   license_status: "نتيجة التحقق من الترخيص",
-  is_admin_approved: "مفعّل",
-  is_active: "نشط",
-  is_visible: "ظاهر في الدليل",
+  is_admin_approved: "قبول العضوية",
+  is_active: "الحساب",
+  is_visible: "الظهور في الدليل",
+  approval_reason: "سبب القبول",
+  license_status_at_approval: "حالة الترخيص عند القبول",
+  slot: "الترخيص",
+  license_number: "رقم الترخيص",
+  license_number_before: "الرقم قبل",
+  license_number_after: "الرقم بعد",
+  license_status_before: "الحالة قبل",
+  license_status_after: "الحالة بعد",
+  source: "مصدر النتيجة",
+  match_first: "مطابقة الاسم الأول",
+  match_family: "مطابقة اسم العائلة",
+  candidates: "القراءات المحتملة للرقم",
+  override_name_mismatch: "حُفظ رغم اختلاف الاسم",
+  registry_first_name: "الاسم الأول في السجل",
+  registry_family_name: "اسم العائلة في السجل",
+  reason: "السبب",
   career_stage: "المرحلة المهنية",
   residency_start_year: "سنة بداية التخصص",
   featured: "العرض في لوحة البحث",
@@ -154,7 +190,10 @@ export function auditFields(row: AuditRow, institutionName: (id: string) => stri
       if (typeof v === "boolean") return { label, value: v ? "نعم" : "لا" };
       if (v === null || v === undefined || v === "") return { label, value: "لا شيء" };
       if (Array.isArray(v)) return { label, value: v.join("، ") || "لا شيء" };
-      if (k === "license_status") return { label, value: LICENSE_STATUS[String(v)] ?? String(v) };
+      // license_status, and license_status_before / _after from a re-check.
+      if (k.startsWith("license_status")) {
+        return { label, value: isLicenseStatus(v) ? licenseStatusSentence(v) : String(v) };
+      }
       if (k === "career_stage") return { label, value: STAGE[String(v)] ?? String(v) };
       if (k === "featured") return { label, value: FEATURED_LABEL[v as FeaturedKind] ?? String(v) };
       if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };

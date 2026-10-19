@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditDetail, auditTime, auditTitle } from "./auditText";
+import { auditDetail, auditFields, auditTime, auditTitle } from "./auditText";
 
 const none = () => undefined;
 
@@ -23,7 +23,92 @@ describe("audit log text", () => {
   it("describes an admin's changes field by field", () => {
     expect(
       auditDetail({ action: "admin_doctor_updated", metadata: { is_active: false, career_stage: null, featured: "doctor" } }, none),
-    ).toBe("عُلّق الحساب · المرحلة: طب عام · عُرض في «طبيب نفتخر به»");
+    ).toBe("أُغلق الحساب · المرحلة: طب عام · عُرض في «طبيب نفتخر به»");
+  });
+
+  // Closing an account and withdrawing membership used to read as the same
+  // word in the log, the same confusion the three switches on /admin fix.
+  it("tells withdrawing membership apart from closing the account", () => {
+    const approval = auditDetail({ action: "admin_doctor_updated", metadata: { is_admin_approved: false } }, none);
+    const account = auditDetail({ action: "admin_doctor_updated", metadata: { is_active: false } }, none);
+    expect(approval).toBe("سُحب قبول العضوية");
+    expect(account).toBe("أُغلق الحساب");
+    expect(approval).not.toBe(account);
+  });
+
+  it("keeps the reason an admin gave for accepting an unverified licence", () => {
+    expect(
+      auditDetail(
+        { action: "admin_doctor_updated", metadata: { is_admin_approved: true, approval_reason: "راجعت صورة الشهادة" } },
+        none,
+      ),
+    ).toBe("قُبلت العضوية · السبب: «راجعت صورة الشهادة»");
+  });
+
+  describe("licence re-checks", () => {
+    it("reads a corrected number as before and after", () => {
+      expect(
+        auditDetail(
+          {
+            action: "admin_license_corrected",
+            metadata: {
+              slot: "primary",
+              license_number_before: "1189371",
+              license_number_after: "189371",
+              license_status_before: "not_found",
+              license_status_after: "verified",
+            },
+          },
+          none,
+        ),
+      ).toBe("الرقم: «1189371» ← «189371» · الترخيص غير موجود في السجل ← الترخيص مطابق لسجل الوزارة");
+    });
+
+    it("reads a re-check of the same number as a status change", () => {
+      expect(
+        auditDetail(
+          {
+            action: "admin_license_rechecked",
+            metadata: { slot: "primary", license_number: "189371", license_status_before: null, license_status_after: "verified" },
+          },
+          none,
+        ),
+      ).toBe("الرقم: «189371» · لم تُسجَّل نتيجة تحقق ← الترخيص مطابق لسجل الوزارة");
+    });
+
+    it("names the secondary slot and keeps an override reason", () => {
+      const detail = auditDetail(
+        {
+          action: "admin_license_corrected",
+          metadata: { slot: "secondary", license_number: "55", license_status_after: "name_mismatch_overridden", reason: "تحققت هاتفيًا" },
+        },
+        none,
+      );
+      expect(detail).toContain("الترخيص الإضافي");
+      expect(detail).toContain("السبب: «تحققت هاتفيًا»");
+    });
+
+    it("renders both actions with an Arabic title, never the raw code", () => {
+      for (const action of ["admin_license_rechecked", "admin_license_corrected"]) {
+        expect(auditTitle(action)).not.toBe(action);
+        expect(auditTitle(action)).toMatch(/[\u0600-\u06FF]/);
+      }
+    });
+
+    it("labels the new metadata keys instead of showing raw keys", () => {
+      const fields = auditFields(
+        {
+          action: "admin_license_corrected",
+          metadata: { license_status_after: "soft_match", match_first: "edit1", source: "mirror" },
+        },
+        none,
+      );
+      expect(fields).toEqual([
+        { label: "الحالة بعد", value: "تطابق تقريبي مع السجل" },
+        { label: "مطابقة الاسم الأول", value: "edit1" },
+        { label: "مصدر النتيجة", value: "mirror" },
+      ]);
+    });
   });
 
   it("names institutions, looking up an id when that is all the entry kept", () => {

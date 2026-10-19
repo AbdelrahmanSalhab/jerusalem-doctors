@@ -1,5 +1,6 @@
 import { daysSince, fetchAdminStats, pct } from "@/lib/adminStats";
 import { COLLEAGUES_GEN, countOf, daysAgoText } from "@/lib/arabicCount";
+import { licenseStatusLabel } from "@/lib/licenseStatus";
 import { requireAdmin } from "@/lib/auth/session";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -215,10 +216,10 @@ export default async function AdminStatsPage() {
             <BarList
               total={d.total}
               items={[
-                { name: "مطابق للسجل", count: s.license.verified },
-                { name: "تطابق تقريبي", count: s.license.soft_match },
-                { name: "غير موجود في السجل", count: s.license.not_found },
-                { name: "اسم غير مطابق (متجاوَز)", count: s.license.mismatch_overridden },
+                { name: licenseStatusLabel("verified"), count: s.license.verified },
+                { name: licenseStatusLabel("soft_match"), count: s.license.soft_match },
+                { name: licenseStatusLabel("not_found"), count: s.license.not_found },
+                { name: licenseStatusLabel("name_mismatch_overridden"), count: s.license.mismatch_overridden },
               ]}
             />
             <p className="text-xs text-foreground/60">
