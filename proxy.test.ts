@@ -13,6 +13,7 @@ describe("isPublic", () => {
     "/_next/data/x",
     "/favicon.ico",
     "/robots.txt",
+    "/manifest.webmanifest",
   ])("%s is public", (p) => expect(isPublic(p)).toBe(true));
 
   it.each(["/dashboard", "/profile", "/admin", "/admin/audit", "/anything"])(

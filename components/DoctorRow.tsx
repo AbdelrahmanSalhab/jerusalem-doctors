@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { ContactButtons } from "@/components/ContactButtons";
-import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
+import { cardChips, cardServices, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { workplaceInfoLine, clinicTelHref } from "@/lib/workplace";
 
@@ -47,6 +47,11 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
                 {doctor.subspecialty}
               </li>
             )}
+            {cardServices(doctor).map((s) => (
+              <li key={s} className="rounded-full border border-line px-2 py-0.5 text-xs">
+                {s}
+              </li>
+            ))}
             {doctor.career_stage && (
               <li className="rounded-full border border-info-line bg-info-bg px-2 py-0.5 text-xs text-info">
                 {careerStageBadge(doctor.career_stage, doctor.residency_start_year)}

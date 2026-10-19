@@ -19,6 +19,8 @@ const PUBLIC_PREFIXES = [
   "/_next/",
   "/favicon",
   "/robots.txt",
+  // The home-screen app manifest; phones fetch it before anyone logs in.
+  "/manifest.webmanifest",
 ];
 
 export function isPublic(pathname: string): boolean {

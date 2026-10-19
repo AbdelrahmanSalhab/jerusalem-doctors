@@ -1,7 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import { ContactButtons } from "@/components/ContactButtons";
 import { clinicTelHref } from "@/lib/workplace";
-import { cardChips, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
+import { cardChips, cardServices, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { WorkplaceDetails } from "@/components/WorkplaceDetails";
 
@@ -10,6 +10,7 @@ import { WorkplaceDetails } from "@/components/WorkplaceDetails";
 export function DoctorCard({ doctor }: { doctor: SearchHit }) {
   const name = `${doctor.arabic_first_name} ${doctor.arabic_family_name}`;
   const chips = cardChips(doctor);
+  const services = cardServices(doctor);
   const primaryWp = doctor.workplaces.find((w) => w.is_primary);
   const otherWps = doctor.workplaces.filter((w) => !w.is_primary);
 
@@ -52,6 +53,12 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
       {doctor.bio && (
         <p className="whitespace-pre-line text-sm text-foreground/80">
           {doctor.bio}
+        </p>
+      )}
+
+      {services.length > 0 && (
+        <p className="text-sm">
+          <span className="text-foreground/65">الخدمات:</span> {services.join("، ")}
         </p>
       )}
 

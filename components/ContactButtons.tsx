@@ -1,38 +1,77 @@
-// Call and WhatsApp, side by side, on a doctor's card or row. The phone
-// number above was already a call link, but nothing made that obvious.
+"use client";
 
+// Call, WhatsApp and "add to contacts" on a doctor's card or row. The
+// WhatsApp message opens with who is writing (lib/contactIntro.ts); the
+// contact file puts the colleague's name on future calls (lib/vcard.ts).
+
+import { useViewer } from "@/components/ViewerContext";
+import { whatsappHref, whatsappIntro } from "@/lib/contactIntro";
 import type { SearchHit } from "@/lib/directory";
+import { doctorVCard, vcardFileName } from "@/lib/vcard";
 import { clinicTelHref } from "@/lib/workplace";
 
-export function ContactButtons({
-  doctor,
-  compact = false,
-}: {
-  doctor: Pick<SearchHit, "phone_display" | "whatsapp_url">;
-  compact?: boolean;
-}) {
+type ContactDoctor = Pick<
+  SearchHit,
+  | "arabic_first_name"
+  | "arabic_family_name"
+  | "phone_display"
+  | "phone_e164"
+  | "whatsapp_url"
+  | "email"
+  | "specialties"
+  | "license_number"
+  | "workplaces"
+>;
+
+function saveContact(d: ContactDoctor) {
+  const url = URL.createObjectURL(new Blob([doctorVCard(d)], { type: "text/vcard;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = vcardFileName(d);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function ContactButtons({ doctor, compact = false }: { doctor: ContactDoctor; compact?: boolean }) {
+  const viewer = useViewer();
   const tel = clinicTelHref(doctor.phone_display);
-  if (!tel && !doctor.whatsapp_url) return null;
+  const wa = doctor.whatsapp_url
+    ? whatsappHref(doctor.whatsapp_url, whatsappIntro(viewer, doctor.arabic_first_name))
+    : null;
+  if (!tel && !wa) return null;
   const size = compact ? "px-3 py-2 text-sm" : "px-4 py-2.5";
   return (
-    <div className={compact ? "flex shrink-0 gap-2" : "mt-1 grid grid-cols-2 gap-2"}>
-      {tel && (
-        <a
-          href={tel}
-          className={`inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-surface font-medium hover:bg-foreground/5 ${size}`}
+    <div className={compact ? "flex shrink-0 flex-wrap gap-2" : "mt-1 flex flex-col gap-2"}>
+      <div className={compact ? "flex gap-2" : "grid grid-cols-2 gap-2"}>
+        {tel && (
+          <a
+            href={tel}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-surface font-medium hover:bg-foreground/5 ${size}`}
+          >
+            <span aria-hidden="true">☎</span> اتصال
+          </a>
+        )}
+        {wa && (
+          <a
+            href={wa}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center justify-center rounded-md bg-[#1fa855] font-medium text-white hover:opacity-90 ${size} ${tel ? "" : "col-span-2"}`}
+          >
+            واتساب
+          </a>
+        )}
+      </div>
+      {doctor.phone_e164 && (
+        <button
+          type="button"
+          onClick={() => saveContact(doctor)}
+          className={`text-sm text-muted underline-offset-2 hover:text-foreground hover:underline ${compact ? "px-1" : "self-center"}`}
         >
-          <span aria-hidden="true">☎</span> اتصال
-        </a>
-      )}
-      {doctor.whatsapp_url && (
-        <a
-          href={doctor.whatsapp_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`inline-flex items-center justify-center rounded-md bg-[#1fa855] font-medium text-white hover:opacity-90 ${size} ${tel ? "" : "col-span-2"}`}
-        >
-          واتساب
-        </a>
+          + إضافة لجهات الاتصال
+        </button>
       )}
     </div>
   );

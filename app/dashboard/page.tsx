@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
+import { ViewerProvider } from "@/components/ViewerContext";
 import { countListed, fetchFeatured } from "@/lib/directory";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
@@ -21,13 +22,29 @@ export default async function DashboardPage() {
     countListed(service),
   ]);
   const me = await requireDoctor();
-  const [[{ data: specialties }, featured, listed], { data: myWorkplaces }] = await Promise.all([
-    reads,
-    service
-      .from("doctor_workplaces")
-      .select("name, workplace_type, address, phone")
-      .eq("doctor_id", me.id),
-  ]);
+  const [[{ data: specialties }, featured, listed], { data: myWorkplaces }, { data: mySpecialties }] =
+    await Promise.all([
+      reads,
+      service
+        .from("doctor_workplaces")
+        .select("name, workplace_type, address, phone, is_primary, sort_order")
+        .eq("doctor_id", me.id),
+      service.from("doctor_specialties").select("specialty_id").eq("doctor_id", me.id),
+    ]);
+  // How this doctor introduces themselves in a WhatsApp message.
+  const specialtyName = (id: string) => specialties?.find((s) => s.id === id)?.name_ar;
+  const primary = [...(myWorkplaces ?? [])].sort(
+    (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order,
+  )[0];
+  const viewer = {
+    firstName: me.arabic_first_name,
+    familyName: me.arabic_family_name,
+    specialty:
+      me.career_stage === null
+        ? "طب عام"
+        : (mySpecialties ?? []).map((r) => specialtyName(r.specialty_id)).filter(Boolean).join(" و") || null,
+    workplace: primary?.name ?? null,
+  };
   // Staff accounts (admin, hidden from the directory) have no card to improve.
   const gaps = me.is_admin && !me.is_visible ? [] : profileGaps(me, myWorkplaces ?? []);
 
@@ -75,7 +92,9 @@ export default async function DashboardPage() {
         </section>
       )}
 
-      <DashboardSearch specialties={specialties ?? []} featured={featured} listed={listed} />
+      <ViewerProvider viewer={viewer}>
+        <DashboardSearch specialties={specialties ?? []} featured={featured} listed={listed} />
+      </ViewerProvider>
     </main>
   );
 }
