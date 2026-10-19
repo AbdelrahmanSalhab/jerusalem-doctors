@@ -12,6 +12,7 @@ import { clinicTelHref } from "@/lib/workplace";
 
 type ContactDoctor = Pick<
   SearchHit,
+  | "id"
   | "arabic_first_name"
   | "arabic_family_name"
   | "phone_display"
@@ -23,7 +24,18 @@ type ContactDoctor = Pick<
   | "workplaces"
 >;
 
+/** Counts the press for the stats page (0017). A beacon survives the page
+ *  handing off to WhatsApp or the dialer, and never delays it. */
+function track(target: string, channel: "call" | "whatsapp" | "save") {
+  try {
+    navigator.sendBeacon?.("/api/usage/contact", JSON.stringify({ target, channel }));
+  } catch {
+    // counting is best effort
+  }
+}
+
 function saveContact(d: ContactDoctor) {
+  track(d.id, "save");
   const url = URL.createObjectURL(new Blob([doctorVCard(d)], { type: "text/vcard;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url;
@@ -48,6 +60,7 @@ export function ContactButtons({ doctor, compact = false }: { doctor: ContactDoc
         {tel && (
           <a
             href={tel}
+            onClick={() => track(doctor.id, "call")}
             className={`inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-surface font-medium hover:bg-foreground/5 ${size}`}
           >
             <span aria-hidden="true">☎</span> اتصال
@@ -56,6 +69,7 @@ export function ContactButtons({ doctor, compact = false }: { doctor: ContactDoc
         {wa && (
           <a
             href={wa}
+            onClick={() => track(doctor.id, "whatsapp")}
             target="_blank"
             rel="noopener noreferrer"
             className={`inline-flex items-center justify-center rounded-md bg-[#1fa855] font-medium text-white hover:opacity-90 ${size} ${tel ? "" : "col-span-2"}`}

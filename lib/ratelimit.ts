@@ -34,6 +34,7 @@ export const RATE_LIMITS = {
   loginResend: { limit: 3, window: "10 m" },
   loginResendIp: { limit: 20, window: "10 m" },
   search: { limit: 30, window: "1 m" },
+  contactClick: { limit: 60, window: "1 m" },
   profilePatch: { limit: 10, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;
 

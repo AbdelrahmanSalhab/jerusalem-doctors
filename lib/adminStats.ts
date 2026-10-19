@@ -22,7 +22,14 @@ export interface AdminStats {
     verified: Count; soft_match: Count; not_found: Count; mismatch_overridden: Count;
   };
   activity: { active_7d: Count; active_30d: Count; never: Count };
-  daily: { day: string; signups: Count; searchers: Count }[];
+  daily: { day: string; signups: Count; searchers: Count; contacts: Count }[];
+  /** Call, WhatsApp and add-to-contacts presses, last 7 days (0017). */
+  contacts: {
+    whatsapp_7d: Count; call_7d: Count; save_7d: Count;
+    contacters_7d: Count; contacted_7d: Count;
+  };
+  /** Accounts that reached 20+ different doctors in 24 h. */
+  heavy_contacters: NamedCount[];
   domains: NamedCount[];
   workplace_types: { hospital: Count; clinic: Count; hmo: Count };
   /** Doctors per institution (0016), most first. */
