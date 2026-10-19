@@ -28,7 +28,7 @@ const REAL: [string, "hospital" | "clinic" | "hmo", string | null][] = [
   ["مؤحيدت", "clinic", "مئوحيدت"],
   ["مكابي", "clinic", "مكابي"],
   ["מרפאת יפת השמש", "hmo", null],
-  ["مقاصد", "hmo", null],
+  ["مقاصد", "hmo", "المقاصد"],
   ["המרכז הירושלמי לבריאות הנפש-مركز القدس للصحة النفسية- كفار شؤول", "hospital", "مركز القدس للصحة النفسية (كفار شاؤول)"],
   ["משגב לדך", "hospital", "مسغاف لداخ"],
   ["القدس", "hospital", null],
@@ -56,6 +56,11 @@ const REAL: [string, "hospital" | "clinic" | "hmo", string | null][] = [
 describe("matchInstitution on every production workplace name", () => {
   it.each(REAL)("%s (%s) -> %s", (name, type, expected) => {
     expect(m(name, type)).toBe(expected);
+  });
+
+  it("links a name that is exactly a spelling, whatever type was picked", () => {
+    expect(m("مقاصد", "hmo")).toBe("المقاصد");
+    expect(m("المقاصد", "clinic")).toBe("المقاصد");
   });
 
   it("keeps hospitals to workplaces entered as hospitals", () => {

@@ -39,10 +39,13 @@ export function InstitutionsEditor({
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    const b = await res.json().catch(() => null);
     if (!res.ok) {
-      const b = await res.json().catch(() => null);
       setError(fieldErrorMessage(b?.fields) ?? apiErrorMessage(b?.code, "تعذّر الحفظ. حاول مجددًا."));
       return false;
+    }
+    if (b?.still_unlinked) {
+      setError("حُفظت طريقة الكتابة، لكن الاسم ما زال غير مربوط. تأكد من اختيار المؤسسة الصحيحة، أو أبلغ المطوّر.");
     }
     startTransition(() => router.refresh());
     return true;

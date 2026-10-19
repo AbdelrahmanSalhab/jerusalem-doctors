@@ -51,7 +51,15 @@ export function matchInstitution(
   name: string,
   workplaceType: WorkplaceType,
 ): string | null {
-  const key = ` ${matchKey(name)} `;
+  // A name that IS one of an institution's spellings links whatever type the
+  // doctor picked: that is an admin's "ربط كطريقة كتابة", and "مقاصد" entered
+  // as صندوق مرضى is still Al-Makassed. Only partial matches follow the type
+  // rule below.
+  const exact = matchKey(name);
+  const exactHits = institutions.filter((i) => keysOf(i).includes(exact));
+  if (exactHits.length === 1) return exactHits[0].id;
+
+  const key = ` ${exact} `;
   const hits = institutions.filter(
     (i) =>
       (i.kind !== "hospital" || workplaceType === "hospital") &&

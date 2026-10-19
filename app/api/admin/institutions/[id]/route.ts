@@ -50,13 +50,15 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: Ctx) => {
     }
     throw r.error;
   }
-  const { changed } = await relinkWorkplaces(service);
+  const { changed, unmatched } = await relinkWorkplaces(service);
   await writeAudit(service, {
     actor_doctor_id: admin.id,
     action: "institution_updated",
     metadata: { id, ...update, linked: changed },
   });
-  return jsonOk({ ok: true, linked: changed });
+  // Lets the page say so when a claimed name still didn't link.
+  const stillUnlinked = "add_alias" in body && unmatched.some((u) => u.name === body.add_alias);
+  return jsonOk({ ok: true, linked: changed, still_unlinked: stillUnlinked });
 });
 
 export const DELETE = withJsonErrors(async (_req: Request, ctx: Ctx) => {
