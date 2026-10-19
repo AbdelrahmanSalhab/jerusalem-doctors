@@ -15,6 +15,9 @@ import { requireAdmin } from "@/lib/auth/session";
 import { allPhotoPaths, PHOTO_BUCKET } from "@/lib/photo";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
+import { approvalNeedsReason } from "@/lib/licenseStatus";
+
+export const APPROVAL_REASON_MIN = 3;
 
 const Body = z.object({
   is_admin_approved: z.boolean().optional(),
@@ -33,7 +36,21 @@ const Body = z.object({
     .optional(),
   // null takes the doctor out of the featured sections.
   featured: z.enum(FEATURED_KINDS).nullable().optional(),
+  // Not a column: why an admin accepted a doctor whose licence the registry
+  // does not confirm. It is stripped before the update and kept in the log.
+  approval_reason: z.string().trim().min(APPROVAL_REASON_MIN).max(300).optional(),
 });
+
+
+/** The columns this route may write; anything else in the body is ignored. */
+const UPDATABLE = [
+  "is_admin_approved",
+  "is_active",
+  "is_visible",
+  "career_stage",
+  "residency_start_year",
+  "featured",
+] as const;
 
 export const PATCH = withJsonErrors(async (
   req: Request,
@@ -52,16 +69,44 @@ export const PATCH = withJsonErrors(async (
   } catch {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
   }
-  if (Object.keys(body).length === 0) {
+  const { approval_reason, ...fields } = body;
+  if (Object.keys(fields).length === 0) {
     return jsonError(400, { error: "no_fields", code: "no_fields" });
   }
 
   const service = createSupabaseServiceClient();
+
+  const current = await service
+    .from("doctors")
+    .select("license_verification_status")
+    .eq("id", id)
+    .maybeSingle();
+  if (current.error && current.error.code !== "PGRST116") {
+    console.error("[admin.doctors.patch] read failed", current.error);
+    return jsonError(500, { error: "update_failed", code: "update_failed" });
+  }
+  if (!current.data) {
+    return jsonError(404, { error: "not_found", code: "not_found" });
+  }
+  const licenseStatus = current.data.license_verification_status as string | null;
+
+  // Accepting a doctor the registry does not confirm is a judgement call, and
+  // the log should say what it rested on.
+  if (fields.is_admin_approved === true && approvalNeedsReason(licenseStatus) && !approval_reason) {
+    return jsonError(400, { error: "approval_reason_required", code: "approval_reason_required" });
+  }
+
+  // Built from the allow-list, never by spreading the body: approval_reason is
+  // not a column and would fail the update.
+  const updates: Record<string, unknown> = {};
+  for (const key of UPDATABLE) {
+    if (key in fields) updates[key] = fields[key];
+  }
   // Re-featuring bumps featured_at, so the newest pick leads the section.
-  const updates =
-    body.featured === undefined
-      ? body
-      : { ...body, featured_at: body.featured ? new Date().toISOString() : null };
+  if (fields.featured !== undefined) {
+    updates.featured_at = fields.featured ? new Date().toISOString() : null;
+  }
+
   const r = await service.from("doctors").update(updates).eq("id", id);
   if (r.error) {
     console.error("[admin.doctors.patch] update failed", r.error);
@@ -72,7 +117,12 @@ export const PATCH = withJsonErrors(async (
     actor_doctor_id: admin.id,
     action: "admin_doctor_updated",
     target_doctor_id: id,
-    metadata: body,
+    metadata: {
+      ...fields,
+      ...(approval_reason && fields.is_admin_approved === true
+        ? { approval_reason, license_status_at_approval: licenseStatus }
+        : {}),
+    },
   });
 
   return jsonOk({ ok: true });
