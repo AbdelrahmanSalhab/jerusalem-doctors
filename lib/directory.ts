@@ -213,6 +213,42 @@ export async function countListed(service: SupabaseClient): Promise<number | nul
   return error ? null : count;
 }
 
+/** Listed doctors per top-level specialty, with subspecialties rolled up
+ *  into their parent (a cardiologist counts under الباطنية, which is the
+ *  chip the dashboard shows). An empty object on a failed read: the chips
+ *  then fall back to listing every specialty, as they did before. */
+export async function countListedByDomain(
+  service: SupabaseClient,
+): Promise<Record<string, number>> {
+  // Its own tree read, in parallel, so the dashboard keeps one round trip.
+  const [doctors, tree] = await Promise.all([
+    service
+      .from("doctors")
+      .select("id, doctor_specialties(specialty_id)")
+      .eq("is_active", true)
+      .eq("is_visible", true)
+      .eq("is_phone_verified", true)
+      .eq("is_admin_approved", true)
+      .eq("consent_directory_use", true),
+    service.from("specialties").select("id, parent_id"),
+  ]);
+  if (doctors.error || tree.error || !doctors.data) return {};
+
+  const parentOf = new Map(
+    (tree.data as { id: string; parent_id: string | null }[]).map((s) => [s.id, s.parent_id]),
+  );
+  const counts: Record<string, number> = {};
+  for (const row of doctors.data as { doctor_specialties: { specialty_id: string }[] | null }[]) {
+    // A doctor counts once per domain, however many subspecialties they
+    // hold under it.
+    const domains = new Set(
+      (row.doctor_specialties ?? []).map((s) => parentOf.get(s.specialty_id) ?? s.specialty_id),
+    );
+    for (const d of domains) counts[d] = (counts[d] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /** A failed read hides the sections rather than failing the dashboard. */
 export async function fetchFeatured(service: SupabaseClient): Promise<FeaturedDoctors> {
   const [doctor, graduates] = await Promise.all([

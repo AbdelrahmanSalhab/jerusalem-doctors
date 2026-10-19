@@ -23,7 +23,7 @@ const plex = IBM_Plex_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "تجمّع أطباء العائلة المقدسي",
+  title: "دليل أطباء القدس",
   description: "دليل مهني مغلق للأطباء المسجلين في القدس",
   robots: { index: false, follow: false },
   // iPhone "Add to Home Screen": the icon's name, and a full-screen launch.
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#161c19" },
+    { media: "(prefers-color-scheme: dark)", color: "#212b27" },
   ],
 };
 

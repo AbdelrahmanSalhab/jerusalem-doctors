@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
 import { ViewerProvider } from "@/components/ViewerContext";
-import { countListed, fetchFeatured } from "@/lib/directory";
+import { countListed, countListedByDomain, fetchFeatured } from "@/lib/directory";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -20,9 +20,14 @@ export default async function DashboardPage() {
       .order("sort_order"),
     fetchFeatured(service),
     countListed(service),
+    countListedByDomain(service),
   ]);
   const me = await requireDoctor();
-  const [[{ data: specialties }, featured, listed], { data: myWorkplaces }, { data: mySpecialties }] =
+  const [
+    [{ data: specialties }, featured, listed, domainCounts],
+    { data: myWorkplaces },
+    { data: mySpecialties },
+  ] =
     await Promise.all([
       reads,
       service
@@ -93,7 +98,12 @@ export default async function DashboardPage() {
       )}
 
       <ViewerProvider viewer={viewer}>
-        <DashboardSearch specialties={specialties ?? []} featured={featured} listed={listed} />
+        <DashboardSearch
+          specialties={specialties ?? []}
+          featured={featured}
+          listed={listed}
+          domainCounts={domainCounts}
+        />
       </ViewerProvider>
     </main>
   );

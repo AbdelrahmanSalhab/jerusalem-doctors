@@ -18,21 +18,30 @@ type ViewMode = "cards" | "rows";
 
 const DEBOUNCE_MS = 250;
 const VIEW_STORAGE_KEY = "search:view";
+/** Chips shown before "كل التخصصات": more than this and the list fills a
+ *  phone screen, pushing the results and the featured doctors out of
+ *  sight. */
+const CHIPS_COLLAPSED = 5;
 
 export function DashboardSearch({
   specialties,
   featured,
   listed,
+  domainCounts,
 }: {
   specialties: Specialty[];
   featured: FeaturedDoctors;
   /** Doctors in the directory, for the line under the search box. */
   listed: number | null;
+  /** Listed doctors per top-level specialty, for ordering the chips and
+   *  dropping the empty ones. */
+  domainCounts: Record<string, number>;
 }) {
   const [q, setQ] = useState("");
   const [specialtyId, setSpecialtyId] = useState<string>("");
   const [state, setState] = useState<SearchState>({ status: "idle" });
   const [view, setView] = useState<ViewMode>("cards");
+  const [allChips, setAllChips] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // Restore the user's preferred view on first paint.
@@ -99,9 +108,17 @@ export function DashboardSearch({
     };
   }, [q, specialtyId]);
 
+  // Busiest specialties first, and never a chip that leads to an empty
+  // result. With no counts (a failed read) the chips stay as they were:
+  // every specialty, in the admin's sort order.
+  const hasCounts = Object.keys(domainCounts).length > 0;
+  const domains = specialties
+    .filter((s) => s.parent_id === null && (!hasCounts || (domainCounts[s.id] ?? 0) > 0))
+    .sort((a, b) => (domainCounts[b.id] ?? 0) - (domainCounts[a.id] ?? 0));
+
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex gap-2 sm:gap-3">
         <input
           type="search"
           value={q}
@@ -110,7 +127,7 @@ export function DashboardSearch({
           className="min-w-0 flex-1 rounded-md border border-line bg-surface px-4 py-3 text-base"
           aria-label="بحث"
         />
-        <div className="sm:w-56">
+        <div className="w-32 shrink-0 sm:w-56">
           <SpecialtyFilter
             options={specialties}
             value={specialtyId}
@@ -123,23 +140,37 @@ export function DashboardSearch({
         <div className="flex flex-col gap-2">
           {listed !== null && (
             <p className="text-sm text-muted">
-              <span className="font-semibold text-foreground">{countOf(listed, DOCTORS)}</span> في الدليل. تصفّح حسب التخصص:
+              <span className="font-semibold text-foreground">{countOf(listed, DOCTORS)}</span> في الدليل.
             </p>
           )}
           <ul className="flex flex-wrap gap-2">
-            {specialties
-              .filter((s) => s.parent_id === null)
-              .map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSpecialtyId(s.id)}
-                    className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-foreground/40"
-                  >
-                    {s.name_ar}
-                  </button>
-                </li>
-              ))}
+            {(allChips ? domains : domains.slice(0, CHIPS_COLLAPSED)).map((s) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => setSpecialtyId(s.id)}
+                  className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-foreground/40"
+                >
+                  {s.name_ar}
+                  {domainCounts[s.id] ? (
+                    <span className="text-xs text-muted">{domainCounts[s.id]}</span>
+                  ) : null}
+                </button>
+              </li>
+            ))}
+            {domains.length > CHIPS_COLLAPSED && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setAllChips((v) => !v)}
+                  className="rounded-full border border-dashed border-line bg-surface px-3 py-1.5 text-sm text-muted hover:border-foreground/40 hover:text-foreground"
+                  aria-expanded={allChips}
+                  aria-label={allChips ? "عرض تخصصات أقل" : "عرض كل التخصصات"}
+                >
+                  {allChips ? "أقل" : `+${domains.length - CHIPS_COLLAPSED}`}
+                </button>
+              </li>
+            )}
           </ul>
         </div>
       )}
