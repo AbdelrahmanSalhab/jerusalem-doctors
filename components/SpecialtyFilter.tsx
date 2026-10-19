@@ -72,7 +72,7 @@ export function SpecialtyFilter({
       {open && (
         <ul
           role="listbox"
-          className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-md border border-foreground/20 bg-background py-1 shadow-lg"
+          className="absolute z-20 mt-1 max-h-[60vh] w-full min-w-56 overflow-y-auto rounded-md border border-line bg-surface py-1 shadow-lg"
         >
           <Item
             label={ALL}
@@ -85,6 +85,7 @@ export function SpecialtyFilter({
             <Item
               key={g.parent.id}
               label={g.parent.name_ar}
+              heading={g.children.length > 0}
               selected={value === g.parent.id}
               onPick={() => pick(g.parent.id)}
             />,
@@ -108,11 +109,15 @@ function Item({
   label,
   selected,
   nested,
+  heading,
   onPick,
 }: {
   label: string;
   selected: boolean;
+  /** A subspecialty, drawn under its parent with a guide line. */
   nested?: boolean;
+  /** A specialty with subspecialties under it. */
+  heading?: boolean;
   onPick: () => void;
 }) {
   return (
@@ -121,12 +126,13 @@ function Item({
       aria-selected={selected}
       onClick={onPick}
       className={
-        "cursor-pointer px-3 py-2.5 text-base hover:bg-foreground/5 " +
-        (nested ? "ps-8 text-foreground/85 " : "") +
-        (selected ? "bg-foreground/10 font-medium" : "")
+        "cursor-pointer px-3 hover:bg-foreground/5 " +
+        (nested ? "py-1.5 ps-6 text-sm text-muted " : "py-2.5 text-base ") +
+        (heading ? "font-semibold " : "") +
+        (selected ? "bg-foreground/10 font-medium text-foreground" : "")
       }
     >
-      {label}
+      {nested ? <span className="block border-s-2 border-line ps-3">{label}</span> : label}
     </li>
   );
 }

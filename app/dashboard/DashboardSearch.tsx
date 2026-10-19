@@ -174,12 +174,12 @@ function ResultsRegion({
           </p>
         )}
         {featured.doctor && (
-          <FeaturedSection title="طبيب مميز">
+          <FeaturedSection title="طبيب نفتخر به">
             <DoctorCard doctor={featured.doctor} />
           </FeaturedSection>
         )}
         {featured.graduates.length > 0 && (
-          <FeaturedSection title="خريجون جدد يبحثون عن عمل">
+          <FeaturedSection title="أطباء مميزون يبحثون عن عمل">
             <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {featured.graduates.map((d) => (
                 <li key={d.id}>
