@@ -17,7 +17,7 @@ export function Section({
     <section className="flex flex-col gap-3">
       <div>
         <h2 className="text-lg font-semibold">{title}</h2>
-        {note && <p className="text-sm text-foreground/60">{note}</p>}
+        {note && <p className="text-sm text-muted">{note}</p>}
       </div>
       {children}
     </section>
@@ -39,9 +39,9 @@ export function Tile({
 }) {
   const body = (
     <>
-      <span className="text-sm text-foreground/65">{label}</span>
+      <span className="text-sm text-muted">{label}</span>
       <span className="text-2xl font-bold tabular-nums">{value}</span>
-      {sub && <span className="text-xs text-foreground/60">{sub}</span>}
+      {sub && <span className="text-xs text-muted">{sub}</span>}
     </>
   );
   const cls =

@@ -16,7 +16,7 @@ export function BarList({
   empty?: string;
 }) {
   if (items.length === 0 || total === 0) {
-    return <p className="text-sm text-foreground/60">{empty}</p>;
+    return <p className="text-sm text-muted">{empty}</p>;
   }
   return (
     <ul className="flex flex-col gap-2">
@@ -31,7 +31,7 @@ export function BarList({
               style={{ width: `${Math.min(100, (it.count * 100) / total)}%` }}
             />
           </span>
-          <span className="tabular-nums text-foreground/75">
+          <span className="tabular-nums text-muted">
             {it.count} · {pct(it.count, total)}
           </span>
         </li>
@@ -54,7 +54,7 @@ export function DailyBars({
   const total = days.reduce((n, d) => n + d.value, 0);
   return (
     <figure className="flex flex-col gap-2">
-      <figcaption className="text-sm text-foreground/65">
+      <figcaption className="text-sm text-muted">
         {label}: <span className="tabular-nums font-semibold text-foreground">{total}</span> في 30 يومًا
         (أعلى يوم {peak})
       </figcaption>

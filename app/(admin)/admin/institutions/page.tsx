@@ -19,7 +19,7 @@ export default async function AdminInstitutionsPage() {
     <main className="flex flex-col gap-6">
       <header>
         <h1 className="text-2xl font-bold">المستشفيات وصناديق المرضى</h1>
-        <p className="mt-1 max-w-3xl text-sm text-foreground/65">
+        <p className="mt-1 max-w-3xl text-sm text-muted">
           يكتب الطبيب مكان عمله بحرية، ويُربط تلقائيًا بالمؤسسة إذا احتوى اسمه على أحد أسمائها أو
           طرق كتابتها. هكذا تُحسب «شعاري تسيدك» مرة واحدة مهما كُتبت، ويجدها البحث بأي كتابة. أي
           تعديل هنا يُطبَّق على كل الأطباء فورًا، وفحص يومي يرسل للمطوّرين الأسماء غير المربوطة.

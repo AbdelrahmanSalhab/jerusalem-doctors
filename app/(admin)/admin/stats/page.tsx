@@ -46,14 +46,14 @@ export default async function AdminStatsPage() {
     <main className="flex flex-col gap-10">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-bold">الإحصائيات</h1>
-        <p className="text-sm text-foreground/60" dir="ltr">
+        <p className="text-sm text-muted" dir="ltr">
           {new Date(s.generated_at).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" })}
         </p>
       </header>
 
       <Section title="يحتاج انتباهك">
         {attentionTotal === 0 ? (
-          <p className="rounded-lg border border-foreground/15 p-3 text-sm">لا شيء ينتظر. كل شيء على ما يرام.</p>
+          <p className="rounded-lg border border-line p-3 text-sm">لا شيء ينتظر. كل شيء على ما يرام.</p>
         ) : (
           <ul className="rounded-lg border border-warn-line bg-warn-bg px-4 text-warn">
             {sms !== null && sms < LOW_SMS && (
@@ -222,7 +222,7 @@ export default async function AdminStatsPage() {
                 { name: licenseStatusLabel("name_mismatch_overridden"), count: s.license.mismatch_overridden },
               ]}
             />
-            <p className="text-xs text-foreground/60">
+            <p className="text-xs text-muted">
               الموافقة: تلقائية {d.approved_auto} · من الإدارة {d.approved_manual}
             </p>
           </div>
