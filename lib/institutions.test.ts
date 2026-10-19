@@ -50,12 +50,19 @@ const REAL: [string, "hospital" | "clinic" | "hmo", string | null][] = [
   ["هداسا العيسوية", "hospital", "هداسا جبل المشارف"],
   ["هداسا عين كارم", "hospital", "هداسا عين كارم"],
   ["هداسا هار هتسوفيم", "hospital", "هداسا جبل المشارف"],
-  ["هداسا", "hospital", null],
+  ["هداسا", "hospital", "هداسا (الفرعان)"],
 ];
 
 describe("matchInstitution on every production workplace name", () => {
   it.each(REAL)("%s (%s) -> %s", (name, type, expected) => {
     expect(m(name, type)).toBe(expected);
+  });
+
+  it("prefers the most specific institution", () => {
+    expect(m("مستشفى هداسا عين كارم", "hospital")).toBe("هداسا عين كارم");
+    expect(m("هداسا العيسوية", "hospital")).toBe("هداسا جبل المشارف");
+    expect(m("هداسا الفرعين", "hospital")).toBe("هداسا (الفرعان)");
+    expect(m("לאומית ומכבי", "clinic")).toBeNull();
   });
 
   it("links a name that is exactly a spelling, whatever type was picked", () => {
@@ -107,5 +114,31 @@ describe("relinkWorkplaces", () => {
     expect(result).toEqual({ changed: 1, unmatched: [{ name: "هداسا", count: 1 }] });
     expect(db.argsOf("doctor_workplaces", "update")).toEqual([[{ institution_id: "szmc" }]]);
     expect(db.argsOf("doctor_workplaces", "in")).toEqual([["id", ["w1"]]]);
+  });
+});
+
+describe("institutionUsage", () => {
+  it("lists each institution's doctors by name, and the unlinked hospital and fund names", async () => {
+    const { db } = await import("@/test/fakeSupabase");
+    const { institutionUsage } = await import("./institutions");
+    db.reset();
+    db.queue("doctor_workplaces", {
+      data: [
+        { doctor_id: "d1", name: "كلاليت", workplace_type: "clinic", institution_id: "clalit" },
+        { doctor_id: "d2", name: "كلاليت الشيخ جراح", workplace_type: "clinic", institution_id: "clalit" },
+        { doctor_id: "d1", name: "كلاليت بيت حنينا", workplace_type: "clinic", institution_id: "clalit" },
+        { doctor_id: "d3", name: "القدس", workplace_type: "hospital", institution_id: null },
+        { doctor_id: "d3", name: "عيادة خاصة", workplace_type: "clinic", institution_id: null },
+      ],
+    });
+    db.queue("doctors", {
+      data: [
+        { id: "d1", arabic_first_name: "ليلى", arabic_family_name: "الخطيب" },
+        { id: "d2", arabic_first_name: "أحمد", arabic_family_name: "سلهب" },
+      ],
+    });
+    const usage = await institutionUsage(db.client as never);
+    expect(usage.doctors.clalit.map((d) => d.name)).toEqual(["أحمد سلهب", "ليلى الخطيب"]);
+    expect(usage.unmatched).toEqual([{ name: "القدس", count: 1 }]);
   });
 });

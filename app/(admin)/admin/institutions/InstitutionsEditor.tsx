@@ -15,6 +15,14 @@ import {
   type InstitutionKind,
 } from "@/lib/institutions";
 
+/** Section headings: hospitals, then the health funds together, then
+ *  clinic networks. */
+const KIND_GROUP: Record<InstitutionKind, string> = {
+  hospital: "مستشفيات",
+  hmo: "صناديق المرضى",
+  clinic_network: "شبكات عيادات",
+};
+
 const splitAliases = (s: string) =>
   s.split(/[,،\n]/).map((x) => x.trim()).filter((x) => x.length >= 2);
 
@@ -24,49 +32,66 @@ export function InstitutionsEditor({
   unmatched,
 }: {
   institutions: Institution[];
-  doctors: Record<string, number>;
+  doctors: Record<string, { id: string; name: string }[]>;
   unmatched: { name: string; count: number }[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  // What the last action did, shown above everything: green on success, red
+  // on failure, so a press never passes without an answer.
+  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [draft, setDraft] = useState({ name_ar: "", name_he: "", kind: "hospital" as InstitutionKind, aliases: "" });
 
-  const send = async (url: string, method: string, body?: unknown) => {
-    setError(null);
+  const send = async (url: string, method: string, body: unknown, success: string) => {
+    setNotice(null);
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const b = await res.json().catch(() => null);
-    if (!res.ok) {
-      setError(fieldErrorMessage(b?.fields) ?? apiErrorMessage(b?.code, "تعذّر الحفظ. حاول مجددًا."));
+    }).catch(() => null);
+    const b = await res?.json().catch(() => null);
+    if (!res?.ok) {
+      setNotice({ ok: false, text: fieldErrorMessage(b?.fields) ?? apiErrorMessage(b?.code, "تعذّر الحفظ. حاول مجددًا.") });
       return false;
     }
-    if (b?.still_unlinked) {
-      setError("حُفظت طريقة الكتابة، لكن الاسم ما زال غير مربوط. تأكد من اختيار المؤسسة الصحيحة، أو أبلغ المطوّر.");
-    }
+    setNotice(
+      b?.still_unlinked
+        ? { ok: false, text: "حُفظت طريقة الكتابة، لكن الاسم ما زال غير مربوط. تأكد من اختيار المؤسسة الصحيحة، أو أبلغ المطوّر." }
+        : { ok: true, text: success },
+    );
     startTransition(() => router.refresh());
     return true;
   };
 
+  const nameOf = (id: string) => institutions.find((i) => i.id === id)?.name_ar ?? "";
+
   const add = async () => {
-    const ok = await send("/api/admin/institutions", "POST", {
-      name_ar: draft.name_ar,
-      name_he: draft.name_he || null,
-      kind: draft.kind,
-      aliases: splitAliases(draft.aliases),
-    });
+    const ok = await send(
+      "/api/admin/institutions",
+      "POST",
+      {
+        name_ar: draft.name_ar,
+        name_he: draft.name_he || null,
+        kind: draft.kind,
+        aliases: splitAliases(draft.aliases),
+      },
+      `✓ أُضيفت «${draft.name_ar.trim()}» وربطت الأسماء المطابقة.`,
+    );
     if (ok) setDraft({ name_ar: "", name_he: "", kind: "hospital", aliases: "" });
   };
 
   return (
     <div className="flex flex-col gap-8">
       <InputStyles />
-      {error && (
-        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
-          {error}
+      {notice && (
+        <p
+          role={notice.ok ? "status" : "alert"}
+          className={
+            "sticky top-2 z-10 rounded border p-3 text-sm shadow-sm " +
+            (notice.ok ? "border-success-line bg-success-bg text-success" : "border-danger-line bg-danger-bg text-danger")
+          }
+        >
+          {notice.text}
         </p>
       )}
 
@@ -84,7 +109,9 @@ export function InstitutionsEditor({
                 item={u}
                 institutions={institutions}
                 disabled={pending}
-                onClaim={(id) => send(`/api/admin/institutions/${id}`, "PATCH", { add_alias: u.name })}
+                onClaim={(id) =>
+                  send(`/api/admin/institutions/${id}`, "PATCH", { add_alias: u.name }, `✓ رُبط «${u.name}» بـ«${nameOf(id)}».`)
+                }
                 onNew={() => setDraft({ name_ar: u.name, name_he: "", kind: "hospital", aliases: "" })}
               />
             ))}
@@ -116,22 +143,31 @@ export function InstitutionsEditor({
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">القائمة <span className="tabular-nums text-foreground/60">({institutions.length})</span></h2>
-        <ul className="divide-y divide-foreground/10 rounded-lg border border-foreground/15">
-          {institutions.map((i) => (
-            <InstitutionRow
-              key={i.id}
-              institution={i}
-              doctors={doctors[i.id] ?? 0}
-              disabled={pending}
-              onSave={(patch) => send(`/api/admin/institutions/${i.id}`, "PATCH", patch)}
-              onDelete={() => {
-                if (window.confirm(`حذف «${i.name_ar}» من القائمة؟ أماكن العمل المرتبطة بها تبقى كما كتبها الأطباء.`)) {
-                  void send(`/api/admin/institutions/${i.id}`, "DELETE");
-                }
-              }}
-            />
-          ))}
-        </ul>
+        {INSTITUTION_KINDS.map((kind) => {
+          const group = institutions.filter((i) => i.kind === kind);
+          if (group.length === 0) return null;
+          return (
+            <div key={kind} className="flex flex-col gap-2">
+              <h3 className="text-sm font-semibold text-muted">{KIND_GROUP[kind]}</h3>
+              <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+                {group.map((i) => (
+                  <InstitutionRow
+                    key={i.id}
+                    institution={i}
+                    doctors={doctors[i.id] ?? []}
+                    disabled={pending}
+                    onSave={(patch) => send(`/api/admin/institutions/${i.id}`, "PATCH", patch, `✓ حُفظت «${i.name_ar}».`)}
+                    onDelete={() => {
+                      if (window.confirm(`حذف «${i.name_ar}» من القائمة؟ أماكن العمل المرتبطة بها تبقى كما كتبها الأطباء.`)) {
+                        void send(`/api/admin/institutions/${i.id}`, "DELETE", undefined, `✓ حُذفت «${i.name_ar}» من القائمة.`);
+                      }
+                    }}
+                  />
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </section>
     </div>
   );
@@ -163,8 +199,12 @@ function UnmatchedRow({
         onChange={(e) => setTarget(e.target.value)}
         aria-label={`ربط «${item.name}» بمؤسسة`}>
         <option value="">اختر مؤسسة</option>
-        {institutions.map((i) => (
-          <option key={i.id} value={i.id}>{i.name_ar}</option>
+        {INSTITUTION_KINDS.map((kind) => (
+          <optgroup key={kind} label={KIND_GROUP[kind]}>
+            {institutions.filter((i) => i.kind === kind).map((i) => (
+              <option key={i.id} value={i.id}>{i.name_ar}</option>
+            ))}
+          </optgroup>
         ))}
       </select>
       <button type="button" disabled={disabled || !target} onClick={() => onClaim(target)}
@@ -186,7 +226,7 @@ function InstitutionRow({
   onDelete,
 }: {
   institution: Institution;
-  doctors: number;
+  doctors: { id: string; name: string }[];
   disabled: boolean;
   onSave: (patch: Record<string, unknown>) => Promise<boolean>;
   onDelete: () => void;
@@ -205,7 +245,20 @@ function InstitutionRow({
         <span className="font-medium">{institution.name_ar}</span>
         {institution.name_he && <span className="text-foreground/60">{institution.name_he}</span>}
         <span className="rounded-full bg-foreground/10 px-2 text-xs">{INSTITUTION_KIND_LABEL[institution.kind]}</span>
-        <span className="tabular-nums text-foreground/60">{doctors} طبيب</span>
+        {doctors.length === 0 ? (
+          <span className="tabular-nums text-muted">لا أطباء</span>
+        ) : (
+          <details className="text-muted">
+            <summary className="cursor-pointer tabular-nums hover:text-foreground">
+              {doctors.length === 1 ? "طبيب واحد" : `${doctors.length} أطباء`}
+            </summary>
+            <ul className="mt-1 list-disc ps-5 text-foreground">
+              {doctors.map((d) => (
+                <li key={d.id}>{d.name}</li>
+              ))}
+            </ul>
+          </details>
+        )}
         {institution.aliases.length > 0 && (
           <span className="w-full text-xs text-muted">تُكتب أيضًا: {institution.aliases.join("، ")}</span>
         )}
