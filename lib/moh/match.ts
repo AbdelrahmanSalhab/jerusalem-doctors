@@ -22,12 +22,42 @@ export interface LicenseVerifyInput {
   hebrewFamilyName: string;
 }
 
+/** How a typed name compares to the registry's spelling of it. */
+export type NameMatchRule = "exact" | "substring" | "edit1" | "none";
+
+export interface NameMatch {
+  first: NameMatchRule;
+  family: NameMatchRule;
+}
+
 export interface LicenseVerifyResult {
   status: LicenseVerifyStatus;
   registryFirstName?: string;
   registryFamilyName?: string;
   registrySpecialtyHe?: string | null;
   source: "mirror" | "live" | "none";
+  /** Present whenever a registry row was found, absent for not_found. */
+  match?: NameMatch;
+}
+
+/**
+ * The registry could not be reached. Signup swallows this into not_found so a
+ * data.gov.il outage can never fail a signup, but an admin re-checking a
+ * licence needs it distinguishable: "not in the registry" and "we could not
+ * ask the registry" are very different answers to give about a doctor.
+ */
+export class MohUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("MoH registry lookup failed");
+    this.name = "MohUnavailableError";
+    this.cause = cause;
+  }
+}
+
+export interface VerifyOptions {
+  mohClient?: MohClient;
+  /** Default "not_found" keeps signup's behaviour. */
+  onLiveError?: "not_found" | "throw";
 }
 
 interface MirrorRow {
@@ -40,15 +70,23 @@ interface MirrorRow {
 }
 
 /**
- * Conservative similarity check. We treat exact match plus single-edit and
- * substring-of as "close enough" to ask the user to confirm the registry's
- * spelling, *not* enough to auto-approve. Anything else is a mismatch.
+ * Which of the similarity rules a pair of names satisfies, or "none".
+ *
+ * The rules themselves are unchanged and still conservative: exact match,
+ * substring-of either way, or a single edit is "close enough" to ask the user
+ * to confirm the registry's spelling, *not* enough to auto-approve. Naming the
+ * rule instead of returning a bare boolean is what lets /admin tell an admin
+ * **why** a doctor came out as a partial match rather than just that they did.
  */
+export function nameMatchRule(a: string, b: string): NameMatchRule {
+  if (!a || !b) return "none";
+  if (a === b) return "exact";
+  if (a.includes(b) || b.includes(a)) return "substring";
+  return levenshtein(a, b) <= 1 ? "edit1" : "none";
+}
+
 function closeEnough(a: string, b: string): boolean {
-  if (!a || !b) return false;
-  if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
-  return levenshtein(a, b) <= 1;
+  return nameMatchRule(a, b) !== "none";
 }
 
 /** Government CSV exports sometimes use a whitespace-only string for
@@ -90,7 +128,7 @@ const LIVE_LOOKUP = { timeoutMs: 5_000, retries: 0 } as const;
 export async function verifyLicense(
   supabase: SupabaseClient,
   input: LicenseVerifyInput,
-  options: { mohClient?: MohClient } = {},
+  options: VerifyOptions = {},
 ): Promise<LicenseVerifyResult> {
   const inputFirst = normalizeHebrew(input.hebrewFirstName);
   const inputFamily = normalizeHebrew(input.hebrewFamilyName);
@@ -121,6 +159,7 @@ export async function verifyLicense(
   try {
     live = await client.findByLicense(input.licenseNumber);
   } catch (err) {
+    if (options.onLiveError === "throw") throw new MohUnavailableError(err);
     console.error("[moh] live registry lookup failed, treating as not_found", err);
     return { status: "not_found", source: "none" };
   }
@@ -146,21 +185,23 @@ function compareNames(
 ): LicenseVerifyResult {
   const specialty = cleanSpecialty(row.specialty_name_he);
 
-  const exact =
-    inputFirstNorm === row.hebrew_first_norm &&
-    inputFamilyNorm === row.hebrew_family_norm;
+  const match: NameMatch = {
+    first: nameMatchRule(inputFirstNorm, row.hebrew_first_norm),
+    family: nameMatchRule(inputFamilyNorm, row.hebrew_family_norm),
+  };
+
+  const exact = match.first === "exact" && match.family === "exact";
 
   if (exact) {
     return {
       status: "verified",
       registrySpecialtyHe: specialty,
       source,
+      match,
     };
   }
 
-  const close =
-    closeEnough(inputFirstNorm, row.hebrew_first_norm) &&
-    closeEnough(inputFamilyNorm, row.hebrew_family_norm);
+  const close = closeEnough(inputFirstNorm, row.hebrew_first_norm) && closeEnough(inputFamilyNorm, row.hebrew_family_norm);
 
   if (close) {
     return {
@@ -169,6 +210,7 @@ function compareNames(
       registryFamilyName: row.hebrew_family_name,
       registrySpecialtyHe: specialty,
       source,
+      match,
     };
   }
 
@@ -182,6 +224,7 @@ function compareNames(
     registryFamilyName: row.hebrew_family_name,
     registrySpecialtyHe: specialty,
     source,
+    match,
   };
 }
 
@@ -212,7 +255,7 @@ export async function resolveIlLicense(
     hebrewFirstName: string;
     hebrewFamilyName: string;
   },
-  options: { mohClient?: MohClient } = {},
+  options: VerifyOptions = {},
 ): Promise<ResolvedIlLicense> {
   let best: ResolvedIlLicense | null = null;
   for (const serial of input.candidates) {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MohClient, type MohRecord } from "./client";
-import { resolveIlLicense, verifyLicense } from "./match";
+import { MohUnavailableError, nameMatchRule, resolveIlLicense, verifyLicense } from "./match";
 
 function fakeSupabase(row: {
   license_number: number;
@@ -236,5 +236,92 @@ describe("resolveIlLicense", () => {
     );
     expect(r.serial).toBe("123456");
     expect(r.result.status).toBe("not_found");
+  });
+});
+
+describe("nameMatchRule", () => {
+  it("names each rule the matcher accepts", () => {
+    expect(nameMatchRule("דניאל", "דניאל")).toBe("exact");
+    // A compound or shortened name: one spelling contains the other.
+    expect(nameMatchRule("דניאל יוסף", "דניאל")).toBe("substring");
+    expect(nameMatchRule("דניאל", "דניאל יוסף")).toBe("substring");
+    // One letter different: a typo, or the same name spelled another way.
+    expect(nameMatchRule("דויד", "דוד")).toBe("edit1");
+    expect(nameMatchRule("דניאל", "אברהם")).toBe("none");
+  });
+
+  it("calls an empty name no match at all, never an accidental substring", () => {
+    expect(nameMatchRule("", "דניאל")).toBe("none");
+    expect(nameMatchRule("דניאל", "")).toBe("none");
+  });
+});
+
+describe("match detail on the result", () => {
+  it("says both parts matched exactly on a verified licence", async () => {
+    const r = await verifyLicense(fakeSupabase(MIRROR_ROW), {
+      licenseNumber: 9417,
+      hebrewFirstName: "דניאל",
+      hebrewFamilyName: "דריפוס",
+    });
+    expect(r.match).toEqual({ first: "exact", family: "exact" });
+  });
+
+  it("says which part was only close on a soft match", async () => {
+    const r = await verifyLicense(fakeSupabase(MIRROR_ROW), {
+      licenseNumber: 9417,
+      hebrewFirstName: "דניא",
+      hebrewFamilyName: "דריפוס",
+    });
+    expect(r.status).toBe("soft_match");
+    expect(r.match).toEqual({ first: "substring", family: "exact" });
+  });
+
+  it("keeps the detail on a name mismatch too", async () => {
+    const r = await verifyLicense(fakeSupabase(MIRROR_ROW), {
+      licenseNumber: 9417,
+      hebrewFirstName: "אברהם",
+      hebrewFamilyName: "כהן",
+    });
+    expect(r.status).toBe("name_mismatch");
+    expect(r.match).toEqual({ first: "none", family: "none" });
+  });
+
+  it("leaves it out when no registry row was found, there being nothing to compare", async () => {
+    const r = await verifyLicense(
+      fakeSupabase(null),
+      { licenseNumber: 99999, hebrewFirstName: "שלום", hebrewFamilyName: "כהן" },
+      { mohClient: fakeMohClient(null) },
+    );
+    expect(r.match).toBeUndefined();
+  });
+});
+
+describe("onLiveError", () => {
+  function downClient() {
+    return {
+      findByLicense: vi.fn(async () => {
+        throw new Error("data.gov.il timeout");
+      }),
+    } as unknown as MohClient;
+  }
+
+  it("rethrows for a caller that must tell an outage from a real absence", async () => {
+    await expect(
+      verifyLicense(
+        fakeSupabase(null),
+        { licenseNumber: 99999, hebrewFirstName: "שלום", hebrewFamilyName: "כהן" },
+        { mohClient: downClient(), onLiveError: "throw" },
+      ),
+    ).rejects.toBeInstanceOf(MohUnavailableError);
+  });
+
+  it("still defaults to not_found, so signup can never fail on an outage", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await verifyLicense(
+      fakeSupabase(null),
+      { licenseNumber: 99999, hebrewFirstName: "שלום", hebrewFamilyName: "כהן" },
+      { mohClient: downClient() },
+    );
+    expect(r.status).toBe("not_found");
   });
 });
