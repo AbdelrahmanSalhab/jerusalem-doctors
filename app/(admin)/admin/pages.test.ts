@@ -17,7 +17,7 @@ vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({
 describe("admin pages", () => {
   it.each([
     ["doctors", () => import("./page"), { searchParams: Promise.resolve({}) }],
-    ["audit", () => import("./audit/page"), undefined],
+    ["audit", () => import("./audit/page"), { searchParams: Promise.resolve({}) }],
     ["specialties", () => import("./specialties/page"), undefined],
     ["stats", () => import("./stats/page"), undefined],
     ["institutions", () => import("./institutions/page"), undefined],
