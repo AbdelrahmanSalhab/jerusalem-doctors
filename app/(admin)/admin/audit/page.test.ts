@@ -19,14 +19,19 @@ const DATA: Record<string, unknown[]> = {
   ],
 };
 
+const ranges: unknown[][] = [];
+
 vi.mock("@/lib/auth/session", () => ({ requireAdmin: vi.fn(async () => ({ id: "a1" })) }));
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from(table: string) {
       const chain: Record<string, unknown> = {
-        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: DATA[table], error: null }).then(ok),
+        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: DATA[table], error: null, count: table === "audit_logs" ? 120 : null }).then(ok),
       };
-      for (const m of ["select", "order", "limit", "in"]) chain[m] = () => chain;
+      for (const m of ["select", "order", "range", "in"]) chain[m] = (...a: unknown[]) => {
+        if (m === "range") ranges.push(a);
+        return chain;
+      };
       return chain;
     },
   }),
@@ -35,7 +40,7 @@ vi.mock("@/lib/supabase/service", () => ({
 describe("/admin/audit", () => {
   it("reads like a log an admin understands", async () => {
     const { default: Page } = await import("./page");
-    const html = renderToStaticMarkup(await Page());
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({}) }));
     expect(html).toContain("تسجيل جديد");
     expect(html).toContain("ليلى الخطيب");
     expect(html).toContain("فُعّل تلقائيًا");
@@ -51,5 +56,26 @@ describe("/admin/audit", () => {
     expect(html).toContain("فتح الطبيب في قائمة الأطباء");
     expect(html).not.toContain("9.9.9.9");
     expect(html).not.toContain("auto_approved");
+    expect(html).toContain("120 حدثًا في السجل");
+    expect(html).toContain("الصفحة 1 من 3");
+    expect(html).not.toContain("السابق");
+    expect(html).toContain('href="/admin/audit?page=2"');
+  });
+
+  it("pages through every entry, 50 at a time", async () => {
+    const { default: Page } = await import("./page");
+    ranges.length = 0;
+    const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ page: "2" }) }));
+    expect(ranges).toEqual([[50, 99]]);
+    expect(html).toContain("الصفحة 2 من 3");
+    expect(html).toContain('href="/admin/audit?page=1"');
+    expect(html).toContain('href="/admin/audit?page=3"');
+  });
+
+  it("treats a junk page number as the first page", async () => {
+    const { default: Page } = await import("./page");
+    ranges.length = 0;
+    await Page({ searchParams: Promise.resolve({ page: "-4x" }) });
+    expect(ranges).toEqual([[0, 49]]);
   });
 });

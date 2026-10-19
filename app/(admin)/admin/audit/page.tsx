@@ -1,5 +1,7 @@
 import { requireAdmin } from "@/lib/auth/session";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { countOf, EVENTS } from "@/lib/arabicCount";
 import { auditDetail, auditFields, auditTime, auditTimeFull, auditTitle } from "@/lib/auditText";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -14,20 +16,34 @@ interface Row {
   created_at: string;
 }
 
-export default async function AdminAuditPage() {
+const PAGE_SIZE = 50;
+
+export default async function AdminAuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   // The (admin) layout's check alone is not enough: Next can render this
   // page without re-running the layout. requireAdmin is request-cached.
   await requireAdmin();
+  const page = Math.max(1, Math.floor(Number((await searchParams).page)) || 1);
+  const from = (page - 1) * PAGE_SIZE;
   const service = createSupabaseServiceClient();
-  const [{ data, error }, { data: institutions }] = await Promise.all([
+  const [{ data, error, count }, { data: institutions }] = await Promise.all([
     service
       .from("audit_logs")
-      .select("id, action, actor_doctor_id, target_doctor_id, metadata, created_at")
+      .select("id, action, actor_doctor_id, target_doctor_id, metadata, created_at", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(200),
+      // Same time? The id keeps the order stable from one page to the next.
+      .order("id", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1),
     service.from("institutions").select("id, name_ar"),
   ]);
+  // PostgREST answers a page past the end with PGRST103.
+  if (error?.code === "PGRST103") redirect("/admin/audit");
   const rows = (data ?? []) as Row[];
+  const total = count ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Names instead of ids, for whoever acted and whoever it concerned.
   const ids = [...new Set(rows.flatMap((r) => [r.actor_doctor_id, r.target_doctor_id]).filter((x): x is string => !!x))];
@@ -45,7 +61,9 @@ export default async function AdminAuditPage() {
   return (
     <main className="space-y-4">
       <h1 className="text-2xl font-bold">سجل النشاط</h1>
-      <p className="text-sm text-muted">آخر 200 حدث، الأحدث أولًا. الأوقات بتوقيت القدس.</p>
+      <p className="text-sm text-muted">
+        {countOf(total, EVENTS)} في السجل، الأحدث أولًا. الأوقات بتوقيت القدس.
+      </p>
       {error && (
         <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           تعذّر تحميل السجل. حاول مجددًا.
@@ -136,6 +154,28 @@ export default async function AdminAuditPage() {
         })}
         {rows.length === 0 && <li className="p-6 text-center text-muted">لا أحداث.</li>}
       </ul>
+
+      {pages > 1 && (
+        <nav aria-label="صفحات السجل" className="flex items-center justify-between gap-3 text-sm">
+          {page > 1 ? (
+            <Link href={`/admin/audit?page=${page - 1}`} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
+              السابق
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="tabular-nums text-muted">
+            الصفحة {page} من {pages}
+          </span>
+          {page < pages ? (
+            <Link href={`/admin/audit?page=${page + 1}`} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
+              التالي
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
     </main>
   );
 }
