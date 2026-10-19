@@ -106,6 +106,10 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  /* The self-hosted Plex Sans is hinted; at small sizes the hinting snaps
+     letters apart ("g mail", "overf low"). Precise placement keeps them
+     where the font designed them. */
+  text-rendering: geometricPrecision;
 }
 
 :focus-visible {
