@@ -285,6 +285,13 @@ max_frequency = "5s"
 # Force log out if the user has been inactive longer than the specified duration.
 # inactivity_timeout = "8h"
 
+# Like production, Auth delivers SMS codes through the app's own hook. The
+# e2e app runs on the host at port 3123; the secret matches e2e/env.ts.
+[auth.hook.send_sms]
+enabled = true
+uri = "http://host.docker.internal:3123/api/auth/hooks/send-otp"
+secrets = "v1,whsec_ZTJlLXRlc3QtaG9vay1zZWNyZXQtZm9yLWNp"
+
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]
 # enabled = true
@@ -296,12 +303,14 @@ max_frequency = "5s"
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
 # Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+# Switched on only so Auth accepts phone sign-ins: the send_sms hook above
+# delivers instead, and the test numbers never send at all. Placeholder
+# values; nothing ever reaches Twilio.
 [auth.sms.twilio]
-enabled = false
-account_sid = ""
-message_service_sid = ""
-# DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
-auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+enabled = true
+account_sid = "AC00000000000000000000000000000000"
+message_service_sid = "MG00000000000000000000000000000000"
+auth_token = "local-placeholder-never-used"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]

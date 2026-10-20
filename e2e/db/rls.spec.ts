@@ -86,7 +86,11 @@ test.describe("row-level security", () => {
   test("a signed-in doctor reads only what the directory already shows", async () => {
     const ids = seededIds();
     for (const t of tables) {
-      const { data } = await doctor.from(t).select("*");
+      const { data, error } = await doctor.from(t).select("*");
+      // A missing grant (42501) is a denial; any other error is a bug:
+      // is_admin() once recursed through RLS to "stack depth limit
+      // exceeded" (0018), which an "empty or error" check let through.
+      if (error) expect(error.code, `doctor read ${t}: ${error.message}`).toBe("42501");
       const rows = (data ?? []) as Record<string, unknown>[];
       const rule = READABLE.doctor[t];
       if (!rule) {
@@ -99,6 +103,16 @@ test.describe("row-level security", () => {
         expect(rows.some((r) => hiddenOrPending.includes(r.doctor_id as string)), `doctor read ${t}`).toBe(false);
       }
     }
+  });
+
+  test("an admin's own session reads every doctor and the activity log", async () => {
+    const admin = await signedIn(ACCOUNTS.admin);
+    const doctors = await admin.from("doctors").select("id");
+    expect(doctors.error).toBeNull();
+    const all = await serviceClient().from("doctors").select("id", { count: "exact", head: true });
+    expect(doctors.data?.length).toBe(all.count);
+    const audit = await admin.from("audit_logs").select("id").limit(1);
+    expect(audit.error).toBeNull();
   });
 
   test("a signed-in doctor cannot change anyone, including themselves", async () => {

@@ -194,9 +194,10 @@ async function reset(db: SupabaseClient) {
 }
 
 async function seedRegistry(db: SupabaseClient) {
-  // 510003 is left out of the mirror so signup has to fall back to the stub.
+  // 510020 (the signup test's licence) is left out of the mirror, so signup
+  // has to fall back to the live registry, here the stub.
   const rows = registry
-    .filter((r) => r["מספר רישיון רופא"] !== 510003)
+    .filter((r) => r["מספר רישיון רופא"] !== 510020)
     .map((r) => ({
       license_number: r["מספר רישיון רופא"],
       hebrew_first_name: r["שם פרטי"],

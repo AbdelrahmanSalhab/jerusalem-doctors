@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { ACCOUNTS, PASSWORD } from "../env";
 import { flushRateLimits } from "../global-setup";
 

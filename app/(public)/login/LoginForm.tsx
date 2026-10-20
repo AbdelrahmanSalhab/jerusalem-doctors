@@ -125,7 +125,7 @@ export function LoginForm() {
           dir="ltr"
           autoComplete="tel"
           inputMode="tel"
-          pattern="[0-9+\-\s()]*"
+          pattern="[0-9+\-\s\(\)]*"
           className="w-full rounded-md border border-foreground/20 px-3 py-2.5"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value)}

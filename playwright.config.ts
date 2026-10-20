@@ -9,8 +9,10 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: "./e2e",
-  outputDir: "./e2e/.results",
+  // Test artifacts; server.log and diagnostics sit beside it in e2e/.results.
+  outputDir: "./e2e/.results/tests",
   globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: false,
   // One worker: the tests share one seeded database and change it.
   workers: 1,
@@ -48,7 +50,8 @@ export default defineConfig({
     },
     {
       // The production build, as Vercel runs it, with the local stack's env.
-      command: `npm run build && npx next start -p ${PORT}`,
+      // Server output goes to a file the teardown summarises.
+      command: `npm run build && mkdir -p e2e/.results && npx next start -p ${PORT} > e2e/.results/server.log 2>&1`,
       url: `${BASE_URL}/login`,
       env: appEnv(),
       timeout: 300_000,
