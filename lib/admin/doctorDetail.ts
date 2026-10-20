@@ -102,6 +102,8 @@ export async function fetchDoctorDetail(
   service: SupabaseClient,
   id: string,
 ): Promise<DoctorDetail | null> {
+  // A malformed id would fail the read with 22P02; it is simply not found.
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const { data, error } = await service.from("doctors").select(DOCTOR_COLUMNS).eq("id", id).maybeSingle();
   if (error && error.code !== "PGRST116") throw new Error(`doctor read failed: ${error.message}`);
   if (!data) return null;

@@ -13,7 +13,7 @@ interface Call {
 const calls: Call[] = [];
 
 const DOCTOR = {
-  id: "d1",
+  id: "00000000-0000-4000-8000-0000000000d1",
   arabic_first_name: "ليلى",
   arabic_family_name: "الخطيب",
   arabic_full_name: "ليلى الخطيب",
@@ -186,7 +186,7 @@ describe("/admin doctor panel", () => {
   });
 
   it("explains why the licence only partly matched, naming the rule", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     expect(html).toContain("التحقق من الترخيص");
     expect(html).toContain("الرقم مطابق، لكن كتابة الاسم تختلف قليلًا عن السجل.");
     expect(html).toContain("حرف واحد فقط يختلف");
@@ -195,12 +195,12 @@ describe("/admin doctor panel", () => {
   });
 
   it("admits when the reasoning is re-derived rather than recorded", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     expect(html).toContain("محسوبة الآن من نسخة السجل الحالية");
   });
 
   it("names the three switches apart and says what each does", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     for (const label of ["قبول العضوية", "الحساب", "الظهور في الدليل"]) {
       expect(html).toContain(label);
     }
@@ -211,13 +211,13 @@ describe("/admin doctor panel", () => {
   });
 
   it("answers whether the doctor is actually in the directory", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     expect(html).toContain("لا يظهر في الدليل الآن");
     expect(html).toContain("لم تُقبل عضويته بعد");
   });
 
   it("shows everything a colleague would see, and more", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     for (const fragment of [
       "laila@example.com",
       "طبيبة أطفال",
@@ -231,13 +231,18 @@ describe("/admin doctor panel", () => {
   });
 
   it("offers no permanent delete while the account is open", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     expect(html).toContain("أغلق الحساب أولًا");
   });
 
   it("says the account is gone rather than failing the page", async () => {
     DATA.doctor_detail = null;
     const html = await render({ doctor: "missing" });
+    expect(html).toContain("هذا الحساب غير موجود");
+  });
+
+  it("treats a malformed id as not found instead of failing the read", async () => {
+    const html = await render({ doctor: "abc" });
     expect(html).toContain("هذا الحساب غير موجود");
   });
 });
