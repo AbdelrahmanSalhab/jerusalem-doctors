@@ -35,6 +35,9 @@ const EXPECTED: RegExp[] = [
   // Vercel Analytics' script is served by Vercel's edge only; the local
   // server 404s it (or the proxy sends it to /login when signed out).
   /_vercel(\/|%2F)insights(\/|%2F)script\.js/,
+  // Turnstile's script in production writes an invisible styled line
+  // ("%c%d font-size:0;color:transparent NaN"); the test key does not.
+  /^console\.error .* \{challenges\.cloudflare\.com\}$/,
   // Cloudflare's Turnstile frame talks to its parent; harmless off its domain.
   /^console\.warning Failed to execute 'postMessage' .*challenges\.cloudflare\.com/,
   // Next aborts in-flight prefetches when a test navigates on.
@@ -51,7 +54,14 @@ export const test = base.extend<{ diagnostics: Issue[] }>({
       page.on("console", (m) => {
         if (m.type() === "error" || m.type() === "warning") {
           // "Failed to load resource" names no URL; the message's location does.
-          const where = m.text().startsWith("Failed to load resource") ? ` [${m.location().url.replace(/^https?:\/\/[^/]+/, "")}]` : "";
+          // Anything written by another site's script is tagged with its host.
+          const loc = m.location().url;
+          const own = loc.startsWith(new URL(page.url() || "http://x").origin);
+          const where = m.text().startsWith("Failed to load resource")
+            ? ` [${loc.replace(/^https?:\/\/[^/]+/, "")}]`
+            : loc && !own && /^https?:/.test(loc)
+              ? ` {${new URL(loc).host}}`
+              : "";
           issues.push({ kind: `console.${m.type()}` as Issue["kind"], text: m.text().slice(0, 300) + where, url: here() });
         }
       });
