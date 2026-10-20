@@ -7,9 +7,10 @@ const audits: Record<string, unknown>[] = [];
 let licenseStatus: string | null = "verified";
 let doctorExists = true;
 
-vi.mock("@/lib/auth/session", () => ({
-  requireAdmin: vi.fn(async () => ({ id: "admin-1" })),
+const { requireAdminOrNull } = vi.hoisted(() => ({
+  requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({ id: "00000000-0000-4000-8000-00000000a001" })),
 }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
@@ -36,7 +37,7 @@ vi.mock("@/lib/supabase/service", () => ({
   }),
 }));
 
-async function call(body: unknown) {
+async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") {
   const { PATCH } = await import("./route");
   return PATCH(
     new Request("https://example.test/api/admin/doctors/d1", {
@@ -44,7 +45,7 @@ async function call(body: unknown) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
-    { params: Promise.resolve({ id: "d1" }) },
+    { params: Promise.resolve({ id }) },
   );
 }
 
@@ -149,5 +150,22 @@ describe("PATCH /api/admin/doctors/[id]: the three switches", () => {
     expect(updates[0]).toEqual({ is_active: false });
     expect(updates[0]).not.toHaveProperty("is_visible");
     expect(updates[0]).not.toHaveProperty("is_admin_approved");
+  });
+});
+
+describe("PATCH /api/admin/doctors/[id]: who and which", () => {
+  it("answers 404 for a malformed id instead of failing the read", async () => {
+    expect((await call({ is_visible: false }, "abc")).status).toBe(404);
+    expect(updates).toEqual([]);
+  });
+
+  it("answers 401 to a non-admin", async () => {
+    requireAdminOrNull.mockResolvedValueOnce(null);
+    expect((await call({ is_visible: false })).status).toBe(401);
+  });
+
+  it("answers 500, not 401, when the admin lookup itself fails", async () => {
+    requireAdminOrNull.mockRejectedValueOnce(new Error("db down"));
+    expect((await call({ is_visible: false })).status).toBe(500);
   });
 });

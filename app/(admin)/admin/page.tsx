@@ -55,15 +55,22 @@ const ROW_COLUMNS = `
 /** "needs a look": anything short of an exact registry match, nulls included. */
 const LICENCE_NEEDS_REVIEW = "license_verification_status.is.null,license_verification_status.neq.verified";
 
+/** Not a non-doctor admin: those rows are hidden on purpose and carry no real
+ *  licence, so they would inflate "hidden" and "licence" (admin_stats() leaves
+ *  them out the same way). */
+const REAL_DOCTOR = "is_admin.eq.false,is_visible.eq.true";
+
 /** The tiles above the list, each a shortcut into the matching filter. */
 async function counts(service: SupabaseClient) {
   const rows = () => service.from("doctors").select("id", { count: "exact", head: true });
 
+  // The same conditions as the filters they open, so a tile's number is the
+  // length of the list behind it.
   const [all, pending, licence, hidden] = await Promise.all([
     rows(),
-    rows().eq("is_admin_approved", false).eq("is_active", true),
-    rows().or(LICENCE_NEEDS_REVIEW),
-    rows().eq("is_visible", false).eq("is_active", true),
+    applyFilter(rows(), "pending"),
+    applyFilter(rows(), "license"),
+    applyFilter(rows(), "hidden"),
   ]);
   return {
     all: all.count ?? 0,
@@ -87,9 +94,10 @@ function applyFilter<T extends { eq: (c: string, v: unknown) => T; or: (f: strin
     case "suspended":
       return query.eq("is_active", false);
     case "hidden":
-      return query.eq("is_visible", false).eq("is_active", true);
+      return query.eq("is_visible", false).eq("is_active", true).eq("is_admin", false);
     case "license":
-      return query.or(LICENCE_NEEDS_REVIEW);
+      // Both groups inside one or=, so they combine with AND.
+      return query.or(`and(or(${LICENCE_NEEDS_REVIEW}),or(${REAL_DOCTOR}))`);
     case "all":
       return query;
   }

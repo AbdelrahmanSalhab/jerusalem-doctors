@@ -4,11 +4,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, jsonRequest } from "@/test/fakeSupabase";
 
-const { requireAdmin, relinkWorkplaces } = vi.hoisted(() => ({
-  requireAdmin: vi.fn(),
+const { requireAdminOrNull, relinkWorkplaces } = vi.hoisted(() => ({
+  requireAdminOrNull: vi.fn(),
   relinkWorkplaces: vi.fn(async () => ({ changed: 3, unmatched: [] as { name: string; count: number }[] })),
 }));
-vi.mock("@/lib/auth/session", () => ({ requireAdmin }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 vi.mock("@/lib/institutions", async (orig) => ({
   ...(await orig<typeof import("@/lib/institutions")>()),
   relinkWorkplaces,
@@ -24,11 +24,11 @@ describe("admin institutions API", () => {
   beforeEach(() => {
     db.reset();
     vi.clearAllMocks();
-    requireAdmin.mockResolvedValue({ id: "admin-1" });
+    requireAdminOrNull.mockResolvedValue({ id: "admin-1" });
   });
 
   it("refuses a non-admin", async () => {
-    requireAdmin.mockRejectedValue(new Error("NEXT_NOT_FOUND"));
+    requireAdminOrNull.mockResolvedValue(null);
     const { POST } = await import("./route");
     const res = await POST(jsonRequest("/api/admin/institutions", { name_ar: "x", kind: "hospital" }));
     expect(res.status).toBe(401);

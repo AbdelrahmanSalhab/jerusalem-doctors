@@ -145,6 +145,18 @@ describe("/admin doctors list", () => {
     expect(eqArgs()).toContainEqual(["is_active", true]);
   });
 
+  // Non-doctor admins are hidden on purpose and hold no real licence.
+  it("leaves non-doctor admin rows out of the hidden and licence filters", async () => {
+    await render({ status: "hidden" });
+    expect(eqArgs()).toContainEqual(["is_admin", false]);
+    calls.length = 0;
+    await render({ status: "license" });
+    const ors = calls.filter((c) => c.table === "doctors" && c.method === "or").map((c) => String(c.args[0]));
+    expect(ors).toContain(
+      "and(or(license_verification_status.is.null,license_verification_status.neq.verified),or(is_admin.eq.false,is_visible.eq.true))",
+    );
+  });
+
   it("asks for the right slice of rows on a later page", async () => {
     await render({ page: "3" });
     const ranges = calls.filter((c) => c.table === "doctors" && c.method === "range").map((c) => c.args);

@@ -3,9 +3,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, jsonRequest } from "@/test/fakeSupabase";
 
-const requireAdmin = vi.hoisted(() => vi.fn());
+const requireAdminOrNull = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth/session", () => ({ requireAdmin }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -24,11 +24,11 @@ async function patch(body: unknown) {
 describe("admin specialties", () => {
   beforeEach(() => {
     db.reset();
-    requireAdmin.mockResolvedValue({ id: "admin" });
+    requireAdminOrNull.mockResolvedValue({ id: "admin" });
   });
 
   it.each([create, patch])("401s a non-admin (%#)", async (fn) => {
-    requireAdmin.mockRejectedValue(new Error("NOT_FOUND"));
+    requireAdminOrNull.mockResolvedValue(null);
     expect((await fn({ name_ar: "جراحة" })).status).toBe(401);
     expect(db.calls).toHaveLength(0);
   });
