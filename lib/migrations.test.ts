@@ -18,6 +18,6 @@ describe("supabase/migrations", () => {
       byNumber.set(n!, [...(byNumber.get(n!) ?? []), f]);
     }
     const clashes = [...byNumber.values()].filter((fs) => fs.length > 1);
-    expect(clashes, "renumber the newer one to the next free number").toEqual([]);
+    expect(clashes, "rename the newer one with `npx supabase migration new` (supabase/migrations/README.md)").toEqual([]);
   });
 });

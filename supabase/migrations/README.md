@@ -1,0 +1,24 @@
+# Database migrations
+
+Each `.sql` file is one change to the database, applied in file-name order.
+CI builds a fresh database from all of them on every PR (the `e2e` job), and
+production gets each one by hand in the Supabase SQL Editor.
+
+## Adding one
+
+```bash
+npx supabase migration new short_name_of_the_change
+```
+
+This names the file by date and time (`20261020114059_short_name_of_the_change.sql`),
+so two people working at once never pick the same number. `0001` to `0020`
+keep their old names; the dated ones sort after them.
+
+Then:
+
+1. Start the file with a comment saying what it changes and why.
+2. Make it safe to run twice (`create or replace`, `if not exists`).
+3. Run it in the Supabase SQL Editor **before** deploying code that needs it,
+   and say so in the PR.
+
+`lib/migrations.test.ts` fails if two files share a number.
