@@ -41,7 +41,9 @@ const EXPECTED: RegExp[] = [
   // Cloudflare's Turnstile frame talks to its parent; harmless off its domain.
   /^console\.warning Failed to execute 'postMessage' .*challenges\.cloudflare\.com/,
   // security.spec.ts injects an inline script to prove the CSP blocks it.
+  // (Chrome's wording, then WebKit's.)
   /^console\.error Executing inline event handler violates the following Content Security Policy/,
+  /^console\.error Refused to execute a script for an inline event handler because 'unsafe-inline' does not appear in the script-src/,
   /^(http 404 GET |console\.error Failed to load resource: .* status of 404 .*\[)\/nope\.png/,
   // Next aborts in-flight prefetches when a test navigates on.
   /^requestfailed GET \S+[?&]_rsc=\S+ net::ERR_ABORTED/,
