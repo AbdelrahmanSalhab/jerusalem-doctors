@@ -14,8 +14,10 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
   fullyParallel: false,
-  // One worker: the tests share one seeded database and change it.
-  workers: 1,
+  // The tests that change data run one at a time, as a chain of projects
+  // (db -> api -> desktop -> phone, one worker each); the read-only page sweep
+  // runs alongside them on the remaining workers.
+  workers: 3,
   retries: CI ? 1 : 0,
   forbidOnly: CI,
   timeout: 30_000,
@@ -29,11 +31,28 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [
-    { name: "db", testMatch: /db\/.*\.spec\.ts/ },
-    { name: "api", testMatch: /api\/.*\.spec\.ts/ },
-    { name: "desktop", testMatch: /ui\/.*\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    { name: "db", testMatch: /db\/.*\.spec\.ts/, workers: 1 },
+    { name: "api", testMatch: /api\/.*\.spec\.ts/, workers: 1, dependencies: ["db"] },
+    {
+      name: "desktop",
+      testMatch: /ui\/.*\.spec\.ts/,
+      testIgnore: /pages\.spec\.ts/,
+      workers: 1,
+      dependencies: ["api"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Only reads: every page as each kind of user. Safe to run in parallel,
+      // and next to the chain above.
+      name: "sweep",
+      testMatch: /ui\/pages\.spec\.ts/,
+      fullyParallel: true,
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "phone",
+      workers: 1,
+      dependencies: ["desktop"],
       testMatch: /ui\/.*\.spec\.ts/,
       grep: /@phone/,
       // Real WebKit in CI (Safari's engine, where the cut-off dropdown bug
@@ -51,7 +70,8 @@ export default defineConfig({
     {
       // The production build, as Vercel runs it, with the local stack's env.
       // Server output goes to a file the teardown summarises.
-      command: `npm run build && mkdir -p e2e/.results && npx next start -p ${PORT} > e2e/.results/server.log 2>&1`,
+      // CI builds in its own step while Supabase starts (E2E_PREBUILT=1).
+      command: `${process.env.E2E_PREBUILT ? "" : "npm run build && "}mkdir -p e2e/.results && npx next start -p ${PORT} > e2e/.results/server.log 2>&1`,
       url: `${BASE_URL}/login`,
       env: appEnv(),
       timeout: 300_000,
