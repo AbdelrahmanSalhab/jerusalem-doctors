@@ -1,6 +1,7 @@
 // POST /api/login/start: the gates in front of the OTP send, in order.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runAfter } from "@/test/after";
 import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
 const rateLimit = vi.hoisted(() => vi.fn());
@@ -10,6 +11,10 @@ vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 const captureException = vi.hoisted(() => vi.fn());
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 vi.mock("@/lib/turnstile", () => ({ verifyTurnstile }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (await import("@/test/after")).deferAfter,
+}));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -23,7 +28,10 @@ const ACTIVE = { id: "d1", is_active: true, is_phone_verified: true };
 
 async function call(body: unknown) {
   const { POST } = await import("./route");
-  return POST(jsonRequest("/api/login/start", body));
+  const res = await POST(jsonRequest("/api/login/start", body));
+  // The send happens after the response, as in production.
+  await runAfter();
+  return res;
 }
 
 describe("POST /api/login/start", () => {
@@ -45,6 +53,18 @@ describe("POST /api/login/start", () => {
       phone: "+972501234567",
       options: { channel: "sms" },
     });
+  });
+
+  // The reply must not wait for the send: a slower answer for registered
+  // numbers would say who has an account.
+  it("answers before the code is sent", async () => {
+    db.queue("doctors", { data: ACTIVE });
+    const { POST } = await import("./route");
+    const res = await POST(jsonRequest("/api/login/start", { phone: "050-123-4567", turnstile_token: "t" }));
+    expect(res.status).toBe(200);
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
+    await runAfter();
+    expect(auth.signInWithOtp).toHaveBeenCalled();
   });
 
   it("rejects a malformed body", async () => {

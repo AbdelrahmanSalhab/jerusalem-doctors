@@ -2,6 +2,7 @@
 // numbers (no enumeration), and only send to an active, verified doctor.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runAfter } from "@/test/after";
 import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
 const { rateLimit, verifyTurnstile } = vi.hoisted(() => ({
@@ -13,6 +14,10 @@ vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 const captureException = vi.hoisted(() => vi.fn());
 vi.mock("@sentry/nextjs", () => ({ captureException }));
 vi.mock("@/lib/turnstile", () => ({ verifyTurnstile }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (await import("@/test/after")).deferAfter,
+}));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -24,7 +29,10 @@ vi.mock("@/lib/supabase/server", async () => {
 
 async function call(body: unknown) {
   const { POST } = await import("./route");
-  return POST(jsonRequest("/api/login/resend", body));
+  const res = await POST(jsonRequest("/api/login/resend", body));
+  // The send happens after the response, as in production.
+  await runAfter();
+  return res;
 }
 
 describe("POST /api/login/resend", () => {

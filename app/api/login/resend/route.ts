@@ -8,6 +8,7 @@
 // not the number is registered, and only actually sends when an active doctor
 // exists. Further bounded by per-phone and per-IP limits.
 
+import { after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
@@ -85,21 +86,24 @@ export async function POST(req: Request) {
     return jsonOk({ ok: true });
   }
 
-  const ssr = await createSupabaseServerClient();
-  const { error: otpErr } = await ssr.auth.signInWithOtp({
-    phone: phoneE164,
-    options: { shouldCreateUser: false },
-  });
-  if (otpErr) {
-    // Same answer as for any other number: a 502 here, which only a
-    // registered phone can reach, would say the number has an account. The
-    // doctor sees the "no code?" help on /verify; we see this in Sentry.
-    console.error("[login/resend] signInWithOtp failed", otpErr);
-    Sentry.captureException(otpErr, { tags: { route: "login/resend" } });
-  }
-  await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
-    doctorId: found.data.id,
-    meta: { resend: true },
+  // Sent after the response (after()), so a registered number is answered
+  // as fast as any other and the timing says nothing about who has an account.
+  const doctorId = found.data.id;
+  after(async () => {
+    const ssr = await createSupabaseServerClient();
+    const { error: otpErr } = await ssr.auth.signInWithOtp({
+      phone: phoneE164,
+      options: { shouldCreateUser: false },
+    });
+    if (otpErr) {
+      // Never surfaced to the caller, for the same reason.
+      console.error("[login/resend] signInWithOtp failed", otpErr);
+      Sentry.captureException(otpErr, { tags: { route: "login/resend" } });
+    }
+    await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
+      doctorId,
+      meta: { resend: true },
+    });
   });
 
   return jsonOk({ ok: true });

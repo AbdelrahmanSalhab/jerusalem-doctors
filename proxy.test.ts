@@ -21,7 +21,19 @@ describe("isPublic", () => {
     "/api/login/password",
   ])("%s is public", (p) => expect(isPublic(p)).toBe(true));
 
-  it.each(["/dashboard", "/profile", "/admin", "/admin/audit", "/anything"])(
+  it.each([
+    "/dashboard",
+    "/profile",
+    "/admin",
+    "/admin/audit",
+    "/anything",
+    // Prefixes only count as whole path segments.
+    "/loginx",
+    "/signup-admin",
+    "/privacy2",
+    "/healthz",
+    "/favicon-admin",
+  ])(
     "%s needs a session",
     (p) => expect(isPublic(p)).toBe(false),
   );

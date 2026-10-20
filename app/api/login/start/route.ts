@@ -7,6 +7,7 @@
 // Resends go to /api/login/resend, which is not Turnstile-gated.
 
 import * as Sentry from "@sentry/nextjs";
+import { after } from "next/server";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
@@ -77,12 +78,12 @@ export const POST = withJsonErrors(async (req: Request) => {
     .eq("phone_e164", phoneE164)
     .maybeSingle();
   if (found.error && found.error.code !== "PGRST116") throw found.error;
-  // ponytail: skipping the send makes this branch faster than a real one, a
-  // timing signal behind Turnstile and the per-phone/IP limits. Pad the
-  // response time if those ever stop being enough.
+  // Both branches answer after the same single lookup; the send and the
+  // counting happen after the response (after()), so the reply time does not
+  // say whether a number has an account.
   if (!found.data || !found.data.is_active || !found.data.is_phone_verified) {
     // Counted (no number kept): doctors trying to log in before signing up.
-    await recordEvent(service, "login_unregistered");
+    after(() => recordEvent(service, "login_unregistered"));
     return jsonOk({ ok: true, phone_e164: phoneE164 });
   }
 
@@ -96,23 +97,24 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonOk({ ok: true, phone_e164: phoneE164, dev_bypass: true });
   }
 
-  const ssr = await createSupabaseServerClient();
-  // channel "sms" is what routes through the Send SMS Hook, which is where
-  // our SMS4FREE delivery lives. Supabase's channel:"whatsapp" is a
-  // Twilio-only path and would bypass the hook entirely.
-  const { error: otpErr } = await ssr.auth.signInWithOtp({
-    phone: phoneE164,
-    options: { channel: "sms" },
-  });
-  if (otpErr) {
-    // Same answer as for any other number: a 502 here, which only a
-    // registered phone can reach, would say the number has an account. The
-    // doctor sees the "no code?" help on /verify; we see this in Sentry.
-    console.error("[login/start] signInWithOtp failed", otpErr);
-    Sentry.captureException(otpErr, { tags: { route: "login/start" } });
-  }
-  await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
-    doctorId: found.data.id,
+  const doctorId = found.data.id;
+  after(async () => {
+    const ssr = await createSupabaseServerClient();
+    // channel "sms" is what routes through the Send SMS Hook, which is where
+    // our SMS4FREE delivery lives. Supabase's channel:"whatsapp" is a
+    // Twilio-only path and would bypass the hook entirely.
+    const { error: otpErr } = await ssr.auth.signInWithOtp({
+      phone: phoneE164,
+      options: { channel: "sms" },
+    });
+    if (otpErr) {
+      // Never surfaced to the caller: an error here, which only a registered
+      // phone can reach, would say the number has an account. The doctor sees
+      // the "no code?" help on /verify; we see this in Sentry.
+      console.error("[login/start] signInWithOtp failed", otpErr);
+      Sentry.captureException(otpErr, { tags: { route: "login/start" } });
+    }
+    await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", { doctorId });
   });
 
   return jsonOk({ ok: true, phone_e164: phoneE164 });

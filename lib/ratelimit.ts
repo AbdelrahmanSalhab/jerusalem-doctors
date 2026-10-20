@@ -46,6 +46,12 @@ export const RATE_LIMITS = {
   adminPhotoUpload: { limit: 30, window: "1 h" },
   // Password sign-in for devs and QA. Tight: a leaked password on one of
   // these accounts is the whole risk, so guessing stays slow.
+  // Every SMS the site sends, all numbers together: the per-phone and per-IP
+  // limits do not stop someone rotating both, and SMS4FREE is prepaid. A
+  // normal day is about 10 codes, the busiest so far about 40 (2026-10).
+  // Raise SMS_DAILY_CAP in Vercel before a big announcement: at the cap,
+  // nobody can sign up or log in until the window frees up.
+  smsDaily: { limit: Number(process.env.SMS_DAILY_CAP) || 200, window: "1 d" },
   devLogin: { limit: 5, window: "15 m" },
   devLoginIp: { limit: 10, window: "15 m" },
 } as const satisfies Record<string, LimitDef>;

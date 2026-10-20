@@ -9,6 +9,7 @@ import { expect, request, test, type APIRequestContext } from "@playwright/test"
 import { ANON_KEY, BASE_URL, CRON_SECRET, STUB_URL, SUPABASE_URL, type Role } from "../env";
 import { flushRateLimits } from "../global-setup";
 import { stateFile } from "../helpers";
+import { createDoctor } from "../seed";
 
 type Policy =
   /** Signed-in admins only; everyone else 401. */
@@ -169,26 +170,44 @@ test.describe("machine callers", () => {
   });
 
   // The path every real login SMS takes: Supabase Auth signs a call to our
-  // hook, the hook checks the signature and sends through SMS4FREE (the stub
-  // here), and the code that arrives signs the doctor in. CI only: on Docker
+  // hook, the hook checks the signature and that the number belongs to a
+  // doctor or a signup in progress, then sends through SMS4FREE (the stub
+  // here), and the code that arrives signs the doctor in. Calling Supabase
+  // directly with the public key, as here, skips our own routes, which is
+  // exactly what the hook's recipient check is for. CI only: on Docker
   // Desktop the Auth container cannot reach an app running in WSL.
-  test("a login code goes Supabase -> signed hook -> SMS4FREE, and works", async () => {
+  test("Supabase can only text registered numbers, through the signed hook", async () => {
     test.skip(!process.env.CI, "needs Docker networking to reach the app");
-    // Not one of the test numbers, so a code is really generated and sent.
-    const phone = "+972521110077";
     const headers = { apikey: ANON_KEY, "Content-Type": "application/json" };
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, { method: "POST", headers, body: JSON.stringify({ phone }) });
-    expect(res.status, await res.text()).toBe(200);
+    const askForCode = (phone: string) =>
+      fetch(`${SUPABASE_URL}/auth/v1/otp`, { method: "POST", headers, body: JSON.stringify({ phone }) });
+    const inbox = async (local: string) =>
+      (await (await fetch(`${STUB_URL}/sms4free/messages?to=${local}`)).json()) as { msg: string; sender: string }[];
 
-    const inbox = (await (await fetch(`${STUB_URL}/sms4free/messages?to=0521110077`)).json()) as { msg: string; sender: string }[];
-    expect(inbox.length).toBeGreaterThan(0);
-    const { msg, sender } = inbox[inbox.length - 1];
-    expect(sender).toBe("JDoctors");
-    const code = msg.match(/\d{6}/)?.[0];
-    expect(code, msg).toBeTruthy();
+    // A number nobody registered: refused, nothing sent.
+    const stranger = await askForCode("+972521110066");
+    expect(stranger.status).not.toBe(200);
+    expect(await inbox("0521110066")).toEqual([]);
 
-    const verify = await fetch(`${SUPABASE_URL}/auth/v1/verify`, { method: "POST", headers, body: JSON.stringify({ phone, token: code, type: "sms" }) });
-    expect(verify.status).toBe(200);
-    expect(((await verify.json()) as { access_token?: string }).access_token).toBeTruthy();
+    // A doctor's number: delivered, and the code works.
+    const doctor = await createDoctor({ first: "صاحب", family: "الرقم", phone: "+972521110077" });
+    try {
+      const res = await askForCode("+972521110077");
+      expect(res.status, await res.text()).toBe(200);
+      const sent = await inbox("0521110077");
+      expect(sent.length).toBeGreaterThan(0);
+      const { msg, sender } = sent[sent.length - 1];
+      expect(sender).toBe("JDoctors");
+      const code = msg.match(/\d{6}/)?.[0];
+      expect(code, msg).toBeTruthy();
+      const verify = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ phone: "+972521110077", token: code, type: "sms" }),
+      });
+      expect(verify.status).toBe(200);
+    } finally {
+      await doctor.remove();
+    }
   });
 });

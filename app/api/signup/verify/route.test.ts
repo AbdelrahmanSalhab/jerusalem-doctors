@@ -70,6 +70,9 @@ async function call(body: unknown) {
 
 const doctorInsert = () => db.argsOf("doctors", "insert")[0]?.[0] as Record<string, unknown>;
 
+/** The attempt counter's compare-and-set took the attempt. */
+const CLAIMED = { data: [{ id: "p1" }] };
+
 describe("POST /api/signup/verify", () => {
   beforeEach(() => {
     db.reset();
@@ -79,7 +82,7 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("creates an auto-approved doctor for a verified license", async () => {
-    db.queue("pending_signups", pending());
+    db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
     const res = await call(BODY);
     expect(await res.json()).toEqual({ ok: true, auto_approved: true });
@@ -110,7 +113,7 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("queues an unverified license for admin approval", async () => {
-    db.queue("pending_signups", pending({ payload: payload({ license_verification_status: "not_found", specialty_ids: [], workplaces: [] }) }));
+    db.queue("pending_signups", pending({ payload: payload({ license_verification_status: "not_found", specialty_ids: [], workplaces: [] }) }), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
     expect(await (await call(BODY)).json()).toEqual({ ok: true, auto_approved: false });
     expect(doctorInsert()).toMatchObject({ is_admin_approved: false, license_verified_at: null });
@@ -119,7 +122,7 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("stamps license_verified_at for a soft match", async () => {
-    db.queue("pending_signups", pending({ payload: payload({ license_verification_status: "soft_match" }) }));
+    db.queue("pending_signups", pending({ payload: payload({ license_verification_status: "soft_match" }) }), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
     await call(BODY);
     expect(doctorInsert()).toMatchObject({ is_admin_approved: false });
@@ -127,7 +130,7 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("keeps going when the specialty or workplace links fail", async () => {
-    db.queue("pending_signups", pending());
+    db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
     db.queue("doctor_specialties", { error: { message: "x" } });
     db.queue("doctor_workplaces", { error: { message: "x" } });
@@ -153,22 +156,31 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("deletes an expired session and answers 410", async () => {
-    db.queue("pending_signups", pending({ expires_at: new Date(Date.now() - 1000).toISOString() }));
+    db.queue("pending_signups", pending({ expires_at: new Date(Date.now() - 1000).toISOString() }), CLAIMED);
     expect((await call(BODY)).status).toBe(410);
     expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);
     expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 
   it("burns the session after too many attempts", async () => {
-    db.queue("pending_signups", pending({ attempts: 5 }));
+    db.queue("pending_signups", pending({ attempts: 5 }), CLAIMED);
     const res = await call(BODY);
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ code: "too_many_attempts" });
     expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);
   });
 
+  it("turns away a request that lost the race for the same attempt", async () => {
+    // Another request moved the counter between our read and our write.
+    db.queue("pending_signups", pending(), { data: [] });
+    const res = await call(BODY);
+    expect(res.status).toBe(429);
+    expect(auth.verifyOtp).not.toHaveBeenCalled();
+    expect(db.argsOf("pending_signups", "eq")).toContainEqual(["attempts", 0]);
+  });
+
   it("counts the attempt even when the code is wrong", async () => {
-    db.queue("pending_signups", pending({ attempts: 2 }));
+    db.queue("pending_signups", pending({ attempts: 2 }), CLAIMED);
     auth.verifyOtp.mockResolvedValue({ data: { user: null }, error: { message: "bad" } });
     const res = await call(BODY);
     expect(res.status).toBe(400);
@@ -177,7 +189,7 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("maps a duplicate insert to 409", async () => {
-    db.queue("pending_signups", pending());
+    db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { error: { code: "23505" } });
     const res = await call(BODY);
     expect(res.status).toBe(409);
@@ -185,7 +197,7 @@ describe("POST /api/signup/verify", () => {
   });
 
   it("maps any other insert error to 500", async () => {
-    db.queue("pending_signups", pending());
+    db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { error: { code: "XX000" } });
     expect(await (await call(BODY)).json()).toMatchObject({ code: "create_failed" });
   });
@@ -204,7 +216,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
   });
 
   it("signs the owner in instead of creating a second doctor", async () => {
-    db.queue("pending_signups", EXISTING);
+    db.queue("pending_signups", EXISTING, CLAIMED);
     db.queue("doctors", {
       data: { id: "d1", is_active: true, is_admin_approved: true, auth_user_id: null },
     });
@@ -216,7 +228,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
   });
 
   it("checks the OTP first", async () => {
-    db.queue("pending_signups", EXISTING);
+    db.queue("pending_signups", EXISTING, CLAIMED);
     auth.verifyOtp.mockResolvedValue({ data: { user: null }, error: { message: "bad" } });
     const res = await call(BODY);
     expect(await res.json()).toMatchObject({ code: "invalid_otp" });
@@ -224,7 +236,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
   });
 
   it("refuses an inactive account", async () => {
-    db.queue("pending_signups", EXISTING);
+    db.queue("pending_signups", EXISTING, CLAIMED);
     db.queue("doctors", { data: { id: "d1", is_active: false, is_admin_approved: true, auth_user_id: "u1" } });
     const res = await call(BODY);
     expect(res.status).toBe(403);
@@ -233,7 +245,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
   });
 
   it("treats a doctor deleted since signup/start as an expired session", async () => {
-    db.queue("pending_signups", EXISTING);
+    db.queue("pending_signups", EXISTING, CLAIMED);
     const res = await call(BODY);
     expect(res.status).toBe(410);
     expect(auth.signOut).toHaveBeenCalled();
@@ -241,7 +253,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
 
   it("reports a failed link", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    db.queue("pending_signups", EXISTING);
+    db.queue("pending_signups", EXISTING, CLAIMED);
     db.queue(
       "doctors",
       { data: { id: "d1", is_active: true, is_admin_approved: false, auth_user_id: null } },
@@ -252,7 +264,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
   });
 
   it("returns a JSON 500 when the doctor read fails", async () => {
-    db.queue("pending_signups", EXISTING);
+    db.queue("pending_signups", EXISTING, CLAIMED);
     db.queue("doctors", { error: { code: "XX000", message: "boom" } });
     expect((await call(BODY)).status).toBe(500);
   });
