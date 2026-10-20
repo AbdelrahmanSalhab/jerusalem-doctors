@@ -245,6 +245,99 @@ in an issue is more than 0 in 1 minute") for:
   "ربط كطريقة كتابة" (add it as a spelling of an existing hospital or fund)
   or "مؤسسة جديدة". Every change re-links all doctors at once.
 
+## Team sign-in with email and password (/login/dev)
+
+Developers and QA cannot receive the WhatsApp OTP for an account they do not
+own, so `/login/dev` signs them in with an email and password instead. It is
+off until `DEV_LOGIN=1` and `DEV_LOGIN_EMAILS` are both set; without them the
+page and the route answer 404.
+
+### Read this before enabling it in production
+
+**The unadvertised URL protects nothing.** `NEXT_PUBLIC_SUPABASE_ANON_KEY` is
+in the browser bundle by design, so once password auth is on for the Supabase
+project, anyone can post these credentials straight to
+`https://<project>.supabase.co/auth/v1/token?grant_type=password` and get a
+session our app accepts. Hiding our page does not change that.
+
+What does hold, in order:
+
+1. **The `doctors` row.** A session is only access once a row carries that
+   `auth_user_id` (`lib/auth/session.ts`). A self-registered email account
+   resolves to no doctor and every page bounces it.
+2. **The allowlist.** `DEV_LOGIN_EMAILS` is checked before Supabase is called
+   at all, so our route refuses anyone else outright.
+3. **The passwords on these few accounts.** With one shared Supabase project
+   this is the real boundary. Long, unique, in a password manager, never in
+   the repo and never in a ticket.
+
+Every failure answers `401 invalid_credentials` identically, so the route
+cannot be used to find out which addresses are allowlisted. Attempts are rate
+limited per address and per IP, and every success writes a
+`dev_password_login` entry visible in /admin/audit.
+
+### Setting it up
+
+1. **Supabase → Authentication → Providers → Email**: enable it.
+2. **Do NOT turn off "Allow new users to sign up."** That setting is global,
+   not per provider, and `signInWithOtp` creates the auth user on a doctor's
+   first signup (`app/api/signup/start/route.ts`), so disabling it breaks
+   doctor registration with `otp_send_failed`.
+
+   This leaves email self-registration possible while the provider is on, and
+   that matters more than it looks: the directory read policy in
+   `supabase/migrations/0002_rls.sql` is granted `to authenticated` with no
+   requirement that the reader has a `doctors` row, so **any** auth user can
+   read every listed doctor straight from PostgREST with the public anon key.
+   An account with no doctors row is stopped by the app, not by the database.
+   Tighten that policy before enabling the Email provider.
+3. **Supabase → Authentication → Password settings**: minimum length 12 or
+   more, and turn on leaked-password protection (HaveIBeenPwned).
+4. **Create each account** under Authentication → Users → Add user, with
+   "Auto Confirm User" checked. Use a generated password per person.
+5. **Link each one to a doctor row.** Either a dedicated test doctor, or your
+   own. The account is useless without this step:
+
+   ```sql
+   -- a dedicated QA doctor, kept out of the directory
+   update public.doctors
+      set auth_user_id = '<auth user uuid>',
+          is_visible   = false
+    where phone_e164 = '+972...';
+   ```
+
+   Keep `is_visible = false` on test accounts so they never appear in a real
+   doctor's search results. Grant `is_admin = true` only to the accounts that
+   actually need the admin panel.
+6. **Set the env vars** on the deployment (Vercel → Settings → Environment
+   Variables), per environment:
+
+   ```
+   DEV_LOGIN=1
+   DEV_LOGIN_EMAILS=dev@example.com,qa@example.com
+   ```
+
+### Turning it off
+
+Unset `DEV_LOGIN` (or clear `DEV_LOGIN_EMAILS`) and redeploy: the page and
+route go back to 404. That closes **our** door, not Supabase's. To close that
+one, disable the Email provider in Supabase or delete the accounts' passwords.
+
+### When someone leaves the team
+
+Remove their address from `DEV_LOGIN_EMAILS`, redeploy, **and** delete their
+Supabase auth user. The first alone leaves them able to use the project's
+token endpoint directly.
+
+### What this does not have
+
+**MFA is not enforced.** Supabase can enrol TOTP, but `signInWithPassword`
+returns a session at AAL1 and nothing in this app checks the `aal` claim, so
+enrolling it would look like protection without being any. Making it real
+needs a challenge step in `/api/login/password` and an `aal2` check in
+`requireDoctor`. Worth doing if these accounts stay enabled in production
+long term.
+
 ## Common one-liners
 
 ### Promote yourself to admin

@@ -40,6 +40,10 @@ export const RATE_LIMITS = {
   // but a loop in the panel must not hammer data.gov.il.
   adminLicenseCheck: { limit: 60, window: "1 h" },
   adminLicenseSave: { limit: 30, window: "1 h" },
+  // Password sign-in for devs and QA. Tight: a leaked password on one of
+  // these accounts is the whole risk, so guessing stays slow.
+  devLogin: { limit: 5, window: "15 m" },
+  devLoginIp: { limit: 10, window: "15 m" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;
