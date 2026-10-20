@@ -5,6 +5,7 @@
 // as a new institution).
 
 import { countOf, DOCTORS } from "@/lib/arabicCount";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { InputStyles } from "@/components/InputStyles";
@@ -14,6 +15,7 @@ import {
   INSTITUTION_KIND_LABEL,
   INSTITUTION_KINDS,
   type InstitutionKind,
+  type UnmatchedName,
 } from "@/lib/institutions";
 
 /** Section headings: hospitals, then the health funds together, then
@@ -27,14 +29,52 @@ const KIND_GROUP: Record<InstitutionKind, string> = {
 const splitAliases = (s: string) =>
   s.split(/[,،\n]/).map((x) => x.trim()).filter((x) => x.length >= 2);
 
+export type DoctorLink = { id: string; name: string };
+
+/** The panel opens over this tab, so closing it comes back here. */
+const panelHref = (id: string) => `/admin/institutions?doctor=${id}`;
+
+/** Doctor names as links into their panel. Inline while the list is short,
+ *  folded away once one bad spelling has gathered a crowd. */
+function DoctorLinks({ doctors }: { doctors: DoctorLink[] }) {
+  if (doctors.length === 0) return null;
+  const link = (d: DoctorLink) => (
+    <Link href={panelHref(d.id)} className="underline underline-offset-2 hover:no-underline">
+      {d.name}
+    </Link>
+  );
+  if (doctors.length <= 3) {
+    return (
+      <span className="flex flex-wrap gap-x-2 text-xs">
+        {doctors.map((d, i) => (
+          <span key={d.id}>
+            {link(d)}
+            {i < doctors.length - 1 && "،"}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer tabular-nums">{countOf(doctors.length, DOCTORS)}</summary>
+      <ul className="mt-1 list-disc ps-5">
+        {doctors.map((d) => (
+          <li key={d.id}>{link(d)}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function InstitutionsEditor({
   institutions,
   doctors,
   unmatched,
 }: {
   institutions: Institution[];
-  doctors: Record<string, { id: string; name: string }[]>;
-  unmatched: { name: string; count: number }[];
+  doctors: Record<string, DoctorLink[]>;
+  unmatched: UnmatchedName[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -181,7 +221,7 @@ function UnmatchedRow({
   onClaim,
   onNew,
 }: {
-  item: { name: string; count: number };
+  item: UnmatchedName;
   institutions: Institution[];
   disabled: boolean;
   onClaim: (id: string) => void;
@@ -190,9 +230,12 @@ function UnmatchedRow({
   const [target, setTarget] = useState("");
   return (
     <li className="flex flex-wrap items-center gap-2 p-3 text-sm">
-      <span className="min-w-0 flex-1">
-        <span className="font-medium">{item.name}</span>{" "}
-        <span className="tabular-nums text-warn">({item.count})</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span>
+          <span className="font-medium">{item.name}</span>{" "}
+          <span className="tabular-nums text-warn">({item.count})</span>
+        </span>
+        <DoctorLinks doctors={item.doctors} />
       </span>
       <select
         className="max-w-full rounded-md border border-warn-line bg-transparent px-2 py-1.5"
@@ -227,7 +270,7 @@ function InstitutionRow({
   onDelete,
 }: {
   institution: Institution;
-  doctors: { id: string; name: string }[];
+  doctors: DoctorLink[];
   disabled: boolean;
   onSave: (patch: Record<string, unknown>) => Promise<boolean>;
   onDelete: () => void;
@@ -255,7 +298,11 @@ function InstitutionRow({
             </summary>
             <ul className="mt-1 list-disc ps-5 text-foreground">
               {doctors.map((d) => (
-                <li key={d.id}>{d.name}</li>
+                <li key={d.id}>
+                  <Link href={panelHref(d.id)} className="underline underline-offset-2 hover:no-underline">
+                    {d.name}
+                  </Link>
+                </li>
               ))}
             </ul>
           </details>

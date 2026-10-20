@@ -29,6 +29,10 @@ export interface AdminDoctorsParams {
   page: number;
   /** The doctor whose panel is open, if any. */
   doctorId: string | null;
+  /** Whether that panel is showing the profile editor. In the URL so the
+   *  wider panel and the specialties read are decided before first paint,
+   *  and so Back closes the editor before the panel. */
+  editing: boolean;
 }
 
 export type RawParams = Record<string, string | string[] | undefined>;
@@ -37,16 +41,33 @@ function one(v: string | string[] | undefined): string {
   return (Array.isArray(v) ? v[0] : v) ?? "";
 }
 
+/** The `?doctor=` value. Every admin page that hosts the panel reads it the
+ *  same way, so /admin/institutions does not grow its own copy. */
+export function readDoctorParam(sp: RawParams): string | null {
+  return one(sp.doctor).trim() || null;
+}
+
+export function readEditParam(sp: RawParams): boolean {
+  return one(sp.edit) === "1";
+}
+
+/** The panel's own address on whichever admin page is hosting it. */
+export function panelHref(base: string, doctorId: string, opts: { edit?: boolean } = {}): string {
+  const qs = new URLSearchParams({ doctor: doctorId });
+  if (opts.edit) qs.set("edit", "1");
+  return `${base}?${qs.toString()}`;
+}
+
 export function parseAdminDoctorsParams(sp: RawParams): AdminDoctorsParams {
   const status = one(sp.status);
   const rawPage = Number(one(sp.page));
-  const doctorId = one(sp.doctor).trim();
 
   return {
     filter: FILTER_KEYS.includes(status) ? (status as DoctorFilter) : DEFAULT_FILTER,
     q: one(sp.q).trim().slice(0, 100),
     page: Number.isFinite(rawPage) && rawPage >= 1 ? Math.floor(rawPage) : 1,
-    doctorId: doctorId || null,
+    doctorId: readDoctorParam(sp),
+    editing: readEditParam(sp),
   };
 }
 
@@ -63,6 +84,7 @@ export function adminDoctorsHref(
   if (next.q) qs.set("q", next.q);
   if (next.page > 1) qs.set("page", String(next.page));
   if (over.doctorId) qs.set("doctor", over.doctorId);
+  if (over.doctorId && over.editing) qs.set("edit", "1");
   const s = qs.toString();
   return s ? `/admin?${s}` : "/admin";
 }

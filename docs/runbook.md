@@ -243,7 +243,11 @@ in an issue is more than 0 in 1 minute") for:
 - `Workplace names not in the institutions list`: from the daily
   institutions cron. Open /admin/institutions and, for each name, either
   "ربط كطريقة كتابة" (add it as a spelling of an existing hospital or fund)
-  or "مؤسسة جديدة". Every change re-links all doctors at once.
+  or "مؤسسة جديدة". Every change re-links all doctors at once. A name that is
+  simply a typo belongs to neither: each unlinked name lists the doctors who
+  typed it, and their names open the doctor panel over the same tab, where
+  "تعديل الملف" lets you correct what they wrote. Saving re-links that
+  doctor's workplaces immediately, so the row disappears on refresh.
 
 ## Team sign-in with email and password (/login/dev)
 

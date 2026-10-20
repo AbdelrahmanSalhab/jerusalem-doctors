@@ -151,3 +151,16 @@ describe("SMS deliverability (Israeli mobiles only, for now)", () => {
     );
   });
 });
+
+describe("maskPhone", () => {
+  it("keeps enough to recognise a change, not enough to ring it", async () => {
+    const { maskPhone } = await import("./phone");
+    expect(maskPhone("+972501234567")).toBe("+9725…4567");
+    expect(maskPhone("+970599123456")).toBe("+9705…3456");
+  });
+
+  it("leaves something too short to mask alone", async () => {
+    const { maskPhone } = await import("./phone");
+    expect(maskPhone("+97250")).toBe("+97250");
+  });
+});

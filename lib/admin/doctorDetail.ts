@@ -73,7 +73,10 @@ export interface LicenseSlotDetail {
 
 export interface DoctorDetail {
   doctor: DetailDoctor;
+  /** Names, for the read-only panel. */
   specialties: string[];
+  /** Ids, for the editor's picker. Same read, no extra round trip. */
+  specialtyIds: string[];
   workplaces: DetailWorkplace[];
   licenses: LicenseSlotDetail[];
   audit: (AuditRow & { id: string; created_at: string })[];
@@ -116,7 +119,7 @@ export async function fetchDoctorDetail(
   ];
 
   const [specialtyRows, workplaceRows, mirror, syncedAt, auditRows, lastSignInAt] = await Promise.all([
-    service.from("doctor_specialties").select("specialty:specialties(name_ar)").eq("doctor_id", id),
+    service.from("doctor_specialties").select("specialty_id, specialty:specialties(name_ar)").eq("doctor_id", id),
     service
       .from("doctor_workplaces")
       .select("name, workplace_type, details, address, hours, phone, is_primary, sort_order")
@@ -183,6 +186,7 @@ export async function fetchDoctorDetail(
   return {
     doctor,
     specialties: specialtyNames(specialtyRows.data),
+    specialtyIds: ((specialtyRows.data ?? []) as { specialty_id: string }[]).map((r) => r.specialty_id),
     workplaces: (workplaceRows.data ?? []) as unknown as DetailWorkplace[],
     licenses,
     audit: (auditRows.data ?? []) as unknown as DoctorDetail["audit"],

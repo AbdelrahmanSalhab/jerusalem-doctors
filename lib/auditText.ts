@@ -2,6 +2,7 @@
 // a one-line summary instead of the raw metadata. Codes stay in the
 // database; this is only how /admin/audit shows them.
 
+import { FIELD_LABELS } from "@/lib/client/apiError";
 import { FEATURED_LABEL, type FeaturedKind } from "@/lib/directory";
 import { isLicenseStatus, licenseStatusSentence, UNCHECKED_SENTENCE } from "@/lib/licenseStatus";
 
@@ -16,6 +17,8 @@ const TITLE: Record<string, string> = {
   signup_verified: "تسجيل جديد",
   delete_requested: "طلب حذف حساب",
   admin_doctor_updated: "تعديل من الإدارة",
+  admin_doctor_profile_edited: "تعديل الملف من الإدارة",
+  admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
   admin_doctor_deleted: "حذف نهائي لحساب",
   admin_license_rechecked: "إعادة فحص الترخيص",
   admin_license_corrected: "تصحيح رقم الترخيص",
@@ -52,6 +55,41 @@ function doctorChanges(m: Record<string, unknown>): string[] {
   return out;
 }
 
+/** Columns an admin's profile edit writes that are not fields they typed:
+ *  the search copies, which would read as duplicates in the log. */
+const DERIVED = /_normalized$/;
+
+const AUTH_SYNC: Record<string, string> = {
+  updated: "نُقل حساب الدخول إلى الرقم الجديد",
+  no_login_account: "لا يوجد حساب دخول مرتبط بعد",
+  rolled_back: "أُعيد حساب الدخول إلى الرقم السابق",
+};
+
+/** What an admin changed on a doctor's profile: which fields, and the
+ *  before/after of the two that identify them. */
+function profileEditDetail(m: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const fields = Array.isArray(m.fields) ? (m.fields as string[]) : [];
+  const named = [
+    ...new Set(
+      fields
+        .filter((f) => !DERIVED.test(f) && f !== "phone_display")
+        .map((f) => FIELD_LABELS[f] ?? f),
+    ),
+  ];
+  if (named.length > 0) parts.push(named.join("، "));
+  if (typeof m.workplaces === "number") parts.push(`أماكن العمل: ${m.workplaces}`);
+  if (typeof m.specialties === "number") parts.push(`التخصصات: ${m.specialties}`);
+  if (m.phone_changed) {
+    parts.push(`الهاتف: ${quote(m.phone_before)} ← ${quote(m.phone_after)}`);
+    if (m.phone_not_sms_deliverable) parts.push("لا يصله رمز الدخول");
+    const sync = AUTH_SYNC[String(m.auth_sync)];
+    if (sync) parts.push(sync);
+  }
+  if (m.hebrew_name_changed) parts.push("يحتاج إعادة فحص الترخيص");
+  return parts.join(" · ");
+}
+
 /** An admin re-checking or correcting a licence number. */
 function licenseCheckDetail(m: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -85,6 +123,10 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       return "أُخفي من البحث، بانتظار إتمام الحذف";
     case "admin_doctor_updated":
       return doctorChanges(m).join(" · ");
+    case "admin_doctor_profile_edited":
+      return profileEditDetail(m);
+    case "admin_doctor_photo_changed":
+      return m.removed ? "حُذفت الصورة الشخصية" : "رُفعت صورة شخصية جديدة";
     case "admin_doctor_deleted":
       return "حُذفت بياناته وصورته وحساب دخوله";
     case "admin_license_rechecked":
@@ -171,6 +213,16 @@ const FIELD_LABEL: Record<string, string> = {
   error: "الخطأ",
   id: "المؤسسة",
   deleted_doctor_id: "رقم الحساب المحذوف",
+  fields: "الحقول المعدَّلة",
+  workplaces: "عدد أماكن العمل",
+  specialties: "عدد التخصصات",
+  hebrew_name_changed: "تغيّر الاسم بالعبرية",
+  phone_changed: "تغيّر رقم الهاتف",
+  phone_before: "الهاتف قبل",
+  phone_after: "الهاتف بعد",
+  phone_not_sms_deliverable: "لا يصله رمز الدخول",
+  auth_sync: "حساب الدخول",
+  removed: "حُذفت الصورة",
 };
 
 /** Kept for the record but never shown to admins. */
@@ -193,6 +245,11 @@ export function auditFields(row: AuditRow, institutionName: (id: string) => stri
       const label = FIELD_LABEL[k] ?? k;
       if (typeof v === "boolean") return { label, value: v ? "نعم" : "لا" };
       if (v === null || v === undefined || v === "") return { label, value: "لا شيء" };
+      // The edited-columns list, in the same Arabic the form uses.
+      if (k === "fields" && Array.isArray(v)) {
+        const named = [...new Set((v as string[]).map((f) => FIELD_LABELS[f] ?? f))];
+        return { label, value: named.join("، ") || "لا شيء" };
+      }
       if (Array.isArray(v)) return { label, value: v.join("، ") || "لا شيء" };
       // license_status, and license_status_before / _after from a re-check.
       if (k.startsWith("license_status")) {
@@ -201,6 +258,7 @@ export function auditFields(row: AuditRow, institutionName: (id: string) => stri
       if (k === "career_stage") return { label, value: STAGE[String(v)] ?? String(v) };
       if (k === "featured") return { label, value: FEATURED_LABEL[v as FeaturedKind] ?? String(v) };
       if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };
+      if (k === "auth_sync") return { label, value: AUTH_SYNC[String(v)] ?? String(v) };
       if (k === "duration_ms" && typeof v === "number") return { label, value: `${Math.round(v / 1000)} ثانية` };
       if (k === "id") return { label, value: institutionName(String(v)) ?? String(v), ltr: !institutionName(String(v)) };
       if (k === "error" || k.endsWith("_id")) return { label, value: String(v), ltr: true };

@@ -19,13 +19,13 @@ import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { StageRadios } from "@/components/StageRadios";
 import { WorkplaceEditor } from "@/components/WorkplaceEditor";
 import {
+  applyStageCascade,
   findGeneralSpecialtyId,
   RESIDENCY_YEAR_MIN,
   residencyYearMax,
   STAGE_BY_KEY,
   type Stage,
   initialProfileStage,
-  workplaceForStage,
 } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
 import { clinicsMissingDetails, profileFormError } from "@/lib/profile/validate";
@@ -101,39 +101,24 @@ export function ProfileForm({
       : specialties;
 
   /**
-   * Same cascade as signup. Both affected sections are force-opened so the
-   * doctor sees what the switch did to their specialties and workplaces
-   * before saving, instead of discovering it afterwards.
+   * Same cascade as signup, shared with the admin's editor. Both affected
+   * sections are force-opened so the doctor sees what the switch did to
+   * their specialties and workplaces before saving, instead of discovering
+   * it afterwards.
    */
   const applyStage = (next: Stage) => {
-    const opt = STAGE_BY_KEY[next];
+    const c = applyStageCascade(next, { specialtyIds, workplaces, generalSpecialtyId });
     setStage(next);
     setStageChanged(true);
-    if (opt.autoAttachesGeneralSpecialty) {
-      // Replace rather than append: a doctor already at the 5-specialty cap
-      // would otherwise produce a 6-element array that fails zod with a bare
-      // invalid_body and no field message.
-      setSpecialtyIds(generalSpecialtyId ? [generalSpecialtyId] : []);
-      setSubspecialty("");
-      setEditingSpecialties(true);
-    } else if (generalSpecialtyId && specialtyIds.includes(generalSpecialtyId)) {
-      setSpecialtyIds((ids) => ids.filter((id) => id !== generalSpecialtyId));
+    if (c.specialtiesChanged) {
+      setSpecialtyIds(c.specialtyIds);
       setEditingSpecialties(true);
     }
-    if (!opt.requiresResidencyStartYear) setResidencyStartYear("");
-    if (!opt.showsCertificates) setCertificates([]);
-    // Untouched rows adopt the stage's default type; named ones are only
-    // corrected when the new stage doesn't offer their type.
-    const coerced = workplaces.map((w) =>
-      workplaceForStage(
-        w.name.trim() === ""
-          ? { ...w, workplace_type: opt.defaultWorkplaceType }
-          : w,
-        next,
-      ),
-    );
-    if (coerced.some((w, i) => w !== workplaces[i])) {
-      setWorkplaces(coerced);
+    if (c.clearSubspecialty) setSubspecialty("");
+    if (c.clearResidencyYear) setResidencyStartYear("");
+    if (c.clearCertificates) setCertificates([]);
+    if (c.workplacesChanged) {
+      setWorkplaces(c.workplaces);
       setEditingWorkplaces(true);
     }
   };
