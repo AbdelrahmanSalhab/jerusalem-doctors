@@ -279,10 +279,18 @@ limited per address and per IP, and every success writes a
 ### Setting it up
 
 1. **Supabase → Authentication → Providers → Email**: enable it.
-2. **Supabase → Authentication → Sign In / Up**: turn **off** "Allow new users
-   to sign up". Otherwise anyone can self-register with the public anon key.
-   They would land without a `doctors` row and get nowhere, but there is no
-   reason to leave it open.
+2. **Do NOT turn off "Allow new users to sign up."** That setting is global,
+   not per provider, and `signInWithOtp` creates the auth user on a doctor's
+   first signup (`app/api/signup/start/route.ts`), so disabling it breaks
+   doctor registration with `otp_send_failed`.
+
+   This leaves email self-registration possible while the provider is on, and
+   that matters more than it looks: the directory read policy in
+   `supabase/migrations/0002_rls.sql` is granted `to authenticated` with no
+   requirement that the reader has a `doctors` row, so **any** auth user can
+   read every listed doctor straight from PostgREST with the public anon key.
+   An account with no doctors row is stopped by the app, not by the database.
+   Tighten that policy before enabling the Email provider.
 3. **Supabase → Authentication → Password settings**: minimum length 12 or
    more, and turn on leaked-password protection (HaveIBeenPwned).
 4. **Create each account** under Authentication → Users → Add user, with

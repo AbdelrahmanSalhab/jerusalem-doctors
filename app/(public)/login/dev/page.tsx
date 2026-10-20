@@ -28,7 +28,7 @@ export default function DevLoginPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">دخول فريق العمل</h1>
         <p className="text-sm text-muted">
-          خاص بفريق التطوير وفحص الجودة. الأطباء يسجّلون دخولهم برقم الهاتف من{" "}
+          الأطباء يسجّلون دخولهم برقم الهاتف من{" "}
           <Link href="/login" className="underline">
             صفحة تسجيل الدخول
           </Link>
