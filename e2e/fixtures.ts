@@ -40,6 +40,8 @@ const EXPECTED: RegExp[] = [
   /^console\.error .* \{challenges\.cloudflare\.com\}$/,
   // Cloudflare's Turnstile frame talks to its parent; harmless off its domain.
   /^console\.warning Failed to execute 'postMessage' .*challenges\.cloudflare\.com/,
+  // WebKit logs the same Turnstile message as an error, in some runs only.
+  /^console\.error Unable to post message to https:\/\/challenges\.cloudflare\.com\. Recipient has origin /,
   // security.spec.ts injects an inline script to prove the CSP blocks it.
   // (Chrome's wording, then WebKit's.)
   /^console\.error Executing inline event handler violates the following Content Security Policy/,
