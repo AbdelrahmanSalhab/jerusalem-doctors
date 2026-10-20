@@ -1,4 +1,4 @@
--- 0019: is_admin() without the RLS recursion it was written to avoid.
+-- 0020: is_admin() without the RLS recursion it was written to avoid.
 --
 -- 0002 says is_admin() "doesn't trigger RLS recursion", but it ran as the
 -- caller: its read of public.doctors went through the doctors policies, one
