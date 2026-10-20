@@ -1,0 +1,15 @@
+# Rate limiting needs Upstash in production mode. CI runs a real Redis behind
+# an Upstash-compatible REST layer instead of switching the limiter off.
+services:
+  redis:
+    image: redis:7-alpine
+  redis-rest:
+    image: hiett/serverless-redis-http:latest
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: e2e-token
+      SRH_CONNECTION_STRING: redis://redis:6379
+    ports:
+      - "8079:80"
+    depends_on:
+      - redis

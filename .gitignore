@@ -46,3 +46,8 @@ next-env.d.ts
 # trycycle worktrees (do not commit)
 .worktrees
 .claude/worktrees
+
+# Playwright
+/e2e/.auth/
+/e2e/.results/
+/e2e/.report/

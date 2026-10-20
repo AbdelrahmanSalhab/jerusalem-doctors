@@ -27,3 +27,37 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+  # Integration and browser tests: the repo's migrations on a fresh local
+  # Supabase, a real Redis for rate limits, the production build, and
+  # Playwright (database security, the API permission table, user journeys
+  # on desktop Chrome and iPhone WebKit). See e2e/README.md.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.121.0
+      - name: Start Supabase (applies every migration from zero)
+        run: |
+          supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor
+          supabase seed buckets
+      - name: Start Redis for rate limits
+        run: docker compose -f e2e/docker-compose.yml -p jd-e2e up -d --wait
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            e2e/.report
+            e2e/.results
+          retention-days: 14

@@ -12,7 +12,9 @@
     "test:rls": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/rls-smoke-test.ts",
     "test:coverage": "vitest run --coverage",
     "dev-login:list": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts --list",
-    "dev-login:add": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts"
+    "dev-login:add": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts",
+    "e2e:stack": "supabase start && supabase seed buckets && docker compose -f e2e/docker-compose.yml -p jd-e2e up -d",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.52.0",
@@ -28,6 +30,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
