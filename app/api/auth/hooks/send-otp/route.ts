@@ -110,6 +110,14 @@ export async function POST(req: Request) {
   // The site-wide daily budget, after the checks above so refused numbers
   // do not spend it.
   const budget = await rateLimit("smsDaily", "all");
+  // One warning as the day crosses half the budget, while there is still
+  // room to raise SMS_DAILY_CAP before signups and logins stop.
+  // ponytail: fires on the exact crossing; two codes landing together could
+  // skip it, and then the cap alert below is the one that arrives.
+  if (budget.success && budget.remaining === Math.floor(budget.limit / 2)) {
+    console.warn(`[send-otp] half the daily SMS budget used (${budget.limit - budget.remaining} of ${budget.limit})`);
+    Sentry.captureMessage("Half the daily SMS budget used", "warning");
+  }
   if (!budget.success) {
     console.error("[send-otp] daily SMS cap reached; no codes until it resets");
     Sentry.captureMessage("Daily SMS cap reached", "error");
