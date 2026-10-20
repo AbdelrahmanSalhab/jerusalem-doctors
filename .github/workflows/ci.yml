@@ -11,7 +11,9 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned to the current LTS on purpose: a moving label (ubuntu-latest)
+    # can change the browser system libraries without a commit.
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -33,26 +35,51 @@ jobs:
   # Playwright (database security, the API permission table, user journeys
   # on desktop Chrome and iPhone WebKit). See e2e/README.md.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.121.0
+      # Supabase spends most of its minute pulling images, so it starts first
+      # and in the background while npm, the browsers and the build run.
+      - name: Start Supabase in the background (every migration from zero)
+        run: |
+          (supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor \
+            && supabase seed buckets; echo $? > "$RUNNER_TEMP/supabase.exit") > "$RUNNER_TEMP/supabase.log" 2>&1 &
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - uses: supabase/setup-cli@v3
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
         with:
-          version: 2.121.0
-      - name: Start Supabase (applies every migration from zero)
+          path: ~/.cache/ms-playwright
+          # ImageOS (ubuntu24, ubuntu26, ...): browser builds are per OS release.
+          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ hashFiles('package-lock.json') }}
+      - name: Install browsers in the background
         run: |
-          supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor
-          supabase seed buckets
+          (npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
+      - name: Build the app against the test stack
+        run: |
+          # e2e/env.ts is the one list of the test stack's settings.
+          node --experimental-strip-types -e 'import("./e2e/env.ts").then((m) => { for (const [k, v] of Object.entries(m.appEnv())) console.log(`${k}=${v}`) })' >> "$GITHUB_ENV"
+      - run: npm run build
       - name: Start Redis for rate limits
         run: docker compose -f e2e/docker-compose.yml -p jd-e2e up -d --wait
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Wait for Supabase and the browsers
+        run: |
+          for job in supabase browsers; do
+            until [ -f "$RUNNER_TEMP/$job.exit" ]; do sleep 2; done
+            code=$(cat "$RUNNER_TEMP/$job.exit")
+            if [ "$code" != "0" ]; then echo "$job failed ($code):"; cat "$RUNNER_TEMP/$job.log"; exit 1; fi
+            tail -3 "$RUNNER_TEMP/$job.log"
+          done
       - run: npx playwright test
+        env:
+          E2E_PREBUILT: "1"
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
