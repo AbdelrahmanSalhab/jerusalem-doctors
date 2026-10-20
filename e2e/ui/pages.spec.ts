@@ -49,8 +49,12 @@ for (const scheme of ["light", "dark"] as const) {
             const res = await page.goto(path);
             expect(res?.status(), path).toBeLessThan(400);
             // Not networkidle: the Turnstile widget on /login keeps polling.
-            await page.waitForLoadState("load");
-            await page.waitForTimeout(500);
+            // The page's own landmark is the signal it has rendered.
+            await expect(page.getByRole("main")).toBeVisible();
+
+            await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+            await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+            expect((await page.title()).trim(), `${path} has no title`).not.toBe("");
 
             const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
             expect(overflow, `${path} scrolls sideways by ${overflow}px`).toBeLessThanOrEqual(1);

@@ -6,9 +6,9 @@ test.beforeEach(flushRateLimits);
 
 async function signInThroughForm(page: import("@playwright/test").Page, email: string, password: string) {
   await page.goto("/login/dev");
-  await page.locator("#dev-email").fill(email);
-  await page.locator("#dev-password").fill(password);
-  await page.locator('button[type="submit"]').click();
+  await page.getByLabel("البريد الإلكتروني").fill(email);
+  await page.getByLabel("كلمة المرور").fill(password);
+  await page.getByRole("button", { name: "تسجيل الدخول" }).click();
 }
 
 test("a doctor signs in with email and password and lands on the directory @phone", async ({ page }) => {

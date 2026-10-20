@@ -45,9 +45,9 @@ test("the services the site depends on can reach it", async ({ request }) => {
 
 test("an admin signs in, searches, and opens the admin screens", async ({ page }) => {
   await page.goto("/login/dev");
-  await page.locator("#dev-email").fill(EMAIL);
-  await page.locator("#dev-password").fill(PASSWORD);
-  await page.locator('button[type="submit"]').click();
+  await page.getByLabel("البريد الإلكتروني").fill(EMAIL);
+  await page.getByLabel("كلمة المرور").fill(PASSWORD);
+  await page.getByRole("button", { name: "تسجيل الدخول" }).click();
   await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 15_000 });
 
   await page.goto("/dashboard");
@@ -75,9 +75,9 @@ test("the registry synced successfully in the last 36 hours", async ({ page }) =
   // of Health registry. data.gov.il refuses many networks (CI included), so
   // the check reads what production itself recorded rather than calling it.
   await page.goto("/login/dev");
-  await page.locator("#dev-email").fill(EMAIL);
-  await page.locator("#dev-password").fill(PASSWORD);
-  await page.locator('button[type="submit"]').click();
+  await page.getByLabel("البريد الإلكتروني").fill(EMAIL);
+  await page.getByLabel("كلمة المرور").fill(PASSWORD);
+  await page.getByRole("button", { name: "تسجيل الدخول" }).click();
   await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 15_000 });
   await page.goto("/admin/audit");
   const rows = await page.locator("summary").allInnerTexts();

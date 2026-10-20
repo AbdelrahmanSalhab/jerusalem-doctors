@@ -5,7 +5,7 @@ import { request } from "@playwright/test";
 import { BASE_URL, PASSWORD, THROWAWAY_ACCOUNTS } from "../env";
 import { expect, test } from "../fixtures";
 import { seededIds, stateFile } from "../helpers";
-import { serviceClient } from "../seed";
+import { createDoctor, serviceClient } from "../seed";
 
 test.describe("photo", () => {
   test.use({ storageState: stateFile("doctor") });
@@ -15,11 +15,16 @@ test.describe("photo", () => {
 
   test("a real image uploads and shows; a renamed text file is refused @phone", async ({ page }) => {
     await page.goto("/profile");
-    const input = page.locator('input[type="file"]');
-    await input.setInputFiles({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("not an image at all") });
+    // Through the file chooser the button opens, as a person would.
+    const choose = async (file: Parameters<import("@playwright/test").FileChooser["setFiles"]>[0]) => {
+      const chooser = page.waitForEvent("filechooser");
+      await page.getByRole("button", { name: /رفع صورة|تغيير الصورة/ }).click();
+      await (await chooser).setFiles(file);
+    };
+    await choose({ name: "photo.png", mimeType: "image/png", buffer: Buffer.from("not an image at all") });
     await expect(page.getByText(/صيغة|نوع|غير مدعوم/).first()).toBeVisible();
 
-    await input.setInputFiles(path.join(__dirname, "../pixel.png"));
+    await choose(path.join(__dirname, "../pixel.png"));
     await expect(page.getByRole("button", { name: "تغيير الصورة" })).toBeVisible();
     const { data } = await serviceClient().from("doctors").select("profile_picture_url").eq("id", seededIds().samer).single();
     expect(data!.profile_picture_url).toMatch(/\/storage\/v1\/object\/public\/doctor-photos\//);
@@ -30,40 +35,12 @@ test.describe("photo", () => {
 
 test.describe("deletion request", () => {
   const email = THROWAWAY_ACCOUNTS[0];
-  let doctorId = "";
-  let userId = "";
-
-  test.beforeAll(async () => {
-    // A throwaway account: the request closes it for good.
-    const db = serviceClient();
-    const { data: u } = await db.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
-    userId = u.user!.id;
-    const { data: d } = await db
-      .from("doctors")
-      .insert({
-        auth_user_id: userId,
-        phone_e164: "+972521234599",
-        license_number: "599001",
-        arabic_first_name: "مغادر",
-        arabic_family_name: "قريبًا",
-        arabic_first_name_normalized: "مغادر",
-        arabic_family_name_normalized: "قريبا",
-        arabic_full_name_normalized: "مغادر قريبا",
-        hebrew_first_name: "מע'אדר",
-        hebrew_family_name: "קריבן",
-        consent_directory_use: true,
-        is_phone_verified: true,
-        is_admin_approved: true,
-      })
-      .select("id")
-      .single();
-    doctorId = d!.id;
+  let doctor: Awaited<ReturnType<typeof createDoctor>>;
+  // The request closes the account for good, so it gets its own.
+  test.beforeEach(async () => {
+    doctor = await createDoctor({ first: "مغادر", family: "قريبًا", loginEmail: email });
   });
-  test.afterAll(async () => {
-    const db = serviceClient();
-    await db.from("doctors").delete().eq("id", doctorId);
-    await db.auth.admin.deleteUser(userId).catch(() => {});
-  });
+  test.afterEach(async () => doctor.remove());
 
   test("closes the account, signs the doctor out and keeps them out", async ({ browser }) => {
     const api = await request.newContext({ baseURL: BASE_URL });
@@ -75,7 +52,7 @@ test.describe("deletion request", () => {
     await page.getByRole("button", { name: /حذف/ }).last().click();
     await expect(page).toHaveURL(/\/login\?status=deleted/);
 
-    const { data } = await serviceClient().from("doctors").select("is_active").eq("id", doctorId).single();
+    const { data } = await serviceClient().from("doctors").select("is_active").eq("id", doctor.id).single();
     expect(data!.is_active).toBe(false);
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/login/);

@@ -36,6 +36,22 @@ run `e2e/.results/diagnostics.md` (and the CI job summary) lists everything
 unexpected, plus the app server's warnings. Known noise is listed with a
 reason in `EXPECTED` in `fixtures.ts`.
 
+## Writing a test
+
+- **Find things the way a person does:** `getByRole`, `getByLabel`,
+  `getByPlaceholder`, `getByText`. CSS only where there is no accessible handle,
+  with a comment saying why.
+- **Wait on what the user waits on:** web-first assertions (`await expect(...)`),
+  never `waitForTimeout`. Start `waitForResponse` before the action that
+  triggers it.
+- **Own the data you change:** `createDoctor()` in `seed.ts` makes a doctor for
+  one test and `remove()` cleans it up, so a retry starts from the same place.
+  The seeded doctors are read-only by convention.
+- **Rate limits remember:** the limiter also caches blocked callers in the
+  server's memory, so a test that trips one uses its own identity.
+- `no-floating-promises` is on for `e2e/`: an un-awaited step is a race.
+- Before pushing a new test: `npx playwright test <file> --repeat-each=3`.
+
 ## Adding an API route
 
 `api/authz.spec.ts` fails until the new route is added to `POLICY` with who

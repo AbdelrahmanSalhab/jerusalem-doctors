@@ -7,6 +7,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
 import { ANON_KEY, BASE_URL, CRON_SECRET, STUB_URL, SUPABASE_URL, type Role } from "../env";
+import { flushRateLimits } from "../global-setup";
 import { stateFile } from "../helpers";
 
 type Policy =
@@ -118,6 +119,31 @@ for (const [key, policy] of Object.entries(POLICY)) {
     }
   });
 }
+
+test.describe("abuse limits", () => {
+  test.beforeEach(flushRateLimits);
+  test.afterEach(flushRateLimits);
+
+  test("password guessing is slowed down after five tries", async () => {
+    const ctx = await as("anon");
+    const statuses: number[] = [];
+    // Its own address and client IP: the limiter also remembers blocked
+    // callers in the server's memory, which flushing Redis does not clear, so
+    // sharing either with other tests would lock them out for 15 minutes.
+    // (Vercel overwrites X-Forwarded-For, so production clients cannot pick one.)
+    // Fresh per run too, so a retry or --repeat-each starts unblocked.
+    const n = Date.now() % 250;
+    const headers = { "x-forwarded-for": `203.0.113.${n}` };
+    const email = `probe-${Date.now()}@e2e.test`;
+    for (let i = 0; i < 6; i++) {
+      const res = await ctx.post("/api/login/password", { headers, data: { email, password: `wrong-${i}-password` } });
+      statuses.push(res.status());
+    }
+    expect(statuses.slice(0, 5)).toEqual([401, 401, 401, 401, 401]);
+    expect(statuses[5]).toBe(429);
+    await ctx.dispose();
+  });
+});
 
 test.describe("machine callers", () => {
   test("cron routes refuse a wrong secret and accept the right one", async () => {

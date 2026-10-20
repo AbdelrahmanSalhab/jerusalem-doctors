@@ -32,6 +32,8 @@ export interface SeedDoctor {
   workplaces: Workplace[];
   email?: string;
   account?: Role;
+  /** A sign-in for a test-owned doctor (an address in THROWAWAY_ACCOUNTS). */
+  loginEmail?: string;
   bio?: string;
   seekingWork?: boolean;
   featured?: "doctor" | "graduate";
@@ -212,10 +214,11 @@ async function seedRegistry(db: SupabaseClient) {
 
 async function insertDoctor(db: SupabaseClient, d: SeedDoctor, specialtyId: Map<string, string>, i: number) {
   let authUserId: string | null = null;
-  if (d.account) {
+  const loginEmail = d.account ? ACCOUNTS[d.account] : d.loginEmail;
+  if (loginEmail) {
     const created = await must(
-      `user ${d.account}`,
-      db.auth.admin.createUser({ email: ACCOUNTS[d.account], password: PASSWORD, email_confirm: true }),
+      `user ${loginEmail}`,
+      db.auth.admin.createUser({ email: loginEmail, password: PASSWORD, email_confirm: true }),
     );
     authUserId = created.user!.id;
   }
@@ -293,4 +296,39 @@ export async function seed(): Promise<Record<string, string>> {
   const ids: Record<string, string> = {};
   for (const [i, d] of DOCTORS.entries()) ids[d.key] = await insertDoctor(db, d, specialtyId, i);
   return ids;
+}
+
+let made = 0;
+
+/**
+ * A doctor that belongs to one test: unique phone and licence, removed with
+ * `remove()`. Tests that change a doctor use one of these rather than a
+ * seeded row, so a retry starts from the same state and nothing leaks into
+ * the next test.
+ */
+export async function createDoctor(over: Partial<SeedDoctor> & { first: string; family: string }) {
+  const db = serviceClient();
+  const { data } = await db.from("specialties").select("id, name_ar");
+  const specialtyId = new Map((data ?? []).map((s: { id: string; name_ar: string }) => [s.name_ar, s.id]));
+  const n = `${Date.now() % 100000}${made++}`.padStart(6, "0").slice(-6);
+  const d: SeedDoctor = {
+    key: `test-${n}`,
+    hebrewFirst: "בדיקה",
+    hebrewFamily: "בדיקה",
+    phone: `+97252${n.padStart(7, "9")}`,
+    license: `7${n}`,
+    stage: "specialist",
+    specialties: ["الباطنية"],
+    workplaces: [],
+    ...over,
+  };
+  const id = await insertDoctor(db, d, specialtyId, 30);
+  return {
+    id,
+    remove: async () => {
+      const { data: row } = await db.from("doctors").select("auth_user_id").eq("id", id).maybeSingle();
+      await db.from("doctors").delete().eq("id", id);
+      if (row?.auth_user_id) await db.auth.admin.deleteUser(row.auth_user_id);
+    },
+  };
 }

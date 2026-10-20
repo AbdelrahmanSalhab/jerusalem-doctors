@@ -30,27 +30,27 @@ interface Signup {
 
 async function signUp(page: Page, s: Signup) {
   await page.goto("/signup");
-  await page.locator("#phone").fill(s.phone.replace("+972", "0"));
-  await page.locator("#license_number").fill(s.license);
-  await page.locator("#email").fill(`${s.license}@example.test`);
+  await page.getByLabel("رقم الهاتف").fill(s.phone.replace("+972", "0"));
+  await page.getByLabel(/^رقم الترخيص/).fill(s.license);
+  await page.getByLabel("البريد الإلكتروني").fill(`${s.license}@example.test`);
   await page.getByRole("button", { name: "التالي" }).click();
 
-  await page.locator("#arabic_first_name").fill(s.arabic[0]);
-  await page.locator("#arabic_family_name").fill(s.arabic[1]);
-  await page.locator("#hebrew_first_name").fill(s.hebrew[0]);
-  await page.locator("#hebrew_family_name").fill(s.hebrew[1]);
+  await page.getByLabel("الاسم بالعربية").fill(s.arabic[0]);
+  await page.getByLabel("اسم العائلة بالعربية").fill(s.arabic[1]);
+  await page.getByLabel(/^الاسم بالعبرية/).fill(s.hebrew[0]);
+  await page.getByLabel(/^اسم العائلة بالعبرية/).fill(s.hebrew[1]);
   await page.getByRole("button", { name: "التالي" }).click();
 
   await page.getByRole("radio", { name: /طب عام/ }).check();
   // Looking for work: the workplace becomes optional (#82).
   await page.getByRole("checkbox", { name: /أبحث عن فرصة عمل/ }).check();
   await expect(page.getByRole("heading", { name: "مكان العمل (اختياري)" })).toBeVisible();
-  await page.locator("#consent").check();
+  await page.getByRole("checkbox", { name: /أوافق على ما ورد أعلاه/ }).check();
   await page.getByRole("button", { name: "تسجيل وإرسال رمز التحقق برسالة نصية" }).click();
 
   await expect(page).toHaveURL(/\/verify\?mode=signup/, { timeout: 15_000 });
-  await page.locator('input[autocomplete="one-time-code"]').fill("123456");
-  await page.locator('button[type="submit"]').click();
+  await page.getByLabel("رمز التحقق").fill("123456");
+  await page.getByRole("button", { name: "تأكيد" }).click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
 }
 

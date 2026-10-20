@@ -22,8 +22,10 @@ test("search finds by name and never shows hidden, pending or admin rows", async
   await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
   // A query every seeded name contains a letter of.
   for (const q of ["ا", "ل"]) {
+    // Wait for this query's response, set up before typing so it cannot be missed.
+    const answered = page.waitForResponse((r) => r.url().includes("/api/search") && r.url().includes(encodeURIComponent(q)));
     await search(page, q);
-    await page.waitForResponse((r) => r.url().includes("/api/search"));
+    await answered;
     const body = await page.locator("main").innerText();
     for (const name of NEVER_LISTED) expect(body, `query ${q}`).not.toContain(name);
   }
