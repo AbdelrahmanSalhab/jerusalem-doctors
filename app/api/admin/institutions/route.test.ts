@@ -4,11 +4,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, jsonRequest } from "@/test/fakeSupabase";
 
-const { requireAdmin, relinkWorkplaces } = vi.hoisted(() => ({
-  requireAdmin: vi.fn(),
+const { requireAdminOrNull, relinkWorkplaces } = vi.hoisted(() => ({
+  requireAdminOrNull: vi.fn(),
   relinkWorkplaces: vi.fn(async () => ({ changed: 3, unmatched: [] as { name: string; count: number }[] })),
 }));
-vi.mock("@/lib/auth/session", () => ({ requireAdmin }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 vi.mock("@/lib/institutions", async (orig) => ({
   ...(await orig<typeof import("@/lib/institutions")>()),
   relinkWorkplaces,
@@ -18,17 +18,17 @@ vi.mock("@/lib/supabase/service", async () => {
   return { createSupabaseServiceClient: () => db.client };
 });
 
-const ctx = { params: Promise.resolve({ id: "inst-1" }) };
+const ctx = { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000001a1" }) };
 
 describe("admin institutions API", () => {
   beforeEach(() => {
     db.reset();
     vi.clearAllMocks();
-    requireAdmin.mockResolvedValue({ id: "admin-1" });
+    requireAdminOrNull.mockResolvedValue({ id: "admin-1" });
   });
 
   it("refuses a non-admin", async () => {
-    requireAdmin.mockRejectedValue(new Error("NEXT_NOT_FOUND"));
+    requireAdminOrNull.mockResolvedValue(null);
     const { POST } = await import("./route");
     const res = await POST(jsonRequest("/api/admin/institutions", { name_ar: "x", kind: "hospital" }));
     expect(res.status).toBe(401);
@@ -79,5 +79,12 @@ describe("admin institutions API", () => {
     expect(relinkWorkplaces).toHaveBeenCalled();
     db.queue("institutions", { data: null });
     expect((await DELETE(jsonRequest("/x", {}), ctx)).status).toBe(404);
+  });
+
+  it("404s a malformed id without asking the database", async () => {
+    const { DELETE } = await import("./[id]/route");
+    const res = await DELETE(jsonRequest("/x", {}), { params: Promise.resolve({ id: "abc" }) });
+    expect(res.status).toBe(404);
+    expect(relinkWorkplaces).not.toHaveBeenCalled();
   });
 });

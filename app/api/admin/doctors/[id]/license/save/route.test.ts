@@ -11,7 +11,7 @@ let mirrorRows: Record<string, unknown>[] = [];
 let duplicateRow: Record<string, unknown> | null = null;
 let updateError: { code: string } | null = null;
 
-vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => ({ id: "admin-1" })) }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => ({ id: "00000000-0000-4000-8000-00000000a001" })) }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
 vi.mock("@/lib/moh/client", () => ({
   MohClient: class {
@@ -51,7 +51,7 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 const DOCTOR = {
-  id: "d1",
+  id: "00000000-0000-4000-8000-0000000000d1",
   hebrew_first_name: "דניאל",
   hebrew_family_name: "דריפוס",
   license_number: "999999",
@@ -81,7 +81,7 @@ async function call(body: unknown) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
-    { params: Promise.resolve({ id: "d1" }) },
+    { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000000d1" }) },
   );
 }
 
@@ -179,7 +179,7 @@ describe("POST .../license/save", () => {
   it("names the doctor already holding the number instead of failing with a 500", async () => {
     mirrorRows = [MIRROR];
     updateError = { code: "23505" };
-    duplicateRow = { doctor_id: "d2", doctor: { arabic_first_name: "خالد", arabic_family_name: "سلهب" } };
+    duplicateRow = { doctor_id: "00000000-0000-4000-8000-0000000000d2", doctor: { arabic_first_name: "خالد", arabic_family_name: "سلهب" } };
     const res = await call({ slot: "primary", license_number: "189371", expected_status: "verified" });
     const body = await res.json();
     expect(res.status).toBe(409);

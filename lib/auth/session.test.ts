@@ -145,6 +145,30 @@ describe("lib/auth/session", () => {
     });
   });
 
+  // The API routes' check: null answers 401, a failed lookup must stay an error.
+  describe("requireAdminOrNull", () => {
+    const check = async () => (await import("./adminApi")).requireAdminOrNull();
+
+    it("is null for a visitor and for a non-admin", async () => {
+      expect(await check()).toBeNull();
+      signedIn();
+      db.queue("doctors", { data: { id: "d1", is_admin: false, is_active: true } });
+      expect(await check()).toBeNull();
+    });
+
+    it("returns an active admin", async () => {
+      signedIn();
+      db.queue("doctors", { data: { id: "d1", is_admin: true, is_active: true } });
+      expect(await check()).toEqual({ id: "d1", is_admin: true, is_active: true });
+    });
+
+    it("throws on a DB error instead of reading as not an admin", async () => {
+      signedIn();
+      db.queue("doctors", { error: { message: "boom" } });
+      await expect(check()).rejects.toEqual({ message: "boom" });
+    });
+  });
+
   it("isPhoneAuthDisabled follows its flag", async () => {
     const { isPhoneAuthDisabled } = await session();
     expect(isPhoneAuthDisabled()).toBe(false);

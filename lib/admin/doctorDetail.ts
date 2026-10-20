@@ -5,6 +5,7 @@
 // specialties, no workplaces. This assembles the whole picture, plus the two
 // licence explanations, so the panel is a plain render of it.
 
+import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { explainLicense, type LicenseExplanation } from "@/lib/moh/explain";
 import { readMirrorFreshness, readMirrorRows } from "@/lib/moh/mirror";
@@ -105,6 +106,8 @@ export async function fetchDoctorDetail(
   service: SupabaseClient,
   id: string,
 ): Promise<DoctorDetail | null> {
+  // A malformed id would fail the read with 22P02; it is simply not found.
+  if (!z.guid().safeParse(id).success) return null;
   const { data, error } = await service.from("doctors").select(DOCTOR_COLUMNS).eq("id", id).maybeSingle();
   if (error && error.code !== "PGRST116") throw new Error(`doctor read failed: ${error.message}`);
   if (!data) return null;

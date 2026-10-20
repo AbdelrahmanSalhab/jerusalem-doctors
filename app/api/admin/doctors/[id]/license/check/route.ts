@@ -33,6 +33,7 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
   if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
 
   const { id } = await ctx.params;
+  if (!z.guid().safeParse(id).success) return jsonError(404, { error: "not_found", code: "not_found" });
 
   let body: z.infer<typeof Body>;
   try {

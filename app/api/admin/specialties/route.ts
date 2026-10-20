@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
-import { requireAdmin } from "@/lib/auth/session";
+import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -13,7 +13,7 @@ const Body = z.object({
 });
 
 export const POST = withJsonErrors(async (req: Request) => {
-  const admin = await requireAdmin().catch(() => null);
+  const admin = await requireAdminOrNull();
   if (!admin) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }

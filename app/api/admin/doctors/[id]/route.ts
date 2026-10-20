@@ -17,7 +17,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
 import { approvalNeedsReason } from "@/lib/licenseStatus";
 
-export const APPROVAL_REASON_MIN = 3;
+const APPROVAL_REASON_MIN = 3;
 
 const Body = z.object({
   is_admin_approved: z.boolean().optional(),
@@ -62,6 +62,7 @@ export const PATCH = withJsonErrors(async (
   }
 
   const { id } = await ctx.params;
+  if (!z.guid().safeParse(id).success) return jsonError(404, { error: "not_found", code: "not_found" });
 
   let body: z.infer<typeof Body>;
   try {
@@ -137,6 +138,7 @@ export const DELETE = withJsonErrors(async (
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
   const { id } = await ctx.params;
+  if (!z.guid().safeParse(id).success) return jsonError(404, { error: "not_found", code: "not_found" });
   if (id === admin.id) {
     return jsonError(409, { error: "cannot_delete_self", code: "cannot_delete_self" });
   }
