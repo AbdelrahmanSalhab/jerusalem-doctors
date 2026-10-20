@@ -79,7 +79,8 @@ test("the registry synced successfully in the last 36 hours", async ({ page }) =
   await page.getByLabel("كلمة المرور").fill(PASSWORD);
   await page.getByRole("button", { name: "تسجيل الدخول" }).click();
   await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 15_000 });
-  await page.goto("/admin/audit");
+  // Only the sync events, so a busy day cannot push them off the first page.
+  await page.goto("/admin/audit?action=moh_sync_completed");
   const rows = await page.locator("summary").allInnerTexts();
   const synced = rows
     .filter((r) => r.includes("مزامنة سجل وزارة الصحة") && !r.includes("فشل"))

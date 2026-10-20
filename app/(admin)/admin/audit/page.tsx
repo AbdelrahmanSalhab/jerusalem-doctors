@@ -2,7 +2,10 @@ import { requireAdmin } from "@/lib/auth/session";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { countOf, EVENTS } from "@/lib/arabicCount";
-import { auditDetail, auditFields, auditTime, auditTimeFull, auditTitle } from "@/lib/auditText";
+import { AUDIT_ACTIONS, auditDetail, auditFields, auditTime, auditTimeFull, auditTitle } from "@/lib/auditText";
+import { auditHref, isFiltered, parseAuditParams, type AuditParams } from "@/lib/admin/auditQuery";
+import type { RawParams } from "@/lib/admin/doctorsQuery";
+import { toIlikeTerm } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -21,28 +24,34 @@ const PAGE_SIZE = 50;
 export default async function AdminAuditPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<RawParams>;
 }) {
   // The (admin) layout's check alone is not enough: Next can render this
   // page without re-running the layout. requireAdmin is request-cached.
   await requireAdmin();
-  const page = Math.max(1, Math.floor(Number((await searchParams).page)) || 1);
+  const params = parseAuditParams(await searchParams);
+  const { page } = params;
   const from = (page - 1) * PAGE_SIZE;
   const service = createSupabaseServiceClient();
-  const [{ data, error, count }, { data: institutions }] = await Promise.all([
-    service
-      .from("audit_logs")
-      .select("id, action, actor_doctor_id, target_doctor_id, metadata, created_at", { count: "exact" })
-      .order("created_at", { ascending: false })
-      // Same time? The id keeps the order stable from one page to the next.
-      .order("id", { ascending: false })
-      .range(from, from + PAGE_SIZE - 1),
+
+  // The filtering is in SQL (admin_audit_events), where the doctor match is a
+  // join and the Jerusalem days are Postgres's own time zone arithmetic.
+  const [{ data, error }, { data: institutions }] = await Promise.all([
+    service.rpc("admin_audit_events", {
+      p_action: params.action || null,
+      p_term: toIlikeTerm(params.q) || null,
+      p_from: params.from || null,
+      p_to: params.to || null,
+      p_people_only: params.people,
+      p_limit: PAGE_SIZE,
+      p_offset: from,
+    }),
     service.from("institutions").select("id, name_ar"),
   ]);
-  // PostgREST answers a page past the end with PGRST103.
-  if (error?.code === "PGRST103") redirect("/admin/audit");
-  const rows = (data ?? []) as Row[];
-  const total = count ?? 0;
+  const rows = (data ?? []) as (Row & { total: number })[];
+  // A page past the end has no rows to carry the total.
+  if (rows.length === 0 && page > 1) redirect(auditHref(params, { page: 1 }));
+  const total = rows[0]?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Names instead of ids, for whoever acted and whoever it concerned.
@@ -62,8 +71,9 @@ export default async function AdminAuditPage({
     <main className="space-y-4">
       <h1 className="text-2xl font-bold">سجل النشاط</h1>
       <p className="text-sm text-muted">
-        {countOf(total, EVENTS)} في السجل، الأحدث أولًا. الأوقات بتوقيت القدس.
+        {countOf(total, EVENTS)} {isFiltered(params) ? "تطابق التصفية" : "في السجل"}، الأحدث أولًا. الأوقات بتوقيت القدس.
       </p>
+      <AuditFilters params={params} />
       {error && (
         <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           تعذّر تحميل السجل. حاول مجددًا.
@@ -152,13 +162,15 @@ export default async function AdminAuditPage({
             </li>
           );
         })}
-        {rows.length === 0 && <li className="p-6 text-center text-muted">لا أحداث.</li>}
+        {rows.length === 0 && (
+          <li className="p-6 text-center text-muted">{isFiltered(params) ? "لا أحداث تطابق التصفية." : "لا أحداث."}</li>
+        )}
       </ul>
 
       {pages > 1 && (
         <nav aria-label="صفحات السجل" className="flex items-center justify-between gap-3 text-sm">
           {page > 1 ? (
-            <Link href={`/admin/audit?page=${page - 1}`} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
+            <Link href={auditHref(params, { page: page - 1 })} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
               السابق
             </Link>
           ) : (
@@ -168,7 +180,7 @@ export default async function AdminAuditPage({
             الصفحة {page} من {pages}
           </span>
           {page < pages ? (
-            <Link href={`/admin/audit?page=${page + 1}`} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
+            <Link href={auditHref(params, { page: page + 1 })} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
               التالي
             </Link>
           ) : (
@@ -177,5 +189,61 @@ export default async function AdminAuditPage({
         </nav>
       )}
     </main>
+  );
+}
+
+/** A plain GET form: the filters live in the URL, and no script is needed. */
+function AuditFilters({ params }: { params: AuditParams }) {
+  const box = "rounded-md border border-line bg-surface px-3 py-2 text-base";
+  return (
+    <form
+      action="/admin/audit"
+      aria-label="تصفية السجل"
+      className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-3 text-sm"
+    >
+      <label className="flex flex-col gap-1">
+        <span className="text-muted">الحدث</span>
+        <select name="action" defaultValue={params.action} className={box}>
+          <option value="">كل الأحداث</option>
+          {AUDIT_ACTIONS.map((a) => (
+            <option key={a} value={a}>
+              {auditTitle(a)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
+        <span className="text-muted">الطبيب</span>
+        <input
+          type="search"
+          name="q"
+          defaultValue={params.q}
+          placeholder="الاسم، الترخيص، أو الهاتف"
+          className={box}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted">من</span>
+        <input type="date" name="from" defaultValue={params.from} className={box} />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-muted">إلى</span>
+        <input type="date" name="to" defaultValue={params.to} className={box} />
+      </label>
+      <label className="flex items-center gap-2 py-2">
+        <input type="checkbox" name="people" value="1" defaultChecked={params.people} />
+        <span>إخفاء الأحداث التلقائية</span>
+      </label>
+      <div className="flex gap-2">
+        <button type="submit" className="rounded-md border border-foreground bg-foreground/5 px-4 py-2 font-semibold">
+          تصفية
+        </button>
+        {isFiltered(params) && (
+          <Link href="/admin/audit" className="rounded-md border border-line px-4 py-2 hover:bg-foreground/5">
+            مسح
+          </Link>
+        )}
+      </div>
+    </form>
   );
 }

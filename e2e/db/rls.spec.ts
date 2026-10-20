@@ -142,6 +142,7 @@ test.describe("row-level security", () => {
     // saving someone else's profile would be the escalation.
     const ARGS: Record<string, Record<string, unknown>> = {
       admin_stats: {},
+      admin_audit_events: {},
       save_doctor_profile: { p_doctor_id: ids.laila, p_updates: { bio: "x" }, p_specialty_ids: null, p_workplaces: null },
     };
     for (const fn of Object.keys(ARGS)) {
