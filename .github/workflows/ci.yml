@@ -11,9 +11,9 @@ concurrency:
 
 jobs:
   check:
-    # Pinned: ubuntu-latest moves to Ubuntu 26 from 2026-10-19, which can
-    # change the browser system libraries under us. Upgrade on purpose.
-    runs-on: ubuntu-24.04
+    # Pinned to the current LTS on purpose: a moving label (ubuntu-latest)
+    # can change the browser system libraries without a commit.
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -35,7 +35,7 @@ jobs:
   # Playwright (database security, the API permission table, user journeys
   # on desktop Chrome and iPhone WebKit). See e2e/README.md.
   e2e:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
