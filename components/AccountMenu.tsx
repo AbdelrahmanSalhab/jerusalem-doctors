@@ -63,10 +63,14 @@ export function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="حسابي"
+        // The badge's number is visible text, so the name has to include it.
+        aria-label={isAdmin && pending > 0 ? `حسابي، ${pending} بانتظار القبول` : "حسابي"}
         className="relative flex rounded-full ring-1 ring-line hover:ring-foreground/40"
       >
-        <Avatar url={photoUrl} fallback={firstName} size="sm" alt="" />
+        {/* Decorative: the button's name is its label, not the initial. */}
+        <span aria-hidden="true" className="flex">
+          <Avatar url={photoUrl} fallback={firstName} size="sm" alt="" />
+        </span>
         {/* Admins see here that someone is waiting, without a tabs row. */}
         {isAdmin && pending > 0 && (
           <span

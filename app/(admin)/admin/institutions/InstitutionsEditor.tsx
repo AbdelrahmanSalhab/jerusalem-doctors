@@ -123,11 +123,11 @@ export function InstitutionsEditor({
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">إضافة مؤسسة</h2>
         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <input id="new-name-ar" className="input" placeholder="الاسم بالعربية" value={draft.name_ar}
+          <input id="new-name-ar" className="input" aria-label="الاسم بالعربية" placeholder="الاسم بالعربية" value={draft.name_ar}
             onChange={(e) => setDraft({ ...draft, name_ar: e.target.value })} />
-          <input id="new-name-he" className="input" dir="rtl" placeholder="الاسم بالعبرية (اختياري)" value={draft.name_he}
+          <input id="new-name-he" className="input" dir="rtl" aria-label="الاسم بالعبرية" placeholder="الاسم بالعبرية (اختياري)" value={draft.name_he}
             onChange={(e) => setDraft({ ...draft, name_he: e.target.value })} />
-          <select id="new-kind" className="input" value={draft.kind}
+          <select id="new-kind" className="input" aria-label="نوع المؤسسة" value={draft.kind}
             onChange={(e) => setDraft({ ...draft, kind: e.target.value as InstitutionKind })}>
             {INSTITUTION_KINDS.map((k) => (
               <option key={k} value={k}>{INSTITUTION_KIND_LABEL[k]}</option>

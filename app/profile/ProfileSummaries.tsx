@@ -155,7 +155,7 @@ export function WorkplacesSummary({ workplaces }: { workplaces: WorkplaceEntry[]
           </span>
           <span>{w.name}</span>
           {workplaceInfoLine(w) && (
-            <span className="text-foreground/60">({workplaceInfoLine(w)})</span>
+            <span className="text-muted">({workplaceInfoLine(w)})</span>
           )}
         </li>
       ))}

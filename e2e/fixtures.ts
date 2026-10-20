@@ -23,7 +23,13 @@ const EXPECTED: RegExp[] = [
   /^http 401 POST \/api\/login\/password/,
   // Visiting /admin as a doctor is a 404 by design.
   /^http 404 GET \/admin$/,
-  /^console\.error Failed to load resource: the server responded with a status of (401|404)/,
+  /^console\.error Failed to load resource: .* status of 401 .*\[\/api\/login\/password\]$/,
+  /^console\.error Failed to load resource: .* status of 404 .*\[\/admin\]$/,
+  // The photo test uploads a text file named .png on purpose.
+  /^(http 415 POST |console\.error Failed to load resource: .* status of 415 .*\[)\/api\/profile\/photo/,
+  // next.config.ts optimises https Supabase images; the local stack serves
+  // them over http from 127.0.0.1, so the optimiser refuses them here only.
+  /^(http 400 GET |console\.error Failed to load resource: .* status of 400 .*\[)\/_next\/image/,
   // The WhatsApp test aborts the wa.me navigation it triggers.
   /^requestfailed .*wa\.me/,
   // Vercel Analytics' script is served by Vercel's edge only; the local
@@ -44,7 +50,9 @@ export const test = base.extend<{ diagnostics: Issue[] }>({
       const here = () => page.url().replace(/^https?:\/\/[^/]+/, "");
       page.on("console", (m) => {
         if (m.type() === "error" || m.type() === "warning") {
-          issues.push({ kind: `console.${m.type()}` as Issue["kind"], text: m.text().slice(0, 300), url: here() });
+          // "Failed to load resource" names no URL; the message's location does.
+          const where = m.text().startsWith("Failed to load resource") ? ` [${m.location().url.replace(/^https?:\/\/[^/]+/, "")}]` : "";
+          issues.push({ kind: `console.${m.type()}` as Issue["kind"], text: m.text().slice(0, 300) + where, url: here() });
         }
       });
       page.on("pageerror", (e) => issues.push({ kind: "pageerror", text: String(e).slice(0, 300), url: here() }));

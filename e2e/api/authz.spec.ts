@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
-import { BASE_URL, CRON_SECRET, type Role } from "../env";
+import { ANON_KEY, BASE_URL, CRON_SECRET, SUPABASE_URL, type Role } from "../env";
 import { stateFile } from "../helpers";
 
 type Policy =
@@ -137,5 +137,20 @@ test.describe("machine callers", () => {
     });
     expect(res.status()).toBe(401);
     await ctx.dispose();
+  });
+
+  // The path every real login SMS takes: Supabase Auth signs a call to our
+  // hook, the hook checks the signature and hands the code to the provider
+  // (the mock here). A 200 from Auth means all of that worked. CI only: on
+  // Docker Desktop the Auth container cannot reach an app running in WSL.
+  test("Supabase Auth delivers a code through the signed SMS hook", async () => {
+    test.skip(!process.env.CI, "needs Docker networking to reach the app");
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+      method: "POST",
+      headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
+      // Not one of the test numbers, so a code is really generated and sent.
+      body: JSON.stringify({ phone: "+972521110077" }),
+    });
+    expect(res.status, await res.text()).toBe(200);
   });
 });

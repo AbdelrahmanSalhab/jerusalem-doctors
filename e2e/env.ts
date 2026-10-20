@@ -37,6 +37,9 @@ export const ACCOUNTS = {
 } as const;
 export type Role = keyof typeof ACCOUNTS;
 
+/** Accounts a single test creates and removes (e.g. the deletion request). */
+export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test"];
+
 /** Everything the app reads from its environment, for both build and start. */
 export function appEnv(): Record<string, string> {
   return {
@@ -48,7 +51,7 @@ export function appEnv(): Record<string, string> {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_SITE_KEY,
     TURNSTILE_SECRET_KEY,
     DEV_LOGIN: "1",
-    DEV_LOGIN_EMAILS: Object.values(ACCOUNTS).join(","),
+    DEV_LOGIN_EMAILS: [...Object.values(ACCOUNTS), ...THROWAWAY_ACCOUNTS].join(","),
     OTP_PROVIDER: "mock",
     SEND_SMS_HOOK_SECRET: "v1,whsec_ZTJlLXRlc3QtaG9vay1zZWNyZXQtZm9yLWNp",
     CRON_SECRET,
