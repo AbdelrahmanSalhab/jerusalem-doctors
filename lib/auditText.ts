@@ -31,6 +31,9 @@ const TITLE: Record<string, string> = {
   moh_sync_failed: "فشل مزامنة سجل وزارة الصحة",
 };
 
+/** Every action the log knows a name for, in the order above. */
+export const AUDIT_ACTIONS = Object.keys(TITLE);
+
 export function auditTitle(action: string): string {
   return TITLE[action] ?? action;
 }
