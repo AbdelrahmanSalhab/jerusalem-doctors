@@ -19,6 +19,7 @@ const TITLE: Record<string, string> = {
   admin_doctor_deleted: "حذف نهائي لحساب",
   admin_license_rechecked: "إعادة فحص الترخيص",
   admin_license_corrected: "تصحيح رقم الترخيص",
+  dev_password_login: "دخول فريق التطوير بكلمة مرور",
   institution_created: "إضافة مؤسسة",
   institution_updated: "تعديل مؤسسة",
   institution_deleted: "حذف مؤسسة",
@@ -89,6 +90,8 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
     case "admin_license_rechecked":
     case "admin_license_corrected":
       return licenseCheckDetail(m);
+    case "dev_password_login":
+      return [m.email, m.is_admin ? "بصلاحيات إدارة" : ""].filter(Boolean).join(" · ");
     case "institution_created":
       return [quote(m.name_ar), typeof m.linked === "number" ? `أماكن عمل مربوطة: ${m.linked}` : ""]
         .filter(Boolean)
@@ -151,6 +154,7 @@ const FIELD_LABEL: Record<string, string> = {
   registry_first_name: "الاسم الأول في السجل",
   registry_family_name: "اسم العائلة في السجل",
   reason: "السبب",
+  email: "البريد الإلكتروني",
   career_stage: "المرحلة المهنية",
   residency_start_year: "سنة بداية التخصص",
   featured: "العرض في لوحة البحث",
