@@ -16,6 +16,15 @@ describe("audit log text", () => {
       .toBe("بانتظار موافقة الإدارة · الترخيص غير موجود في السجل");
   });
 
+  it("marks the production smoke test's sign-ins as automated", () => {
+    const run = "https://github.com/a/b/actions/runs/1";
+    expect(auditDetail({ action: "dev_password_login", metadata: { email: "x@y.z", is_admin: true, ci_run: run } }, none))
+      .toBe("اختبار آلي (CI) · x@y.z · بصلاحيات إدارة");
+    expect(auditDetail({ action: "dev_password_login", metadata: { email: "x@y.z", is_admin: false } }, none)).toBe("x@y.z");
+    const field = auditFields({ action: "dev_password_login", metadata: { ci_run: run } }, none)[0];
+    expect(field).toEqual({ label: "تشغيل الاختبار الآلي", value: run, ltr: true });
+  });
+
   it("never shows the IP kept with a deletion request", () => {
     expect(auditDetail({ action: "delete_requested", metadata: { ip: "1.2.3.4" } }, none)).not.toContain("1.2.3.4");
   });

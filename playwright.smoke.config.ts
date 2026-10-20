@@ -1,0 +1,22 @@
+// Read-only checks against production (.github/workflows/smoke.yml). Signs
+// in with a real admin account through /login/dev; every same-origin request
+// carries x-ci-run so the activity log marks it as a test and its searches
+// stay out of the stats (lib/ciRun.ts). Changes nothing.
+
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./e2e/smoke",
+  outputDir: "./e2e/.results/smoke",
+  workers: 1,
+  retries: 1,
+  timeout: 45_000,
+  reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
+  use: {
+    baseURL: process.env.SMOKE_BASE_URL ?? "https://jerusalem-doctors.vercel.app",
+    locale: "ar",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    ...devices["Desktop Chrome"],
+  },
+});

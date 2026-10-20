@@ -9,6 +9,7 @@
 // from "wrong password" would turn this route into a way to discover which
 // addresses are allowlisted, which is the one thing worth knowing about it.
 
+import { ciRunOf } from "@/lib/ciRun";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { writeAudit } from "@/lib/audit";
@@ -80,7 +81,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     actor_doctor_id: doctor.data.id,
     action: "dev_password_login",
     target_doctor_id: doctor.data.id,
-    metadata: { email, is_admin: doctor.data.is_admin },
+    metadata: { email, is_admin: doctor.data.is_admin, ...(ciRunOf(req) ? { ci_run: ciRunOf(req) } : {}) },
   });
 
   return jsonOk({ ok: true, is_admin_approved: doctor.data.is_admin_approved });

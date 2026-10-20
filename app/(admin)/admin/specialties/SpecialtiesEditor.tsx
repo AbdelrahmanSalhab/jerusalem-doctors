@@ -46,6 +46,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                 <td className="p-3 text-center" dir="ltr">
                   <input
                     type="number"
+                    aria-label={`ترتيب ${r.name_ar}`}
                     defaultValue={r.sort_order ?? 0}
                     onBlur={(e) =>
                       update(r.id, { sort_order: Number(e.target.value) })
@@ -55,6 +56,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                 </td>
                 <td className="p-3 text-center">
                   <input
+                    aria-label={`الاسم بالعربية: ${r.name_ar}`}
                     defaultValue={r.name_ar}
                     onBlur={(e) => update(r.id, { name_ar: e.target.value })}
                     className="rounded border border-line bg-transparent px-2 py-1 text-center"
@@ -62,6 +64,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                 </td>
                 <td className="p-3 text-center" dir="auto">
                   <input
+                    aria-label={`الاسم بالعبرية: ${r.name_ar}`}
                     defaultValue={r.name_he ?? ""}
                     onBlur={(e) => update(r.id, { name_he: e.target.value })}
                     className="rounded border border-line bg-transparent px-2 py-1 text-center"
@@ -69,6 +72,7 @@ export function SpecialtiesEditor({ rows }: { rows: Row[] }) {
                 </td>
                 <td className="p-3 text-center" dir="ltr">
                   <input
+                    aria-label={`الاسم بالإنجليزية: ${r.name_ar}`}
                     defaultValue={r.name_en ?? ""}
                     onBlur={(e) => update(r.id, { name_en: e.target.value })}
                     className="rounded border border-line bg-transparent px-2 py-1 text-center"
@@ -132,6 +136,7 @@ function NewSpecialtyRow() {
     >
       <label className="text-sm font-medium">إضافة تخصص جديد:</label>
       <input
+        aria-label="التخصص الجديد بالعربية"
         placeholder="بالعربية"
         value={nameAr}
         onChange={(e) => setNameAr(e.target.value)}
@@ -139,6 +144,7 @@ function NewSpecialtyRow() {
         required
       />
       <input
+        aria-label="التخصص الجديد بالعبرية"
         placeholder="بالعبرية"
         dir="auto"
         value={nameHe}
@@ -146,6 +152,7 @@ function NewSpecialtyRow() {
         className="rounded border border-line bg-transparent px-2 py-1 text-sm"
       />
       <input
+        aria-label="التخصص الجديد بالإنجليزية"
         placeholder="English"
         dir="ltr"
         value={nameEn}

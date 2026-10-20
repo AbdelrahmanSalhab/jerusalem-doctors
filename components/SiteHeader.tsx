@@ -40,7 +40,8 @@ export async function SiteHeader() {
           <span className="shrink-0 rounded-lg bg-white p-1 shadow-sm ring-1 ring-line">
             <Image
               src="/logo.jpeg"
-              alt={SITE_NAME_AR}
+              // The name is written right beside it; alt would say it twice.
+              alt=""
               width={64}
               height={64}
               priority

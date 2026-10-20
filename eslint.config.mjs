@@ -5,6 +5,16 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // A missing await in a Playwright test is the classic flaky test: the step
+  // races the next one. Typed linting only where it pays for itself.
+  {
+    files: ["e2e/**/*.ts"],
+    languageOptions: { parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname } },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/await-thenable": "error",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

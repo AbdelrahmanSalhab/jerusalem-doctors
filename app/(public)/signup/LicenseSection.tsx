@@ -32,7 +32,7 @@ export function LicenseSection({
           dir="ltr"
           autoComplete="tel"
           inputMode="tel"
-          pattern="[0-9+\-\s()]*"
+          pattern="[0-9+\-\s\(\)]*"
           className="input"
           value={form.phone}
           onChange={(e) => update("phone", cleanPhone(e.target.value))}
@@ -83,7 +83,8 @@ export function LicenseSection({
           required
           dir="ltr"
           inputMode={form.license_region === "IL" ? "numeric" : "text"}
-          pattern={form.license_region === "IL" ? "[0-9-]*" : undefined}
+          // Escaped for the v flag browsers now compile patterns with.
+          pattern={form.license_region === "IL" ? "[0-9\\-]*" : undefined}
           className="input"
           placeholder={form.license_region === "IL" ? "189371" : undefined}
           value={form.license_number}

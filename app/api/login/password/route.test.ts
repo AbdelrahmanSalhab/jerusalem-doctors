@@ -31,12 +31,12 @@ vi.mock("@/lib/supabase/service", () => ({
   }),
 }));
 
-async function call(body: unknown) {
+async function call(body: unknown, extra: Record<string, string> = {}) {
   const { POST } = await import("./route");
   return POST(
     new Request("https://example.test/api/login/password", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-forwarded-for": "1.2.3.4" },
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "1.2.3.4", ...extra },
       body: JSON.stringify(body),
     }),
   );
@@ -148,6 +148,12 @@ describe("the record", () => {
       actor_doctor_id: "d1",
       metadata: { email: "dev@example.com", is_admin: true },
     });
+    expect(audits[0].metadata).not.toHaveProperty("ci_run");
+  });
+
+  it("names the CI run when the production smoke test signs in", async () => {
+    await call(GOOD, { "x-ci-run": "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123" });
+    expect(audits[0]).toMatchObject({ metadata: { ci_run: "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123" } });
   });
 
   it("slows guessing down", async () => {
