@@ -200,6 +200,49 @@ describe("POST .../license/save", () => {
     expect(audits[0]).toMatchObject({ metadata: { slot: "secondary" } });
   });
 
+  // A partial match is a spelling difference, not a different person: the one
+  // way to make it read "موثّق" honestly is to stop storing the spelling the
+  // registry disagrees with.
+  it("takes the registry's spelling and the exact match that follows from it", async () => {
+    doctor = { ...DOCTOR, hebrew_first_name: "דנאל", license_number: "189371", license_verification_status: "soft_match" };
+    mirrorRows = [MIRROR];
+    const res = await call({
+      slot: "primary",
+      license_number: "189371",
+      expected_status: "soft_match",
+      adopt_registry_name: true,
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()).hebrew_name_changed).toBe(true);
+    expect(updates[0]).toMatchObject({
+      hebrew_first_name: "דניאל",
+      hebrew_family_name: "דריפוס",
+      license_verification_status: "verified",
+    });
+    expect(audits[0]).toMatchObject({
+      metadata: { adopted_registry_name: true, hebrew_name_before: "דנאל דריפוס", hebrew_name_after: "דניאל דריפוס" },
+    });
+  });
+
+  it("leaves the name alone, and the partial match standing, when not asked to adopt", async () => {
+    doctor = { ...DOCTOR, hebrew_first_name: "דנאל", license_number: "189371", license_verification_status: "not_found" };
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "soft_match" });
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ license_verification_status: "soft_match" });
+    expect(updates[0]).not.toHaveProperty("hebrew_first_name");
+  });
+
+  // Adopting there would rewrite a doctor into whoever holds the number.
+  it("refuses to adopt a name the registry gives to someone else", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [{ ...MIRROR, hebrew_first_name: "משה", hebrew_first_norm: "משה" }];
+    const res = await call({ slot: "primary", license_number: "189371", adopt_registry_name: true });
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("name_not_adoptable");
+    expect(updates).toEqual([]);
+  });
+
   it("404s for a doctor that does not exist", async () => {
     doctor = null;
     expect((await call({ slot: "primary", license_number: "189371" })).status).toBe(404);

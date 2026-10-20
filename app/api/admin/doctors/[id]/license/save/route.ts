@@ -12,6 +12,7 @@ import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { writeAudit } from "@/lib/audit";
 import {
+  adoptableName,
   checkLicense,
   findDuplicate,
   LICENSE_ROW_COLUMNS,
@@ -31,6 +32,9 @@ const Body = z.object({
   region: z.enum(["IL", "PS"]).optional(),
   /** What the admin was shown; a mismatch means the answer moved. */
   expected_status: z.string().nullable().optional(),
+  /** Store the registry's spelling of the Hebrew name instead of ours, which
+   *  is what turns a partial match into a real one. Only for a soft match. */
+  adopt_registry_name: z.boolean().optional(),
   override_name_mismatch: z.boolean().optional(),
   reason: z.string().trim().min(3).max(300).optional(),
 });
@@ -76,15 +80,18 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     });
   }
 
-  let outcome;
-  try {
-    outcome = await checkLicense(service, {
+  const lookUp = (first: string | null, family: string | null) =>
+    checkLicense(service, {
       slot: body.slot,
       region,
       licenseNumber: body.license_number,
-      hebrewFirstName: doctor.hebrew_first_name,
-      hebrewFamilyName: doctor.hebrew_family_name,
+      hebrewFirstName: first,
+      hebrewFamilyName: family,
     });
+
+  let outcome;
+  try {
+    outcome = await lookUp(doctor.hebrew_first_name, doctor.hebrew_family_name);
   } catch (err) {
     if (err instanceof MohUnavailableError) {
       return jsonError(503, { error: "moh_unavailable", code: "moh_unavailable" });
@@ -98,6 +105,30 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
       error: "result_changed",
       code: "result_changed",
     });
+  }
+
+  // Taking the registry's spelling of the name. The status is still the
+  // matcher's: we swap the name in and ask again, rather than writing the
+  // "verified" the client asked for. If that second answer is not an exact
+  // match the premise was wrong and nothing is saved.
+  let adopted: { first: string; family: string } | null = null;
+  if (body.adopt_registry_name) {
+    adopted = adoptableName(outcome);
+    if (adopted) {
+      try {
+        const after = await lookUp(adopted.first, adopted.family);
+        if (after.status === "verified") outcome = after;
+        else adopted = null;
+      } catch (err) {
+        if (err instanceof MohUnavailableError) {
+          return jsonError(503, { error: "moh_unavailable", code: "moh_unavailable" });
+        }
+        throw err;
+      }
+    }
+    if (!adopted) {
+      return jsonError(409, { error: "name_not_adoptable", code: "name_not_adoptable" });
+    }
   }
 
   // The number belongs to someone else in the registry. Storable only once an
@@ -117,10 +148,13 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
   const nextStatus = toColumnStatus(outcome.status, body.override_name_mismatch);
   const numberChanged = stored.number !== outcome.checkedNumber || stored.region !== region;
   const statusChanged = stored.status !== nextStatus;
+  const nameChanged =
+    adopted !== null &&
+    (adopted.first !== doctor.hebrew_first_name || adopted.family !== doctor.hebrew_family_name);
 
   // Nothing to do. Worth saying rather than writing: a no-op update would
   // still fire the licence-slot trigger.
-  if (!numberChanged && !statusChanged) {
+  if (!numberChanged && !statusChanged && !nameChanged) {
     return jsonOk({ ok: true, changed: false, status: nextStatus, checked_number: outcome.checkedNumber });
   }
 
@@ -130,6 +164,13 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     [cols.region]: region,
     [cols.status]: nextStatus,
   };
+  // The Hebrew name is the doctor's, not the slot's: the other slot's stored
+  // verdict was reached against the old spelling and is not re-run here, the
+  // same way an admin's profile edit leaves it to be redone.
+  if (nameChanged && adopted) {
+    updates.hebrew_first_name = adopted.first;
+    updates.hebrew_family_name = adopted.family;
+  }
   // Only the primary slot has a verified-at column, and it has always meant
   // "matched approximately or better".
   if (body.slot === "primary") {
@@ -169,10 +210,23 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
       ...(outcome.match ? { match_first: outcome.match.first, match_family: outcome.match.family } : {}),
       ...(outcome.candidates.length > 1 ? { candidates: outcome.candidates } : {}),
       ...(overriding ? { override_name_mismatch: true } : {}),
+      ...(nameChanged && adopted
+        ? {
+            adopted_registry_name: true,
+            hebrew_name_before: `${doctor.hebrew_first_name ?? ""} ${doctor.hebrew_family_name ?? ""}`.trim(),
+            hebrew_name_after: `${adopted.first} ${adopted.family}`,
+          }
+        : {}),
       ...(body.reason ? { reason: body.reason } : {}),
     },
   });
 
-  return jsonOk({ ok: true, changed: true, status: nextStatus, checked_number: outcome.checkedNumber });
+  return jsonOk({
+    ok: true,
+    changed: true,
+    status: nextStatus,
+    checked_number: outcome.checkedNumber,
+    hebrew_name_changed: nameChanged,
+  });
 });
 

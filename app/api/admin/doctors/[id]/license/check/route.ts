@@ -8,6 +8,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import {
+  adoptableName,
   checkLicense,
   findDuplicate,
   LICENSE_ROW_COLUMNS,
@@ -93,6 +94,10 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     match: outcome.match,
     explanation: outcome.explanation,
     checkable: outcome.checkable,
+    // The two spellings side by side, and the one word that settles a partial
+    // match: what we hold, and what the registry would have us hold instead.
+    our_name: { firstName: doctor.hebrew_first_name, familyName: doctor.hebrew_family_name },
+    adoptable_name: adoptableName(outcome),
     duplicate_of: duplicate,
     same_as_stored: stored.number === outcome.checkedNumber && stored.region === region,
     stored_status: stored.status,

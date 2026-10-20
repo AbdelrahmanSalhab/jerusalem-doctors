@@ -22,6 +22,9 @@ interface CheckResult {
   registry: { firstName: string | null; familyName: string | null; specialtyHe: string | null } | null;
   explanation: LicenseExplanation;
   checkable: boolean;
+  our_name: { firstName: string | null; familyName: string | null };
+  /** The registry's spelling, when taking it would make the match exact. */
+  adoptable_name: { first: string; family: string } | null;
   duplicate_of: { id: string; name: string } | null;
   same_as_stored: boolean;
   stored_status: string | null;
@@ -85,7 +88,7 @@ export function LicenseCheckPanel({
     }
   };
 
-  const save = async () => {
+  const save = async (adoptName = false) => {
     if (!result) return;
     setBusy(true);
     setError(null);
@@ -95,6 +98,7 @@ export function LicenseCheckPanel({
         license_number: result.checked_number,
         region,
         expected_status: result.column_status,
+        ...(adoptName ? { adopt_registry_name: true } : {}),
         ...(override ? { override_name_mismatch: true, reason: reason.trim() } : {}),
       });
       if (!ok) {
@@ -105,7 +109,12 @@ export function LicenseCheckPanel({
         setSaved("هذا هو الرقم المحفوظ والحالة لم تتغيّر، لا شيء ليُحفظ.");
         return;
       }
-      setSaved(`حُفظ الرقم ${payload.checked_number} والحالة: ${licenseStatusLabel(payload.status)}.`);
+      setSaved(
+        `حُفظ الرقم ${payload.checked_number} والحالة: ${licenseStatusLabel(payload.status)}.` +
+          (payload.hebrew_name_changed
+            ? " واعتُمدت كتابة السجل للاسم العبري؛ إن كان للطبيب ترخيص آخر فأعد فحصه."
+            : ""),
+      );
       setResult(null);
       router.refresh();
     } catch {
@@ -130,6 +139,8 @@ export function LicenseCheckPanel({
   const registryName = result?.registry
     ? `${result.registry.firstName ?? ""} ${result.registry.familyName ?? ""}`.trim()
     : "";
+  const ourName = result ? `${result.our_name.firstName ?? ""} ${result.our_name.familyName ?? ""}`.trim() : "";
+  const adoptable = Boolean(result?.adoptable_name);
   const mismatch = result?.status === "name_mismatch";
   const canSave = Boolean(result) && (!mismatch || (override && reason.trim().length >= 3));
 
@@ -200,6 +211,11 @@ export function LicenseCheckPanel({
               )}
             </p>
           )}
+          {adoptable && (
+            <p>
+              المسجَّل لدينا: <span dir="ltr">{ourName}</span>
+            </p>
+          )}
           {result.source === "live" && <p className="text-xs text-muted">بحث مباشر في موقع الوزارة الآن.</p>}
           {result.checked_number !== number.trim() && (
             <p className="text-xs text-muted">
@@ -242,16 +258,40 @@ export function LicenseCheckPanel({
             </div>
           )}
 
+          {/* The one action that settles a partial match. The number is the
+              registry's and only the spelling of the name differs, so taking
+              the registry's spelling makes the match exact — which is the
+              only way "موثّق" can be true rather than merely asserted. */}
+          {adoptable && (
+            <div className="flex flex-col gap-1.5 rounded-md border border-success-line bg-surface p-2">
+              <p>
+                اعتماد كتابة السجل يستبدل الاسم العبري المسجَّل لدينا بـ{" "}
+                <span dir="ltr">{registryName}</span>، فتصبح الحالة{" "}
+                <span className={toneChip("success")}>{licenseStatusLabel("verified")}</span>.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => save(true)}
+                className="w-fit rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-40"
+              >
+                اعتماد كتابة السجل وحفظها
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <button
               type="button"
               disabled={busy || !canSave}
-              onClick={save}
+              onClick={() => save()}
               className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-40"
             >
               {result.same_as_stored && result.column_status === result.stored_status
                 ? "لا شيء ليُحفظ"
-                : "حفظ هذا الرقم"}
+                : adoptable
+                  ? "حفظ كما هو"
+                  : "حفظ هذا الرقم"}
             </button>
             <button
               type="button"
