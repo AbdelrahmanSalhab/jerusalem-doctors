@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
-import { ANON_KEY, BASE_URL, CRON_SECRET, SUPABASE_URL, type Role } from "../env";
+import { ANON_KEY, BASE_URL, CRON_SECRET, STUB_URL, SUPABASE_URL, type Role } from "../env";
 import { stateFile } from "../helpers";
 
 type Policy =
@@ -143,17 +143,26 @@ test.describe("machine callers", () => {
   });
 
   // The path every real login SMS takes: Supabase Auth signs a call to our
-  // hook, the hook checks the signature and hands the code to the provider
-  // (the mock here). A 200 from Auth means all of that worked. CI only: on
-  // Docker Desktop the Auth container cannot reach an app running in WSL.
-  test("Supabase Auth delivers a code through the signed SMS hook", async () => {
+  // hook, the hook checks the signature and sends through SMS4FREE (the stub
+  // here), and the code that arrives signs the doctor in. CI only: on Docker
+  // Desktop the Auth container cannot reach an app running in WSL.
+  test("a login code goes Supabase -> signed hook -> SMS4FREE, and works", async () => {
     test.skip(!process.env.CI, "needs Docker networking to reach the app");
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
-      method: "POST",
-      headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
-      // Not one of the test numbers, so a code is really generated and sent.
-      body: JSON.stringify({ phone: "+972521110077" }),
-    });
+    // Not one of the test numbers, so a code is really generated and sent.
+    const phone = "+972521110077";
+    const headers = { apikey: ANON_KEY, "Content-Type": "application/json" };
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, { method: "POST", headers, body: JSON.stringify({ phone }) });
     expect(res.status, await res.text()).toBe(200);
+
+    const inbox = (await (await fetch(`${STUB_URL}/sms4free/messages?to=0521110077`)).json()) as { msg: string; sender: string }[];
+    expect(inbox.length).toBeGreaterThan(0);
+    const { msg, sender } = inbox[inbox.length - 1];
+    expect(sender).toBe("JDoctors");
+    const code = msg.match(/\d{6}/)?.[0];
+    expect(code, msg).toBeTruthy();
+
+    const verify = await fetch(`${SUPABASE_URL}/auth/v1/verify`, { method: "POST", headers, body: JSON.stringify({ phone, token: code, type: "sms" }) });
+    expect(verify.status).toBe(200);
+    expect(((await verify.json()) as { access_token?: string }).access_token).toBeTruthy();
   });
 });

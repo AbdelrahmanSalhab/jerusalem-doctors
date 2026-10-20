@@ -1,7 +1,8 @@
 # Integration and browser tests
 
 Playwright, against the real production build, a local Supabase built from
-`supabase/migrations`, and a local Redis for rate limits. CI runs the same
+`supabase/migrations`, and a local Redis for rate limits, and `stubs.mjs` standing in for data.gov.il and
+SMS4FREE. CI runs the same
 thing in the `e2e` job.
 
 ## Run locally

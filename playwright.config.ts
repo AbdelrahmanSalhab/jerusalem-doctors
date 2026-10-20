@@ -3,7 +3,7 @@
 // e2e/README.md for running them.
 
 import { defineConfig, devices } from "@playwright/test";
-import { appEnv, BASE_URL, MOH_STUB_PORT, PORT } from "./e2e/env";
+import { appEnv, BASE_URL, PORT, STUB_URL } from "./e2e/env";
 
 const CI = !!process.env.CI;
 
@@ -44,8 +44,8 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "node e2e/mohStub.mjs",
-      url: `http://127.0.0.1:${MOH_STUB_PORT}/health`,
+      command: "node e2e/stubs.mjs",
+      url: `${STUB_URL}/health`,
       reuseExistingServer: !CI,
     },
     {

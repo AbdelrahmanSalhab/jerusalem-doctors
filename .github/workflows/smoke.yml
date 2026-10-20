@@ -51,3 +51,5 @@ jobs:
           name: smoke-results
           path: e2e/.results
           retention-days: 14
+          # The folders start with a dot, which upload-artifact skips by default.
+          include-hidden-files: true

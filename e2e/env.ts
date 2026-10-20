@@ -23,8 +23,9 @@ export const CRON_SECRET = "e2e-cron-secret";
 export const TURNSTILE_SITE_KEY = "1x00000000000000000000AA";
 export const TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA";
 
-/** The registry stub (e2e/mohStub.ts), standing in for data.gov.il. */
-export const MOH_STUB_PORT = 3124;
+/** e2e/stubs.mjs: data.gov.il's registry and SMS4FREE's send API. */
+export const STUB_PORT = 3124;
+export const STUB_URL = `http://127.0.0.1:${STUB_PORT}`;
 
 export const PASSWORD = "e2e-password-123";
 
@@ -52,10 +53,17 @@ export function appEnv(): Record<string, string> {
     TURNSTILE_SECRET_KEY,
     DEV_LOGIN: "1",
     DEV_LOGIN_EMAILS: [...Object.values(ACCOUNTS), ...THROWAWAY_ACCOUNTS].join(","),
-    OTP_PROVIDER: "mock",
+    // The production provider, pointed at the stub: the mock sender refuses
+    // to run in a production build, and this is the path real codes take.
+    OTP_PROVIDER: "sms4free",
+    SMS4FREE_API_URL: `${STUB_URL}/sms4free/send`,
+    SMS4FREE_KEY: "e2e-key",
+    SMS4FREE_USER: "0500000000",
+    SMS4FREE_PASS: "e2e-pass",
+    SMS4FREE_SENDER: "JDoctors",
     SEND_SMS_HOOK_SECRET: "v1,whsec_ZTJlLXRlc3QtaG9vay1zZWNyZXQtZm9yLWNp",
     CRON_SECRET,
-    MOH_API_BASE: `http://127.0.0.1:${MOH_STUB_PORT}/api/3`,
+    MOH_API_BASE: `${STUB_URL}/api/3`,
     NEXT_TELEMETRY_DISABLED: "1",
   };
 }
