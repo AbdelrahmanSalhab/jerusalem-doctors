@@ -103,6 +103,9 @@ function licenseCheckDetail(m: Record<string, unknown>): string {
   const after = isLicenseStatus(m.license_status_after) ? licenseStatusSentence(m.license_status_after) : null;
   if (after && before !== after) parts.push(`${before ?? UNCHECKED_SENTENCE} ← ${after}`);
   else if (after) parts.push(after);
+  if (m.adopted_registry_name) {
+    parts.push(`الاسم العبري: ${quote(m.hebrew_name_before)} ← ${quote(m.hebrew_name_after)} (كتابة السجل)`);
+  }
   if (m.reason) parts.push(`السبب: ${quote(m.reason)}`);
   return parts.join(" · ");
 }
