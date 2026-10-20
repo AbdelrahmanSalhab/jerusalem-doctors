@@ -24,6 +24,7 @@ export const PATCH = withJsonErrors(async (
   }
 
   const { id } = await ctx.params;
+  if (!z.guid().safeParse(id).success) return jsonError(404, { error: "not_found", code: "not_found" });
 
   let body: z.infer<typeof Body>;
   try {

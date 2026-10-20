@@ -18,7 +18,7 @@ async function create(body: unknown) {
 
 async function patch(body: unknown) {
   const { PATCH } = await import("./[id]/route");
-  return PATCH(jsonRequest("/api/admin/specialties/s1", body), { params: Promise.resolve({ id: "s1" }) });
+  return PATCH(jsonRequest("/api/admin/specialties/s1", body), { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000005a1" }) });
 }
 
 describe("admin specialties", () => {
@@ -70,7 +70,7 @@ describe("admin specialties", () => {
         name_ar_normalized: "اسعاف",
         is_active: false,
       });
-      expect(db.argsOf("specialties", "eq")).toEqual([["id", "s1"]]);
+      expect(db.argsOf("specialties", "eq")).toEqual([["id", "00000000-0000-4000-8000-0000000005a1"]]);
     });
 
     it("rejects an empty update", async () => {

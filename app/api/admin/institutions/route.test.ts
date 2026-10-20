@@ -18,7 +18,7 @@ vi.mock("@/lib/supabase/service", async () => {
   return { createSupabaseServiceClient: () => db.client };
 });
 
-const ctx = { params: Promise.resolve({ id: "inst-1" }) };
+const ctx = { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000001a1" }) };
 
 describe("admin institutions API", () => {
   beforeEach(() => {
@@ -79,5 +79,12 @@ describe("admin institutions API", () => {
     expect(relinkWorkplaces).toHaveBeenCalled();
     db.queue("institutions", { data: null });
     expect((await DELETE(jsonRequest("/x", {}), ctx)).status).toBe(404);
+  });
+
+  it("404s a malformed id without asking the database", async () => {
+    const { DELETE } = await import("./[id]/route");
+    const res = await DELETE(jsonRequest("/x", {}), { params: Promise.resolve({ id: "abc" }) });
+    expect(res.status).toBe(404);
+    expect(relinkWorkplaces).not.toHaveBeenCalled();
   });
 });

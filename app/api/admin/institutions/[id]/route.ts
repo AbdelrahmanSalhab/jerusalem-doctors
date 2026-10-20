@@ -28,6 +28,7 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: Ctx) => {
   const admin = await requireAdminOrNull();
   if (!admin) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   const { id } = await ctx.params;
+  if (!z.guid().safeParse(id).success) return jsonError(404, { error: "not_found", code: "not_found" });
 
   const parsed = Patch.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -65,6 +66,7 @@ export const DELETE = withJsonErrors(async (_req: Request, ctx: Ctx) => {
   const admin = await requireAdminOrNull();
   if (!admin) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   const { id } = await ctx.params;
+  if (!z.guid().safeParse(id).success) return jsonError(404, { error: "not_found", code: "not_found" });
 
   const service = createSupabaseServiceClient();
   const r = await service.from("institutions").delete().eq("id", id).select("name_ar").maybeSingle();

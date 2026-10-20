@@ -104,7 +104,7 @@ export async function fetchDoctorDetail(
   id: string,
 ): Promise<DoctorDetail | null> {
   // A malformed id would fail the read with 22P02; it is simply not found.
-  if (!z.uuid().safeParse(id).success) return null;
+  if (!z.guid().safeParse(id).success) return null;
   const { data, error } = await service.from("doctors").select(DOCTOR_COLUMNS).eq("id", id).maybeSingle();
   if (error && error.code !== "PGRST116") throw new Error(`doctor read failed: ${error.message}`);
   if (!data) return null;
