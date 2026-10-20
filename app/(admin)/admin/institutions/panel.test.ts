@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const reads: string[] = [];
 
 const DOCTOR = {
-  id: "d1",
+  id: "00000000-0000-4000-8000-0000000000d1",
   arabic_first_name: "ليلى",
   arabic_family_name: "الخطيب",
   arabic_full_name: "ليلى الخطيب",
@@ -47,8 +47,8 @@ const DOCTOR = {
 
 const DATA: Record<string, unknown[]> = {
   institutions: [{ id: "i1", name_ar: "هداسا", name_he: "הדסה", kind: "hospital", aliases: [] }],
-  doctor_workplaces: [{ doctor_id: "d1", name: "القدس", workplace_type: "hospital", institution_id: null }],
-  doctors: [{ id: "d1", arabic_first_name: "ليلى", arabic_family_name: "الخطيب" }],
+  doctor_workplaces: [{ doctor_id: "00000000-0000-4000-8000-0000000000d1", name: "القدس", workplace_type: "hospital", institution_id: null }],
+  doctors: [{ id: "00000000-0000-4000-8000-0000000000d1", arabic_first_name: "ليلى", arabic_family_name: "الخطيب" }],
   specialties: [{ id: "s1", name_ar: "طب الأطفال", code: "peds", parent_id: null }],
   doctor_specialties: [{ specialty_id: "s1", specialty: { name_ar: "طب الأطفال" } }],
   audit_logs: [],
@@ -96,17 +96,17 @@ describe("/admin/institutions, the doctor panel", () => {
   });
 
   it("opens over the institutions list and closes back to it", async () => {
-    const html = await render({ doctor: "d1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1" });
     expect(html).toContain('role="dialog"');
     expect(html).toContain("ليلى الخطيب");
     // The way into the editor, on this tab.
-    expect(html).toContain('href="/admin/institutions?doctor=d1&amp;edit=1"');
+    expect(html).toContain('href="/admin/institutions?doctor=00000000-0000-4000-8000-0000000000d1&amp;edit=1"');
     // Read-only until then: no catalogue fetched, no form.
     expect(reads).not.toContain("specialties");
   });
 
   it("shows the editor, and loads the specialties it needs, with edit=1", async () => {
-    const html = await render({ doctor: "d1", edit: "1" });
+    const html = await render({ doctor: "00000000-0000-4000-8000-0000000000d1", edit: "1" });
     expect(html).toContain("تعديل ملف");
     expect(html).toContain("حفظ الملف");
     // The fields a doctor cannot change for themselves are here.

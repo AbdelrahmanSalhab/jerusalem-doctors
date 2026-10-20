@@ -5,6 +5,7 @@
 // write to someone else's row lives under /api/admin, so no route ever has a
 // "…unless the caller is an admin" branch to get wrong later.
 
+import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { writeAudit } from "@/lib/audit";
@@ -13,6 +14,9 @@ import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Ctx = { params: Promise<{ id: string }> };
+
+/** A malformed id would fail the read with 22P02; it is simply not found. */
+const badId = (id: string) => !z.guid().safeParse(id).success;
 
 async function doctorExists(service: ReturnType<typeof createSupabaseServiceClient>, id: string) {
   const found = await service.from("doctors").select("id").eq("id", id).maybeSingle();
@@ -28,6 +32,8 @@ export const POST = withJsonErrors(async (req: Request, ctx: Ctx) => {
   if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
 
   const { id } = await ctx.params;
+  if (badId(id)) return jsonError(404, { error: "not_found", code: "not_found" });
+
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) {
@@ -59,6 +65,8 @@ export const DELETE = withJsonErrors(async (_req: Request, ctx: Ctx) => {
   if (!admin) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
 
   const { id } = await ctx.params;
+  if (badId(id)) return jsonError(404, { error: "not_found", code: "not_found" });
+
   const service = createSupabaseServiceClient();
   if (!(await doctorExists(service, id))) {
     return jsonError(404, { error: "not_found", code: "not_found" });

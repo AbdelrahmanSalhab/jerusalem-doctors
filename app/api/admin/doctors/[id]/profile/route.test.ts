@@ -15,19 +15,18 @@ const saves: Saved[] = [];
 const audits: Record<string, unknown>[] = [];
 const authCalls: { id: string; attrs: Record<string, unknown> }[] = [];
 
-let isAdmin = true;
 let doctor: Record<string, unknown> | null;
 /** Another doctor already holding the number the admin typed. */
 let phoneHeldBy: { arabic_first_name: string; arabic_family_name: string } | null = null;
 let rpcError: { code?: string; message: string } | null = null;
 let authError: { status?: number; message: string } | null = null;
 
-vi.mock("@/lib/auth/session", () => ({
-  requireAdmin: vi.fn(async () => {
-    if (!isAdmin) throw new Error("NEXT_NOT_FOUND");
-    return { id: "admin-1" };
-  }),
+const { requireAdminOrNull } = vi.hoisted(() => ({
+  requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({
+    id: "00000000-0000-4000-8000-00000000a001",
+  })),
 }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
 // The relink is best-effort after the save and reads tables this fake does
 // not model; it swallows its own errors, so stub it out of the way.
@@ -64,7 +63,7 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 const BASE = {
-  id: "d1",
+  id: "00000000-0000-4000-8000-0000000000d1",
   auth_user_id: "auth-1",
   arabic_first_name: "ليلى",
   arabic_family_name: "الخطيب",
@@ -79,12 +78,12 @@ const BASE = {
 async function call(body: unknown) {
   const { PATCH } = await import("./route");
   return PATCH(
-    new Request("https://example.test/api/admin/doctors/d1/profile", {
+    new Request("https://example.test/api/admin/doctors/00000000-0000-4000-8000-0000000000d1/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
-    { params: Promise.resolve({ id: "d1" }) },
+    { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000000d1" }) },
   );
 }
 
@@ -92,7 +91,7 @@ beforeEach(() => {
   saves.length = 0;
   audits.length = 0;
   authCalls.length = 0;
-  isAdmin = true;
+  requireAdminOrNull.mockClear();
   doctor = { ...BASE };
   phoneHeldBy = null;
   rpcError = null;
@@ -101,8 +100,28 @@ beforeEach(() => {
 
 describe("PATCH /api/admin/doctors/[id]/profile: who may call it", () => {
   it("refuses anyone who is not an admin, before reading anything", async () => {
-    isAdmin = false;
+    requireAdminOrNull.mockResolvedValueOnce(null);
     expect((await call({ bio: "x" })).status).toBe(401);
+    expect(saves).toHaveLength(0);
+  });
+
+  it("answers 500, not 401, when the admin lookup itself fails", async () => {
+    requireAdminOrNull.mockRejectedValueOnce(new Error("db down"));
+    expect((await call({ bio: "x" })).status).toBe(500);
+    expect(saves).toHaveLength(0);
+  });
+
+  it("treats a malformed id as not found, before any read", async () => {
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      new Request("https://example.test/api/admin/doctors/abc/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: "x" }),
+      }),
+      { params: Promise.resolve({ id: "abc" }) },
+    );
+    expect(res.status).toBe(404);
     expect(saves).toHaveLength(0);
   });
 
@@ -115,7 +134,7 @@ describe("PATCH /api/admin/doctors/[id]/profile: who may call it", () => {
 describe("PATCH /api/admin/doctors/[id]/profile: profile fields", () => {
   it("writes the field and its search copy, for the doctor in the path", async () => {
     expect((await call({ arabic_first_name: "ليلى سناء" })).status).toBe(200);
-    expect(saves[0].p_doctor_id).toBe("d1");
+    expect(saves[0].p_doctor_id).toBe("00000000-0000-4000-8000-0000000000d1");
     expect(saves[0].p_updates).toMatchObject({
       arabic_first_name: "ليلى سناء",
       arabic_first_name_normalized: expect.any(String),
@@ -243,8 +262,8 @@ describe("PATCH /api/admin/doctors/[id]/profile: the trail", () => {
     const m = audits[0].metadata as Record<string, unknown>;
     expect(audits[0]).toMatchObject({
       action: "admin_doctor_profile_edited",
-      actor_doctor_id: "admin-1",
-      target_doctor_id: "d1",
+      actor_doctor_id: "00000000-0000-4000-8000-00000000a001",
+      target_doctor_id: "00000000-0000-4000-8000-0000000000d1",
     });
     expect(m.fields).toContain("bio");
     expect(m).toMatchObject({
