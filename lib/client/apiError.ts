@@ -14,6 +14,9 @@ const MESSAGES: Record<string, string> = {
   invalid_body: "بعض الحقول غير صحيحة. راجع الحقول المعلَّمة وحاول مجددًا.",
   exactly_one_primary: "اختر مكان عمل رئيسيًا واحدًا فقط.",
   unauthenticated: "انتهت جلستك. سجّل الدخول من جديد.",
+  // Deliberately says no more than the server does: the route answers the
+  // same way whether the address is unknown or the password is wrong.
+  invalid_credentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
   update_failed: "تعذّر حفظ التغييرات. حاول مجددًا.",
   not_found: "لم نجد هذا الحساب. ربما حُذف.",
   no_fields: "لا يوجد تغيير لحفظه.",

@@ -8,6 +8,7 @@
 // The unadvertised path is a convenience, not a control. See
 // lib/auth/devLogin.ts for what the protection actually rests on.
 
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DevLoginForm } from "./DevLoginForm";
 import { devLoginEnabled } from "@/lib/auth/devLogin";
@@ -15,7 +16,7 @@ import { devLoginEnabled } from "@/lib/auth/devLogin";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Staff sign-in",
+  title: "دخول فريق العمل",
   robots: { index: false, follow: false },
 };
 
@@ -24,22 +25,20 @@ export default function DevLoginPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-sm flex-col gap-5 px-4 py-12">
-      <header className="flex flex-col gap-1" dir="ltr">
-        <h1 className="text-xl font-bold">Staff sign-in</h1>
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold">دخول فريق العمل</h1>
         <p className="text-sm text-muted">
-          For the development and QA team. Doctors sign in with their phone number on{" "}
-          <a href="/login" className="underline">
-            /login
-          </a>
+          خاص بفريق التطوير وفحص الجودة. الأطباء يسجّلون دخولهم برقم الهاتف من{" "}
+          <Link href="/login" className="underline">
+            صفحة تسجيل الدخول
+          </Link>
           .
         </p>
       </header>
 
       <DevLoginForm />
 
-      <p className="text-xs text-muted" dir="ltr">
-        Every sign-in here is recorded in the activity log.
-      </p>
+      <p className="text-xs text-muted">يُسجَّل كل دخول من هنا في سجل النشاط.</p>
     </main>
   );
 }

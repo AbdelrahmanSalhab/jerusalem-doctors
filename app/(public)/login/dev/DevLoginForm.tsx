@@ -1,21 +1,23 @@
 "use client";
 
-// Deliberately plain, and in English: this form is for the team, and it should
-// never be mistaken for the doctors' Arabic sign-in.
+// Same shape as the doctors' login form (app/(public)/login/LoginForm.tsx),
+// in Arabic like the rest of the site. Only the email and the password read
+// left to right, being Latin text inside an RTL page.
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiErrorMessage } from "@/lib/client/apiError";
 
 export function DevLoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
+    setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/login/password", {
@@ -24,67 +26,70 @@ export function DevLoginForm() {
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
-        // The server answers the same way for every failure on purpose; this
-        // only separates "slow down" from "that did not work".
-        setError(
-          payload?.code === "rate_limited"
-            ? "Too many attempts. Wait a few minutes and try again."
-            : "That did not work.",
-        );
+        const data = await res.json().catch(() => ({}));
+        // The server answers the same way for every refusal on purpose, so
+        // this says no more than the server does.
+        setError(apiErrorMessage(data?.code));
         return;
       }
       // A fresh server render picks up the session cookie the route just set.
       router.push("/dashboard");
       router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3" dir="ltr">
-      <label className="flex flex-col gap-1 text-sm">
-        Email
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <div>
+        <label htmlFor="dev-email" className="mb-1.5 block text-sm font-medium">
+          البريد الإلكتروني
+        </label>
         <input
+          id="dev-email"
           type="email"
-          name="email"
-          autoComplete="username"
           required
+          dir="ltr"
+          autoComplete="username"
+          inputMode="email"
+          className="w-full rounded-md border border-line px-3 py-2.5"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-line bg-surface px-3 py-2 text-base"
         />
-      </label>
+      </div>
 
-      <label className="flex flex-col gap-1 text-sm">
-        Password
+      <div>
+        <label htmlFor="dev-password" className="mb-1.5 block text-sm font-medium">
+          كلمة المرور
+        </label>
         <input
+          id="dev-password"
           type="password"
-          name="password"
-          autoComplete="current-password"
           required
+          dir="ltr"
           minLength={8}
+          autoComplete="current-password"
+          className="w-full rounded-md border border-line px-3 py-2.5"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-line bg-surface px-3 py-2 text-base"
         />
-      </label>
+      </div>
 
       {error && (
-        <p role="alert" className="rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-sm text-danger">
+        <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
         </p>
       )}
 
       <button
         type="submit"
-        disabled={busy || !email || !password}
-        className="rounded-md bg-primary px-4 py-2.5 text-primary-fg disabled:opacity-50"
+        disabled={submitting || !email.trim() || !password}
+        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
       >
-        {busy ? "Signing in…" : "Sign in"}
+        {submitting ? "جارٍ تسجيل الدخول..." : "تسجيل الدخول"}
       </button>
     </form>
   );
