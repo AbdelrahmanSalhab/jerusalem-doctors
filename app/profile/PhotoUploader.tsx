@@ -10,10 +10,14 @@ export function PhotoUploader({
   currentUrl,
   fallback,
   onUploaded,
+  endpoint = "/api/profile/photo",
 }: {
   currentUrl: string | null;
   fallback: string;
   onUploaded: (url: string) => void;
+  /** Whose photo this writes. An admin editing someone else posts to
+   *  /api/admin/doctors/[id]/photo instead. */
+  endpoint?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState<string | null>(currentUrl);
@@ -41,7 +45,7 @@ export function PhotoUploader({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/profile/photo", {
+      const res = await fetch(endpoint, {
         method: "POST",
         body: fd,
       });

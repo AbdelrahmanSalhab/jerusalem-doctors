@@ -40,6 +40,10 @@ export const RATE_LIMITS = {
   // but a loop in the panel must not hammer data.gov.il.
   adminLicenseCheck: { limit: 60, window: "1 h" },
   adminLicenseSave: { limit: 30, window: "1 h" },
+  // Generous on purpose: an admin working through a list of unlinked names
+  // opens and fixes one profile after another. It only brakes a runaway loop.
+  adminProfileSave: { limit: 60, window: "1 h" },
+  adminPhotoUpload: { limit: 30, window: "1 h" },
   // Password sign-in for devs and QA. Tight: a leaked password on one of
   // these accounts is the whole risk, so guessing stays slow.
   devLogin: { limit: 5, window: "15 m" },

@@ -20,7 +20,7 @@ describe("admin pages", () => {
     ["audit", () => import("./audit/page"), { searchParams: Promise.resolve({}) }],
     ["specialties", () => import("./specialties/page"), undefined],
     ["stats", () => import("./stats/page"), undefined],
-    ["institutions", () => import("./institutions/page"), undefined],
+    ["institutions", () => import("./institutions/page"), { searchParams: Promise.resolve({}) }],
   ] as const)("%s refuses a non-admin before reading any data", async (_name, load, props) => {
     const Page = (await load()).default as (p: unknown) => Promise<unknown>;
     await expect(Page(props)).rejects.toThrow("NEXT_NOT_FOUND");

@@ -1,7 +1,8 @@
 import { ProfileForm } from "./ProfileForm";
 import { requireDoctor } from "@/lib/auth/session";
+import { fetchActiveSpecialties } from "@/lib/specialties/catalogue";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import type { DoctorWorkplace, Specialty } from "@/lib/db/types";
+import type { DoctorWorkplace } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +10,9 @@ export default async function ProfilePage() {
   const me = await requireDoctor();
   const service = createSupabaseServiceClient();
 
-  const [{ data: specialties }, { data: doctorSpecialties }, { data: workplaces }] =
+  const [specialties, { data: doctorSpecialties }, { data: workplaces }] =
     await Promise.all([
-      service
-        .from("specialties")
-        .select("id, name_ar, code, parent_id")
-        .eq("is_active", true)
-        .order("sort_order"),
+      fetchActiveSpecialties(service),
       service
         .from("doctor_specialties")
         .select("specialty_id")
@@ -37,9 +34,7 @@ export default async function ProfilePage() {
 
       <ProfileForm
         doctor={me}
-        specialties={
-          (specialties as Pick<Specialty, "id" | "name_ar" | "code" | "parent_id">[]) ?? []
-        }
+        specialties={specialties}
         currentSpecialtyIds={(doctorSpecialties ?? []).map(
           (r) => r.specialty_id,
         )}

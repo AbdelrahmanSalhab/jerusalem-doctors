@@ -154,3 +154,41 @@ describe("audit entry details", () => {
     expect(auditTimeFull("2026-10-19T08:53:17Z")).toBe("19/10/2026 11:53:17");
   });
 });
+
+describe("an admin editing a profile", () => {
+  it("names the fields in Arabic, drops the search copies, and masks the phone", () => {
+    expect(auditTitle("admin_doctor_profile_edited")).toBe("تعديل الملف من الإدارة");
+    const line = auditDetail(
+      {
+        action: "admin_doctor_profile_edited",
+        metadata: {
+          fields: ["arabic_first_name", "arabic_first_name_normalized", "bio", "phone_e164", "phone_display"],
+          workplaces: 2,
+          hebrew_name_changed: true,
+          phone_changed: true,
+          phone_before: "+9725…1122",
+          phone_after: "+9725…3344",
+          auth_sync: "updated",
+        },
+      },
+      () => undefined,
+    );
+    expect(line).toContain("الاسم الأول");
+    expect(line).toContain("النبذة");
+    // The *_normalized twins and phone_display would read as duplicates.
+    expect(line).not.toContain("_normalized");
+    expect(line).not.toContain("صيغة عرض الهاتف");
+    expect(line).toContain("أماكن العمل: 2");
+    expect(line).toContain("«+9725…1122» ← «+9725…3344»");
+    expect(line).toContain("نُقل حساب الدخول إلى الرقم الجديد");
+    expect(line).toContain("يحتاج إعادة فحص الترخيص");
+  });
+
+  it("says which way the photo went", () => {
+    expect(auditTitle("admin_doctor_photo_changed")).toBe("تغيير الصورة من الإدارة");
+    const removed = auditDetail({ action: "admin_doctor_photo_changed", metadata: { removed: true } }, () => undefined);
+    expect(removed).toBe("حُذفت الصورة الشخصية");
+    const added = auditDetail({ action: "admin_doctor_photo_changed", metadata: { removed: false } }, () => undefined);
+    expect(added).toBe("رُفعت صورة شخصية جديدة");
+  });
+});

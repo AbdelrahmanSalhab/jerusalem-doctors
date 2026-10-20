@@ -5,10 +5,12 @@
 // who they are, why their licence came out the way it did, where they work,
 // how to reach them, and what has been done to the account.
 
+import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
+import { DoctorAuditList } from "./DoctorAuditList";
 import { DoctorPanelControls } from "./DoctorPanelControls";
 import { LicenseSection } from "./LicenseSection";
-import { auditDetail, auditTime, auditTitle } from "@/lib/auditText";
+import { auditTime } from "@/lib/auditText";
 import { careerStageBadge } from "@/lib/careerStage";
 import { FEATURED_LABEL } from "@/lib/directory";
 import type { DoctorDetail } from "@/lib/admin/doctorDetail";
@@ -43,7 +45,16 @@ function Rows({ items }: { items: [string, React.ReactNode][] }) {
 
 const yesNo = (v: boolean) => (v ? "نعم" : "لا");
 
-export function DoctorPanelBody({ detail, closeHref }: { detail: DoctorDetail; closeHref: string }) {
+export function DoctorPanelBody({
+  detail,
+  closeHref,
+  editHref,
+}: {
+  detail: DoctorDetail;
+  closeHref: string;
+  /** This same panel with the profile editor open. */
+  editHref: string;
+}) {
   const d = detail.doctor;
   const stage = d.career_stage ? careerStageBadge(d.career_stage, d.residency_start_year) : "طب عام";
   const hebrew = [d.hebrew_first_name, d.hebrew_family_name].filter(Boolean).join(" ");
@@ -67,6 +78,13 @@ export function DoctorPanelBody({ detail, closeHref }: { detail: DoctorDetail; c
             {d.is_admin && <span>· حساب إدارة</span>}
           </p>
         </div>
+        <Link
+          href={editHref}
+          scroll={false}
+          className="ms-auto shrink-0 rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5"
+        >
+          تعديل الملف
+        </Link>
       </header>
 
       <DoctorPanelControls
@@ -176,23 +194,7 @@ export function DoctorPanelBody({ detail, closeHref }: { detail: DoctorDetail; c
       </Section>
 
       <Section title="آخر الأحداث">
-        {detail.audit.length === 0 ? (
-          <p className="text-sm text-muted">لا أحداث مسجَّلة.</p>
-        ) : (
-          <ul className="flex flex-col gap-2 text-sm">
-            {detail.audit.map((row) => {
-              const line = auditDetail(row, () => undefined);
-              return (
-                <li key={row.id} className="flex flex-col">
-                  <span className="font-medium">
-                    {auditTitle(row.action)} <span className="text-xs text-muted">{auditTime(row.created_at)}</span>
-                  </span>
-                  {line && <span className="text-muted">{line}</span>}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <DoctorAuditList audit={detail.audit} />
         <a href="/admin/audit" className="w-fit text-sm underline">
           سجل النشاط الكامل
         </a>

@@ -49,6 +49,17 @@ export function normalizePhone(input: string, defaultCountry: "IL" = "IL"): stri
 }
 
 /**
+ * Enough of a number for an admin to recognise the change they made, not
+ * enough to ring it: "+972501234567" becomes "+9725…4567". Used in the audit
+ * trail, which outlives the doctor's own later edits.
+ */
+export function maskPhone(e164: string): string {
+  const s = e164.trim();
+  if (s.length <= 9) return s;
+  return `${s.slice(0, 5)}…${s.slice(-4)}`;
+}
+
+/**
  * Best-effort display formatting for the dashboard. Falls back to the E.164
  * form on failure so callers always get a string.
  */
