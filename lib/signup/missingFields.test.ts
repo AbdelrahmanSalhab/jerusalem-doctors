@@ -19,6 +19,7 @@ const EMPTY: SignupFields = {
   specialty_ids: [],
   email: "",
   seeking_work: false,
+  retired: false,
   workplaces: [WP],
   consent: false,
 };
@@ -101,6 +102,10 @@ describe("getMissingFields", () => {
 
   it("does not ask a doctor looking for work for a workplace", () => {
     expect(keys({ ...COMPLETE, seeking_work: true, workplaces: [WP] })).toEqual([]);
+  });
+
+  it("does not ask a retired doctor for a workplace", () => {
+    expect(keys({ ...COMPLETE, retired: true, workplaces: [WP] })).toEqual([]);
   });
 
   it("lets a specialist sign up before filling a clinic's address and phone", () => {

@@ -15,7 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoUploader } from "@/app/profile/PhotoUploader";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
-import { Field, SeekingWorkCheckbox } from "@/components/FormField";
+import { Field, RetiredCheckbox, SeekingWorkCheckbox } from "@/components/FormField";
 import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { StageRadios } from "@/components/StageRadios";
@@ -48,6 +48,7 @@ export interface AdminEditDoctor {
   bio: string | null;
   certificates: string[] | null;
   seeking_work: boolean;
+  retired: boolean;
   career_stage: "resident" | "specialist" | null;
   residency_start_year: number | null;
   profile_picture_url: string | null;
@@ -90,6 +91,7 @@ export function DoctorProfileEditor({
   const [bio, setBio] = useState(doctor.bio ?? "");
   const [certificates, setCertificates] = useState<string[]>(doctor.certificates ?? []);
   const [seekingWork, setSeekingWork] = useState(doctor.seeking_work);
+  const [retired, setRetired] = useState(doctor.retired);
   const [specialtyIds, setSpecialtyIds] = useState<string[]>(savedSpecialtyIds);
   const [workplaces, setWorkplaces] = useState<WorkplaceEntry[]>(() => toWorkplaceEntries(savedWorkplaces));
   const [photoUrl, setPhotoUrl] = useState<string | null>(doctor.profile_picture_url);
@@ -141,6 +143,7 @@ export function DoctorProfileEditor({
     put("subspecialty", subspecialty.trim() || null, doctor.subspecialty);
     put("bio", bio.trim() || null, doctor.bio);
     put("seeking_work", seekingWork, doctor.seeking_work);
+    put("retired", retired, doctor.retired);
     put("specialty_ids", [...specialtyIds].sort(), [...savedSpecialtyIds].sort());
     if (stage !== null) {
       const opt = STAGE_BY_KEY[stage];
@@ -168,7 +171,7 @@ export function DoctorProfileEditor({
     setError(null);
     setNotes([]);
 
-    const problem = profileFormError({ stageOpt, workplaces, specialtyIds, residencyStartYear, seekingWork });
+    const problem = profileFormError({ stageOpt, workplaces, specialtyIds, residencyStartYear, seekingWork, retired });
     if (problem) {
       setError(problem.message);
       return;
@@ -299,6 +302,7 @@ export function DoctorProfileEditor({
           </Field>
         )}
         <SeekingWorkCheckbox checked={seekingWork} onChange={setSeekingWork} />
+        <RetiredCheckbox checked={retired} onChange={setRetired} />
       </Block>
 
       <Block title="التخصص">
@@ -328,7 +332,7 @@ export function DoctorProfileEditor({
       </Block>
 
       <Block title="أماكن العمل">
-        <WorkplaceEditor workplaces={workplaces} onChange={setWorkplaces} stage={stage} optional={seekingWork} />
+        <WorkplaceEditor workplaces={workplaces} onChange={setWorkplaces} stage={stage} optional={seekingWork || retired} />
       </Block>
 
       {error && (

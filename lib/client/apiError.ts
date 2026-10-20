@@ -67,6 +67,7 @@ export const FIELD_LABELS: Record<string, string> = {
   phone_display: "صيغة عرض الهاتف",
   is_phone_verified: "توثيق الهاتف",
   seeking_work: "يبحث عن عمل",
+  retired: "متقاعد",
   profile_picture_url: "الصورة الشخصية",
 };
 

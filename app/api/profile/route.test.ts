@@ -7,7 +7,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updateSpy = vi.fn();
 const insertSpy = vi.fn();
-let me: { id: string; career_stage: "resident" | "specialist" | null; seeking_work?: boolean } = {
+let me: {
+  id: string;
+  career_stage: "resident" | "specialist" | null;
+  seeking_work?: boolean;
+  retired?: boolean;
+} = {
   id: "doc-1",
   career_stage: null,
 };
@@ -194,6 +199,24 @@ describe("PATCH /api/profile: workplaces", () => {
     me = { id: "doc-1", career_stage: "specialist", seeking_work: true };
     expect((await call({ seeking_work: false, workplaces: [] })).status).toBe(400);
   });
+
+  it("lets a retired doctor clear their workplaces", async () => {
+    me = { id: "doc-1", career_stage: "specialist", retired: true };
+    expect((await call({ workplaces: [] })).status).toBe(200);
+    me = { id: "doc-1", career_stage: "specialist", retired: false };
+    expect((await call({ retired: true, workplaces: [] })).status).toBe(200);
+    me = { id: "doc-1", career_stage: "specialist", retired: true };
+    expect((await call({ retired: false, workplaces: [] })).status).toBe(400);
+  });
+
+  it("keeps the workplace optional while either flag survives the save", async () => {
+    me = { id: "doc-1", career_stage: "specialist", seeking_work: true, retired: true };
+    expect((await call({ retired: false, workplaces: [] })).status).toBe(200);
+    expect((await call({ seeking_work: false, workplaces: [] })).status).toBe(200);
+    expect(
+      (await call({ seeking_work: false, retired: false, workplaces: [] })).status,
+    ).toBe(400);
+  });
 });
 
 describe("PATCH /api/profile: certificates and seeking work", () => {
@@ -232,6 +255,17 @@ describe("PATCH /api/profile: certificates and seeking work", () => {
     const res = await call({ seeking_work: true });
     expect(res.status).toBe(200);
     expect(doctorUpdate()).toMatchObject({ seeking_work: true });
+  });
+
+  it("saves retired", async () => {
+    const res = await call({ retired: true });
+    expect(res.status).toBe(200);
+    expect(doctorUpdate()).toMatchObject({ retired: true });
+  });
+
+  it("leaves retired alone when the key is absent", async () => {
+    expect((await call({ bio: "نبذة" })).status).toBe(200);
+    expect(doctorUpdate()).not.toHaveProperty("retired");
   });
 });
 

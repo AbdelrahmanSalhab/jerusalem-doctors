@@ -38,6 +38,7 @@ const DOCTOR = {
   consent_directory_use: true,
   consent_timestamp: "2026-08-01T10:00:00Z",
   seeking_work: false,
+  retired: false,
   featured: null,
   featured_at: null,
   created_at: "2026-08-01T10:00:00Z",

@@ -3,7 +3,7 @@
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Field, RequiredMark, SeekingWorkCheckbox } from "@/components/FormField";
+import { Field, RequiredMark, RetiredCheckbox, SeekingWorkCheckbox } from "@/components/FormField";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
 import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
@@ -81,6 +81,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     [specialties],
   );
   const stageOpt = form.stage ? STAGE_BY_KEY[form.stage] : null;
+  // Either flag on its own excuses the workplace, and they are independent:
+  // a retired doctor may still be looking for locum work.
+  const workplaceOptional = form.seeking_work || form.retired;
   // A طب عام signup posts the الطب العام specialty on the doctor's behalf.
   // If that row has been deactivated from /admin/specialties there is nothing
   // to attach, and a silently empty specialty_ids would leave submit disabled
@@ -276,6 +279,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             checked={form.seeking_work}
             onChange={(v) => update("seeking_work", v)}
           />
+
+          <RetiredCheckbox
+            checked={form.retired}
+            onChange={(v) => update("retired", v)}
+          />
         </Section>
 
         {stageOpt?.showsCertificates && (
@@ -340,11 +348,11 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
           title={
             stageOpt.workplaceOptional
               ? "مكان التدريب الحالي (اختياري)"
-              : form.seeking_work
+              : workplaceOptional
                 ? "مكان العمل (اختياري)"
                 : "مكان العمل"
           }
-          required={!stageOpt.workplaceOptional && !form.seeking_work}
+          required={!stageOpt.workplaceOptional && !workplaceOptional}
         >
           {stageOpt.workplaceOptional && (
             <p className="text-sm text-foreground/65">
@@ -352,7 +360,12 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
               التخصص، وتعديله لاحقًا من ملفك.
             </p>
           )}
-          {!stageOpt.workplaceOptional && form.seeking_work && (
+          {!stageOpt.workplaceOptional && form.retired && (
+            <p className="text-sm text-foreground/65">
+              يمكنك تركه فارغًا بعد التقاعد، أو إضافة مكان عملك السابق إن أردت.
+            </p>
+          )}
+          {!stageOpt.workplaceOptional && !form.retired && form.seeking_work && (
             <p className="text-sm text-foreground/65">
               يمكنك تركه فارغًا ما دمت تبحث عن عمل، وإضافته من ملفك حين تبدأ.
             </p>
@@ -361,7 +374,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
             workplaces={form.workplaces}
             onChange={(next) => update("workplaces", next)}
             stage={form.stage}
-            optional={form.seeking_work}
+            optional={workplaceOptional}
           />
           {fieldError("workplaces") && (
             <p className="mt-1 text-sm text-danger">{fieldError("workplaces")}</p>

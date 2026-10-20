@@ -15,6 +15,7 @@ const ok = {
   specialtyIds: ["s1"],
   residencyStartYear: "",
   seekingWork: false,
+  retired: false,
 };
 
 describe("profileFormError", () => {
@@ -38,6 +39,19 @@ describe("profileFormError", () => {
 
   it("lets a doctor looking for work leave the workplace empty", () => {
     expect(profileFormError({ ...ok, workplaces: [emptyWorkplace(true)], seekingWork: true })).toBeNull();
+  });
+
+  it("lets a retired doctor leave the workplace empty", () => {
+    expect(profileFormError({ ...ok, workplaces: [emptyWorkplace(true)], retired: true })).toBeNull();
+    // Independent of seekingWork: either flag alone is enough.
+    expect(
+      profileFormError({
+        ...ok,
+        workplaces: [emptyWorkplace(true)],
+        retired: true,
+        seekingWork: true,
+      }),
+    ).toBeNull();
   });
 
   it("saves a specialist's clinic without its address and phone", () => {

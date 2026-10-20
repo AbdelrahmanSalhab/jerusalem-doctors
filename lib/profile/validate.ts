@@ -21,9 +21,15 @@ export function profileFormError(f: {
   specialtyIds: readonly string[];
   residencyStartYear: string;
   seekingWork: boolean;
+  retired: boolean;
 }): ProfileCheck | null {
   const cleaned = cleanWorkplaces(f.workplaces);
-  if (cleaned.length === 0 && !f.stageOpt?.workplaceOptional && !f.seekingWork) {
+  if (
+    cleaned.length === 0 &&
+    !f.stageOpt?.workplaceOptional &&
+    !f.seekingWork &&
+    !f.retired
+  ) {
     return { message: "الرجاء إدخال مكان عمل واحد على الأقل." };
   }
   if (f.workplaces.some(hasInvalidClinicPhone)) {

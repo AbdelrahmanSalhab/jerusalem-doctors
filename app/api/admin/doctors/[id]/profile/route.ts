@@ -44,7 +44,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 const CURRENT_COLUMNS = `
   id, auth_user_id, arabic_first_name, arabic_family_name,
   hebrew_first_name, hebrew_family_name, phone_e164, phone_display,
-  career_stage, seeking_work
+  career_stage, seeking_work, retired
 `;
 
 interface CurrentRow {
@@ -58,6 +58,7 @@ interface CurrentRow {
   phone_display: string | null;
   career_stage: "resident" | "specialist" | null;
   seeking_work: boolean;
+  retired: boolean;
 }
 
 const fail = (f: SaveFailure) =>

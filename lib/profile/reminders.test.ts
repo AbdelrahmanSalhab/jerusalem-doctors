@@ -32,6 +32,22 @@ describe("profileGaps", () => {
       "أضف مكان عملك ليعرف الزملاء أين يجدونك.",
     ]);
   });
+
+  it("asks nothing about workplaces of a retired doctor", () => {
+    // The nudge would never clear: they have no workplace to add.
+    expect(
+      profileGaps(
+        { career_stage: "specialist", profile_picture_url: "p.jpg", certificates: ["ACLS"], retired: true },
+        [],
+      ),
+    ).toEqual([]);
+    expect(
+      profileGaps(
+        { career_stage: "specialist", profile_picture_url: "p.jpg", certificates: ["ACLS"], retired: true },
+        [clinic],
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("profileGaps: services", () => {
