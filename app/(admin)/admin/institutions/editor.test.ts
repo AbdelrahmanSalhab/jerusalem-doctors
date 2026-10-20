@@ -22,7 +22,7 @@ describe("InstitutionsEditor", () => {
       createElement(InstitutionsEditor, {
         institutions: list,
         doctors: { f1: [{ id: "d1", name: "ليلى الخطيب" }, { id: "d2", name: "أحمد سلهب" }] },
-        unmatched: [{ name: "مقاصد", count: 1 }],
+        unmatched: [{ name: "مقاصد", count: 1, doctors: [{ id: "d3", name: "سامي نعمان" }] }],
       }),
     );
     const order = ["مستشفيات", "صناديق المرضى", "شبكات عيادات"].map((h) => html.indexOf(`>${h}<`));
@@ -33,5 +33,31 @@ describe("InstitutionsEditor", () => {
     expect(html).toContain("ليلى الخطيب");
     expect(html).toContain("لا أطباء");
     expect(html).toContain('<optgroup label="صناديق المرضى">');
+  });
+
+  it("names the doctors behind an unlinked name and links them to their panel", async () => {
+    const { InstitutionsEditor } = await import("./InstitutionsEditor");
+    const html = renderToStaticMarkup(
+      createElement(InstitutionsEditor, {
+        institutions: list,
+        doctors: { f1: [{ id: "d1", name: "ليلى الخطيب" }] },
+        unmatched: [
+          {
+            name: "القدس",
+            count: 2,
+            doctors: [
+              { id: "d3", name: "سامي نعمان" },
+              { id: "d4", name: "رنا حدّاد" },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(html).toContain("سامي نعمان");
+    expect(html).toContain("رنا حدّاد");
+    expect(html).toContain('href="/admin/institutions?doctor=d3"');
+    expect(html).toContain('href="/admin/institutions?doctor=d4"');
+    // The doctors under an institution are links too.
+    expect(html).toContain('href="/admin/institutions?doctor=d1"');
   });
 });

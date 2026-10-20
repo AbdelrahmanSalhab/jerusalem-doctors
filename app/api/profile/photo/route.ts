@@ -3,14 +3,13 @@
 // profile_picture_url.
 //
 // Body: multipart/form-data with field "file" (≤ 2MB, image/jpeg|png|webp).
+// The upload itself lives in lib/profile/photoUpload.ts, shared with the
+// admin's route; this one only decides that the doctor may write their own.
 
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
-import { sniffImageType } from "@/lib/imageType";
-import { PHOTO_BUCKET, photoPath } from "@/lib/photo";
+import { uploadDoctorPhoto } from "@/lib/profile/photoUpload";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-
-const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
 export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
@@ -24,47 +23,11 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(400, { error: "no_file", code: "no_file" });
   }
 
-  if (file.size > MAX_BYTES) {
-    return jsonError(413, { error: "file_too_large", code: "file_too_large" });
-  }
-  // The type comes from the bytes; file.type is whatever the client claims.
-  const arrayBuffer = await file.arrayBuffer();
-  const type = sniffImageType(new Uint8Array(arrayBuffer));
-  if (!type) {
-    return jsonError(415, {
-      error: "unsupported_type",
-      code: "unsupported_type",
-    });
-  }
-
-  const path = photoPath(me.id, type);
   const service = createSupabaseServiceClient();
-
-  // Upload (overwrites previous photo at the same path).
-  const { error: uploadErr } = await service.storage
-    .from(PHOTO_BUCKET)
-    .upload(path, arrayBuffer, {
-      contentType: type,
-      upsert: true,
-      cacheControl: "60",
-    });
-  if (uploadErr) {
-    console.error("[profile.photo] storage upload failed", uploadErr);
-    return jsonError(500, { error: "upload_failed", code: "upload_failed" });
+  const result = await uploadDoctorPhoto(service, me.id, file, "profile.photo");
+  if ("error" in result) {
+    return jsonError(result.error.status, { error: result.error.code, code: result.error.code });
   }
 
-  const { data: pub } = service.storage.from(PHOTO_BUCKET).getPublicUrl(path);
-  // Cache-bust on overwrite by appending a version param.
-  const url = `${pub.publicUrl}?v=${Date.now()}`;
-
-  const { error: updateErr } = await service
-    .from("doctors")
-    .update({ profile_picture_url: url })
-    .eq("id", me.id);
-  if (updateErr) {
-    console.error("[profile.photo] db update failed", updateErr);
-    return jsonError(500, { error: "update_failed", code: "update_failed" });
-  }
-
-  return jsonOk({ ok: true, url });
+  return jsonOk({ ok: true, url: result.url });
 });

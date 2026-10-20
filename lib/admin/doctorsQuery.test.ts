@@ -11,7 +11,7 @@ import {
 describe("parseAdminDoctorsParams", () => {
   // Requirement: the page opens on everyone, not on the review queue.
   it("defaults to all doctors, page one, no panel", () => {
-    expect(parseAdminDoctorsParams({})).toEqual({ filter: "all", q: "", page: 1, doctorId: null });
+    expect(parseAdminDoctorsParams({})).toEqual({ filter: "all", q: "", page: 1, doctorId: null, editing: false });
   });
 
   it("keeps the filter values the rest of the app already links to", () => {
@@ -93,5 +93,26 @@ describe("the filter list", () => {
       "approved",
     ]);
     for (const f of DOCTOR_FILTERS) expect(f.label).toMatch(/[؀-ۿ]/);
+  });
+});
+
+describe("the panel's address", () => {
+  it("opens, and opens into the editor, on whichever page hosts it", async () => {
+    const { panelHref, readDoctorParam, readEditParam } = await import("./doctorsQuery");
+    expect(panelHref("/admin/institutions", "d1")).toBe("/admin/institutions?doctor=d1");
+    expect(panelHref("/admin/institutions", "d1", { edit: true })).toBe(
+      "/admin/institutions?doctor=d1&edit=1",
+    );
+    expect(readDoctorParam({ doctor: " d1 " })).toBe("d1");
+    expect(readDoctorParam({})).toBeNull();
+    expect(readEditParam({ edit: "1" })).toBe(true);
+    expect(readEditParam({ edit: "yes" })).toBe(false);
+  });
+
+  it("keeps the editor out of the doctors-list URL unless a panel is open", async () => {
+    const { adminDoctorsHref } = await import("./doctorsQuery");
+    const here = { filter: "all" as const, q: "", page: 1 };
+    expect(adminDoctorsHref(here, { doctorId: "d1", editing: true })).toBe("/admin?doctor=d1&edit=1");
+    expect(adminDoctorsHref(here, { editing: true })).toBe("/admin");
   });
 });

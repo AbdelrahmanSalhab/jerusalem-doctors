@@ -193,6 +193,60 @@ export function workplaceForStage<
 type ClinicFields = { details: string; address: string; hours: string; phone: string };
 const CLINIC_KEYS = ["details", "address", "hours", "phone"] as const;
 
+/**
+ * What switching to a stage does to the rest of the form. Both profile forms
+ * (the doctor's own and the admin's) run this, because the cascade is subtle
+ * — طب عام replaces the specialty list rather than appending to it, and an
+ * untouched workplace row adopts the new stage's default type — and two
+ * copies of it would not stay the same for long.
+ */
+export function applyStageCascade<
+  T extends { name: string; workplace_type: WorkplaceType; details: string; address: string; hours: string; phone: string },
+>(
+  next: Stage,
+  input: { specialtyIds: readonly string[]; workplaces: readonly T[]; generalSpecialtyId: string | null },
+): {
+  specialtyIds: string[];
+  specialtiesChanged: boolean;
+  workplaces: T[];
+  workplacesChanged: boolean;
+  clearSubspecialty: boolean;
+  clearResidencyYear: boolean;
+  clearCertificates: boolean;
+} {
+  const opt = STAGE_BY_KEY[next];
+  const { generalSpecialtyId } = input;
+
+  let specialtyIds = [...input.specialtyIds];
+  let specialtiesChanged = false;
+  if (opt.autoAttachesGeneralSpecialty) {
+    // Replace rather than append: a doctor already at the 5-specialty cap
+    // would otherwise produce a 6-element array that fails zod with a bare
+    // invalid_body and no field message.
+    specialtyIds = generalSpecialtyId ? [generalSpecialtyId] : [];
+    specialtiesChanged = true;
+  } else if (generalSpecialtyId && specialtyIds.includes(generalSpecialtyId)) {
+    specialtyIds = specialtyIds.filter((id) => id !== generalSpecialtyId);
+    specialtiesChanged = true;
+  }
+
+  // Untouched rows adopt the stage's default type; named ones are only
+  // corrected when the new stage doesn't offer their type.
+  const workplaces = input.workplaces.map((w) =>
+    workplaceForStage(w.name.trim() === "" ? { ...w, workplace_type: opt.defaultWorkplaceType } : w, next),
+  );
+
+  return {
+    specialtyIds,
+    specialtiesChanged,
+    workplaces,
+    workplacesChanged: workplaces.some((w, i) => w !== input.workplaces[i]),
+    clearSubspecialty: opt.autoAttachesGeneralSpecialty,
+    clearResidencyYear: !opt.requiresResidencyStartYear,
+    clearCertificates: !opt.showsCertificates,
+  };
+}
+
 export const GENERAL_SPECIALTY_CODE = "general";
 
 /**

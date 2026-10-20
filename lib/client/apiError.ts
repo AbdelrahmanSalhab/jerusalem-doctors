@@ -28,6 +28,12 @@ const MESSAGES: Record<string, string> = {
   duplicate_license: "رقم الترخيص مسجَّل مسبقًا لطبيب آخر. لا يمكن أن يحمل رقمًا واحدًا طبيبان.",
   result_changed: "تغيّرت نتيجة البحث. راجع النتيجة الجديدة ثم احفظ.",
   name_mismatch: "الرقم يخصّ اسمًا آخر في السجل. تأكد من الرقم قبل الحفظ.",
+  duplicate_phone: "رقم الهاتف مسجَّل مسبقًا لطبيب آخر.",
+  phone_not_sms_deliverable: "لن يصل رمز الدخول إلى هذا الرقم.",
+  auth_update_failed: "تعذّر تحديث حساب الدخول المرتبط بالرقم. حاول مجددًا.",
+  upload_failed: "تعذّر رفع الصورة. حاول لاحقًا.",
+  unsupported_type: "نوع الملف غير مدعوم. استخدم JPG أو PNG أو WebP.",
+  file_too_large: "حجم الصورة أكبر من 2 ميغابايت.",
   internal_error: "حدث خطأ في الخادم. حاول بعد قليل.",
 };
 
@@ -35,7 +41,9 @@ export function apiErrorMessage(code: unknown, fallback = "حدث خطأ. الر
   return (typeof code === "string" && MESSAGES[code]) || fallback;
 }
 
-const FIELD_LABELS: Record<string, string> = {
+/** Field names in Arabic. Exported because the activity log names the same
+ *  fields an admin just edited. */
+export const FIELD_LABELS: Record<string, string> = {
   phone: "رقم الهاتف",
   license_number: "رقم الترخيص",
   approval_reason: "سبب القبول",
@@ -55,6 +63,11 @@ const FIELD_LABELS: Record<string, string> = {
   workplaces: "أماكن العمل",
   certificates: "الشهادات",
   consent: "الموافقة على الشروط",
+  phone_e164: "رقم الهاتف",
+  phone_display: "صيغة عرض الهاتف",
+  is_phone_verified: "توثيق الهاتف",
+  seeking_work: "يبحث عن عمل",
+  profile_picture_url: "الصورة الشخصية",
 };
 
 /** The server's first field error, prefixed with the field's Arabic name. */

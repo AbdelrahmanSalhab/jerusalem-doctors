@@ -7,8 +7,8 @@
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DoctorsList, type DoctorRowData } from "./DoctorsList";
-import { DoctorPanel } from "./DoctorPanel";
-import { DoctorPanelBody } from "./DoctorPanelBody";
+import { DoctorPanelSlot } from "./DoctorPanelSlot";
+import { fetchDoctorDetail } from "@/lib/admin/doctorDetail";
 import { Tile, TileGrid } from "@/components/AdminParts";
 import { countOf, DOCTORS } from "@/lib/arabicCount";
 import { requireAdmin } from "@/lib/auth/session";
@@ -20,8 +20,8 @@ import {
   parseAdminDoctorsParams,
   type DoctorFilter,
 } from "@/lib/admin/doctorsQuery";
-import { fetchDoctorDetail } from "@/lib/admin/doctorDetail";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
+import { fetchActiveSpecialties } from "@/lib/specialties/catalogue";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -129,10 +129,12 @@ export default async function AdminDoctorsPage({
     }
   }
 
-  const [listed, tiles, detail] = await Promise.all([
+  const [listed, tiles, detail, specialties] = await Promise.all([
     query,
     counts(service),
     params.doctorId ? fetchDoctorDetail(service, params.doctorId) : Promise.resolve(null),
+    // Only the panel's editor needs the catalogue.
+    params.doctorId && params.editing ? fetchActiveSpecialties(service) : Promise.resolve([]),
   ]);
 
   // Asked for a page past the end, usually by editing the URL or by rows
@@ -182,16 +184,14 @@ export default async function AdminDoctorsPage({
       />
 
       {params.doctorId && (
-        <DoctorPanel
+        <DoctorPanelSlot
+          detail={detail}
+          specialties={specialties}
+          editing={params.editing}
           closeHref={listHref}
-          title={detail ? `د. ${detail.doctor.arabic_first_name} ${detail.doctor.arabic_family_name}` : "الطبيب"}
-        >
-          {detail ? (
-            <DoctorPanelBody detail={detail} closeHref={listHref} />
-          ) : (
-            <p className="text-sm text-muted">هذا الحساب غير موجود (ربما حُذف).</p>
-          )}
-        </DoctorPanel>
+          viewHref={adminDoctorsHref(params, { doctorId: params.doctorId })}
+          editHref={adminDoctorsHref(params, { doctorId: params.doctorId, editing: true })}
+        />
       )}
     </main>
   );

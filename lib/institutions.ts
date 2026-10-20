@@ -175,14 +175,23 @@ export async function relinkDoctor(service: SupabaseClient, doctorId: string): P
   }
 }
 
+export interface UnmatchedName {
+  /** The workplace name exactly as the doctors typed it. */
+  name: string;
+  /** How many distinct doctors typed it. */
+  count: number;
+  /** Who they are, so an admin can open the profile and fix a typo. */
+  doctors: { id: string; name: string }[];
+}
+
 /**
  * Read-only view for the admin tab: doctors per institution, and hospital
- * and fund names no institution claims (with how many doctors use each).
+ * and fund names no institution claims, each with the doctors behind it.
  */
 export async function institutionUsage(service: SupabaseClient): Promise<{
   /** Doctors per institution, by name, for "who works here". */
   doctors: Record<string, { id: string; name: string }[]>;
-  unmatched: { name: string; count: number }[];
+  unmatched: UnmatchedName[];
 }> {
   const rows: { doctor_id: string; name: string; workplace_type: WorkplaceType; institution_id: string | null }[] = [];
   for (let from = 0; ; from += PAGE) {
@@ -196,16 +205,22 @@ export async function institutionUsage(service: SupabaseClient): Promise<{
     if (!data || data.length < PAGE) break;
   }
   const perInstitution = new Map<string, Set<string>>();
-  const unmatched = new Map<string, number>();
+  const unmatched = new Map<string, Set<string>>();
   for (const r of rows) {
     if (r.institution_id) {
       perInstitution.set(r.institution_id, (perInstitution.get(r.institution_id) ?? new Set()).add(r.doctor_id));
     } else if (r.workplace_type !== "clinic") {
-      unmatched.set(r.name, (unmatched.get(r.name) ?? 0) + 1);
+      unmatched.set(r.name, (unmatched.get(r.name) ?? new Set()).add(r.doctor_id));
     }
   }
-  const ids = [...new Set([...perInstitution.values()].flatMap((s) => [...s]))];
-  const names = new Map<string, string>();
+  // One batched read covers both lists.
+  const ids = [
+    ...new Set([
+      ...[...perInstitution.values()].flatMap((s) => [...s]),
+      ...[...unmatched.values()].flatMap((s) => [...s]),
+    ]),
+  ];
+  const names = new Map<string, { name: string; isStaff: boolean }>();
   for (let i = 0; i < ids.length; i += 150) {
     const { data, error } = await service
       .from("doctors")
@@ -213,24 +228,35 @@ export async function institutionUsage(service: SupabaseClient): Promise<{
       .in("id", ids.slice(i, i + 150));
     if (error) throw error;
     for (const d of data ?? []) {
-      // Staff accounts (admin, hidden from the directory) aren't doctors to
-      // count, same as on the stats page.
-      if (d.is_admin && !d.is_visible) continue;
-      names.set(d.id, `${d.arabic_first_name} ${d.arabic_family_name}`);
+      names.set(d.id, {
+        name: `${d.arabic_first_name} ${d.arabic_family_name}`,
+        isStaff: Boolean(d.is_admin && !d.is_visible),
+      });
     }
   }
+
+  /**
+   * Staff accounts (admin, hidden from the directory) aren't doctors to count
+   * on an institution, same as on the stats page. Under an unlinked name they
+   * stay: the point there is to reach whoever typed it, whoever that is.
+   */
+  const named = (set: Set<string>, withStaff: boolean) => {
+    const out: { id: string; name: string }[] = [];
+    for (const id of set) {
+      const entry = names.get(id);
+      if (!entry || (!withStaff && entry.isStaff)) continue;
+      out.push({ id, name: entry.name });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name, "ar"));
+  };
+
   return {
-    doctors: Object.fromEntries(
-      [...perInstitution].map(([inst, set]) => [
-        inst,
-        [...set]
-          .filter((id) => names.has(id))
-          .map((id) => ({ id, name: names.get(id)! }))
-          .sort((a, b) => a.name.localeCompare(b.name, "ar")),
-      ]),
-    ),
+    doctors: Object.fromEntries([...perInstitution].map(([inst, set]) => [inst, named(set, false)])),
     unmatched: [...unmatched.entries()]
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, set]) => {
+        const doctors = named(set, true);
+        return { name, count: doctors.length, doctors };
+      })
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
   };
 }

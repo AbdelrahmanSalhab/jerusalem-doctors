@@ -13,13 +13,19 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+/** The read-only record fits a narrow sheet; the profile editor's workplace
+ *  rows do not. */
+const WIDTH = { md: "max-w-xl", lg: "max-w-3xl" } as const;
+
 export function DoctorPanel({
   closeHref,
   title,
+  width = "md",
   children,
 }: {
   closeHref: string;
   title: string;
+  width?: keyof typeof WIDTH;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -63,7 +69,10 @@ export function DoctorPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="doctor-panel-title"
-        className="fixed inset-y-0 end-0 z-50 flex w-full max-w-xl flex-col overflow-y-auto border-s border-line bg-surface shadow-lg"
+        className={
+          "fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-y-auto border-s border-line bg-surface shadow-lg " +
+          WIDTH[width]
+        }
       >
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
           <h2

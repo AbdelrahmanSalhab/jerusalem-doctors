@@ -118,7 +118,7 @@ describe("relinkWorkplaces", () => {
 });
 
 describe("institutionUsage", () => {
-  it("lists each institution's doctors by name (staff accounts left out), and the unlinked names", async () => {
+  it("lists each institution's doctors by name (staff accounts left out), and the unlinked names with who typed them", async () => {
     const { db } = await import("@/test/fakeSupabase");
     const { institutionUsage } = await import("./institutions");
     db.reset();
@@ -129,6 +129,12 @@ describe("institutionUsage", () => {
         { doctor_id: "d1", name: "كلاليت بيت حنينا", workplace_type: "clinic", institution_id: "clalit" },
         { doctor_id: "staff", name: "كلاليت", workplace_type: "clinic", institution_id: "clalit" },
         { doctor_id: "d3", name: "القدس", workplace_type: "hospital", institution_id: null },
+        { doctor_id: "d2", name: "القدس", workplace_type: "hospital", institution_id: null },
+        // The same doctor twice: the count is doctors, not rows.
+        { doctor_id: "d2", name: "القدس", workplace_type: "hmo", institution_id: null },
+        // A staff account is still named under an unlinked name: the point
+        // there is to reach whoever typed it.
+        { doctor_id: "staff", name: "ايخيلوف", workplace_type: "hospital", institution_id: null },
         { doctor_id: "d3", name: "عيادة خاصة", workplace_type: "clinic", institution_id: null },
       ],
     });
@@ -136,11 +142,22 @@ describe("institutionUsage", () => {
       data: [
         { id: "d1", arabic_first_name: "ليلى", arabic_family_name: "الخطيب" },
         { id: "d2", arabic_first_name: "أحمد", arabic_family_name: "سلهب" },
+        { id: "d3", arabic_first_name: "رنا", arabic_family_name: "حدّاد" },
         { id: "staff", arabic_first_name: "إدارة", arabic_family_name: "الموقع", is_admin: true, is_visible: false },
       ],
     });
     const usage = await institutionUsage(db.client as never);
     expect(usage.doctors.clalit.map((d) => d.name)).toEqual(["أحمد سلهب", "ليلى الخطيب"]);
-    expect(usage.unmatched).toEqual([{ name: "القدس", count: 1 }]);
+    expect(usage.unmatched).toEqual([
+      {
+        name: "القدس",
+        count: 2,
+        doctors: [
+          { id: "d2", name: "أحمد سلهب" },
+          { id: "d3", name: "رنا حدّاد" },
+        ],
+      },
+      { name: "ايخيلوف", count: 1, doctors: [{ id: "staff", name: "إدارة الموقع" }] },
+    ]);
   });
 });
