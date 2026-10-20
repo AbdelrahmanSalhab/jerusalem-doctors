@@ -91,7 +91,7 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
     case "admin_license_corrected":
       return licenseCheckDetail(m);
     case "dev_password_login":
-      return [m.email, m.is_admin ? "بصلاحيات إدارة" : ""].filter(Boolean).join(" · ");
+      return [m.ci_run ? "اختبار آلي (CI)" : "", m.email, m.is_admin ? "بصلاحيات إدارة" : ""].filter(Boolean).join(" · ");
     case "institution_created":
       return [quote(m.name_ar), typeof m.linked === "number" ? `أماكن عمل مربوطة: ${m.linked}` : ""]
         .filter(Boolean)
@@ -155,6 +155,7 @@ const FIELD_LABEL: Record<string, string> = {
   registry_family_name: "اسم العائلة في السجل",
   reason: "السبب",
   email: "البريد الإلكتروني",
+  ci_run: "تشغيل الاختبار الآلي",
   career_stage: "المرحلة المهنية",
   residency_start_year: "سنة بداية التخصص",
   featured: "العرض في لوحة البحث",
@@ -203,7 +204,7 @@ export function auditFields(row: AuditRow, institutionName: (id: string) => stri
       if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };
       if (k === "duration_ms" && typeof v === "number") return { label, value: `${Math.round(v / 1000)} ثانية` };
       if (k === "id") return { label, value: institutionName(String(v)) ?? String(v), ltr: !institutionName(String(v)) };
-      if (k === "error" || k.endsWith("_id")) return { label, value: String(v), ltr: true };
+      if (k === "error" || k === "ci_run" || k.endsWith("_id")) return { label, value: String(v), ltr: true };
       if (typeof v === "object") return { label, value: JSON.stringify(v), ltr: true };
       return { label, value: String(v) };
     });

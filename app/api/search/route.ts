@@ -16,6 +16,7 @@ import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { normalizeArabic, toIlikeTerm } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
+import { ciRunOf } from "@/lib/ciRun";
 import { recordEvent } from "@/lib/usage";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { withSubspecialties } from "@/lib/specialtyTree";
@@ -180,8 +181,9 @@ export const GET = withJsonErrors(async (req: Request) => {
   const hits = toSearchHits(data);
   const results = hits.slice(0, SEARCH_PAGE_SIZE);
   // No search text is kept. A specialty filter that finds nobody tells us
-  // which specialties the directory is missing.
-  await recordEvent(service, "search", {
+  // which specialties the directory is missing. The production smoke test's
+  // searches are not usage (lib/ciRun.ts).
+  if (!ciRunOf(req)) await recordEvent(service, "search", {
     doctorId: me.id,
     meta: {
       results: hits.length,

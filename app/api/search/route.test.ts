@@ -36,6 +36,8 @@ const { requireDoctor } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+const recordEvent = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/lib/usage", () => ({ recordEvent }));
 
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
@@ -75,11 +77,11 @@ vi.mock("@/lib/supabase/service", () => ({
   }),
 }));
 
-async function search(params: Record<string, string>) {
+async function search(params: Record<string, string>, headers: Record<string, string> = {}) {
   const { GET } = await import("./route");
   const url = new URL("https://example.test/api/search");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return GET(new Request(url));
+  return GET(new Request(url, { headers }));
 }
 
 describe("GET /api/search: specialty tree", () => {
@@ -219,5 +221,19 @@ describe("GET /api/search merge order", () => {
     ];
     const body = await (await search({ q: "باطنية" })).json();
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(["doc-2", "doc-1"]);
+  });
+});
+
+describe("GET /api/search: usage", () => {
+  beforeEach(() => recordEvent.mockClear());
+
+  it("counts a search", async () => {
+    await search({ q: "ليلى" });
+    expect(recordEvent).toHaveBeenCalledWith(expect.anything(), "search", expect.anything());
+  });
+
+  it("does not count the production smoke test's searches", async () => {
+    await search({ q: "ليلى" }, { "x-ci-run": "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123" });
+    expect(recordEvent).not.toHaveBeenCalled();
   });
 });

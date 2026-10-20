@@ -1,0 +1,53 @@
+name: Production smoke
+
+# Read-only checks against the live site: after every production deploy,
+# every six hours, and on demand. Signs in with an admin account through
+# /login/dev; its requests carry this run's URL (x-ci-run), so the activity
+# log shows the sign-in as "اختبار آلي (CI)" and its searches are not counted
+# in the stats. A failure here means the live site needs a look.
+#
+# Secrets: SMOKE_EMAIL, SMOKE_PASSWORD (an address in Vercel's DEV_LOGIN_EMAILS).
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    # Deploy events fire for previews and for every state; only a finished
+    # production deploy is worth checking.
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke checks
+        run: npx playwright test -c playwright.smoke.config.ts
+        env:
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Lighthouse (public pages)
+        if: github.event_name != 'schedule'
+        run: npx -y @lhci/cli@0.15.1 autorun
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-results
+          path: e2e/.results
+          retention-days: 14
