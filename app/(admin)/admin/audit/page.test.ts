@@ -54,6 +54,7 @@ describe("/admin/audit", () => {
     expect(html).toContain("الوقت الدقيق");
     expect(html).toContain("19/10/2026 11:53:17");
     expect(html).toContain("فتح الطبيب في قائمة الأطباء");
+    expect(html).toContain('href="/admin?doctor=d1"');
     expect(html).not.toContain("9.9.9.9");
     expect(html).not.toContain("auto_approved");
     expect(html).toContain("120 حدثًا في السجل");

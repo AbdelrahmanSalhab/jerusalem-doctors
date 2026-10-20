@@ -127,7 +127,7 @@ export default async function AdminAuditPage({
 
                   {doctor && doctor !== "حساب محذوف" && (
                     <Link
-                      href={`/admin?status=all&q=${encodeURIComponent(doctor)}`}
+                      href={`/admin?doctor=${r.target_doctor_id}`}
                       className="self-start rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5"
                     >
                       فتح الطبيب في قائمة الأطباء

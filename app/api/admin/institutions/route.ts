@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { writeAudit } from "@/lib/audit";
-import { requireAdmin } from "@/lib/auth/session";
+import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { INSTITUTION_KINDS, relinkWorkplaces } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -16,7 +16,7 @@ const InstitutionBody = z.object({
 });
 
 export const POST = withJsonErrors(async (req: Request) => {
-  const admin = await requireAdmin().catch(() => null);
+  const admin = await requireAdminOrNull();
   if (!admin) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
 
   const parsed = InstitutionBody.safeParse(await req.json().catch(() => null));

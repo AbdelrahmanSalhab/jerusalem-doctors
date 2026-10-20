@@ -3,9 +3,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, jsonRequest } from "@/test/fakeSupabase";
 
-const requireAdmin = vi.hoisted(() => vi.fn());
+const requireAdminOrNull = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth/session", () => ({ requireAdmin }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -18,17 +18,17 @@ async function create(body: unknown) {
 
 async function patch(body: unknown) {
   const { PATCH } = await import("./[id]/route");
-  return PATCH(jsonRequest("/api/admin/specialties/s1", body), { params: Promise.resolve({ id: "s1" }) });
+  return PATCH(jsonRequest("/api/admin/specialties/s1", body), { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000005a1" }) });
 }
 
 describe("admin specialties", () => {
   beforeEach(() => {
     db.reset();
-    requireAdmin.mockResolvedValue({ id: "admin" });
+    requireAdminOrNull.mockResolvedValue({ id: "admin" });
   });
 
   it.each([create, patch])("401s a non-admin (%#)", async (fn) => {
-    requireAdmin.mockRejectedValue(new Error("NOT_FOUND"));
+    requireAdminOrNull.mockResolvedValue(null);
     expect((await fn({ name_ar: "جراحة" })).status).toBe(401);
     expect(db.calls).toHaveLength(0);
   });
@@ -70,7 +70,7 @@ describe("admin specialties", () => {
         name_ar_normalized: "اسعاف",
         is_active: false,
       });
-      expect(db.argsOf("specialties", "eq")).toEqual([["id", "s1"]]);
+      expect(db.argsOf("specialties", "eq")).toEqual([["id", "00000000-0000-4000-8000-0000000005a1"]]);
     });
 
     it("rejects an empty update", async () => {

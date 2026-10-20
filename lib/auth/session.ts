@@ -91,12 +91,19 @@ export async function requireDoctor(): Promise<Doctor> {
  * existence isn't leaked to regular users.
  */
 export async function requireAdmin(): Promise<Doctor> {
-  const doctor = await getCurrentDoctor();
-  if (!doctor || !doctor.is_admin || !doctor.is_active) {
+  const admin = await getCurrentAdmin();
+  if (!admin) {
     const { notFound } = await import("next/navigation");
     notFound(); // throws, control never returns here
   }
-  return doctor as Doctor;
+  return admin as Doctor;
+}
+
+/** The signed-in active admin, or null. A failed lookup throws rather than
+ *  reading as "not an admin". */
+export async function getCurrentAdmin(): Promise<Doctor | null> {
+  const doctor = await getCurrentDoctor();
+  return doctor && doctor.is_admin && doctor.is_active ? doctor : null;
 }
 
 /**
