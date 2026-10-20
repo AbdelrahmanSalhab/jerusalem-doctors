@@ -15,6 +15,7 @@ import { MohClient } from "@/lib/moh/client";
 import { readMirrorFreshness, readMirrorRows } from "@/lib/moh/mirror";
 import { resolveIlLicense, type LicenseVerifyStatus, type NameMatch } from "@/lib/moh/match";
 import { canonicalLicenseNumber, ilLicenseCandidates } from "@/lib/normalize/license";
+import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import type { LicenseStatusValue } from "@/lib/licenseStatus";
 
 /** An admin is not a signup form waiting on a page, so it can wait longer. */
@@ -158,6 +159,28 @@ export async function checkLicense(
       match: result.match,
     }),
   };
+}
+
+/**
+ * The registry's own spelling of the name, when taking it would turn this
+ * partial match into an exact one.
+ *
+ * A soft match is a difference in spelling, not in identity: the number is the
+ * registry's and the name is a letter or a space away from it. The only honest
+ * way to make such a doctor read "موثّق" is to stop storing the spelling the
+ * registry disagrees with — not to overrule the column, which means "matches
+ * the registry exactly" everywhere it is read (lib/licenseStatus.ts, the
+ * approval gate, the admin stats views).
+ *
+ * null for every other verdict. A name_mismatch is a different person until a
+ * human says otherwise, and adopting the registry's name there would silently
+ * rewrite a doctor into whoever holds the number.
+ */
+export function adoptableName(outcome: CheckOutcome): { first: string; family: string } | null {
+  if (outcome.status !== "soft_match") return null;
+  const first = normalizeHebrew(outcome.registry?.firstName ?? "");
+  const family = normalizeHebrew(outcome.registry?.familyName ?? "");
+  return first && family ? { first, family } : null;
 }
 
 /** The columns one slot writes. */
