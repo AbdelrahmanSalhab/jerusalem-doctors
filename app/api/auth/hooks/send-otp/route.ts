@@ -12,6 +12,9 @@
 import * as Sentry from "@sentry/nextjs";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { getOtpSender, OtpProviderError } from "@/lib/otp";
+import { isKnownRecipient } from "@/lib/otp/recipients";
+import { rateLimit } from "@/lib/ratelimit";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 
 // nodejs is already the default in Next 16, but webhook.ts needs node:crypto:
@@ -88,9 +91,34 @@ export async function POST(req: Request) {
     return hookResponse(400);
   }
 
+  // Only a registered doctor or a number mid-signup (lib/otp/recipients.ts).
+  // 400: Supabase must not retry a number that will never qualify.
+  const e164 = toE164(phone);
+  let known: boolean;
+  try {
+    known = await isKnownRecipient(createSupabaseServiceClient(), e164);
+  } catch (err) {
+    console.error("[send-otp] recipient check failed:", (err as Error)?.message);
+    Sentry.captureException(err);
+    return hookResponse(500);
+  }
+  if (!known) {
+    console.warn("[send-otp] refused: no account or signup for this number");
+    return hookResponse(400);
+  }
+
+  // The site-wide daily budget, after the checks above so refused numbers
+  // do not spend it.
+  const budget = await rateLimit("smsDaily", "all");
+  if (!budget.success) {
+    console.error("[send-otp] daily SMS cap reached; no codes until it resets");
+    Sentry.captureMessage("Daily SMS cap reached", "error");
+    return hookResponse(400);
+  }
+
   try {
     const sender = getOtpSender();
-    await sender.send(toE164(phone), code);
+    await sender.send(e164, code);
     return hookResponse(200);
   } catch (err) {
     // OtpProviderError messages carry Meta's error code and message, never

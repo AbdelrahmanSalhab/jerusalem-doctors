@@ -1,37 +1,53 @@
-// Refreshes the Supabase Auth session on every request and gates the
-// protected routes. See plan §3 (auth flow) and §9 (RLS reliance on session
-// JWT being fresh).
+// Runs before every page and API request:
 //
-// Public routes: / (exactly), /login, /signup, /verify, /privacy, /api/*,
-// /_next/*, /favicon, /health, /robots.txt. Everything else requires a
-// session. "/" must match exactly: as a prefix it would match every path.
+// 1. Sets the Content-Security-Policy with a fresh nonce (lib/security/csp.ts).
+//    Next reads the nonce back from the request header and stamps it on its
+//    own scripts; the root layout stamps it on the theme boot script.
+// 2. Refreshes the Supabase Auth session, with cookies scripts cannot read.
+// 3. Sends a visitor without a session to /login, except on public paths.
+//
+// Public paths match exactly, or as a whole subtree ("/login/dev" is under
+// "/login/", but "/loginx" is under nothing). Every page and route also checks
+// access itself; this is the first layer, not the only one.
 
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { hardenCookie } from "@/lib/security/cookies";
+import { buildCsp, newNonce } from "@/lib/security/csp";
 
-const PUBLIC_PREFIXES = [
+const PUBLIC_EXACT = new Set([
+  "/",
   "/login",
   "/signup",
   "/verify",
   "/privacy",
   "/health",
-  "/api/",
-  "/_next/",
-  "/favicon",
+  "/favicon.ico",
   "/robots.txt",
   // The home-screen app manifest; phones fetch it before anyone logs in.
   "/manifest.webmanifest",
-];
+]);
+
+const PUBLIC_TREES = ["/login/", "/api/", "/_next/"];
 
 export function isPublic(pathname: string): boolean {
-  return (
-    pathname === "/" ||
-    PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))
-  );
+  return PUBLIC_EXACT.has(pathname) || PUBLIC_TREES.some((p) => pathname.startsWith(p));
 }
 
 export async function proxy(req: NextRequest) {
-  const res = NextResponse.next({ request: req });
+  const nonce = newNonce();
+  const csp = buildCsp({
+    nonce,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    upgradeInsecure: req.nextUrl.protocol === "https:",
+  });
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", csp);
+
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
+  res.headers.set("content-security-policy", csp);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -41,16 +57,15 @@ export async function proxy(req: NextRequest) {
         getAll: () => req.cookies.getAll(),
         setAll: (cookiesToSet) => {
           for (const { name, value, options } of cookiesToSet) {
-            res.cookies.set({ name, value, ...options });
+            res.cookies.set({ name, value, ...hardenCookie(options) });
           }
         },
       },
     },
   );
 
-  // Also refreshes an expiring session and writes the new cookies. getClaims
-  // verifies locally with asymmetric signing keys, so most requests skip the
-  // Auth round trip getUser always made.
+  // getClaims verifies the JWT and refreshes an expired session, writing the
+  // new cookies through setAll above.
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims.sub);
 
@@ -59,7 +74,6 @@ export async function proxy(req: NextRequest) {
     url.searchParams.set("next", req.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
-
   return res;
 }
 

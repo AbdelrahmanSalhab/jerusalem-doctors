@@ -127,12 +127,20 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   }
 
-  // Increment attempts BEFORE calling Supabase verifyOtp so a flood of bad
-  // codes can't bypass the counter via abandoned races.
-  await service
+  // Take this attempt BEFORE calling Supabase verifyOtp, and only if the
+  // count is still the one we read: parallel requests that all read the same
+  // count would otherwise each get a guess past MAX_ATTEMPTS. The one that
+  // loses the race is turned away without spending a guess.
+  const claimed = await service
     .from("pending_signups")
     .update({ attempts: pending.data.attempts + 1 })
-    .eq("id", pending.data.id);
+    .eq("id", pending.data.id)
+    .eq("attempts", pending.data.attempts)
+    .select("id");
+  if (claimed.error) throw claimed.error;
+  if (!claimed.data || claimed.data.length === 0) {
+    return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+  }
 
   const verify = await ssr.auth.verifyOtp({
     phone: pending.data.phone_e164,

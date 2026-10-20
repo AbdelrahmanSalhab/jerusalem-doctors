@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { hardenCookie } from "@/lib/security/cookies";
 
 export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
@@ -13,7 +14,7 @@ export async function createSupabaseServerClient() {
         setAll: (cookiesToSet) => {
           try {
             for (const { name, value, options } of cookiesToSet) {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, hardenCookie(options));
             }
           } catch {
             // Called from a Server Component, where cookies cannot be mutated.

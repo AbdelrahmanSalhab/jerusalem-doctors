@@ -40,6 +40,9 @@ const EXPECTED: RegExp[] = [
   /^console\.error .* \{challenges\.cloudflare\.com\}$/,
   // Cloudflare's Turnstile frame talks to its parent; harmless off its domain.
   /^console\.warning Failed to execute 'postMessage' .*challenges\.cloudflare\.com/,
+  // security.spec.ts injects an inline script to prove the CSP blocks it.
+  /^console\.error Executing inline event handler violates the following Content Security Policy/,
+  /^(http 404 GET |console\.error Failed to load resource: .* status of 404 .*\[)\/nope\.png/,
   // Next aborts in-flight prefetches when a test navigates on.
   /^requestfailed GET \S+[?&]_rsc=\S+ net::ERR_ABORTED/,
 ];

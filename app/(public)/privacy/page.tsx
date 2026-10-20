@@ -1,4 +1,6 @@
-export const dynamic = "force-static";
+// Rendered per request like every page: the Content-Security-Policy nonce
+// (proxy.ts) only reaches scripts in a page rendered for that request, and a
+// page built once at deploy time would have every script blocked.
 
 export default function PrivacyPage() {
   return (
