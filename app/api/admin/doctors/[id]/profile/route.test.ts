@@ -73,6 +73,7 @@ const BASE = {
   phone_display: "050-111-2222",
   career_stage: "specialist" as const,
   seeking_work: false,
+  retired: false,
 };
 
 async function call(body: unknown) {

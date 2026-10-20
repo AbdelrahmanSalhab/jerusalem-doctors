@@ -13,7 +13,7 @@ import {
   WorkplacesSummary,
 } from "./ProfileSummaries";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
-import { Field, SeekingWorkCheckbox } from "@/components/FormField";
+import { Field, RetiredCheckbox, SeekingWorkCheckbox } from "@/components/FormField";
 import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { StageRadios } from "@/components/StageRadios";
@@ -58,6 +58,7 @@ export function ProfileForm({
   const [bio, setBio] = useState(doctor.bio ?? "");
   const [certificates, setCertificates] = useState<string[]>(doctor.certificates ?? []);
   const [seekingWork, setSeekingWork] = useState(doctor.seeking_work ?? false);
+  const [retired, setRetired] = useState(doctor.retired ?? false);
   const [specialtyIds, setSpecialtyIds] = useState<string[]>(
     currentSpecialtyIds,
   );
@@ -139,6 +140,7 @@ export function ProfileForm({
       specialtyIds,
       residencyStartYear,
       seekingWork,
+      retired,
     });
     if (problem) {
       setError(problem.message);
@@ -169,6 +171,7 @@ export function ProfileForm({
             certificates: STAGE_BY_KEY[stage].showsCertificates ? certificates : [],
           }),
           seeking_work: seekingWork,
+          retired,
           workplaces: cleanWorkplaces(workplaces),
         }),
       });
@@ -265,6 +268,7 @@ export function ProfileForm({
           </ReadOnlyView>
         )}
         <SeekingWorkCheckbox checked={seekingWork} onChange={setSeekingWork} />
+        <RetiredCheckbox checked={retired} onChange={setRetired} />
       </Section>
 
       <Section
@@ -348,7 +352,7 @@ export function ProfileForm({
             workplaces={workplaces}
             onChange={setWorkplaces}
             stage={stage}
-            optional={seekingWork}
+            optional={seekingWork || retired}
           />
         ) : (
           <ReadOnlyView>

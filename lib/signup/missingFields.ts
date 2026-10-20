@@ -29,6 +29,7 @@ export interface SignupFields {
   specialty_ids: readonly string[];
   email: string;
   seeking_work: boolean;
+  retired: boolean;
   workplaces: readonly {
     name: string;
     workplace_type: WorkplaceType;
@@ -83,7 +84,10 @@ export function getMissingFields(f: SignupFields): MissingField[] {
     );
     need(f.specialty_ids.length === 0, "specialty_ids", "التخصص");
     need(
-      !opt.workplaceOptional && !f.seeking_work && !f.workplaces.some((w) => !blank(w.name)),
+      !opt.workplaceOptional &&
+        !f.seeking_work &&
+        !f.retired &&
+        !f.workplaces.some((w) => !blank(w.name)),
       "workplace_0_name",
       "مكان العمل",
     );

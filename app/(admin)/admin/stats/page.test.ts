@@ -9,7 +9,7 @@ const SAMPLE: AdminStats = {
   generated_at: "2026-10-19T09:00:00Z",
   doctors: {
     total: 40, listed: 31, pending: 3, suspended: 2, new_24h: 4, new_7d: 12, new_30d: 40,
-    seeking_work: 5, with_photo: 18, with_bio: 22, with_workplace: 37, approved_auto: 30, approved_manual: 5,
+    seeking_work: 5, retired: 3, with_photo: 18, with_bio: 22, with_workplace: 37, approved_auto: 30, approved_manual: 5,
   },
   stage: { general: 10, resident: 12, specialist: 18 },
   license: { il_only: 25, ps_only: 9, both: 6, verified: 30, soft_match: 2, not_found: 7, mismatch_overridden: 1 },

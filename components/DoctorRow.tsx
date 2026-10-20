@@ -1,6 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { ContactButtons } from "@/components/ContactButtons";
-import { cardChips, cardServices, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
+import { cardChips, cardServices, RETIRED_LABEL, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { workplaceInfoLine, clinicTelHref } from "@/lib/workplace";
 
@@ -31,6 +31,7 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
         <h3 className="text-lg font-bold leading-tight">{name}</h3>
 
         {(chips.length > 0 || doctor.seeking_work ||
+          doctor.retired ||
           doctor.subspecialty ||
           doctor.career_stage) && (
           <ul className="flex flex-wrap gap-1.5">
@@ -60,6 +61,11 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
             {doctor.seeking_work && (
               <li className="rounded-full border border-success-line bg-success-bg px-2 py-0.5 text-xs text-success">
                 {SEEKING_WORK_LABEL}
+              </li>
+            )}
+            {doctor.retired && (
+              <li className="rounded-full border border-foreground/20 bg-foreground/5 px-2 py-0.5 text-xs text-muted">
+                {RETIRED_LABEL}
               </li>
             )}
           </ul>

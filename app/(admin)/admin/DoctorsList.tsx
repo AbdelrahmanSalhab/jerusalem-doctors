@@ -36,6 +36,7 @@ export interface DoctorRowData {
   consent_directory_use: boolean;
   featured: "doctor" | "graduate" | null;
   seeking_work: boolean;
+  retired: boolean;
   subspecialty: string | null;
   created_at: string;
   doctor_specialties: { specialty: { name_ar: string } | { name_ar: string }[] | null }[] | null;

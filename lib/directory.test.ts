@@ -18,6 +18,7 @@ const ROW = {
   residency_start_year: null,
   certificates: null,
   seeking_work: null,
+  retired: null,
   doctor_specialties: [{ specialty: { name_ar: "الطب العام" } }],
   doctor_workplaces: [
     { name: "ب", workplace_type: "clinic", details: null, address: null, hours: null, phone: null, is_primary: false, sort_order: 2 },
@@ -30,6 +31,7 @@ describe("toSearchHits", () => {
     const [hit] = toSearchHits([ROW]);
     expect(hit.certificates).toEqual([]);
     expect(hit.seeking_work).toBe(false);
+    expect(hit.retired).toBe(false);
     expect(hit.whatsapp_url).toBeNull();
     expect(hit.workplaces.map((w) => w.name)).toEqual(["أ", "ب"]);
     expect(hit.specialties).toEqual(["الطب العام"]);

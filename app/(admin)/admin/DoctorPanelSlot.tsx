@@ -70,6 +70,7 @@ export function DoctorPanelSlot({
           bio: d.bio,
           certificates: d.certificates,
           seeking_work: d.seeking_work,
+          retired: d.retired,
           career_stage: d.career_stage,
           residency_start_year: d.residency_start_year,
           profile_picture_url: d.profile_picture_url,

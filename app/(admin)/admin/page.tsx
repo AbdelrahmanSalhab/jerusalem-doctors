@@ -47,6 +47,7 @@ const ROW_COLUMNS = `
   consent_directory_use,
   featured,
   seeking_work,
+  retired,
   subspecialty,
   created_at,
   doctor_specialties(specialty:specialties(name_ar))

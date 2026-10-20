@@ -70,6 +70,7 @@ interface PendingPayload {
   certificates?: string[];
   certificates_normalized?: string | null;
   seeking_work?: boolean;
+  retired?: boolean;
   specialty_ids: string[];
   workplaces: PendingWorkplace[];
   license_verification_status:
@@ -179,6 +180,7 @@ export const POST = withJsonErrors(async (req: Request) => {
       certificates: payload.certificates ?? [],
       certificates_normalized: payload.certificates_normalized ?? null,
       seeking_work: payload.seeking_work ?? false,
+      retired: payload.retired ?? false,
       license_verified_at:
         payload.license_verification_status === "verified" ||
         payload.license_verification_status === "soft_match"

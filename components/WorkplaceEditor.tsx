@@ -61,7 +61,7 @@ export function WorkplaceEditor({
   onChange: (next: WorkplaceEntry[]) => void;
   /** null: a legacy profile that never declared a stage; nothing is coerced. */
   stage: Stage | null;
-  /** The doctor is looking for work, so no workplace is required. */
+  /** The doctor is looking for work or retired, so no workplace is required. */
   optional?: boolean;
 }) {
   const [known, setKnown] = useState<Suggestion[]>([]);

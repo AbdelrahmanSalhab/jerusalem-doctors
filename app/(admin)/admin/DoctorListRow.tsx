@@ -102,6 +102,7 @@ export function DoctorListRow({
         )}
         {visibility.listed && <span className={toneChip("success")}>في الدليل</span>}
         {row.seeking_work && <span className={toneChip("neutral")}>يبحث عن عمل</span>}
+        {row.retired && <span className={toneChip("neutral")}>طبيب متقاعد</span>}
       </div>
 
       <div className="flex items-center gap-2 md:justify-end">

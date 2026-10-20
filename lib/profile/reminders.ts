@@ -7,6 +7,7 @@ interface ReminderDoctor {
   career_stage: "resident" | "specialist" | null;
   profile_picture_url: string | null;
   certificates?: string[] | null;
+  retired?: boolean | null;
 }
 
 interface ReminderWorkplace {
@@ -18,8 +19,9 @@ interface ReminderWorkplace {
 
 export function profileGaps(doctor: ReminderDoctor, workplaces: ReminderWorkplace[]): string[] {
   const gaps: string[] = [];
-  // Residents rotate and have no clinic fields (see STAGE_OPTIONS).
-  if (doctor.career_stage !== "resident") {
+  // Residents rotate and have no clinic fields (see STAGE_OPTIONS); a retired
+  // doctor has no workplace to add, so nagging them about one never clears.
+  if (doctor.career_stage !== "resident" && !doctor.retired) {
     if (workplaces.length === 0) gaps.push("أضف مكان عملك ليعرف الزملاء أين يجدونك.");
     for (const w of workplaces) {
       const missing = missingClinicFields({

@@ -123,6 +123,7 @@ export function DoctorPanelBody({
             ["شهادات وخدمات", d.certificates?.length ? d.certificates.join("، ") : "لا شيء"],
             ["نبذة", d.bio || "لا شيء"],
             ["يبحث عن فرصة عمل", yesNo(d.seeking_work)],
+            ["طبيب متقاعد", yesNo(d.retired)],
           ]}
         />
       </Section>
