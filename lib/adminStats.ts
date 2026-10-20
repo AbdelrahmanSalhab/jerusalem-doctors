@@ -13,6 +13,7 @@ export interface AdminStats {
   doctors: {
     total: Count; listed: Count; pending: Count; suspended: Count;
     new_24h: Count; new_7d: Count; new_30d: Count; seeking_work: Count;
+    retired: Count;
     with_photo: Count; with_bio: Count; with_workplace: Count;
     approved_auto: Count; approved_manual: Count;
   };

@@ -55,6 +55,9 @@ export interface Doctor {
   profile_picture_url: string | null;
   /** Self-declared on /signup and /profile (0013). */
   seeking_work: boolean;
+  /** Self-declared on /signup and /profile (0019). Independent of
+   *  seeking_work: a retired doctor may still want locum work. */
+  retired: boolean;
   /** Set by an admin; drives the dashboard's featured sections. */
   featured: "doctor" | "graduate" | null;
   featured_at: string | null;

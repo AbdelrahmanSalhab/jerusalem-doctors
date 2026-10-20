@@ -29,6 +29,8 @@ export type FormState = {
   /** طب عام only; see lib/certificates.ts. */
   certificates: string[];
   seeking_work: boolean;
+  /** Independent of seeking_work; either makes the workplace optional. */
+  retired: boolean;
   workplaces: WorkplaceEntry[];
   consent: boolean;
 };
@@ -56,6 +58,7 @@ export const INITIAL: FormState = {
   bio: "",
   certificates: [],
   seeking_work: false,
+  retired: false,
   workplaces: [emptyWorkplace(true)],
   consent: false,
 };

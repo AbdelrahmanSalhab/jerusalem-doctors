@@ -72,3 +72,31 @@ export function SeekingWorkCheckbox({
     </label>
   );
 }
+
+/** Independent of SeekingWorkCheckbox: a retired doctor may still want locum
+ *  work. Either one on its own makes the workplace optional. */
+export function RetiredCheckbox({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className={OPTION_CARD}>
+      <input
+        type="checkbox"
+        className={OPTION_INPUT}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>
+        أنا طبيب متقاعد
+        <span className="block text-sm text-muted">
+          تظهر عبارة &quot;طبيب متقاعد&quot; على بطاقتك، ولا يُطلب منك إدخال مكان عمل.
+          يمكنك إلغاؤها في أي وقت من ملفك.
+        </span>
+      </span>
+    </label>
+  );
+}

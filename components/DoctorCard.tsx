@@ -1,7 +1,7 @@
 import { Avatar } from "@/components/Avatar";
 import { ContactButtons } from "@/components/ContactButtons";
 import { clinicTelHref } from "@/lib/workplace";
-import { cardChips, cardServices, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
+import { cardChips, cardServices, RETIRED_LABEL, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { WorkplaceDetails } from "@/components/WorkplaceDetails";
 
@@ -25,7 +25,10 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         />
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-bold leading-tight">{name}</h3>
-          {(chips.length > 0 || doctor.seeking_work || doctor.career_stage) && (
+          {(chips.length > 0 ||
+            doctor.seeking_work ||
+            doctor.retired ||
+            doctor.career_stage) && (
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
               {chips.map((s) => (
                 <li
@@ -43,6 +46,11 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
               {doctor.seeking_work && (
                 <li className="rounded-full border border-success-line bg-success-bg px-2 py-0.5 text-xs text-success">
                   {SEEKING_WORK_LABEL}
+                </li>
+              )}
+              {doctor.retired && (
+                <li className="rounded-full border border-foreground/20 bg-foreground/5 px-2 py-0.5 text-xs text-muted">
+                  {RETIRED_LABEL}
                 </li>
               )}
             </ul>

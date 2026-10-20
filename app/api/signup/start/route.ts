@@ -70,6 +70,7 @@ const Body = z
     workplaces: z.array(WorkplaceInputSchema).max(20),
     certificates: CertificatesSchema.optional(),
     seeking_work: z.boolean().optional(),
+    retired: z.boolean().optional(),
     consent: z.literal(true),
     turnstile_token: z.string().optional(),
     // Soft-match override flow: client confirms registry name; we record it.
@@ -83,11 +84,18 @@ const Body = z
     message: "الترخيص الإضافي يجب أن يكون من الجهة الأخرى",
     path: ["secondary_license_region"],
   })
-  // Residents rotate; a doctor looking for work may have none yet.
-  .refine((b) => b.career_stage === "resident" || b.seeking_work || b.workplaces.length > 0, {
-    message: "أدخل مكان عمل واحدًا على الأقل",
-    path: ["workplaces"],
-  });
+  // Residents rotate; a doctor looking for work or retired may have none.
+  .refine(
+    (b) =>
+      b.career_stage === "resident" ||
+      b.seeking_work ||
+      b.retired ||
+      b.workplaces.length > 0,
+    {
+      message: "أدخل مكان عمل واحدًا على الأقل",
+      path: ["workplaces"],
+    },
+  );
 
 export const POST = withJsonErrors(async (req: Request) => {
   const disabled = rejectWhilePhoneAuthDisabled();
@@ -383,6 +391,7 @@ export const POST = withJsonErrors(async (req: Request) => {
       residency_start_year: parsed.residency_start_year ?? null,
       ...certificateFields(parsed.certificates ?? []),
       seeking_work: parsed.seeking_work ?? false,
+      retired: parsed.retired ?? false,
 
       specialty_ids: parsed.specialty_ids,
       workplaces,

@@ -40,6 +40,7 @@ export interface SearchHit {
   /** A طب عام doctor's extra certificates, shown in place of الطب العام. */
   certificates: string[];
   seeking_work: boolean;
+  retired: boolean;
   /** Empty only for a doctor with no workplace rows. */
   workplaces: SearchWorkplace[];
   profile_picture_url: string | null;
@@ -83,6 +84,7 @@ export function directoryQuery(service: SupabaseClient, specialtyFilter = false)
       residency_start_year,
       certificates,
       seeking_work,
+      retired,
       doctor_specialties(
         specialty:specialties(id, name_ar)
       ),
@@ -113,6 +115,7 @@ interface DirectoryRow {
   residency_start_year: number | null;
   certificates: string[] | null;
   seeking_work: boolean | null;
+  retired: boolean | null;
   doctor_specialties:
     | { specialty: { name_ar: string } | { name_ar: string }[] | null }[]
     | null;
@@ -168,6 +171,7 @@ function toSearchHit(d: DirectoryRow): SearchHit {
     specialties,
     certificates: d.certificates ?? [],
     seeking_work: d.seeking_work ?? false,
+    retired: d.retired ?? false,
     workplaces,
     profile_picture_url: d.profile_picture_url ?? null,
   };
@@ -188,6 +192,7 @@ export function cardChips(d: Pick<SearchHit, "career_stage" | "specialties" | "c
 }
 
 export const SEEKING_WORK_LABEL = "يبحث عن فرصة عمل";
+export const RETIRED_LABEL = "طبيب متقاعد";
 
 export interface FeaturedDoctors {
   doctor: SearchHit | null;

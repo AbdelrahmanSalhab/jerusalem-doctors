@@ -40,6 +40,7 @@ export const ProfileFieldsSchema = z.object({
   // Only kept for طب عام; any other stage stores an empty list.
   certificates: CertificatesSchema.optional(),
   seeking_work: z.boolean().optional(),
+  retired: z.boolean().optional(),
 });
 
 export type ProfileFields = z.infer<typeof ProfileFieldsSchema>;
@@ -71,19 +72,27 @@ export interface ProfileCurrent {
   arabic_family_name: string;
   career_stage: "resident" | "specialist" | null;
   seeking_work: boolean;
+  retired: boolean;
 }
 
 /**
- * A doctor may list no workplace only while they are a resident or looking
- * for one. The stage may come from this request or from the stored row.
+ * A doctor may list no workplace only while they are a resident, looking for
+ * one, or retired. Each of the three may come from this request or from the
+ * stored row, so the state *after* the save is what the rule reads.
  */
 export function workplacesRuleFailure(
   p: ProfileFields,
-  current: Pick<ProfileCurrent, "career_stage" | "seeking_work">,
+  current: Pick<ProfileCurrent, "career_stage" | "seeking_work" | "retired">,
 ): SaveFailure | null {
   const stageAfterSave = p.career_stage !== undefined ? p.career_stage : current.career_stage;
   const seekingAfterSave = p.seeking_work ?? current.seeking_work;
-  if (p.workplaces?.length === 0 && stageAfterSave !== "resident" && !seekingAfterSave) {
+  const retiredAfterSave = p.retired ?? current.retired;
+  if (
+    p.workplaces?.length === 0 &&
+    stageAfterSave !== "resident" &&
+    !seekingAfterSave &&
+    !retiredAfterSave
+  ) {
     return {
       status: 400,
       code: "invalid_body",
@@ -135,6 +144,9 @@ export function buildProfileUpdates(
   }
   if (p.seeking_work !== undefined) {
     updates.seeking_work = p.seeking_work;
+  }
+  if (p.retired !== undefined) {
+    updates.retired = p.retired;
   }
   return updates;
 }

@@ -54,6 +54,7 @@ export interface DetailDoctor {
   consent_directory_use: boolean;
   consent_timestamp: string | null;
   seeking_work: boolean;
+  retired: boolean;
   featured: "doctor" | "graduate" | null;
   featured_at: string | null;
   created_at: string;
@@ -91,7 +92,7 @@ const DOCTOR_COLUMNS = `
   license_number, license_region, license_verification_status, license_verified_at,
   secondary_license_number, secondary_license_region, secondary_license_verification_status,
   is_admin_approved, is_active, is_visible, is_phone_verified, is_admin,
-  consent_directory_use, consent_timestamp, seeking_work, featured, featured_at,
+  consent_directory_use, consent_timestamp, seeking_work, retired, featured, featured_at,
   created_at, updated_at, auth_user_id
 `;
 

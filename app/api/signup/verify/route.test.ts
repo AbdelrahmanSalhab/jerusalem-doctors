@@ -94,6 +94,7 @@ describe("POST /api/signup/verify", () => {
       certificates: [],
       certificates_normalized: null,
       seeking_work: false,
+      retired: false,
     });
     expect(doctorInsert().license_verified_at).toEqual(expect.any(String));
     expect(db.argsOf("pending_signups", "update")).toEqual([[{ attempts: 1 }]]);

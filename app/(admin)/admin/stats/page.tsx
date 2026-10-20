@@ -114,6 +114,7 @@ export default async function AdminStatsPage() {
           <Tile label="جدد آخر 7 أيام" value={d.new_7d} />
           <Tile label="جدد آخر 30 يومًا" value={d.new_30d} />
           <Tile label="يبحثون عن عمل" value={d.seeking_work} sub={pct(d.seeking_work, d.total)} />
+          <Tile label="متقاعدون" value={d.retired} sub={pct(d.retired, d.total)} />
         </TileGrid>
         <DailyBars label="تسجيلات جديدة" days={s.daily.map((x) => ({ day: x.day, value: x.signups }))} />
       </Section>
