@@ -89,7 +89,7 @@ test.describe("row-level security", () => {
       const { data, error } = await doctor.from(t).select("*");
       // A missing grant (42501) is a denial; any other error is a bug:
       // is_admin() once recursed through RLS to "stack depth limit
-      // exceeded" (0018), which an "empty or error" check let through.
+      // exceeded" (0019), which an "empty or error" check let through.
       if (error) expect(error.code, `doctor read ${t}: ${error.message}`).toBe("42501");
       const rows = (data ?? []) as Record<string, unknown>[];
       const rule = READABLE.doctor[t];
