@@ -17,6 +17,7 @@ import { z } from "zod";
 import { cachedInstitutions } from "@/lib/cachedReads";
 import { institutionsMatching } from "@/lib/institutions";
 import { SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
+import { WORKPLACE_TYPES } from "@/lib/workplace";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
@@ -28,6 +29,11 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 const Query = z.object({
   q: z.string().trim().max(100).default(""),
   specialty_id: z.uuid().optional(),
+  // The filter panel (lib/searchFilters.ts).
+  institution_id: z.uuid().optional(),
+  workplace_type: z.enum(WORKPLACE_TYPES).optional(),
+  stage: z.enum(["specialist", "resident", "general"]).optional(),
+  seeking_work: z.literal("1").optional(),
 });
 
 export type { SearchHit, SearchWorkplace } from "@/lib/directory";
@@ -35,9 +41,14 @@ export type { SearchHit, SearchWorkplace } from "@/lib/directory";
 export const GET = withJsonErrors(async (req: Request) => {
   const started = performance.now();
   const url = new URL(req.url);
+  const param = (k: string) => url.searchParams.get(k) || undefined;
   const parsed = Query.safeParse({
     q: url.searchParams.get("q") ?? "",
-    specialty_id: url.searchParams.get("specialty_id") ?? undefined,
+    specialty_id: param("specialty_id"),
+    institution_id: param("institution_id"),
+    workplace_type: param("workplace_type"),
+    stage: param("stage"),
+    seeking_work: param("seeking_work"),
   });
 
   // requireDoctor, not getCurrentDoctor: a deactivated doctor's session must
@@ -50,7 +61,7 @@ export const GET = withJsonErrors(async (req: Request) => {
     return jsonError(400, { error: "invalid_query", code: "invalid_query" });
   }
 
-  const { q, specialty_id } = parsed.data;
+  const { q, specialty_id, institution_id, workplace_type, stage, seeking_work } = parsed.data;
   // Letters, digits and spaces only, normalised like the stored text: no
   // LIKE wildcards can reach the query.
   const term = toIlikeTerm(q);
@@ -73,6 +84,10 @@ export const GET = withJsonErrors(async (req: Request) => {
       p_institution_ids: term ? institutionsMatching(institutions, q) : [],
       // One extra row tells us whether more matched than we return.
       p_limit: SEARCH_PAGE_SIZE + 1,
+      p_workplace_institution: institution_id ?? null,
+      p_workplace_type: workplace_type ?? null,
+      p_stage: stage ?? null,
+      p_seeking_work: seeking_work === "1",
     }),
   ]);
   if (!rl.success) {
@@ -92,7 +107,10 @@ export const GET = withJsonErrors(async (req: Request) => {
         doctorId: me.id,
         meta: {
           results: hits.length,
+          // The stats' "specialties searched with no result" reads this as
+          // a specialty filter; the panel's filters are counted apart.
           filtered: Boolean(specialty_id),
+          ...((institution_id || workplace_type || stage || seeking_work) && { panel_filters: true }),
           ...(specialty_id && { specialty_id }),
         },
       }),

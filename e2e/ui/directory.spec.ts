@@ -53,6 +53,22 @@ test("the specialty filter narrows the list @phone", async ({ page }) => {
   await expect(page.getByText("يوسف حداد")).toHaveCount(0);
 });
 
+test("the filter panel narrows by career stage and looking for work, with no text @phone", async ({ page }) => {
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: /^تصفية/ }).click();
+  await page.getByLabel("المرحلة المهنية").selectOption({ label: "طبيب مقيم" });
+  await expect(page.getByText("مريم عودة").first()).toBeVisible();
+  await expect(page.getByText("سامر ناصر")).toHaveCount(0);
+
+  await page.getByLabel("المرحلة المهنية").selectOption({ label: "الكل" });
+  await page.getByLabel("يبحث عن فرصة عمل").check();
+  await expect(page.getByText("يوسف حداد").first()).toBeVisible();
+  await expect(page.getByText("مريم عودة")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "مسح التصفية" }).click();
+  await expect(page.getByText(/في الدليل/)).toBeVisible();
+});
+
 test("saving a contact gives name and numbers, never the licence", async ({ page }) => {
   await search(page, "ليلى");
   const [download] = await Promise.all([
