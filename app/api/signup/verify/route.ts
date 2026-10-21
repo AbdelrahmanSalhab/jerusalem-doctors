@@ -12,6 +12,7 @@ import { relinkDoctor } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { WorkplaceType } from "@/lib/workplace";
 import { writeAudit } from "@/lib/audit";
+import { directoryChanged } from "@/lib/cachedReads";
 import { raiseAlert } from "@/lib/alerts";
 
 const MAX_ATTEMPTS = 5;
@@ -290,6 +291,8 @@ export const POST = withJsonErrors(async (req: Request) => {
     });
   }
 
+  // An auto-approved doctor is listed now; the dashboard count shows it.
+  if (isAutoApproved) directoryChanged();
   return jsonOk({ ok: true, auto_approved: isAutoApproved });
 });
 

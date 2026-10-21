@@ -15,6 +15,7 @@ import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { allPhotoPaths, PHOTO_BUCKET } from "@/lib/photo";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
+import { directoryChanged } from "@/lib/cachedReads";
 import { approvalNeedsReason } from "@/lib/licenseStatus";
 
 const APPROVAL_REASON_MIN = 3;
@@ -113,6 +114,8 @@ export const PATCH = withJsonErrors(async (
     console.error("[admin.doctors.patch] update failed", r.error);
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
+  // Approving, hiding or featuring shows on every dashboard at once.
+  directoryChanged();
 
   await writeAudit(service, {
     actor_doctor_id: admin.id,

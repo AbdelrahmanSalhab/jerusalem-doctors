@@ -8,6 +8,7 @@ import { requireDoctor } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
+import { directoryChanged } from "@/lib/cachedReads";
 
 export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
@@ -40,5 +41,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   const ssr = await createSupabaseServerClient();
   await ssr.auth.signOut();
 
+  // The closed account leaves the dashboard's counts and featured cards.
+  directoryChanged();
   return jsonOk({ ok: true });
 });

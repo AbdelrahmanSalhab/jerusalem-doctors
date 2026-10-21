@@ -20,6 +20,21 @@ test.describe("admin_stats()", () => {
   });
 });
 
+test.describe("directory_counts()", () => {
+  test("counts listed doctors, rolling subspecialties into their parent", async () => {
+    const db = serviceClient();
+    const { data, error } = await db.rpc("directory_counts");
+    expect(error).toBeNull();
+    const counts = data as { listed: number; by_domain: Record<string, number> };
+    expect(counts.listed).toBe(LISTED.length);
+    const id = async (name: string) => (await db.from("specialties").select("id").eq("name_ar", name).single()).data!.id;
+    // سامر is stored under القلب, which counts under الباطنية.
+    expect(counts.by_domain[await id("الباطنية")]).toBe(1);
+    expect(counts.by_domain[await id("القلب")]).toBeUndefined();
+    expect(counts.by_domain[await id("الأطفال")]).toBe(2);
+  });
+});
+
 test.describe("save_doctor_profile()", () => {
   // The closed account: nothing else in the run reads it.
   const read = async (id: string) => {

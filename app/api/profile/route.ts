@@ -18,6 +18,7 @@ import {
 } from "@/lib/profile/save";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { directoryChanged } from "@/lib/cachedReads";
 
 export const PATCH = withJsonErrors(async (req: Request) => {
   const me = await requireDoctorOrNull();
@@ -82,6 +83,8 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     });
   }
 
+  // A featured card, or "looking for work", shows the change at once.
+  directoryChanged();
   return jsonOk({ ok: true });
 });
 

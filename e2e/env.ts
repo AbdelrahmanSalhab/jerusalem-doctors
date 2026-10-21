@@ -63,6 +63,8 @@ export function appEnv(): Record<string, string> {
     SMS4FREE_SENDER: "JDoctors",
     SEND_SMS_HOOK_SECRET: "v1,whsec_ZTJlLXRlc3QtaG9vay1zZWNyZXQtZm9yLWNp",
     CRON_SECRET,
+    // Tests change doctors straight in the database (lib/cachedReads.ts).
+    DIRECTORY_CACHE_SECONDS: "0",
     MOH_API_BASE: `${STUB_URL}/api/3`,
     NEXT_TELEMETRY_DISABLED: "1",
   };

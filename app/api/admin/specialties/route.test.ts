@@ -6,6 +6,8 @@ import { db, jsonRequest } from "@/test/fakeSupabase";
 const requireAdminOrNull = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
+const specialtiesChanged = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/cachedReads", () => ({ specialtiesChanged }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -49,6 +51,8 @@ describe("admin specialties", () => {
         sort_order: 8,
         is_active: true,
       });
+      // Signup and the dashboard read the list from a cache.
+      expect(specialtiesChanged).toHaveBeenCalled();
     });
 
     it("starts at 1 on an empty table", async () => {
@@ -71,6 +75,7 @@ describe("admin specialties", () => {
         is_active: false,
       });
       expect(db.argsOf("specialties", "eq")).toEqual([["id", "00000000-0000-4000-8000-0000000005a1"]]);
+      expect(specialtiesChanged).toHaveBeenCalled();
     });
 
     it("rejects an empty update", async () => {

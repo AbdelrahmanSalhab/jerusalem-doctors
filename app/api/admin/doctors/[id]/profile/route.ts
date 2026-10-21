@@ -40,6 +40,7 @@ import {
 } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { directoryChanged } from "@/lib/cachedReads";
 
 const CURRENT_COLUMNS = `
   id, auth_user_id, arabic_first_name, arabic_family_name,
@@ -260,6 +261,7 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: { params: Promise<
     },
   });
 
+  directoryChanged();
   return jsonOk({
     ok: true,
     warnings,

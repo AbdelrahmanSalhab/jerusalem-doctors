@@ -1,6 +1,6 @@
 import { ProfileForm } from "./ProfileForm";
 import { requireDoctor } from "@/lib/auth/session";
-import { fetchActiveSpecialties } from "@/lib/specialties/catalogue";
+import { cachedSpecialties } from "@/lib/cachedReads";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { DoctorWorkplace } from "@/lib/db/types";
 
@@ -12,7 +12,7 @@ export default async function ProfilePage() {
 
   const [specialties, { data: doctorSpecialties }, { data: workplaces }] =
     await Promise.all([
-      fetchActiveSpecialties(service),
+      cachedSpecialties(),
       service
         .from("doctor_specialties")
         .select("specialty_id")
