@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
 import { ViewerProvider } from "@/components/ViewerContext";
-import { cachedDirectoryOverview, cachedSpecialties } from "@/lib/cachedReads";
+import { cachedDirectoryOverview, cachedInstitutions, cachedSpecialties } from "@/lib/cachedReads";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -14,10 +14,10 @@ export default async function DashboardPage() {
   // same (specialties, featured doctors, counts) comes from the cache
   // (lib/cachedReads.ts); only this doctor's own rows are read each time.
   const service = createSupabaseServiceClient();
-  const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview()]);
+  const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview(), cachedInstitutions()]);
   const me = await requireDoctor();
   const [
-    [specialties, { featured, counts }],
+    [specialties, { featured, counts }, allInstitutions],
     { data: myWorkplaces },
     { data: mySpecialties },
   ] =
@@ -96,6 +96,9 @@ export default async function DashboardPage() {
           featured={featured}
           listed={counts.listed}
           domainCounts={counts.byDomain}
+          institutions={allInstitutions
+            .filter((i) => counts.byInstitution[i.id])
+            .map((i) => ({ id: i.id, name_ar: i.name_ar, kind: i.kind, count: counts.byInstitution[i.id] }))}
         />
       </ViewerProvider>
     </main>
