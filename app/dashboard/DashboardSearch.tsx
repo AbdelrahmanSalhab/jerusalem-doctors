@@ -22,6 +22,14 @@ const VIEW_STORAGE_KEY = "search:view";
  *  phone screen, pushing the results and the featured doctors out of
  *  sight. */
 const CHIPS_COLLAPSED = 5;
+/** Cards flow down columns instead of across grid rows. Their heights vary a
+ *  lot (a long bio and two workplaces next to a name and a phone number), and
+ *  a grid row is as tall as its tallest card, so a short card used to leave a
+ *  hole beside it. In multicol `gap` is the column gap only, so the vertical
+ *  rhythm between cards is the item's own margin. */
+const CARD_COLUMNS = "columns-1 gap-4 md:columns-2";
+const CARD_COLUMN_ITEM =
+  "mb-4 break-inside-avoid [-webkit-column-break-inside:avoid]";
 
 export function DashboardSearch({
   specialties,
@@ -212,9 +220,9 @@ function ResultsRegion({
         )}
         {featured.graduates.length > 0 && (
           <FeaturedSection title="أطباء مميزون يبحثون عن عمل">
-            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <ul className={CARD_COLUMNS}>
               {featured.graduates.map((d) => (
-                <li key={d.id}>
+                <li key={d.id} className={CARD_COLUMN_ITEM}>
                   <DoctorCard doctor={d} />
                 </li>
               ))}
@@ -295,9 +303,9 @@ function ResultsRegion({
       )}
 
       {view === "cards" ? (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <ul className={CARD_COLUMNS}>
           {state.results.map((d) => (
-            <li key={d.id}>
+            <li key={d.id} className={CARD_COLUMN_ITEM}>
               <DoctorCard doctor={d} />
             </li>
           ))}

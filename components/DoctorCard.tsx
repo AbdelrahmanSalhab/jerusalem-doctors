@@ -99,26 +99,28 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         </div>
       )}
 
-      <dl className="flex flex-col gap-1 text-sm">
-        {doctor.phone_display && (
-          <div className="flex items-baseline gap-2">
-            <dt className="text-foreground/65">الهاتف:</dt>
-            <dd dir="ltr">
-              <a href={clinicTelHref(doctor.phone_display) ?? undefined} className="hover:underline">
-                {doctor.phone_display}
-              </a>
-            </dd>
-          </div>
-        )}
-        {doctor.email && (
-          <div className="flex items-baseline gap-2">
-            <dt className="text-foreground/65">البريد:</dt>
-            <dd dir="ltr" className="break-all">
-              {doctor.email}
-            </dd>
-          </div>
-        )}
-      </dl>
+      {(doctor.phone_display || doctor.email) && (
+        <dl className="flex flex-col gap-1 text-sm">
+          {doctor.phone_display && (
+            <div className="flex items-baseline gap-2">
+              <dt className="text-foreground/65">الهاتف:</dt>
+              <dd dir="ltr">
+                <a href={clinicTelHref(doctor.phone_display) ?? undefined} className="hover:underline">
+                  {doctor.phone_display}
+                </a>
+              </dd>
+            </div>
+          )}
+          {doctor.email && (
+            <div className="flex items-baseline gap-2">
+              <dt className="text-foreground/65">البريد:</dt>
+              <dd dir="ltr" className="break-all">
+                {doctor.email}
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
 
       <ContactButtons doctor={doctor} />
     </article>

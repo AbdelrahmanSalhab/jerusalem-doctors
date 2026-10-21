@@ -14,6 +14,10 @@ export interface CspInput {
   sentryDsn?: string;
   /** Off for http://localhost (the e2e stack); on everywhere served over https. */
   upgradeInsecure: boolean;
+  /** `next dev` only. React evals in development to rebuild server stacks in
+   *  the browser, and without this the console fills with CSP errors. Neither
+   *  React nor Next eval in production, so this must never be on there. */
+  dev?: boolean;
 }
 
 function originOf(url: string | undefined): string | null {
@@ -25,13 +29,13 @@ function originOf(url: string | undefined): string | null {
   }
 }
 
-export function buildCsp({ nonce, supabaseUrl, sentryDsn, upgradeInsecure }: CspInput): string {
+export function buildCsp({ nonce, supabaseUrl, sentryDsn, upgradeInsecure, dev }: CspInput): string {
   const supabase = originOf(supabaseUrl);
   const sentry = originOf(sentryDsn);
   const directives: [string, ...(string | null)[]][] = [
     ["default-src", "'self'"],
     // The host is a fallback for browsers without 'strict-dynamic'.
-    ["script-src", "'self'", `'nonce-${nonce}'`, "'strict-dynamic'", TURNSTILE],
+    ["script-src", "'self'", `'nonce-${nonce}'`, "'strict-dynamic'", TURNSTILE, dev ? "'unsafe-eval'" : null],
     // Inline style attributes are used in a few components; styles are not
     // a script-execution vector, scripts are what this policy is for.
     ["style-src", "'self'", "'unsafe-inline'"],

@@ -59,7 +59,15 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* The CSP spec has the browser blank out the nonce attribute once the
+            page is parsed, so React reads back nonce="" and reports a mismatch
+            on hydration. The <html> suppression above only covers that element,
+            not this one. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
+        />
       </head>
       <body className="min-h-full flex flex-col font-sans overflow-x-hidden">
         <SiteHeader />

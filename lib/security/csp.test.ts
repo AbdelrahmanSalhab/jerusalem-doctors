@@ -17,6 +17,12 @@ describe("buildCsp", () => {
     expect(directive(csp, "script-src")).not.toContain("unsafe-inline");
   });
 
+  it("evals only under next dev, never in production", () => {
+    const local = buildCsp({ nonce: "n", upgradeInsecure: false, dev: true });
+    expect(directive(local, "script-src")).toBe("script-src 'self' 'nonce-n' 'strict-dynamic' https://challenges.cloudflare.com 'unsafe-eval'");
+    expect(buildCsp({ nonce: "n", upgradeInsecure: true, dev: false })).not.toContain("unsafe-eval");
+  });
+
   it("allows the photo, Turnstile and Sentry hosts and nothing else", () => {
     expect(directive(csp, "img-src")).toBe("img-src 'self' data: blob: https://projref.supabase.co");
     expect(directive(csp, "connect-src")).toBe("connect-src 'self' https://challenges.cloudflare.com https://o1.ingest.de.sentry.io");

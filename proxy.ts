@@ -41,6 +41,7 @@ export async function proxy(req: NextRequest) {
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
     sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
     upgradeInsecure: req.nextUrl.protocol === "https:",
+    dev: process.env.NODE_ENV === "development",
   });
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-nonce", nonce);
