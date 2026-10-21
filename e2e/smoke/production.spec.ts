@@ -2,6 +2,7 @@
 // real users, or something in front of it (Vercel's firewall) is blocking
 // people or the services the site depends on.
 
+import { join } from "node:path";
 import { expect, test } from "../fixtures";
 
 const EMAIL = process.env.SMOKE_EMAIL ?? "";
@@ -43,52 +44,48 @@ test("the services the site depends on can reach it", async ({ request }) => {
   }
 });
 
-test("an admin signs in, searches, and opens the admin screens", async ({ page }) => {
-  await page.goto("/login/dev");
-  await page.getByLabel("البريد الإلكتروني").fill(EMAIL);
-  await page.getByLabel("كلمة المرور").fill(PASSWORD);
-  await page.getByRole("button", { name: "تسجيل الدخول" }).click();
-  await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 15_000 });
+// Signed in once per run by smoke.setup.ts, through the real /login/dev
+// form, and the session shared by the tests below.
+const STATE = join(__dirname, "..", ".results", "smoke-session.json");
+test.describe("signed in as an admin", () => {
+  test.use({ storageState: STATE });
 
-  await page.goto("/dashboard");
-  const count = page.getByText(/\d+ (أطباء|طبيبًا|طبيب) في الدليل/);
-  await expect(count).toBeVisible();
+  test("searches, and opens the admin screens", async ({ page }) => {
+    await page.goto("/dashboard");
+    const count = page.getByText(/\d+ (أطباء|طبيبًا|طبيب) في الدليل/);
+    await expect(count).toBeVisible();
 
-  const searched = page.waitForResponse((r) => r.url().includes("/api/search"));
-  await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("د");
-  const res = await searched;
-  expect(res.status()).toBe(200);
-  const body = await res.json();
-  expect(body.count).toBeGreaterThan(0);
-  // Never in a search response (#83).
-  expect(JSON.stringify(body)).not.toContain("license_number");
+    const searched = page.waitForResponse((r) => r.url().includes("/api/search"));
+    await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("د");
+    const res = await searched;
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.count).toBeGreaterThan(0);
+    // Never in a search response (#83).
+    expect(JSON.stringify(body)).not.toContain("license_number");
 
-  for (const path of ["/admin", "/admin/stats", "/admin/audit"]) {
-    const r = await page.goto(path);
-    expect(r?.status(), path).toBe(200);
-  }
-  await expect(page.getByText("اختبار آلي (CI)").first()).toBeVisible();
-});
+    for (const path of ["/admin", "/admin/stats", "/admin/audit"]) {
+      const r = await page.goto(path);
+      expect(r?.status(), path).toBe(200);
+    }
+    await expect(page.getByText("اختبار آلي (CI)").first()).toBeVisible();
+  });
 
-test("the registry synced successfully in the last 36 hours", async ({ page }) => {
-  // Signup and the admin licence check read the nightly copy of the Ministry
-  // of Health registry. data.gov.il refuses many networks (CI included), so
-  // the check reads what production itself recorded rather than calling it.
-  await page.goto("/login/dev");
-  await page.getByLabel("البريد الإلكتروني").fill(EMAIL);
-  await page.getByLabel("كلمة المرور").fill(PASSWORD);
-  await page.getByRole("button", { name: "تسجيل الدخول" }).click();
-  await expect(page).toHaveURL(/\/dashboard|\/admin/, { timeout: 15_000 });
-  // Only the sync events, so a busy day cannot push them off the first page.
-  await page.goto("/admin/audit?action=moh_sync_completed");
-  const rows = await page.locator("summary").allInnerTexts();
-  const synced = rows
-    .filter((r) => r.includes("مزامنة سجل وزارة الصحة") && !r.includes("فشل"))
-    .map((r) => r.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/))
-    .filter((m): m is RegExpMatchArray => !!m)
-    // Jerusalem time is UTC+2 or +3; +3 keeps the age an upper bound.
-    .map(([, d, mo, y, h, mi]) => Date.UTC(+y, +mo - 1, +d, +h - 3, +mi));
-  expect(synced.length, "no successful registry sync on the log's first page").toBeGreaterThan(0);
-  const hours = (Date.now() - Math.max(...synced)) / 3_600_000;
-  expect(hours, `last successful registry sync was ${hours.toFixed(0)} hours ago`).toBeLessThan(36);
+  test("the registry synced successfully in the last 36 hours", async ({ page }) => {
+    // Signup and the admin licence check read the nightly copy of the Ministry
+    // of Health registry. data.gov.il refuses many networks (CI included), so
+    // the check reads what production itself recorded rather than calling it.
+    // Only the sync events, so a busy day cannot push them off the first page.
+    await page.goto("/admin/audit?action=moh_sync_completed");
+    const rows = await page.locator("summary").allInnerTexts();
+    const synced = rows
+      .filter((r) => r.includes("مزامنة سجل وزارة الصحة") && !r.includes("فشل"))
+      .map((r) => r.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/))
+      .filter((m): m is RegExpMatchArray => !!m)
+      // Jerusalem time is UTC+2 or +3; +3 keeps the age an upper bound.
+      .map(([, d, mo, y, h, mi]) => Date.UTC(+y, +mo - 1, +d, +h - 3, +mi));
+    expect(synced.length, "no successful registry sync on the log's first page").toBeGreaterThan(0);
+    const hours = (Date.now() - Math.max(...synced)) / 3_600_000;
+    expect(hours, `last successful registry sync was ${hours.toFixed(0)} hours ago`).toBeLessThan(36);
+  });
 });

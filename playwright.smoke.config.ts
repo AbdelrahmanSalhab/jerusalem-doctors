@@ -19,4 +19,10 @@ export default defineConfig({
     screenshot: "only-on-failure",
     ...devices["Desktop Chrome"],
   },
+  // Sign in once (smoke.setup.ts), then run the checks with that session.
+  projects: [
+    // No retry: a refused sign-in retried is one more attempt against the limit.
+    { name: "setup", testMatch: /smoke\.setup\.ts/, retries: 0 },
+    { name: "smoke", testMatch: /production\.spec\.ts/, dependencies: ["setup"] },
+  ],
 });
