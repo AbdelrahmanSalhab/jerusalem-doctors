@@ -136,6 +136,12 @@ test.describe("row-level security", () => {
     expect(slot.data ?? []).toEqual([]);
   });
 
+  test("helpers the policies use are not callable through the API", () => {
+    // private.is_admin() (migration 20261021103844): the policies call it,
+    // nobody else should.
+    expect(rpcs).not.toContain("is_admin");
+  });
+
   test("only the server can call the privileged functions", async () => {
     const ids = seededIds();
     // Real arguments, so the call reaches the permission check: a doctor
