@@ -52,11 +52,15 @@ test("later nights ask only for our doctors, and flag a licence the registry dro
     expect(doctor?.license_verification_status).toBe("not_found");
     const { data: audit } = await db.from("audit_logs").select("metadata").eq("action", "license_missing_from_registry").eq("target_doctor_id", gone.id);
     expect(audit).toEqual([{ metadata: expect.objectContaining({ slot: "primary", license_status_before: "verified" }) }]);
+    // And an alert for the admins.
+    const { data: alerts } = await db.from("audit_logs").select("metadata").eq("action", "alert").eq("metadata->>alert", "licenses_missing");
+    expect(alerts).toEqual([{ metadata: { alert: "licenses_missing", level: "warning", flagged: 1 } }]);
 
     // Already flagged: the next night leaves it alone.
     expect(await runSync()).toMatchObject({ scope: "ours", flagged: 0 });
   } finally {
     await serviceClient().from("audit_logs").delete().eq("target_doctor_id", gone.id);
+    await serviceClient().from("audit_logs").delete().eq("action", "alert").eq("metadata->>alert", "licenses_missing");
     await gone.remove();
   }
 });

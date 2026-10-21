@@ -2,6 +2,7 @@
 // a one-line summary instead of the raw metadata. Codes stay in the
 // database; this is only how /admin/audit shows them.
 
+import { ALERTS, isAlertCode } from "@/lib/alerts";
 import { FIELD_LABELS } from "@/lib/client/apiError";
 import { FEATURED_LABEL, type FeaturedKind } from "@/lib/directory";
 import { isLicenseStatus, licenseStatusSentence, UNCHECKED_SENTENCE } from "@/lib/licenseStatus";
@@ -9,6 +10,15 @@ import { isLicenseStatus, licenseStatusSentence, UNCHECKED_SENTENCE } from "@/li
 export interface AuditRow {
   action: string;
   metadata: Record<string, unknown> | null;
+}
+
+const LEVEL: Record<string, string> = { info: "للعلم", warning: "تحذير", error: "عاجل" };
+
+/** "عاجل · بلغت الرسائل الحد اليومي …", with the one number that matters. */
+function alertDetail(m: Record<string, unknown>): string {
+  const what = isAlertCode(m.alert) ? ALERTS[m.alert].ar : String(m.alert ?? "");
+  const n = [m.balance, m.count, m.flagged].find((x) => typeof x === "number");
+  return [LEVEL[String(m.level)], what, n === undefined ? "" : String(n)].filter(Boolean).join(" · ");
 }
 
 const STAGE: Record<string, string> = { resident: "طبيب مقيم", specialist: "طبيب أخصائي" };
@@ -30,6 +40,7 @@ const TITLE: Record<string, string> = {
   moh_sync_completed: "مزامنة سجل وزارة الصحة",
   moh_sync_failed: "فشل مزامنة سجل وزارة الصحة",
   license_missing_from_registry: "الترخيص لم يعد في سجل الوزارة",
+  alert: "تنبيه",
 };
 
 /** Every action the log knows a name for, in the order above. */
@@ -167,6 +178,8 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       ]
         .filter(Boolean)
         .join(" · ");
+    case "alert":
+      return alertDetail(m);
     case "moh_sync_failed":
       return typeof m.error === "string" ? m.error : "";
     default:
@@ -226,6 +239,14 @@ const FIELD_LABEL: Record<string, string> = {
   unmatched: "أسماء غير مربوطة",
   rows_upserted: "تراخيص محدَّثة",
   missing: "تراخيص لم تعد في السجل",
+  alert: "التنبيه",
+  level: "الأهمية",
+  balance: "الرصيد",
+  threshold: "حد التنبيه",
+  limit: "الحد اليومي",
+  count: "العدد",
+  names: "الأسماء",
+  key: "النوع",
   flagged: "أُحيلت للمراجعة",
   scope: "النطاق",
   duration_ms: "المدة",
@@ -275,6 +296,8 @@ export function auditFields(row: AuditRow, institutionName: (id: string) => stri
         return { label, value: isLicenseStatus(v) ? licenseStatusSentence(v) : String(v) };
       }
       if (k === "career_stage") return { label, value: STAGE[String(v)] ?? String(v) };
+      if (k === "alert") return { label, value: isAlertCode(v) ? ALERTS[v].ar : String(v) };
+      if (k === "level") return { label, value: LEVEL[String(v)] ?? String(v) };
       if (k === "scope") return { label, value: v === "full" ? "السجل كاملًا" : "تراخيص أطبائنا فقط" };
       if (k === "featured") return { label, value: FEATURED_LABEL[v as FeaturedKind] ?? String(v) };
       if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };

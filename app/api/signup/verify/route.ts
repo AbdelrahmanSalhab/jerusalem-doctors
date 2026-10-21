@@ -3,7 +3,6 @@
 // the pending_signups payload, links specialties, and lets the SSR cookie
 // helper persist the session.
 
-import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { linkAuthUser } from "@/lib/auth/link";
@@ -13,6 +12,7 @@ import { relinkDoctor } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { WorkplaceType } from "@/lib/workplace";
 import { writeAudit } from "@/lib/audit";
+import { raiseAlert } from "@/lib/alerts";
 
 const MAX_ATTEMPTS = 5;
 
@@ -282,11 +282,11 @@ export const POST = withJsonErrors(async (req: Request) => {
   });
 
   if (!isAutoApproved) {
-    // Reaches whoever has a Sentry alert rule on it; the admin nav also
-    // shows the pending count.
-    Sentry.captureMessage("New doctor waiting for approval", {
-      level: "info",
+    // Sentry and the admin's alerts list; the admin nav also shows the
+    // pending count.
+    await raiseAlert(service, "doctor_waiting", {
       tags: { license_status: String(payload.license_verification_status) },
+      extra: { doctor_id: insert.data.id },
     });
   }
 
