@@ -1,14 +1,16 @@
 // License-verification matcher (plan §13).
 //
 // Inputs:  user-typed license number + Hebrew first/family name.
-// Source:  local `moh_practitioners` mirror (synced daily) + live CKAN
-//          fallback for licenses issued after the last snapshot.
+// Source:  `moh_practitioners`, the licences already looked up, then one live
+//          CKAN request for a licence we have not seen, whose answer is kept
+//          there so the next check of the same licence costs nothing.
 // Output:  one of four discrete statuses, with the registry's own spelling
 //          included on mismatches so the UI can prompt "did you mean…?".
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { MohClient } from "./client";
+import { saveRegistryRows, toRegistryRows, type RegistryRow } from "./registry";
 
 export type LicenseVerifyStatus =
   | "verified"
@@ -155,25 +157,19 @@ export async function verifyLicense(
   // blocking us must not fail the signup. It lands in admin review instead,
   // the same as a license the registry doesn't know.
   const client = options.mohClient ?? new MohClient(LIVE_LOOKUP);
-  let live: Awaited<ReturnType<MohClient["findByLicense"]>>;
+  let liveRow: RegistryRow | undefined;
   try {
-    live = await client.findByLicense(input.licenseNumber);
+    [liveRow] = toRegistryRows(await client.findByLicenses([input.licenseNumber]));
   } catch (err) {
     if (options.onLiveError === "throw") throw new MohUnavailableError(err);
     console.error("[moh] live registry lookup failed, treating as not_found", err);
     return { status: "not_found", source: "none" };
   }
-  if (!live) return { status: "not_found", source: "none" };
+  if (!liveRow) return { status: "not_found", source: "none" };
 
-  const liveRow: MirrorRow = {
-    license_number: live["מספר רישיון רופא"],
-    hebrew_first_name: live["שם פרטי"],
-    hebrew_family_name: live["שם משפחה"],
-    hebrew_first_norm: normalizeHebrew(live["שם פרטי"]),
-    hebrew_family_norm: normalizeHebrew(live["שם משפחה"]),
-    specialty_name_he: live["שם התמחות"] ?? null,
-  };
-
+  // Kept for the rest of this signup (check-license, then start) and for an
+  // admin opening the doctor. Failing to keep it costs a request, not a signup.
+  await saveRegistryRows(supabase, [liveRow]).catch((err) => console.error("[moh] could not keep the registry row", err));
   return compareNames(liveRow, inputFirst, inputFamily, "live");
 }
 

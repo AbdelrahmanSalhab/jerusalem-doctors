@@ -116,10 +116,17 @@ curl -i -X POST https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp \
 
 ### MoH license sync stops working
 
+How the registry is used: `moh_practitioners` holds only licences we have
+looked up, not a copy of the registry. A signup asks data.gov.il for its own
+licence (one request, kept afterwards), and the nightly cron (04:00 UTC, after
+the ministry republishes at about 03:12) asks for our doctors' licences only,
+300 per request, then drops every other row. A 403 or 429 is never retried:
+the next night tries again.
+
 **Symptoms:** New signups land with `license_verification_status = 'not_found'` more often than usual.
 
 **Why:**
-- data.gov.il rate-limited or down
+- data.gov.il rate-limited, refusing us, or down
 - Their dataset URL changed (resource ID rotates very rarely)
 - CKAN responded with HTML instead of JSON (anti-bot)
 
@@ -131,7 +138,7 @@ curl -i -X POST https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp \
    curl -X GET "https://jerusalem-doctors.vercel.app/api/cron/sync-moh" \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
-4. If data.gov.il itself is the issue: a license missing from the mirror gets one live CKAN try (5 s, no retries). If that fails it is treated as `not_found`, so the signup still completes and lands in the admin queue. Look for `[moh] live registry lookup failed` in the logs.
+4. If data.gov.il itself is the issue: a signup's licence gets one live CKAN try (5 s, no retries). If that fails it is treated as `not_found`, so the signup still completes and lands in the admin queue. Look for `[moh] live registry lookup failed` in the logs.
 
 If the dataset URL changed, update `MOH_RESOURCE_ID` in Vercel env vars; no code change needed.
 
@@ -367,7 +374,7 @@ select arabic_first_name, arabic_family_name, license_number, license_verificati
  limit 20;
 ```
 
-### Force-resync MoH (deletes mirror, then refills)
+### Force-resync MoH (empties the table, then refills our doctors' licences)
 
 ```sql
 truncate table public.moh_practitioners;

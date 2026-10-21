@@ -1,120 +1,85 @@
-// GET /api/cron/sync-moh, daily MoH practitioners sync (plan §13).
+// GET /api/cron/sync-moh, the nightly MoH registry refresh (plan §13).
 //
 // Auth: header `Authorization: Bearer ${CRON_SECRET}`. Vercel Cron sends
 // this automatically when configured in vercel.json.
 //
-// Behavior: paginate CKAN datastore_search in 1000-row chunks; upsert into
-// `moh_practitioners`; record stats in `audit_logs`. Idempotent, safe to
-// re-run on failure.
+// It used to copy the whole registry, 65k rows in 65 requests, to answer
+// questions about a few dozen doctors. Now it asks only for our doctors'
+// Israeli licences, a few hundred per request (lib/moh/client.ts), and
+// `moh_practitioners` keeps only those: a licence someone signs up with is
+// fetched on the spot (lib/moh/match.ts). Fewer requests to the one source we
+// cannot do without, and no copy of 57k people's details we have no use for.
+//
+// A licence we asked for that the registry no longer lists is dropped too,
+// so /admin shows it as missing rather than as last seen. The count is in the
+// audit entry.
+//
+// Runs at 04:00 UTC: the ministry republishes the registry at about 03:12.
 
 import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/api/cronAuth";
 import { jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { MohClient } from "@/lib/moh/client";
-import { normalizeHebrew } from "@/lib/normalize/hebrew";
+import { saveRegistryRows, toRegistryRows } from "@/lib/moh/registry";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // 5 minutes, full snapshot is ~3MB / 63k rows
+export const maxDuration = 60;
 
 export const GET = withJsonErrors(async (req: Request) => {
   const denied = verifyCronAuth(req);
   if (denied) return denied;
 
   const startedAt = Date.now();
-  const client = new MohClient();
   const supabase = createSupabaseServiceClient();
 
-  let upserted = 0;
-  let batch: NonNullable<ReturnType<typeof toRow>>[] = [];
-  const flush = async () => {
-    if (batch.length === 0) return;
-    // Registry has multiple rows per license (one per specialty cert).
-    // Dedupe within the batch so ON CONFLICT doesn't see the same key twice
-    // in a single statement. Cross-batch duplicates are fine, successive
-    // upserts just overwrite via ON CONFLICT.
-    const seen = new Set<number>();
-    const deduped = batch.filter((r) => {
-      if (seen.has(r.license_number)) return false;
-      seen.add(r.license_number);
-      return true;
-    });
+  let asked: number[] = [];
+  let kept: number[] = [];
+  try {
+    asked = await ourLicenses(supabase);
+    const rows = toRegistryRows(await new MohClient().findByLicenses(asked));
+    await saveRegistryRows(supabase, rows);
+    kept = rows.map((r) => r.license_number);
+    // Everything else goes: earlier signups' lookups, the old full copy, and
+    // licences the registry stopped listing.
+    // ponytail: the kept list rides in the URL; past ~1500 doctors, prune by
+    // synced_at older than this run instead.
     const { error } = await supabase
       .from("moh_practitioners")
-      .upsert(deduped, { onConflict: "license_number" });
-    if (error) throw new Error(`moh upsert failed: ${error.message}`);
-    upserted += deduped.length;
-    batch = [];
-  };
-
-  try {
-    for await (const rec of client.iterateAll(1000)) {
-      const row = toRow(rec);
-      if (!row) continue;
-      batch.push(row);
-      if (batch.length >= 500) await flush();
-    }
-    await flush();
+      .delete()
+      .not("license_number", "in", `(${kept.join(",") || 0})`);
+    if (error) throw new Error(`moh_practitioners prune failed: ${error.message}`);
   } catch (err) {
     console.error("[cron/sync-moh] failed", err);
     await writeAudit(supabase, {
       action: "moh_sync_failed",
       metadata: {
         error: err instanceof Error ? err.message : String(err),
-        rows_upserted: upserted,
         duration_ms: Date.now() - startedAt,
       },
     });
-    return NextResponse.json(
-      { ok: false, upserted, error: "sync_failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "sync_failed" }, { status: 500 });
   }
 
-  await writeAudit(supabase, {
-    action: "moh_sync_completed",
-    metadata: {
-      rows_upserted: upserted,
-      duration_ms: Date.now() - startedAt,
-    },
-  });
-
-  return jsonOk({
-    ok: true,
-    rows_upserted: upserted,
+  const summary = {
+    rows_upserted: kept.length,
+    missing: asked.length - kept.length,
     duration_ms: Date.now() - startedAt,
-  });
+  };
+  await writeAudit(supabase, { action: "moh_sync_completed", metadata: summary });
+  return jsonOk({ ok: true, ...summary });
 });
 
-function toRow(rec: {
-  "מספר רישיון רופא": number;
-  "שם פרטי": string;
-  "שם משפחה": string;
-  "שם התמחות"?: string | null;
-  "תאריך רישום רישיון"?: number | null;
-}): {
-  license_number: number;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
-  hebrew_first_norm: string;
-  hebrew_family_norm: string;
-  specialty_name_he: string | null;
-  license_issued_yyyymmdd: number | null;
-  synced_at: string;
-} | null {
-  const lic = rec["מספר רישיון רופא"];
-  const first = rec["שם פרטי"];
-  const family = rec["שם משפחה"];
-  if (!Number.isInteger(lic) || lic <= 0 || !first || !family) return null;
-  return {
-    license_number: lic,
-    hebrew_first_name: first,
-    hebrew_family_name: family,
-    hebrew_first_norm: normalizeHebrew(first),
-    hebrew_family_norm: normalizeHebrew(family),
-    specialty_name_he: rec["שם התמחות"] ?? null,
-    license_issued_yyyymmdd: rec["תאריך רישום רישיון"] ?? null,
-    synced_at: new Date().toISOString(),
-  };
+/** Every Israeli licence on a doctor's account, primary or secondary. */
+async function ourLicenses(supabase: ReturnType<typeof createSupabaseServiceClient>): Promise<number[]> {
+  const { data, error } = await supabase
+    .from("doctors")
+    .select("license_number, license_region, secondary_license_number, secondary_license_region");
+  if (error) throw new Error(`doctors read failed: ${error.message}`);
+  const serials = (data ?? []).flatMap((d) => [
+    d.license_region === "IL" ? d.license_number : null,
+    d.secondary_license_region === "IL" ? d.secondary_license_number : null,
+  ]);
+  return [...new Set(serials.filter((s): s is string => !!s && /^\d{1,9}$/.test(s)).map(Number))];
 }

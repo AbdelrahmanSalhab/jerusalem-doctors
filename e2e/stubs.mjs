@@ -25,7 +25,8 @@ function registry(url, res) {
   const filters = url.searchParams.get("filters");
   if (filters) {
     const f = JSON.parse(filters);
-    rows = rows.filter((r) => Object.entries(f).every(([k, v]) => r[k] === v));
+    // A list matches any of its values, as CKAN does.
+    rows = rows.filter((r) => Object.entries(f).every(([k, v]) => (Array.isArray(v) ? v.includes(r[k]) : r[k] === v)));
   }
   const q = url.searchParams.get("q");
   if (q) rows = rows.filter((r) => Object.values(r).some((v) => String(v).includes(q)));

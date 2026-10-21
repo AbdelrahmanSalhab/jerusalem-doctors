@@ -18,13 +18,20 @@ function fakeSupabase(row: {
           maybeSingle: async () => ({ data: row, error: null }),
         }),
       }),
+      upsert: async (rows: unknown) => {
+        saved.push(rows);
+        return { error: null };
+      },
     }),
   } as unknown as SupabaseClient;
 }
 
+/** What the live path kept in moh_practitioners. */
+const saved: unknown[] = [];
+
 function fakeMohClient(record: MohRecord | null) {
   return {
-    findByLicense: vi.fn(async () => record),
+    findByLicenses: vi.fn(async () => (record ? [record] : [])),
   } as unknown as MohClient;
 }
 
@@ -111,6 +118,8 @@ describe("verifyLicense (live fallback)", () => {
     expect(r.status).toBe("verified");
     expect(r.source).toBe("live");
     expect(r.registrySpecialtyHe).toBe("רפואת המשפחה");
+    // Kept, so the rest of the signup does not ask again.
+    expect(saved.at(-1)).toMatchObject([{ license_number: 12345, specialties: ["רפואת המשפחה"] }]);
   });
 
   it("returns not_found when CKAN also has no row", async () => {
@@ -130,7 +139,7 @@ describe("verifyLicense (live fallback)", () => {
   it("treats a registry outage as not_found, so the signup goes to admin review", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const down = {
-      findByLicense: vi.fn(async () => {
+      findByLicenses: vi.fn(async () => {
         throw new Error("data.gov.il timeout");
       }),
     } as unknown as MohClient;
@@ -299,7 +308,7 @@ describe("match detail on the result", () => {
 describe("onLiveError", () => {
   function downClient() {
     return {
-      findByLicense: vi.fn(async () => {
+      findByLicenses: vi.fn(async () => {
         throw new Error("data.gov.il timeout");
       }),
     } as unknown as MohClient;

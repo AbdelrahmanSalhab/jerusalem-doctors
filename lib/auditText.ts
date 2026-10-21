@@ -157,9 +157,16 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
     case "institutions_relinked":
       return `أماكن عمل تغيّر ربطها: ${m.changed ?? 0} · أسماء غير مربوطة: ${m.unmatched ?? 0}`;
     case "moh_sync_completed":
-      return `سجلات محدَّثة: ${m.rows_upserted ?? 0}${typeof m.duration_ms === "number" ? ` · ${Math.round(m.duration_ms / 1000)} ثانية` : ""}`;
+      return [
+        `تراخيص محدَّثة: ${m.rows_upserted ?? 0}`,
+        // Our doctors' licences the registry no longer lists.
+        typeof m.missing === "number" && m.missing > 0 ? `غير موجودة في السجل: ${m.missing}` : "",
+        typeof m.duration_ms === "number" ? `${Math.round(m.duration_ms / 1000)} ثانية` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
     case "moh_sync_failed":
-      return `سجلات محدَّثة قبل الفشل: ${m.rows_upserted ?? 0}`;
+      return typeof m.error === "string" ? m.error : "";
     default:
       return "";
   }
@@ -215,7 +222,8 @@ const FIELD_LABEL: Record<string, string> = {
   relinked: "أماكن عمل أُعيد ربطها",
   changed: "أماكن عمل تغيّر ربطها",
   unmatched: "أسماء غير مربوطة",
-  rows_upserted: "سجلات محدَّثة",
+  rows_upserted: "تراخيص محدَّثة",
+  missing: "تراخيص لم تعد في السجل",
   duration_ms: "المدة",
   error: "الخطأ",
   id: "المؤسسة",

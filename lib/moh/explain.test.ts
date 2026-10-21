@@ -9,7 +9,9 @@ const ROW: MirrorPractitioner = {
   hebrewFirstNorm: "דניאל",
   hebrewFamilyNorm: "דריפוס",
   specialtyHe: "פנימית",
-  issuedYyyymmdd: 20110503,
+  specialties: ["פנימית"],
+  licenseIssuedOn: "2011-05-03",
+  specialistSince: "2017-02-01",
   syncedAt: "2026-10-19T03:00:00.000Z",
 };
 
