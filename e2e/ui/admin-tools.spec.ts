@@ -1,5 +1,6 @@
 // The admin's working tools: licence correction against the registry,
-// institutions, and paging through and filtering the activity log.
+// institutions, residents the registry lists as specialists, and paging
+// through and filtering the activity log.
 
 import { expect, test } from "../fixtures";
 import { seededIds, stateFile } from "../helpers";
@@ -28,6 +29,50 @@ test.describe("licence correction", () => {
       .toEqual({ license_number: "510030", license_verification_status: "verified" });
     const { data: audit } = await serviceClient().from("audit_logs").select("action").eq("target_doctor_id", doctor.id);
     expect(audit!.map((a) => a.action)).toContain("admin_license_corrected");
+  });
+});
+
+test.describe("residents the registry lists as specialists", () => {
+  const made: Awaited<ReturnType<typeof createDoctor>>[] = [];
+  let licences: number[] = [];
+  test.beforeAll(async () => {
+    const db = serviceClient();
+    // One resident whose licence carries a specialty in the registry, one
+    // whose licence carries none, and a specialist who does: only the first
+    // picked the wrong stage.
+    for (const [first, stage] of [["مقيم-خطأ", "resident"], ["مقيم-صح", "resident"], ["أخصائي-صح", "specialist"]] as const) {
+      made.push(await createDoctor({ first, family: "فحص", stage }));
+    }
+    const { data: rows } = await db.from("doctors").select("id, license_number").in("id", made.map((d) => d.id));
+    const licenceOf = new Map((rows ?? []).map((r) => [r.id, Number(r.license_number)]));
+    licences = [...licenceOf.values()];
+    const registry = [
+      { id: made[0].id, specialty: "פנימית" },
+      { id: made[1].id, specialty: null },
+      { id: made[2].id, specialty: "ילדים" },
+    ].map(({ id, specialty }) => ({
+      license_number: licenceOf.get(id),
+      hebrew_first_name: "בדיקה",
+      hebrew_family_name: "בדיקה",
+      hebrew_first_norm: "בדיקה",
+      hebrew_family_norm: "בדיקה",
+      specialty_name_he: specialty,
+    }));
+    const { error } = await db.from("moh_practitioners").insert(registry);
+    expect(error).toBeNull();
+  });
+  test.afterAll(async () => {
+    await serviceClient().from("moh_practitioners").delete().in("license_number", licences);
+    for (const d of made) await d.remove();
+  });
+
+  test("the tab lists only the resident the registry calls a specialist", async ({ page }) => {
+    await page.goto("/admin");
+    await page.getByRole("link", { name: "مقيم والسجل يقول أخصائي" }).click();
+    await expect(page).toHaveURL(/status=stage/);
+    await expect(page.getByText("مقيم-خطأ فحص").first()).toBeVisible();
+    await expect(page.getByText("مقيم-صح فحص")).toHaveCount(0);
+    await expect(page.getByText("أخصائي-صح فحص")).toHaveCount(0);
   });
 });
 

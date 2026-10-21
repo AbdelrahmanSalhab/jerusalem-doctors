@@ -88,6 +88,7 @@ describe("the filter list", () => {
       "all",
       "pending",
       "license",
+      "stage",
       "hidden",
       "suspended",
       "approved",

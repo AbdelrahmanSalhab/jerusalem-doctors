@@ -79,7 +79,7 @@ vi.mock("@/lib/supabase/service", () => ({
             count: table === "doctors" ? 60 : null,
           }).then(ok),
       };
-      for (const m of ["select", "eq", "or", "order", "range", "in", "limit", "maybeSingle"]) {
+      for (const m of ["select", "eq", "or", "not", "order", "range", "in", "limit", "maybeSingle"]) {
         chain[m] = (...args: unknown[]) => {
           calls.push({ table, method: m, args });
           // Two different reads end in maybeSingle: the panel's doctor, and
@@ -156,6 +156,13 @@ describe("/admin doctors list", () => {
     expect(ors).toContain(
       "and(or(license_verification_status.is.null,license_verification_status.neq.verified),or(is_admin.eq.false,is_visible.eq.true))",
     );
+  });
+
+  it("finds residents whose licence the registry lists with a specialty", async () => {
+    await render({ status: "stage" });
+    expect(eqArgs()).toContainEqual(["career_stage", "resident"]);
+    const nots = calls.filter((c) => c.table === "doctors" && c.method === "not").map((c) => c.args);
+    expect(nots).toContainEqual(["registry_specialty", "is", null]);
   });
 
   it("asks for the right slice of rows on a later page", async () => {

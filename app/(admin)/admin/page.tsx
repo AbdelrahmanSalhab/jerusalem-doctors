@@ -81,7 +81,9 @@ async function counts(service: SupabaseClient) {
   };
 }
 
-function applyFilter<T extends { eq: (c: string, v: unknown) => T; or: (f: string) => T }>(
+function applyFilter<
+  T extends { eq: (c: string, v: unknown) => T; or: (f: string) => T; not: (c: string, op: string, v: unknown) => T },
+>(
   query: T,
   filter: DoctorFilter,
 ): T {
@@ -99,6 +101,10 @@ function applyFilter<T extends { eq: (c: string, v: unknown) => T; or: (f: strin
     case "license":
       // Both groups inside one or=, so they combine with AND.
       return query.or(`and(or(${LICENCE_NEEDS_REVIEW}),or(${REAL_DOCTOR}))`);
+    case "stage":
+      // Marked طبيب مقيم, but the registry lists a specialty, which it only
+      // does once the board certificate is granted (registry_specialty()).
+      return query.eq("career_stage", "resident").not("registry_specialty", "is", null);
     case "all":
       return query;
   }
