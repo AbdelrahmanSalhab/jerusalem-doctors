@@ -144,6 +144,7 @@ test.describe("row-level security", () => {
       admin_stats: {},
       admin_audit_events: {},
       search_directory: {},
+      directory_counts: {},
       save_doctor_profile: { p_doctor_id: ids.laila, p_updates: { bio: "x" }, p_specialty_ids: null, p_workplaces: null },
     };
     for (const fn of Object.keys(ARGS)) {

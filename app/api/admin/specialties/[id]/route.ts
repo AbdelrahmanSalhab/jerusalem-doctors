@@ -5,6 +5,7 @@ import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { specialtiesChanged } from "@/lib/cachedReads";
 
 const Body = z.object({
   name_ar: z.string().trim().min(2).max(120).optional(),
@@ -47,6 +48,7 @@ export const PATCH = withJsonErrors(async (
     console.error("[admin.specialties.patch] failed", r.error);
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
+  specialtiesChanged();
 
   return jsonOk({ ok: true });
 });

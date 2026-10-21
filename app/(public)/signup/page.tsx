@@ -1,18 +1,16 @@
 import { redirect } from "next/navigation";
 import { SignupForm } from "./SignupForm";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { cachedSpecialties } from "@/lib/cachedReads";
 import { SupportContact } from "@/components/SupportContact";
 
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage() {
-  const service = createSupabaseServiceClient();
-  const { data: specialties, error } = await service
-    .from("specialties")
-    .select("id, name_ar, code, parent_id")
-    .eq("is_active", true)
-    .order("sort_order");
+  const { data: specialties, error } = await cachedSpecialties().then(
+    (data) => ({ data, error: null }),
+    (error: unknown) => ({ data: null, error }),
+  );
 
   if (error) {
     // Migrations not applied yet, surface clearly rather than crashing.

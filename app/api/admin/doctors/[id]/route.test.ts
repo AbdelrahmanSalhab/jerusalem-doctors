@@ -11,6 +11,10 @@ const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({ id: "00000000-0000-4000-8000-00000000a001" })),
 }));
 vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
+// The dashboard's cache is cleared after an update; there is no request
+// scope for revalidateTag here.
+const directoryChanged = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/cachedReads", () => ({ directoryChanged }));
 
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
@@ -61,6 +65,8 @@ describe("PATCH /api/admin/doctors/[id]: featured", () => {
     expect((await call({ featured: "graduate" })).status).toBe(200);
     expect(updates[0]).toMatchObject({ featured: "graduate" });
     expect(typeof updates[0].featured_at).toBe("string");
+    // Every dashboard shows the new featured doctor at once.
+    expect(directoryChanged).toHaveBeenCalled();
   });
 
   it("clears featured_at when unfeaturing", async () => {

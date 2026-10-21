@@ -5,6 +5,7 @@ import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { specialtiesChanged } from "@/lib/cachedReads";
 
 const Body = z.object({
   name_ar: z.string().trim().min(2).max(120),
@@ -48,6 +49,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     console.error("[admin.specialties.create] failed", r.error);
     return jsonError(500, { error: "create_failed", code: "create_failed" });
   }
+  specialtiesChanged();
 
   return jsonOk({ ok: true });
 });

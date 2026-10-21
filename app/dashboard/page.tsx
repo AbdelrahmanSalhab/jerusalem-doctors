@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
 import { ViewerProvider } from "@/components/ViewerContext";
-import { countListed, countListedByDomain, fetchFeatured } from "@/lib/directory";
+import { cachedDirectoryOverview, cachedSpecialties } from "@/lib/cachedReads";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -10,21 +10,14 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   // Started before the auth check so the two don't run back to back; nothing
-  // is rendered unless requireDoctor() passes.
+  // is rendered unless requireDoctor() passes. What every doctor sees the
+  // same (specialties, featured doctors, counts) comes from the cache
+  // (lib/cachedReads.ts); only this doctor's own rows are read each time.
   const service = createSupabaseServiceClient();
-  const reads = Promise.all([
-    service
-      .from("specialties")
-      .select("id, name_ar, parent_id")
-      .eq("is_active", true)
-      .order("sort_order"),
-    fetchFeatured(service),
-    countListed(service),
-    countListedByDomain(service),
-  ]);
+  const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview()]);
   const me = await requireDoctor();
   const [
-    [{ data: specialties }, featured, listed, domainCounts],
+    [specialties, { featured, counts }],
     { data: myWorkplaces },
     { data: mySpecialties },
   ] =
@@ -101,8 +94,8 @@ export default async function DashboardPage() {
         <DashboardSearch
           specialties={specialties ?? []}
           featured={featured}
-          listed={listed}
-          domainCounts={domainCounts}
+          listed={counts.listed}
+          domainCounts={counts.byDomain}
         />
       </ViewerProvider>
     </main>

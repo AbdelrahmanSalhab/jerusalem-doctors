@@ -198,54 +198,23 @@ export interface FeaturedDoctors {
   graduates: SearchHit[];
 }
 
-/** How many doctors the directory lists (same visibility as search), or
- *  null when the count can't be read. */
-export async function countListed(service: SupabaseClient): Promise<number | null> {
-  const { count, error } = await service
-    .from("doctors")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", true)
-    .eq("is_visible", true)
-    .eq("is_phone_verified", true)
-    .eq("is_admin_approved", true)
-    .eq("consent_directory_use", true);
-  return error ? null : count;
+export interface DirectoryCounts {
+  /** Null when the count can't be read. */
+  listed: number | null;
+  /** Listed doctors per top-level specialty, subspecialties rolled up into
+   *  their parent (a cardiologist counts under الباطنية, the chip the
+   *  dashboard shows). Empty on a failed read: the chips then list every
+   *  specialty, as they did before counts existed. */
+  byDomain: Record<string, number>;
 }
 
-/** Listed doctors per top-level specialty, with subspecialties rolled up
- *  into their parent (a cardiologist counts under الباطنية, which is the
- *  chip the dashboard shows). An empty object on a failed read: the chips
- *  then fall back to listing every specialty, as they did before. */
-export async function countListedByDomain(
-  service: SupabaseClient,
-): Promise<Record<string, number>> {
-  // Its own tree read, in parallel, so the dashboard keeps one round trip.
-  const [doctors, tree] = await Promise.all([
-    service
-      .from("doctors")
-      .select("id, doctor_specialties(specialty_id)")
-      .eq("is_active", true)
-      .eq("is_visible", true)
-      .eq("is_phone_verified", true)
-      .eq("is_admin_approved", true)
-      .eq("consent_directory_use", true),
-    service.from("specialties").select("id, parent_id"),
-  ]);
-  if (doctors.error || tree.error || !doctors.data) return {};
-
-  const parentOf = new Map(
-    (tree.data as { id: string; parent_id: string | null }[]).map((s) => [s.id, s.parent_id]),
-  );
-  const counts: Record<string, number> = {};
-  for (const row of doctors.data as { doctor_specialties: { specialty_id: string }[] | null }[]) {
-    // A doctor counts once per domain, however many subspecialties they
-    // hold under it.
-    const domains = new Set(
-      (row.doctor_specialties ?? []).map((s) => parentOf.get(s.specialty_id) ?? s.specialty_id),
-    );
-    for (const d of domains) counts[d] = (counts[d] ?? 0) + 1;
-  }
-  return counts;
+/** Counted in the database (directory_counts(), migration 20261021085031):
+ *  one small value back, whatever the directory's size. */
+export async function fetchDirectoryCounts(service: SupabaseClient): Promise<DirectoryCounts> {
+  const { data, error } = await service.rpc("directory_counts");
+  if (error || !data) return { listed: null, byDomain: {} };
+  const d = data as { listed: number; by_domain: Record<string, number> };
+  return { listed: d.listed, byDomain: d.by_domain };
 }
 
 /** A failed read hides the sections rather than failing the dashboard. */
