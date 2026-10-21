@@ -12,6 +12,10 @@
 // represented by NULL. Everything each choice implies, which specialties are
 // offered, which workplace types, whether a residency year is asked for:
 // lives in STAGE_OPTIONS so the two forms and the admin table agree.
+//
+// صندوق مرضى is open to every stage: most GPs and many specialists work at
+// one. When it was offered to residents only, specialists at Clalit or
+// Maccabi picked طبيب مقيم just to be able to list where they work.
 
 import { type WorkplaceType, WORKPLACE_TYPES } from "@/lib/workplace";
 
@@ -55,7 +59,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     autoAttachesGeneralSpecialty: true,
     excludesGeneralSpecialty: false,
     requiresResidencyStartYear: false,
-    workplaceTypes: ["hospital", "clinic"],
+    workplaceTypes: ["hospital", "clinic", "hmo"],
     defaultWorkplaceType: "clinic",
     showsClinicFields: true,
     workplaceOptional: false,
@@ -87,7 +91,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     autoAttachesGeneralSpecialty: false,
     excludesGeneralSpecialty: true,
     requiresResidencyStartYear: false,
-    workplaceTypes: ["hospital", "clinic"],
+    workplaceTypes: ["hospital", "clinic", "hmo"],
     defaultWorkplaceType: "hospital",
     showsClinicFields: true,
     workplaceOptional: false,
