@@ -17,7 +17,6 @@
 //
 // Runs at 04:00 UTC: the ministry republishes the registry at about 03:12.
 
-import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/api/cronAuth";
 import { jsonOk, withJsonErrors } from "@/lib/api/respond";
@@ -25,6 +24,7 @@ import { MohClient } from "@/lib/moh/client";
 import { saveRegistryRows, toRegistryRows, type RegistryRow } from "@/lib/moh/registry";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
+import { raiseAlert } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // the weekly sweep: ~65 paced requests, 57k licences
@@ -164,8 +164,6 @@ async function flagMissing(supabase: Service, doctors: OurDoctor[], missing: Set
       flagged++;
     }
   }
-  if (flagged > 0) {
-    Sentry.captureMessage("Doctor licences no longer in the MoH registry", { level: "warning", extra: { flagged } });
-  }
+  if (flagged > 0) await raiseAlert(supabase, "licenses_missing", { extra: { flagged } });
   return flagged;
 }

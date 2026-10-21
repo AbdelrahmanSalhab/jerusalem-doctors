@@ -9,6 +9,8 @@
 import * as Sentry from "@sentry/nextjs";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { ALERTS, raiseAlert } from "@/lib/alerts";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type WindowSpec = `${number} ${"s" | "m" | "h" | "d"}`;
 type LimitDef = { limit: number; window: WindowSpec };
@@ -74,6 +76,7 @@ const redisFromEnv = (): Redis | null => {
 
 const upstashLimiters = new Map<RateLimitKey, Ratelimit>();
 let lastTimeoutReport = 0;
+let lastTimeoutAlert = 0;
 const localCounters = new Map<string, { count: number; resetAt: number }>();
 
 function getUpstashLimiter(key: RateLimitKey, redis: Redis): Ratelimit {
@@ -151,13 +154,19 @@ export async function rateLimit(
   // ponytail: a slow Redis (no answer within @upstash/ratelimit's 5 s) lets
   // the request through, so a slowdown doesn't lock doctors out; Turnstile and
   // Supabase's own limits still stand. A hard Upstash error (DNS, 5xx) makes
-  // limit() throw instead, and the route answers 500. Reported at most once a
-  // minute per instance so an outage doesn't flood Sentry.
+  // limit() throw instead, and the route answers 500. Reported to Sentry at
+  // most once a minute per instance so an outage doesn't flood it, and to the
+  // admin's alerts list at most once an hour.
+  // ponytail: the timers are per serverless instance, so a busy hour can log
+  // one alert per warm instance; a shared Redis key would make it exact.
   if (r.reason === "timeout") {
     console.error(`[ratelimit] ${key} timed out, request allowed`);
-    if (Date.now() - lastTimeoutReport > 60_000) {
+    if (Date.now() - lastTimeoutAlert > 3_600_000) {
+      lastTimeoutAlert = lastTimeoutReport = Date.now();
+      await raiseAlert(createSupabaseServiceClient(), "ratelimit_timeout", { tags: { key }, extra: { key } });
+    } else if (Date.now() - lastTimeoutReport > 60_000) {
       lastTimeoutReport = Date.now();
-      Sentry.captureMessage("Rate limiter timed out (fail-open)", { level: "warning", tags: { key } });
+      Sentry.captureMessage(ALERTS.ratelimit_timeout.sentry, { level: "warning", tags: { key } });
     }
   }
   return {

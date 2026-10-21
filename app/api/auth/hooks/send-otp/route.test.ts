@@ -17,11 +17,17 @@ vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn(), captureMessage }))
 /** Who the database knows: a doctor's phone, or a live signup's. */
 const known = { doctor: true, pending: false, error: false };
 let budgetLeft = true;
+/** Rows written to the activity log, as [table, row]. */
+const inserts: unknown[][] = [];
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from(table: string) {
       const chain: Record<string, unknown> = {};
       for (const m of ["select", "eq", "gt", "limit"]) chain[m] = () => chain;
+      chain.insert = async (row: unknown) => {
+        inserts.push([table, row]);
+        return { error: null };
+      };
       chain.maybeSingle = async () => {
         if (known.error) return { data: null, error: { message: "down" } };
         const hit = table === "doctors" ? known.doctor : known.pending;
@@ -107,7 +113,9 @@ describe("send-otp hook route", () => {
       expect(captureMessage).not.toHaveBeenCalled();
       remaining = 100;
       expect((await POST(hookRequest(PAYLOAD))).status).toBe(200);
-      expect(captureMessage).toHaveBeenCalledWith("Half the daily SMS budget used", "warning");
+      expect(captureMessage).toHaveBeenCalledWith("Half the daily SMS budget used", expect.objectContaining({ level: "warning" }));
+      // Also in the admin's alerts list, for whoever does not read Sentry.
+      expect(inserts).toContainEqual(["audit_logs", { action: "alert", metadata: { alert: "sms_half_budget", level: "warning", limit: 200 } }]);
       remaining = 99;
       await POST(hookRequest(PAYLOAD));
       expect(captureMessage).toHaveBeenCalledTimes(1);
@@ -118,6 +126,7 @@ describe("send-otp hook route", () => {
       const { POST } = await import("./route");
       expect((await POST(hookRequest(PAYLOAD))).status).toBe(400);
       expect(send).not.toHaveBeenCalled();
+      expect(inserts).toContainEqual(["audit_logs", { action: "alert", metadata: { alert: "sms_cap_reached", level: "error", limit: 200 } }]);
     });
   });
 

@@ -12,6 +12,8 @@ import * as Sentry from "@sentry/nextjs";
 import { verifyCronAuth } from "@/lib/api/cronAuth";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
+import { raiseAlert } from "@/lib/alerts";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,10 +53,10 @@ export const GET = withJsonErrors(async (req: Request) => {
     console.error(
       `[cron/sms-balance] LOW BALANCE: ${balance} messages left (threshold ${threshold})`,
     );
-    Sentry.captureMessage(
-      `SMS4FREE balance low: ${balance} messages remaining`,
-      balance === 0 ? "error" : "warning",
-    );
+    await raiseAlert(createSupabaseServiceClient(), "sms_balance_low", {
+      level: balance === 0 ? "error" : "warning",
+      extra: { balance, threshold },
+    });
   }
 
   return jsonOk({ ok: true, balance, threshold, low });

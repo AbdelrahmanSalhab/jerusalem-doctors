@@ -76,6 +76,35 @@ test.describe("residents the registry lists as specialists", () => {
   });
 });
 
+test.describe("alerts", () => {
+  test.beforeAll(async () => {
+    // Only this test's alerts: earlier tests raise real ones.
+    await serviceClient().from("audit_logs").delete().eq("action", "alert");
+    const { error } = await serviceClient()
+      .from("audit_logs")
+      .insert([
+        { action: "alert", metadata: { alert: "sms_cap_reached", level: "error", limit: 200 } },
+        // For the record, not for the badge.
+        { action: "alert", metadata: { alert: "doctor_waiting", level: "info" } },
+      ]);
+    expect(error).toBeNull();
+  });
+  test.afterAll(async () => {
+    await serviceClient().from("audit_logs").delete().eq("action", "alert");
+  });
+
+  test("the alerts tab counts what needs attention and opens the log on alerts", async ({ page }) => {
+    await page.goto("/admin");
+    const tab = page.getByRole("link", { name: /التنبيهات/ });
+    await expect(tab.getByLabel("تنبيه واحد في آخر 24 ساعة")).toHaveText("1");
+    await tab.click();
+    await expect(page).toHaveURL(/\/admin\/audit\?action=alert/);
+    await expect(page.getByText("حدثان تطابق التصفية")).toBeVisible();
+    await expect(page.getByText("عاجل · بلغت الرسائل الحد اليومي", { exact: false })).toBeVisible();
+    await expect(page.getByText("للعلم · طبيب جديد بانتظار القبول")).toBeVisible();
+  });
+});
+
 test("an admin adds an institution and removes it", async ({ page }) => {
   await page.goto("/admin/institutions");
   await page.getByLabel("الاسم بالعربية").fill("مستشفى الاختبار");

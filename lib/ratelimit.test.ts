@@ -7,6 +7,10 @@ const limit = vi.hoisted(() => vi.fn());
 const ctor = vi.hoisted(() => vi.fn());
 
 vi.mock("@upstash/redis", () => ({ Redis: vi.fn() }));
+const { captureMessage, raiseAlert } = vi.hoisted(() => ({ captureMessage: vi.fn(), raiseAlert: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({ captureMessage }));
+vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({}) }));
+vi.mock("@/lib/alerts", async (orig) => ({ ...(await orig<typeof import("@/lib/alerts")>()), raiseAlert }));
 vi.mock("@upstash/ratelimit", () => {
   class Ratelimit {
     static slidingWindow = vi.fn((n: number, w: string) => `${n}/${w}`);
@@ -85,5 +89,32 @@ describe("rateLimit", () => {
     await rateLimit("search", "e");
     expect(ctor).toHaveBeenCalledTimes(1);
     expect(ctor).toHaveBeenCalledWith(expect.objectContaining({ prefix: "rl:search", limiter: "30/1 m" }));
+  });
+
+  it("lets a request through when Redis is slow, alerting admins at most once an hour", async () => {
+    vi.useFakeTimers({ now: new Date("2026-10-21T08:00:00Z") });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.test");
+      vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "tok");
+      limit.mockResolvedValue({ success: true, limit: 30, remaining: 29, reset: 5, reason: "timeout" });
+      const rateLimit = await load();
+
+      expect((await rateLimit("search", "d")).success).toBe(true);
+      expect(raiseAlert).toHaveBeenCalledTimes(1);
+      expect(raiseAlert).toHaveBeenCalledWith(expect.anything(), "ratelimit_timeout", expect.anything());
+
+      // Two minutes on: Sentry hears again, the admin list does not.
+      vi.advanceTimersByTime(2 * 60_000);
+      await rateLimit("search", "d");
+      expect(captureMessage).toHaveBeenCalledTimes(1);
+      expect(raiseAlert).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(60 * 60_000);
+      await rateLimit("search", "d");
+      expect(raiseAlert).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

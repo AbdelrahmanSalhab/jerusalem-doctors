@@ -18,6 +18,8 @@ export const DOCTORS: NounForms = { one: "طبيب واحد", two: "طبيبان
 /** After a preposition (مع، من): genitive two. */
 export const COLLEAGUES_GEN: NounForms = { one: "زميل واحد", two: "زميلين", few: "زملاء", many: "زميلًا", hundred: "زميل" };
 
+export const ALERT_NOUN: NounForms = { one: "تنبيه واحد", two: "تنبيهان", few: "تنبيهات", many: "تنبيهًا", hundred: "تنبيه" };
+
 export const EVENTS: NounForms = { one: "حدث واحد", two: "حدثان", few: "أحداث", many: "حدثًا", hundred: "حدث" };
 
 export function countOf(n: number, f: NounForms): string {

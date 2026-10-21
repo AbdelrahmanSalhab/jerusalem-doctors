@@ -12,6 +12,8 @@ export interface NavTab {
   label: string;
   /** A small count after the label (e.g. doctors waiting for approval). */
   badge?: number;
+  /** What the badge counts, for screen readers. */
+  badgeLabel?: string;
   /** Match only this exact path (for a section root like /admin). */
   exact?: boolean;
 }
@@ -37,7 +39,7 @@ export function NavTabs({ tabs, label }: { tabs: NavTab[]; label: string }) {
           {t.badge ? (
             <span
               className="ms-1.5 rounded-full bg-warn-solid px-1.5 text-xs font-semibold text-white"
-              aria-label={`${t.badge} بانتظار المراجعة`}
+              aria-label={t.badgeLabel ?? `${t.badge} بانتظار المراجعة`}
             >
               {t.badge}
             </span>

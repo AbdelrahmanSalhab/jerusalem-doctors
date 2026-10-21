@@ -247,6 +247,16 @@ the floor (Dashboard → Authentication):
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
 
+### Alerts: the admin panel and Sentry
+
+Every alert the app raises is listed in `lib/alerts.ts` and goes to two
+places through `raiseAlert()`: Sentry, under the English message below, and
+the activity log as an `تنبيه` entry. Admins who do not use Sentry see them
+under **التنبيهات** in the admin panel (the log filtered to alerts); the tab's
+badge counts warnings and urgent alerts from the last 24 hours. The rate
+limiter's timeout alert reaches the log at most once an hour (Sentry once a
+minute), so a slow Redis cannot flood it.
+
 ### Sentry alert rules worth having
 
 Sentry groups identical messages into one issue, and a default "new issue"
@@ -257,7 +267,12 @@ in an issue is more than 0 in 1 minute") for:
   badge shows the count too).
 - `signInWithOtp failed` tagged `route:login/start` or `route:login/resend`:
   login codes are not being sent.
-- `SMS4FREE balance low`: from the daily balance cron.
+- `SMS4FREE balance low`: from the daily balance cron. The remaining balance
+  is in the event's extra data (it used to be in the message).
+- `Daily SMS cap reached` and `Half the daily SMS budget used`: from the
+  Send SMS hook.
+- `Doctor licences no longer in the MoH registry`: from the registry sync;
+  the doctors are under "ترخيص يحتاج مراجعة".
 - `Workplace names not in the institutions list`: from the daily
   institutions cron. Open /admin/institutions and, for each name, either
   "ربط كطريقة كتابة" (add it as a spelling of an existing hospital or fund)

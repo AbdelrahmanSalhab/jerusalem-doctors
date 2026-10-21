@@ -1,5 +1,7 @@
 import { NavTabs } from "@/components/NavTabs";
+import { ALERT_NOUN, countOf } from "@/lib/arabicCount";
 import { requireAdmin } from "@/lib/auth/session";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ export default async function AdminLayout({
   // requireAdmin() returns 404 for non-admins, so the panel's existence is
   // not leaked to regular users.
   await requireAdmin();
+  const alerts = await recentAlerts();
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -23,10 +26,30 @@ export default async function AdminLayout({
             { href: "/admin/institutions", label: "المستشفيات" },
             { href: "/admin/specialties", label: "التخصصات" },
             { href: "/admin/audit", label: "سجل النشاط" },
+            {
+              href: "/admin/audit?action=alert",
+              label: "التنبيهات",
+              badge: alerts,
+              badgeLabel: `${countOf(alerts, ALERT_NOUN)} في آخر 24 ساعة`,
+            },
           ]}
         />
       </div>
       {children}
     </div>
   );
+}
+
+/** Warnings and urgent alerts in the last 24 hours (lib/alerts.ts); "a new
+ *  doctor is waiting" has its own count in the account menu. One indexed
+ *  count per admin page. */
+async function recentAlerts(): Promise<number> {
+  const { count, error } = await createSupabaseServiceClient()
+    .from("audit_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("action", "alert")
+    .in("metadata->>level", ["warning", "error"])
+    .gte("created_at", new Date(Date.now() - 86_400_000).toISOString());
+  // A badge is not worth failing the admin panel over.
+  return error ? 0 : (count ?? 0);
 }

@@ -15,6 +15,7 @@ import { getOtpSender, OtpProviderError } from "@/lib/otp";
 import { isKnownRecipient } from "@/lib/otp/recipients";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { raiseAlert } from "@/lib/alerts";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 
 // nodejs is already the default in Next 16, but webhook.ts needs node:crypto:
@@ -116,11 +117,11 @@ export async function POST(req: Request) {
   // skip it, and then the cap alert below is the one that arrives.
   if (budget.success && budget.remaining === Math.floor(budget.limit / 2)) {
     console.warn(`[send-otp] half the daily SMS budget used (${budget.limit - budget.remaining} of ${budget.limit})`);
-    Sentry.captureMessage("Half the daily SMS budget used", "warning");
+    await raiseAlert(createSupabaseServiceClient(), "sms_half_budget", { extra: { limit: budget.limit } });
   }
   if (!budget.success) {
     console.error("[send-otp] daily SMS cap reached; no codes until it resets");
-    Sentry.captureMessage("Daily SMS cap reached", "error");
+    await raiseAlert(createSupabaseServiceClient(), "sms_cap_reached", { extra: { limit: budget.limit } });
     return hookResponse(400);
   }
 
