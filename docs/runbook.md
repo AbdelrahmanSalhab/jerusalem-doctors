@@ -247,6 +247,21 @@ the floor (Dashboard → Authentication):
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
 
+### Usage against the free plans
+
+`/admin/stats` → **الاستخدام الفعلي** shows measured usage, one row per UTC
+day from `metrics_daily`, written by `/api/cron/metrics` at 00:30 UTC:
+database size against Supabase's 500 MB, the busiest SMS day against the
+app's daily cap, and each day's searches, SMS sent, sign-ins, completed
+signups, contact presses, alerts and requests to the MoH registry. Past 70%
+of the database limit it raises an alert. The limits live in
+`lib/limits.ts`.
+
+What it cannot see, because only the provider counts it: Supabase egress,
+Upstash commands, and Vercel function calls and cache use. Read those in each
+dashboard's Usage page. To rebuild a missed day, run
+`select record_daily_metrics('YYYY-MM-DD');` in the SQL editor.
+
 ### Alerts: the admin panel and Sentry
 
 Every alert the app raises is listed in `lib/alerts.ts` and goes to two

@@ -31,6 +31,11 @@ export const ALERTS = {
     ar: "تراخيص أطباء لم تعد في سجل وزارة الصحة",
     level: "warning",
   },
+  db_size_high: {
+    sentry: "Database past 70% of the free plan",
+    ar: "قاعدة البيانات تجاوزت ٧٠٪ من حد الخطة المجانية",
+    level: "warning",
+  },
   ratelimit_timeout: {
     sentry: "Rate limiter timed out (fail-open)",
     ar: "تأخر نظام حماية الطلبات، فسُمح بالطلبات دون فحص",

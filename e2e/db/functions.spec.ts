@@ -35,6 +35,39 @@ test.describe("directory_counts()", () => {
   });
 });
 
+test.describe("record_daily_metrics()", () => {
+  test("snapshots a day's size and counts, and replaces it when run again", async () => {
+    const db = serviceClient();
+    // A day of its own, far from the seed's events.
+    const day = "2001-01-01";
+    await db.from("usage_events").insert([
+      { kind: "search", created_at: `${day}T10:00:00Z` },
+      { kind: "search", created_at: `${day}T23:59:00Z` },
+      { kind: "sms_sent", created_at: `${day}T12:00:00Z` },
+      { kind: "registry_lookup", created_at: `${day}T12:00:00Z` },
+      // The next day: not counted.
+      { kind: "search", created_at: "2001-01-02T00:00:01Z" },
+    ]);
+    await db.from("audit_logs").insert({ action: "moh_sync_completed", metadata: { requests: 65 }, created_at: `${day}T04:00:00Z` });
+    try {
+      const first = await db.rpc("record_daily_metrics", { p_day: day });
+      expect(first.error).toBeNull();
+      const row = first.data as { db_bytes: number; counts: Record<string, number>; top_tables: { name: string }[] };
+      expect(row.counts).toMatchObject({ searches: 2, sms_sent: 1, registry_requests: 66 });
+      expect(row.db_bytes).toBeGreaterThan(0);
+      expect(row.top_tables.map((t) => t.name)).toContain("doctors");
+
+      await db.rpc("record_daily_metrics", { p_day: day });
+      const { data } = await db.from("metrics_daily").select("day").eq("day", day);
+      expect(data).toHaveLength(1);
+    } finally {
+      await db.from("usage_events").delete().lt("created_at", "2001-01-03");
+      await db.from("audit_logs").delete().lt("created_at", "2001-01-03");
+      await db.from("metrics_daily").delete().eq("day", day);
+    }
+  });
+});
+
 test.describe("save_doctor_profile()", () => {
   // The closed account: nothing else in the run reads it.
   const read = async (id: string) => {

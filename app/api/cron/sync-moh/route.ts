@@ -41,12 +41,13 @@ export const GET = withJsonErrors(async (req: Request) => {
 
   const started = new Date();
   const supabase = createSupabaseServiceClient();
+  let client: MohClient | null = null;
   try {
     const doctors = await ourDoctors(supabase);
     const ours = [...new Set(doctors.flatMap((d) => d.licenses.map((l) => l.number)))];
     const full = await fullSweepDue(supabase, started);
 
-    const client = new MohClient();
+    client = new MohClient();
     const rows = toRegistryRows(full ? await client.findAll() : await client.findByLicenses(ours), started);
     const found = new Set(rows.map((r) => r.license_number));
     const missing = ours.filter((n) => !found.has(n));
@@ -61,6 +62,7 @@ export const GET = withJsonErrors(async (req: Request) => {
       rows_upserted: rows.length,
       missing: missing.length,
       flagged,
+      requests: client.requests,
       duration_ms: Date.now() - started.getTime(),
     };
     await writeAudit(supabase, { action: "moh_sync_completed", metadata: summary });
@@ -69,7 +71,11 @@ export const GET = withJsonErrors(async (req: Request) => {
     console.error("[cron/sync-moh] failed", err);
     await writeAudit(supabase, {
       action: "moh_sync_failed",
-      metadata: { error: err instanceof Error ? err.message : String(err), duration_ms: Date.now() - started.getTime() },
+      metadata: {
+        error: err instanceof Error ? err.message : String(err),
+        requests: client?.requests ?? 0,
+        duration_ms: Date.now() - started.getTime(),
+      },
     });
     return NextResponse.json({ ok: false, error: "sync_failed" }, { status: 500 });
   }

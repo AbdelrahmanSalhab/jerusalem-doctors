@@ -16,7 +16,12 @@ export type UsageKind =
   | "login_succeeded"
   | "contact_call"
   | "contact_whatsapp"
-  | "contact_save";
+  | "contact_save"
+  /** An SMS the provider accepted (the Send SMS hook): the real count, for
+   *  metrics_daily, whatever flow asked for it. */
+  | "sms_sent"
+  /** A live data.gov.il request at signup, for a licence not in our copy. */
+  | "registry_lookup";
 
 export async function recordEvent(
   service: SupabaseClient,

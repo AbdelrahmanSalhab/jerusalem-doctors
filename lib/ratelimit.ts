@@ -10,6 +10,7 @@ import * as Sentry from "@sentry/nextjs";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { ALERTS, raiseAlert } from "@/lib/alerts";
+import { SMS_DAILY_CAP } from "@/lib/limits";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type WindowSpec = `${number} ${"s" | "m" | "h" | "d"}`;
@@ -53,7 +54,7 @@ export const RATE_LIMITS = {
   // normal day is about 10 codes, the busiest so far about 40 (2026-10).
   // Raise SMS_DAILY_CAP in Vercel before a big announcement: at the cap,
   // nobody can sign up or log in until the window frees up.
-  smsDaily: { limit: Number(process.env.SMS_DAILY_CAP) || 200, window: "1 d" },
+  smsDaily: { limit: SMS_DAILY_CAP, window: "1 d" },
   devLogin: { limit: 5, window: "15 m" },
   devLoginIp: { limit: 10, window: "15 m" },
 } as const satisfies Record<string, LimitDef>;

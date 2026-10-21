@@ -12,6 +12,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
 import { MohClient } from "./client";
 import { saveRegistryRows, toRegistryRows, type RegistryRow } from "./registry";
+import { recordEvent } from "@/lib/usage";
 
 export type LicenseVerifyStatus =
   | "verified"
@@ -159,6 +160,9 @@ export async function verifyLicense(
   // the same as a license the registry doesn't know.
   const client = options.mohClient ?? new MohClient(LIVE_LOOKUP);
   let liveRow: RegistryRow | undefined;
+  // Counted whatever the answer: it is a request to the registry
+  // (metrics_daily).
+  await recordEvent(supabase, "registry_lookup");
   try {
     [liveRow] = toRegistryRows(await client.findByLicenses([input.licenseNumber]));
   } catch (err) {
