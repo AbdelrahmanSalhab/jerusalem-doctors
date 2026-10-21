@@ -209,15 +209,18 @@ export interface DirectoryCounts {
    *  dashboard shows). Empty on a failed read: the chips then list every
    *  specialty, as they did before counts existed. */
   byDomain: Record<string, number>;
+  /** Listed doctors per hospital or fund, by institution id. */
+  byInstitution: Record<string, number>;
 }
 
 /** Counted in the database (directory_counts(), migration 20261021085031):
  *  one small value back, whatever the directory's size. */
 export async function fetchDirectoryCounts(service: SupabaseClient): Promise<DirectoryCounts> {
   const { data, error } = await service.rpc("directory_counts");
-  if (error || !data) return { listed: null, byDomain: {} };
-  const d = data as { listed: number; by_domain: Record<string, number> };
-  return { listed: d.listed, byDomain: d.by_domain };
+  if (error || !data) return { listed: null, byDomain: {}, byInstitution: {} };
+  const d = data as { listed: number; by_domain: Record<string, number>; by_institution?: Record<string, number> };
+  // by_institution is absent until migration 20261021124944 is applied.
+  return { listed: d.listed, byDomain: d.by_domain, byInstitution: d.by_institution ?? {} };
 }
 
 /** «جديد هذا الأسبوع» shows at most this many. */

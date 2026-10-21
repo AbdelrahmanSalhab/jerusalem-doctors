@@ -62,7 +62,30 @@ describe("GET /api/search", () => {
       p_institution_ids: [SHAAREI],
       // One past the page, to know whether more matched.
       p_limit: 51,
+      p_workplace_institution: null,
+      p_workplace_type: null,
+      p_stage: null,
+      p_seeking_work: false,
     });
+  });
+
+  it("passes the filter panel's choices", async () => {
+    await search({ institution_id: SHAAREI, workplace_type: "hmo", stage: "general", seeking_work: "1" });
+    expect(rpc).toHaveBeenCalledWith(
+      "search_directory",
+      expect.objectContaining({
+        p_term: null,
+        p_workplace_institution: SHAAREI,
+        p_workplace_type: "hmo",
+        p_stage: "general",
+        p_seeking_work: true,
+      }),
+    );
+  });
+
+  it("400s on a filter value it does not know", async () => {
+    expect((await search({ workplace_type: "spa" })).status).toBe(400);
+    expect((await search({ stage: "consultant" })).status).toBe(400);
   });
 
   it("strips anything that could act as a LIKE wildcard", async () => {

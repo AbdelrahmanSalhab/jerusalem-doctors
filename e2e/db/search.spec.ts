@@ -11,7 +11,16 @@ interface Card {
   doctor_workplaces: { name: string }[];
 }
 
-async function search(args: { p_term?: string; p_specialty_id?: string; p_institution_ids?: string[]; p_limit?: number }) {
+async function search(args: {
+  p_term?: string;
+  p_specialty_id?: string;
+  p_institution_ids?: string[];
+  p_limit?: number;
+  p_workplace_institution?: string;
+  p_workplace_type?: string;
+  p_stage?: string;
+  p_seeking_work?: boolean;
+}) {
   const { data, error } = await serviceClient().rpc("search_directory", args);
   expect(error).toBeNull();
   return data as Card[];
@@ -68,4 +77,29 @@ test("stops at the limit and carries the card's specialties and workplaces", asy
   const [samer] = await search({ p_term: "سامر" });
   expect(samer.doctor_specialties.map((s) => s.specialty.name_ar)).toEqual(["القلب"]);
   expect(samer.doctor_workplaces.map((w) => w.name).sort()).toEqual(["المقاصد", "عيادة القلب في بيت حنينا"].sort());
+});
+
+test("the filter panel: workplace, kind of workplace, career stage, looking for work", async () => {
+  // Seeded: سامر (specialist; المقاصد hospital + a clinic), ليلى (specialist;
+  // هداسا عين كارم), مريم (resident; المطّلع), يوسف (طب عام, looking for work).
+  expect(names(await search({ p_stage: "resident" }))).toEqual(["مريم عودة"]);
+  expect(names(await search({ p_stage: "general" }))).toEqual(["يوسف حداد"]);
+  expect(names(await search({ p_stage: "specialist" }))).toEqual(["سامر ناصر", "ليلى الخطيب"].sort());
+  expect(names(await search({ p_seeking_work: true }))).toEqual(["يوسف حداد"]);
+  expect(names(await search({ p_workplace_type: "clinic" }))).toEqual(["سامر ناصر"]);
+
+  const db = serviceClient();
+  const makassed = await idOf("institutions", "المقاصد");
+  // Linked the way the daily check links it.
+  const { data: before } = await db.from("doctor_workplaces").select("id, institution_id").eq("name", "المقاصد");
+  await db.from("doctor_workplaces").update({ institution_id: makassed }).eq("name", "المقاصد");
+  try {
+    expect(names(await search({ p_workplace_institution: makassed }))).toContain("سامر ناصر");
+    // One workplace must be both: سامر's المقاصد row is a hospital, not a clinic.
+    expect(names(await search({ p_workplace_institution: makassed, p_workplace_type: "clinic" }))).toEqual([]);
+  } finally {
+    for (const w of before ?? []) await db.from("doctor_workplaces").update({ institution_id: w.institution_id }).eq("id", w.id);
+  }
+  // Filters combine with the text.
+  expect(names(await search({ p_term: "سامر", p_stage: "resident" }))).toEqual([]);
 });

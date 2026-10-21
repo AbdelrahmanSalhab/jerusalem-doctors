@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
 import { SpecialtyFilter } from "@/components/SpecialtyFilter";
+import { type FilterInstitution, SearchFilterPanel } from "@/components/SearchFilterPanel";
+import { activeFilterCount, NO_FILTERS, setFilterParams, type SearchFilters } from "@/lib/searchFilters";
 import { SEARCH_PAGE_SIZE, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
 
 type Specialty = { id: string; name_ar: string; parent_id: string | null };
@@ -37,10 +39,13 @@ export function DashboardSearch({
   listed,
   domainCounts,
   recent,
+  institutions,
 }: {
   specialties: Specialty[];
   /** «جديد هذا الأسبوع», already ranked for this viewer. */
   recent: SearchHit[];
+  /** Hospitals and funds with listed doctors, for the filter panel. */
+  institutions: FilterInstitution[];
   featured: FeaturedDoctors;
   /** Doctors in the directory, for the line under the search box. */
   listed: number | null;
@@ -50,6 +55,8 @@ export function DashboardSearch({
 }) {
   const [q, setQ] = useState("");
   const [specialtyId, setSpecialtyId] = useState<string>("");
+  const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
+  const filtering = activeFilterCount(filters) > 0;
   const [state, setState] = useState<SearchState>({ status: "idle" });
   const [view, setView] = useState<ViewMode>("cards");
   const [allChips, setAllChips] = useState(false);
@@ -70,8 +77,8 @@ export function DashboardSearch({
 
   useEffect(() => {
     const trimmed = q.trim();
-    // An empty query renders as idle (see `shown` below), no fetch needed.
-    if (!trimmed && !specialtyId) return;
+    // Nothing typed or chosen renders as idle (see `shown` below), no fetch.
+    if (!trimmed && !specialtyId && !filtering) return;
 
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -83,6 +90,7 @@ export function DashboardSearch({
         const params = new URLSearchParams();
         if (trimmed) params.set("q", trimmed);
         if (specialtyId) params.set("specialty_id", specialtyId);
+        setFilterParams(params, filters);
         const res = await fetch(`/api/search?${params}`, {
           signal: ctrl.signal,
           headers: { Accept: "application/json" },
@@ -117,7 +125,7 @@ export function DashboardSearch({
       clearTimeout(timer);
       ctrl.abort();
     };
-  }, [q, specialtyId]);
+  }, [q, specialtyId, filters, filtering]);
 
   // Busiest specialties first, and never a chip that leads to an empty
   // result. With no counts (a failed read) the chips stay as they were:
@@ -147,7 +155,9 @@ export function DashboardSearch({
         </div>
       </div>
 
-      {!q.trim() && !specialtyId && (
+      <SearchFilterPanel institutions={institutions} value={filters} onChange={setFilters} />
+
+      {!q.trim() && !specialtyId && !filtering && (
         <div className="flex flex-col gap-2">
           {listed !== null && (
             <p className="text-sm text-muted">
@@ -187,7 +197,7 @@ export function DashboardSearch({
       )}
 
       <ResultsRegion
-        state={!q.trim() && !specialtyId ? { status: "idle" } : state}
+        state={!q.trim() && !specialtyId && !filtering ? { status: "idle" } : state}
         featured={featured}
         recent={recent}
         view={view}

@@ -32,6 +32,8 @@ test.describe("directory_counts()", () => {
     expect(counts.by_domain[await id("الباطنية")]).toBe(1);
     expect(counts.by_domain[await id("القلب")]).toBeUndefined();
     expect(counts.by_domain[await id("الأطفال")]).toBe(2);
+    // Per hospital or fund, for the search filter: linked workplaces only.
+    expect(Object.values((data as { by_institution: Record<string, number> }).by_institution).every((n) => n > 0)).toBe(true);
   });
 });
 
