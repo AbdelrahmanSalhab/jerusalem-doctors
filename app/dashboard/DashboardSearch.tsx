@@ -4,8 +4,7 @@ import { countOf, DOCTORS } from "@/lib/arabicCount";
 import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
-import { SpecialtyFilter } from "@/components/SpecialtyFilter";
-import { type FilterInstitution, SearchFilterPanel } from "@/components/SearchFilterPanel";
+import { type FilterInstitution, SearchFilterChips } from "@/components/SearchFilterChips";
 import { activeFilterCount, NO_FILTERS, setFilterParams, type SearchFilters } from "@/lib/searchFilters";
 import { SEARCH_PAGE_SIZE, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
 
@@ -137,25 +136,24 @@ export function DashboardSearch({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex gap-2 sm:gap-3">
+      <div className="flex flex-col gap-3">
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="ابحث عن طبيب أو تخصص"
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-4 py-3 text-base"
+          className="w-full rounded-md border border-line bg-surface px-4 py-3 text-base"
           aria-label="بحث"
         />
-        <div className="min-w-0 max-w-[50%] shrink-0 sm:w-56 sm:max-w-none">
-          <SpecialtyFilter
-            options={specialties}
-            value={specialtyId}
-            onChange={setSpecialtyId}
-          />
-        </div>
+        <SearchFilterChips
+          specialties={specialties}
+          specialtyId={specialtyId}
+          onSpecialty={setSpecialtyId}
+          institutions={institutions}
+          filters={filters}
+          onFilters={setFilters}
+        />
       </div>
-
-      <SearchFilterPanel institutions={institutions} value={filters} onChange={setFilters} />
 
       {!q.trim() && !specialtyId && !filtering && (
         <div className="flex flex-col gap-2">
