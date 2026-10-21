@@ -7,6 +7,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { writeAudit } from "@/lib/audit";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
+import { institutionsChanged } from "@/lib/cachedReads";
 import { INSTITUTION_KINDS, relinkWorkplaces } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -51,6 +52,7 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: Ctx) => {
     }
     throw r.error;
   }
+  institutionsChanged();
   const { changed, unmatched } = await relinkWorkplaces(service);
   await writeAudit(service, {
     actor_doctor_id: admin.id,
@@ -72,6 +74,7 @@ export const DELETE = withJsonErrors(async (_req: Request, ctx: Ctx) => {
   const r = await service.from("institutions").delete().eq("id", id).select("name_ar").maybeSingle();
   if (r.error) throw r.error;
   if (!r.data) return jsonError(404, { error: "not_found", code: "not_found" });
+  institutionsChanged();
   const { changed } = await relinkWorkplaces(service);
   await writeAudit(service, {
     actor_doctor_id: admin.id,

@@ -1,239 +1,128 @@
-// GET /api/search finds an internist stored under a subspecialty only, both
-// through the specialty filter and through a text query for الباطنية.
+// GET /api/search: who may search, what reaches search_directory(), the
+// page cap, and the usage count. What a search matches is tested against
+// the real database in e2e/db/search.spec.ts.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { runAfter } from "@/test/after";
 
-const INTERNAL = "11111111-1111-4111-8111-111111111111";
-const NEPHRO = "22222222-2222-4222-8222-222222222222";
-const RHEUM = "33333333-3333-4333-8333-333333333333";
-const PEDS = "44444444-4444-4444-8444-444444444444";
+const SPECIALTY = "11111111-1111-4111-8111-111111111111";
+const SHAAREI = "55555555-5555-4555-8555-555555555555";
 
-const SPECIALTIES = [
-  { id: INTERNAL, parent_id: null },
-  { id: NEPHRO, parent_id: INTERNAL },
-  { id: RHEUM, parent_id: INTERNAL },
-  { id: PEDS, parent_id: null },
-];
-
-/** Every `.in(column, values)` the route issued, per table. */
-const inCalls: { table: string; column: string; values: unknown[] }[] = [];
-
-/** What the doctors query returns, and the limit it was given. */
-let doctorRows: unknown[] = [];
-let doctorLimit: number | undefined;
-let doctorError: unknown = null;
-/** doctor_specialties rows the specialty lookups get. */
-let specialtyLinks: { doctor_id: string }[] = [];
-/** Every select() issued on doctors. */
-const doctorSelects: string[] = [];
-
-vi.mock("@/lib/ratelimit", () => ({
-  rateLimit: vi.fn(async () => ({ success: true })),
-}));
-
-const { requireDoctor } = vi.hoisted(() => ({
+const { requireDoctor, rateLimit, rpc, recordEvent } = vi.hoisted(() => ({
   requireDoctor: vi.fn(async () => ({ id: "me" })),
+  rateLimit: vi.fn(async () => ({ success: true })),
+  rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({ data: [], error: null })),
+  recordEvent: vi.fn(async () => {}),
 }));
 vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
-vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
-const recordEvent = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 vi.mock("@/lib/usage", () => ({ recordEvent }));
-
-vi.mock("@/lib/supabase/service", () => ({
-  createSupabaseServiceClient: () => ({
-    from(table: string) {
-      let selected = "";
-      const result = () => {
-        if (table === "doctors") return { data: doctorError ? null : doctorRows, error: doctorError };
-        if (table === "doctor_specialties") return { data: specialtyLinks, error: null };
-        if (table !== "specialties") return { data: [], error: null };
-        // The name match (".or(name_ar...)") finds الباطنية itself; the
-        // tree lookup selects parent_id and gets the whole list.
-        return selected.includes("parent_id")
-          ? { data: SPECIALTIES, error: null }
-          : { data: [{ id: INTERNAL }], error: null };
-      };
-      const chain: Record<string, unknown> = {
-        select(cols: string) {
-          selected = cols;
-          if (table === "doctors") doctorSelects.push(cols);
-          return chain;
-        },
-        in(column: string, values: unknown[]) {
-          inCalls.push({ table, column, values });
-          return chain;
-        },
-        then(resolve: (v: unknown) => unknown) {
-          return Promise.resolve(result()).then(resolve);
-        },
-      };
-      chain.limit = (n: number) => {
-        if (table === "doctors") doctorLimit = n;
-        return chain;
-      };
-      for (const m of ["eq", "or", "order"]) chain[m] = () => chain;
-      return chain;
-    },
-  }),
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({ rpc }) }));
+vi.mock("@/lib/cachedReads", () => ({
+  cachedInstitutions: async () => [
+    { id: SHAAREI, name_ar: "شعاري تسيدك", name_he: "שערי צדק", kind: "hospital", aliases: ["شعري"] },
+  ],
 }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (await import("@/test/after")).deferAfter,
+}));
+
+const doctor = (i: number) => ({ id: `d${i}`, arabic_first_name: "د", arabic_family_name: String(i) });
 
 async function search(params: Record<string, string>, headers: Record<string, string> = {}) {
   const { GET } = await import("./route");
   const url = new URL("https://example.test/api/search");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  return GET(new Request(url, { headers }));
+  const res = await GET(new Request(url, { headers }));
+  await runAfter();
+  return res;
 }
 
-describe("GET /api/search: specialty tree", () => {
-  beforeEach(() => {
-    inCalls.length = 0;
-    doctorRows = [];
-    specialtyLinks = [{ doctor_id: "doc-1" }];
-  });
-
-  const specialtyFilter = () =>
-    inCalls.find((c) => c.table === "doctors" && c.column === "specialty_filter.specialty_id");
-
-  it("filtering by الباطنية includes its subspecialties", async () => {
-    const res = await search({ specialty_id: INTERNAL });
-    expect(res.status).toBe(200);
-    expect(specialtyFilter()?.values).toEqual(expect.arrayContaining([INTERNAL, NEPHRO, RHEUM]));
-    expect(specialtyFilter()?.values).not.toContain(PEDS);
-  });
-
-  it("filtering by a leaf specialty stays on that specialty", async () => {
-    await search({ specialty_id: NEPHRO });
-    expect(specialtyFilter()?.values).toEqual([NEPHRO]);
-  });
-
-  it("filters through a separate inner embed, so a card keeps its other specialties", async () => {
-    await search({ specialty_id: NEPHRO });
-    expect(inCalls.find((c) => c.table === "doctors")).toMatchObject({
-      column: "specialty_filter.specialty_id",
-      values: [NEPHRO],
-    });
-    expect(doctorSelects[0]).toContain("specialty_filter:doctor_specialties!inner(specialty_id)");
-    expect(doctorSelects[0]).toMatch(/doctor_specialties\(\s*specialty:specialties/);
-  });
-
-  it("a text match on الباطنية also matches doctors under its subspecialties", async () => {
-    await search({ q: "باطنية" });
-    const viaSpecialty = inCalls.find(
-      (c) => c.table === "doctor_specialties" && c.column === "specialty_id",
-    );
-    expect(viaSpecialty?.values).toEqual(expect.arrayContaining([INTERNAL, NEPHRO, RHEUM]));
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  rpc.mockResolvedValue({ data: [], error: null });
+  rateLimit.mockResolvedValue({ success: true });
 });
 
-function doctorRow(i: number) {
-  return {
-    id: `doc-${i}`,
-    arabic_first_name: "طبيب",
-    arabic_family_name: String(i),
-    doctor_specialties: [],
-    doctor_workplaces: [],
-  };
-}
-
-describe("GET /api/search: result cap", () => {
-  beforeEach(() => {
-    doctorRows = [];
-    doctorLimit = undefined;
+describe("GET /api/search", () => {
+  it("401s when requireDoctor refuses (no session, or a deactivated doctor)", async () => {
+    requireDoctor.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    expect((await search({ q: "x" })).status).toBe(401);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("asks for one row past the page to know whether more matched", async () => {
-    await search({ q: "طبيب" });
-    expect(doctorLimit).toBe(51);
+  it("asks the database once, with the normalised term and the institutions it names", async () => {
+    await search({ q: "شعري", specialty_id: SPECIALTY });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("search_directory", {
+      p_term: "شعري",
+      p_specialty_id: SPECIALTY,
+      p_institution_ids: [SHAAREI],
+      // One past the page, to know whether more matched.
+      p_limit: 51,
+    });
+  });
+
+  it("strips anything that could act as a LIKE wildcard", async () => {
+    await search({ q: "س%ا_مر" });
+    expect(rpc).toHaveBeenCalledWith("search_directory", expect.objectContaining({ p_term: "س ا مر" }));
+  });
+
+  it("lists everyone (filtered or not) when there is no text", async () => {
+    await search({ specialty_id: SPECIALTY });
+    expect(rpc).toHaveBeenCalledWith("search_directory", expect.objectContaining({ p_term: null, p_institution_ids: [] }));
+  });
+
+  it("answers an all-punctuation query with nothing, without a query", async () => {
+    const body = await (await search({ q: "!!!" })).json();
+    expect(body).toEqual({ results: [], count: 0, truncated: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a rate-limited caller", async () => {
+    rateLimit.mockResolvedValueOnce({ success: false });
+    expect((await search({ q: "x" })).status).toBe(429);
+  });
+
+  it("400s on a malformed specialty id", async () => {
+    expect((await search({ specialty_id: "nope" })).status).toBe(400);
+  });
+
+  it("says how long the server took", async () => {
+    expect((await search({ q: "x" })).headers.get("Server-Timing")).toMatch(/^search;dur=\d+$/);
   });
 
   it("50 matches: all returned, not truncated", async () => {
-    doctorRows = Array.from({ length: 50 }, (_, i) => doctorRow(i));
-    const body = await (await search({ q: "طبيب" })).json();
-    expect(body.results).toHaveLength(50);
-    expect(body.count).toBe(50);
-    expect(body.truncated).toBe(false);
+    rpc.mockResolvedValueOnce({ data: Array.from({ length: 50 }, (_, i) => doctor(i)), error: null });
+    const body = await (await search({ q: "د" })).json();
+    expect(body).toMatchObject({ count: 50, truncated: false });
   });
 
-  it("51 matches: first 50 returned, truncated", async () => {
-    doctorRows = Array.from({ length: 51 }, (_, i) => doctorRow(i));
-    const body = await (await search({ q: "طبيب" })).json();
-    expect(body.results).toHaveLength(50);
-    expect(body.count).toBe(50);
-    expect(body.truncated).toBe(true);
-  });
-
-  it("an all-punctuation query is not truncated", async () => {
-    const body = await (await search({ q: "..." })).json();
-    expect(body).toEqual({ results: [], count: 0, truncated: false });
-  });
-});
-
-describe("GET /api/search access", () => {
-  it("401s when requireDoctor refuses (no session, or a deactivated doctor)", async () => {
-    requireDoctor.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
-    const res = await search({ q: "x" });
-    expect(res.status).toBe(401);
-  });
-});
-
-describe("GET /api/search at directory scale", () => {
-  beforeEach(() => {
-    inCalls.length = 0;
-    doctorRows = [];
-    doctorError = null;
-  });
-
-  it("splits a long id list across queries instead of one huge URL", async () => {
-    specialtyLinks = Array.from({ length: 400 }, (_, i) => ({ doctor_id: `doc-${i}` }));
-    await search({ q: "باطنية" });
-    const idQueries = inCalls.filter((c) => c.table === "doctors" && c.column === "id");
-    expect(idQueries).toHaveLength(3);
-    expect(Math.max(...idQueries.map((c) => c.values.length))).toBeLessThanOrEqual(150);
-    expect(new Set(idQueries.flatMap((c) => c.values)).size).toBe(400);
-  });
-
-  it("merges pages without duplicates", async () => {
-    specialtyLinks = Array.from({ length: 200 }, (_, i) => ({ doctor_id: `doc-${i}` }));
-    doctorRows = [doctorRow(1), doctorRow(2)];
-    const body = await (await search({ q: "باطنية" })).json();
-    expect(body.results.map((r: { id: string }) => r.id)).toEqual(["doc-1", "doc-2"]);
+  it("51 matches: the first 50 returned, truncated", async () => {
+    rpc.mockResolvedValueOnce({ data: Array.from({ length: 51 }, (_, i) => doctor(i)), error: null });
+    const body = await (await search({ q: "د" })).json();
+    expect(body).toMatchObject({ count: 50, truncated: true });
+    expect(body.results.at(-1).id).toBe("d49");
   });
 
   it("reports a failed query instead of answering with no results", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    doctorError = { message: "URI too long" };
-    const res = await search({ q: "طبيب" });
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ code: "internal_error" });
-  });
-});
-
-describe("GET /api/search merge order", () => {
-  beforeEach(() => {
-    doctorError = null;
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+    expect((await search({ q: "x" })).status).toBe(500);
   });
 
-  it("sorts merged pages in code-unit order, as Postgres orders each page", async () => {
-    specialtyLinks = Array.from({ length: 200 }, (_, i) => ({ doctor_id: `doc-${i}` }));
-    doctorRows = [
-      { ...doctorRow(1), arabic_full_name: "ابراهيم" },
-      { ...doctorRow(2), arabic_full_name: "أحمد" },
-    ];
-    const body = await (await search({ q: "باطنية" })).json();
-    expect(body.results.map((r: { id: string }) => r.id)).toEqual(["doc-2", "doc-1"]);
-  });
-});
-
-describe("GET /api/search: usage", () => {
-  beforeEach(() => recordEvent.mockClear());
-
-  it("counts a search", async () => {
-    await search({ q: "ليلى" });
-    expect(recordEvent).toHaveBeenCalledWith(expect.anything(), "search", expect.anything());
+  it("counts a search, after answering, without its text", async () => {
+    await search({ q: "قلب", specialty_id: SPECIALTY });
+    expect(recordEvent).toHaveBeenCalledWith(expect.anything(), "search", {
+      doctorId: "me",
+      meta: { results: 0, filtered: true, specialty_id: SPECIALTY },
+    });
   });
 
   it("does not count the production smoke test's searches", async () => {
-    await search({ q: "ليلى" }, { "x-ci-run": "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123" });
+    await search({ q: "x" }, { "x-ci-run": "https://github.com/a/b/actions/runs/1" });
     expect(recordEvent).not.toHaveBeenCalled();
   });
 });

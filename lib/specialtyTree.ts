@@ -73,14 +73,3 @@ export function toggleChild(
   if (chosen.length >= MAX_SUBSPECIALTIES) return [...selected];
   return [...selected.filter((id) => id !== g.parent.id), childId];
 }
-
-/** `ids` plus the children of any parent in it. */
-export function withSubspecialties(
-  list: readonly Pick<SpecialtyNode, "id" | "parent_id">[],
-  ids: readonly string[],
-): string[] {
-  const children = list
-    .filter((s) => s.parent_id !== null && ids.includes(s.parent_id))
-    .map((s) => s.id);
-  return Array.from(new Set([...ids, ...children]));
-}

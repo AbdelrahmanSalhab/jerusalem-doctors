@@ -1,6 +1,7 @@
 // What the directory shows of a doctor, and who it shows. Shared by
-// /api/search and the dashboard's featured sections so a card never differs
-// depending on where it was loaded from.
+// /api/search (whose rows come from search_directory() in SQL) and the
+// dashboard's featured sections, so a card never differs depending on where
+// it was loaded from.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
@@ -59,11 +60,9 @@ export const FEATURED_LABEL: Record<FeaturedKind, string> = {
   graduate: "طبيب مميز يبحث عن عمل",
 };
 
-/** `specialtyFilter` adds a second, filter-only embed of doctor_specialties
- *  (`specialty_filter`, inner-joined): filter on it with
- *  `.in("specialty_filter.specialty_id", ids)`. The displayed list comes from
- *  the plain embed, so a card keeps all its specialties. */
-export function directoryQuery(service: SupabaseClient, specialtyFilter = false) {
+/** Listed doctors with what a card shows. Search builds the same card in SQL
+ *  (search_directory(), migration 20261021084302); keep the two in step. */
+export function directoryQuery(service: SupabaseClient) {
   return service
     .from("doctors")
     .select(
@@ -89,7 +88,6 @@ export function directoryQuery(service: SupabaseClient, specialtyFilter = false)
         specialty:specialties(id, name_ar)
       ),
       doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order)
-      ${specialtyFilter ? ",specialty_filter:doctor_specialties!inner(specialty_id)" : ""}
     `,
     )
     .eq("is_active", true)
