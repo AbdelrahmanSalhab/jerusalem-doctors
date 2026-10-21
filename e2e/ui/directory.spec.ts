@@ -39,8 +39,8 @@ test("a specialty search includes its subspecialties", async ({ page }) => {
 
 test("the specialty filter narrows the list @phone", async ({ page }) => {
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: /كل التخصصات/ }).click();
-  const list = page.getByRole("listbox");
+  await page.getByRole("button", { name: "التخصص" }).click();
+  const list = page.getByRole("listbox", { name: "التخصص" });
   await expect(list).toBeVisible();
   // The whole list fits the screen (the iPhone cut-off bug).
   const box = await list.boundingBox();
@@ -74,19 +74,30 @@ test.describe("new this week", () => {
   });
 });
 
-test("the filter panel narrows by career stage and looking for work, with no text @phone", async ({ page }) => {
+test("the filter chips narrow the list with no text, and clear @phone", async ({ page }) => {
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: /^تصفية/ }).click();
-  await page.getByLabel("المرحلة المهنية").selectOption({ label: "طبيب مقيم" });
-  await expect(page.getByText("مريم عودة").first()).toBeVisible();
-  await expect(page.getByText("سامر ناصر")).toHaveCount(0);
+  const results = page.locator("main");
 
-  await page.getByLabel("المرحلة المهنية").selectOption({ label: "الكل" });
-  await page.getByLabel("يبحث عن فرصة عمل").check();
-  await expect(page.getByText("يوسف حداد").first()).toBeVisible();
-  await expect(page.getByText("مريم عودة")).toHaveCount(0);
+  // Career stage: the chip turns into its value.
+  await page.getByRole("button", { name: "المرحلة" }).click();
+  await page.getByRole("listbox", { name: "المرحلة" }).getByRole("option", { name: "طبيب مقيم" }).click();
+  await expect(page.getByRole("button", { name: "المرحلة: طبيب مقيم" })).toBeVisible();
+  await expect(results.getByText("مريم عودة").first()).toBeVisible();
+  await expect(results.getByText("سامر ناصر")).toHaveCount(0);
+  await page.getByRole("button", { name: "إزالة المرحلة" }).click();
 
-  await page.getByRole("button", { name: "مسح التصفية" }).click();
+  // A kind of workplace: يوسف lists none, so any hospital leaves him out.
+  await page.getByRole("button", { name: "مكان العمل" }).click();
+  await page.getByRole("listbox", { name: "مكان العمل" }).getByRole("option", { name: "كل المستشفيات" }).click();
+  await expect(results.getByText("ليلى الخطيب").first()).toBeVisible();
+  await expect(results.getByText("يوسف حداد")).toHaveCount(0);
+
+  // On top of it, looking for work: nobody is both.
+  await page.getByRole("button", { name: "يبحث عن عمل" }).click();
+  await expect(page.getByRole("button", { name: "يبحث عن عمل" })).toHaveAttribute("aria-pressed", "true");
+  await expect(results.getByText("لا توجد نتائج مطابقة.")).toBeVisible();
+
+  await page.getByRole("button", { name: "مسح الكل" }).click();
   await expect(page.getByText(/في الدليل/)).toBeVisible();
 });
 

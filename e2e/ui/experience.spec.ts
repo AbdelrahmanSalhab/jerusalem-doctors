@@ -19,14 +19,23 @@ test.describe("as a doctor", () => {
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   });
 
-  test("the specialty filter works from the keyboard", async ({ page }) => {
+  test("the filter chips work from the keyboard", async ({ page }) => {
     await page.goto("/dashboard");
-    const button = page.getByRole("button", { name: /كل التخصصات/ });
-    await button.focus();
+    const chip = page.getByRole("button", { name: "المرحلة" });
+    await chip.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("listbox")).toBeVisible();
+    const list = page.getByRole("listbox", { name: "المرحلة" });
+    await expect(list).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("listbox")).toBeHidden();
+    await expect(list).toBeHidden();
+    // Focus is back on the chip, not lost.
+    await expect(chip).toBeFocused();
+
+    // Tab to an option and pick it with Enter.
+    await page.keyboard.press("Enter");
+    await list.getByRole("option", { name: "طبيب مقيم" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("button", { name: "المرحلة: طبيب مقيم" })).toBeVisible();
   });
 
   test.describe("featured graduates", () => {
