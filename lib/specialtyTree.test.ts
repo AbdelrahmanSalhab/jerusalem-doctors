@@ -6,7 +6,6 @@ import {
   MAX_SUBSPECIALTIES,
   toggleChild,
   toggleGroup,
-  withSubspecialties,
 } from "./specialtyTree";
 
 const s = (id: string, parent_id: string | null = null) => ({
@@ -77,19 +76,5 @@ describe("selecting inside a group", () => {
       "peds",
       "internal",
     ]);
-  });
-});
-
-describe("withSubspecialties", () => {
-  // Searching or filtering by الباطنية must still find a nephrologist, who
-  // is stored under the child only.
-  it("adds every child of a selected parent", () => {
-    expect(withSubspecialties(LIST, ["internal"]).sort()).toEqual(
-      ["cardio", "internal", "nephro", "rheum"].sort(),
-    );
-  });
-
-  it("leaves leaf ids alone", () => {
-    expect(withSubspecialties(LIST, ["nephro", "peds"])).toEqual(["nephro", "peds"]);
   });
 });

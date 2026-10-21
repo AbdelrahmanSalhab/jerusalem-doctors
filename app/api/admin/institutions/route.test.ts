@@ -4,11 +4,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, jsonRequest } from "@/test/fakeSupabase";
 
-const { requireAdminOrNull, relinkWorkplaces } = vi.hoisted(() => ({
+const { requireAdminOrNull, relinkWorkplaces, institutionsChanged } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(),
+  institutionsChanged: vi.fn(),
   relinkWorkplaces: vi.fn(async () => ({ changed: 3, unmatched: [] as { name: string; count: number }[] })),
 }));
 vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
+vi.mock("@/lib/cachedReads", () => ({ institutionsChanged }));
 vi.mock("@/lib/institutions", async (orig) => ({
   ...(await orig<typeof import("@/lib/institutions")>()),
   relinkWorkplaces,
@@ -44,6 +46,8 @@ describe("admin institutions API", () => {
     expect(await res.json()).toEqual({ ok: true, id: "inst-9", linked: 3 });
     expect(db.argsOf("institutions", "insert")[0][0]).toMatchObject({ name_ar: "مستشفى الهلال الأحمر", name_he: null });
     expect(relinkWorkplaces).toHaveBeenCalled();
+    // Search reads the list from a cache; it must see the new one.
+    expect(institutionsChanged).toHaveBeenCalled();
     expect(db.argsOf("audit_logs", "insert")[0][0]).toMatchObject({ action: "institution_created" });
   });
 
