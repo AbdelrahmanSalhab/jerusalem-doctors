@@ -10,16 +10,20 @@ import "./globals.css";
 // One family for both scripts: IBM Plex Sans for Latin (phone numbers,
 // emails, English words) and its Arabic sister for Arabic. The Latin face
 // comes first and covers only Latin, so the browser picks per character.
+//
+// Three weights, not four: 500 (font-medium) is so close to 400 that it was
+// a whole extra file per script for a barely visible difference, and the
+// browser now draws font-medium with the 400 file.
 const plexLatin = IBM_Plex_Sans({
   variable: "--font-latin",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "600", "700"],
   display: "swap",
 });
 const plex = IBM_Plex_Sans_Arabic({
   variable: "--font-arabic",
   subsets: ["arabic"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "600", "700"],
   display: "swap",
 });
 
