@@ -1,4 +1,5 @@
-// Reads of the local `moh_practitioners` mirror, for showing an admin what
+// Reads of `moh_practitioners`, our copy of the registry, for showing an
+// admin what
 // the registry actually says about a licence.
 //
 // Separate from match.ts on purpose: the matcher answers "does this name fit
@@ -16,12 +17,16 @@ export interface MirrorPractitioner {
   hebrewFirstNorm: string;
   hebrewFamilyNorm: string;
   specialtyHe: string | null;
-  issuedYyyymmdd: number | null;
+  /** Every specialty certificate, oldest first. */
+  specialties: string[];
+  /** YYYY-MM-DD. */
+  licenseIssuedOn: string | null;
+  specialistSince: string | null;
   syncedAt: string;
 }
 
 const COLUMNS =
-  "license_number, hebrew_first_name, hebrew_family_name, hebrew_first_norm, hebrew_family_norm, specialty_name_he, license_issued_yyyymmdd, synced_at";
+  "license_number, hebrew_first_name, hebrew_family_name, hebrew_first_norm, hebrew_family_norm, specialty_name_he, specialties, license_issued_on, specialist_since, synced_at";
 
 interface MirrorRow {
   license_number: number;
@@ -30,7 +35,9 @@ interface MirrorRow {
   hebrew_first_norm: string;
   hebrew_family_norm: string;
   specialty_name_he: string | null;
-  license_issued_yyyymmdd: number | null;
+  specialties: string[] | null;
+  license_issued_on: string | null;
+  specialist_since: string | null;
   synced_at: string;
 }
 
@@ -42,7 +49,9 @@ function toPractitioner(row: MirrorRow): MirrorPractitioner {
     hebrewFirstNorm: row.hebrew_first_norm,
     hebrewFamilyNorm: row.hebrew_family_norm,
     specialtyHe: row.specialty_name_he?.trim() || null,
-    issuedYyyymmdd: row.license_issued_yyyymmdd,
+    specialties: row.specialties ?? [],
+    licenseIssuedOn: row.license_issued_on,
+    specialistSince: row.specialist_since,
     syncedAt: row.synced_at,
   };
 }
@@ -72,8 +81,8 @@ export async function readMirrorRows(
 /**
  * When the mirror was last refreshed, so the panel can say "not in the copy we
  * have, last synced …" instead of claiming the registry itself is missing a
- * licence. Read from the sync's audit entry rather than by sorting 63k rows on
- * an unindexed `synced_at`.
+ * licence. Read from the sync's audit entry rather than by sorting rows on an
+ * unindexed `synced_at`.
  */
 export async function readMirrorFreshness(service: SupabaseClient): Promise<string | null> {
   const { data, error } = await service

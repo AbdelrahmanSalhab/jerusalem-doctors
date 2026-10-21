@@ -1,15 +1,22 @@
 // Israel MoH practitioners registry, CKAN client (plan §13).
 //
-// Endpoints:
-//   GET {base}/action/datastore_search?resource_id=...&limit=...&offset=...
-//   GET {base}/action/datastore_search_sql?sql=SELECT ...
+// One endpoint: GET {base}/action/datastore_search, with a list of licences
+// in `filters`, or paged through the whole registry. CKAN returns
+// { success, result }.
 //
-// All requests are GETs; CKAN returns { success, result }.
+// The registry is the source we cannot do without, so it is asked as little
+// as possible: our own doctors' licences nightly, the whole registry weekly
+// (paced), and a licence nobody has seen yet when someone signs up with it
+// (app/api/cron/sync-moh, lib/moh/match.ts).
 
 const DEFAULT_BASE = "https://data.gov.il/api/3";
 const DEFAULT_RESOURCE_ID = "9c64c522-bbc2-48fe-96fb-3b2a8626f59e";
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRIES = 2;
+/** Licences per request: keeps the URL near 3 KB. */
+const BATCH = 300;
+/** Says who is asking, so a problem reaches us rather than a silent block. */
+const USER_AGENT = "jerusalem-doctors/1.0 (+https://jerusalem-doctors.vercel.app)";
 
 export interface MohRecord {
   _id: number;
@@ -20,11 +27,6 @@ export interface MohRecord {
   "מספר תעודת התמחות"?: number | null;
   "תאריך רישום התמחות"?: number | null;
   "שם התמחות"?: string | null;
-}
-
-export interface MohSearchPage {
-  records: MohRecord[];
-  total: number;
 }
 
 export interface MohClientOptions {
@@ -55,69 +57,51 @@ export class MohClient {
   }
 
   /**
-   * Single page of practitioner records via `datastore_search`.
-   * Pass `q` for substring search across all string fields, `offset/limit`
-   * for paging.
-   */
-  async searchPage(
-    options: { q?: string; limit?: number; offset?: number } = {},
-  ): Promise<MohSearchPage> {
-    const params = new URLSearchParams({ resource_id: this.resourceId });
-    if (options.q) params.set("q", options.q);
-    if (options.limit !== undefined) params.set("limit", String(options.limit));
-    if (options.offset !== undefined)
-      params.set("offset", String(options.offset));
-
-    const url = `${this.base}/action/datastore_search?${params}`;
-    const json = await this.requestJSON<{
-      success: boolean;
-      result: { records: MohRecord[]; total: number };
-    }>(url);
-    if (!json.success) {
-      throw new Error("CKAN response success=false");
-    }
-    return { records: json.result.records, total: json.result.total };
-  }
-
-  /**
-   * Direct license-number lookup. Returns null if not present.
-   * Used as the live fallback in the signup license-check route when the
-   * local `moh_practitioners` mirror doesn't have the row.
+   * Every registry row for these licences: a licence with several specialty
+   * certificates has one row per certificate, and an unknown licence has
+   * none. CKAN takes a list in `filters`, so this is one request per
+   * BATCH licences rather than one per licence, or a sweep of all 65k rows.
    *
-   * Implementation note: data.gov.il's `datastore_search_sql` rejects
-   * queries with Hebrew column identifiers (403 Security Violation), so we
-   * use `datastore_search` with the `filters` parameter instead.
+   * (`datastore_search_sql` would be the obvious tool, but data.gov.il
+   * rejects queries naming its Hebrew columns with a 403.)
    */
-  async findByLicense(licenseNumber: number): Promise<MohRecord | null> {
-    if (!Number.isInteger(licenseNumber) || licenseNumber <= 0) return null;
-    const filters = JSON.stringify({ "מספר רישיון רופא": licenseNumber });
-    const params = new URLSearchParams({
-      resource_id: this.resourceId,
-      limit: "1",
-      filters,
-    });
-    const url = `${this.base}/action/datastore_search?${params}`;
-    const json = await this.requestJSON<{
-      success: boolean;
-      result: { records: MohRecord[] };
-    }>(url);
-    if (!json.success) return null;
-    return json.result.records[0] ?? null;
+  async findByLicenses(licenses: readonly number[]): Promise<MohRecord[]> {
+    const wanted = [...new Set(licenses)].filter((n) => Number.isInteger(n) && n > 0);
+    const out: MohRecord[] = [];
+    for (let i = 0; i < wanted.length; i += BATCH) {
+      const batch = wanted.slice(i, i + BATCH);
+      const params = new URLSearchParams({
+        resource_id: this.resourceId,
+        // The most certificates any licence holds is 5 (October 2026).
+        limit: String(batch.length * 10),
+        filters: JSON.stringify({ "מספר רישיון רופא": batch }),
+      });
+      const json = await this.requestJSON<{
+        success: boolean;
+        result: { records: MohRecord[] };
+      }>(`${this.base}/action/datastore_search?${params}`);
+      if (!json.success) throw new Error("CKAN response success=false");
+      out.push(...json.result.records);
+    }
+    return out;
   }
 
   /**
-   * Iterate all records in pages of `pageSize`. Used by the daily sync cron.
+   * The whole registry, a page at a time with a pause between pages: about
+   * 65 requests, made once a week.
    */
-  async *iterateAll(
-    pageSize = 1000,
-  ): AsyncGenerator<MohRecord, void, unknown> {
-    let offset = 0;
-    for (;;) {
-      const { records } = await this.searchPage({ limit: pageSize, offset });
-      if (records.length === 0) return;
-      for (const r of records) yield r;
-      if (records.length < pageSize) return;
-      offset += pageSize;
+  async findAll(pageSize = 1000, pauseMs = 1000): Promise<MohRecord[]> {
+    const out: MohRecord[] = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const params = new URLSearchParams({ resource_id: this.resourceId, limit: String(pageSize), offset: String(offset) });
+      const json = await this.requestJSON<{
+        success: boolean;
+        result: { records: MohRecord[] };
+      }>(`${this.base}/action/datastore_search?${params}`);
+      if (!json.success) throw new Error("CKAN response success=false");
+      out.push(...json.result.records);
+      if (json.result.records.length < pageSize) return out;
+      await sleep(pauseMs);
     }
   }
 
@@ -130,13 +114,17 @@ export class MohClient {
         const res = await this.fetch(url, {
           method: "GET",
           signal: ctrl.signal,
-          headers: { Accept: "application/json" },
+          headers: { Accept: "application/json", "User-Agent": USER_AGENT },
         });
+        // Refused or asked to slow down: asking again straight away is how a
+        // client gets blocked, so give up until the next run.
+        if (res.status === 403 || res.status === 429) throw new MohRefusedError(res.status);
         if (!res.ok) {
           throw new Error(`MoH HTTP ${res.status}`);
         }
         return (await res.json()) as T;
       } catch (e) {
+        if (e instanceof MohRefusedError) throw e;
         lastErr = e;
         if (attempt < this.retries) {
           await sleep(200 * Math.pow(2, attempt));
@@ -148,6 +136,13 @@ export class MohClient {
     throw lastErr instanceof Error
       ? lastErr
       : new Error("MoH request failed after retries");
+  }
+}
+
+export class MohRefusedError extends Error {
+  constructor(readonly status: number) {
+    super(`MoH HTTP ${status}`);
+    this.name = "MohRefusedError";
   }
 }
 

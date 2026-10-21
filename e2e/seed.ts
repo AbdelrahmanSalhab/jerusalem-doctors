@@ -4,7 +4,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { normalizeArabic } from "@/lib/normalize/arabic";
-import { normalizeHebrew } from "@/lib/normalize/hebrew";
+import { toRegistryRows } from "@/lib/moh/registry";
 import registry from "./registry.json";
 import { ACCOUNTS, PASSWORD, SERVICE_ROLE_KEY, SUPABASE_URL, type Role } from "./env";
 
@@ -198,17 +198,7 @@ async function reset(db: SupabaseClient) {
 async function seedRegistry(db: SupabaseClient) {
   // 510020 (the signup test's licence) is left out of the mirror, so signup
   // has to fall back to the live registry, here the stub.
-  const rows = registry
-    .filter((r) => r["מספר רישיון רופא"] !== 510020)
-    .map((r) => ({
-      license_number: r["מספר רישיון רופא"],
-      hebrew_first_name: r["שם פרטי"],
-      hebrew_family_name: r["שם משפחה"],
-      hebrew_first_norm: normalizeHebrew(r["שם פרטי"]),
-      hebrew_family_norm: normalizeHebrew(r["שם משפחה"]),
-      specialty_name_he: r["שם התמחות"],
-      license_issued_yyyymmdd: r["תאריך רישום רישיון"],
-    }));
+  const rows = toRegistryRows(registry.filter((r) => r["מספר רישיון רופא"] !== 510020));
   await must("registry", db.from("moh_practitioners").insert(rows));
 }
 

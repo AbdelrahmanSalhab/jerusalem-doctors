@@ -26,8 +26,8 @@ vi.mock("@/lib/turnstile", () => ({
 
 vi.mock("@/lib/moh/client", () => ({
   MohClient: class {
-    async findByLicense() {
-      return null;
+    async findByLicenses() {
+      return [];
     }
   },
 }));

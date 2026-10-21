@@ -12,7 +12,9 @@ const ROW = {
   hebrew_first_norm: "דניאל",
   hebrew_family_norm: "דריפוס",
   specialty_name_he: "פסיכיאטריה",
-  license_issued_yyyymmdd: 20110503,
+  specialties: ["פסיכיאטריה"],
+  license_issued_on: "2011-05-03",
+  specialist_since: "2017-02-01",
   synced_at: "2026-10-19T03:00:00.000Z",
 };
 

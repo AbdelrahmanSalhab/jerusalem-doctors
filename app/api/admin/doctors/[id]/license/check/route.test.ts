@@ -15,9 +15,9 @@ vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: tru
 
 vi.mock("@/lib/moh/client", () => ({
   MohClient: class {
-    async findByLicense() {
+    async findByLicenses() {
       if (liveThrows) throw new Error("data.gov.il timeout");
-      return null;
+      return [];
     }
   },
 }));

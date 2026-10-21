@@ -15,8 +15,8 @@ vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => ({
 vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
 vi.mock("@/lib/moh/client", () => ({
   MohClient: class {
-    async findByLicense() {
-      return null;
+    async findByLicenses() {
+      return [];
     }
   },
 }));
