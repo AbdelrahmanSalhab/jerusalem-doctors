@@ -5,6 +5,7 @@
 // /login and /signup break even when the SMS was delivered. These tests pin
 // the header on every exit path, not just the happy one.
 
+import { runAfter } from "@/test/after";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OtpProviderError } from "@/lib/otp/provider";
 import { signSendSmsHook } from "@/lib/otp/webhook";
@@ -13,6 +14,10 @@ const send = vi.fn();
 
 const { captureMessage } = vi.hoisted(() => ({ captureMessage: vi.fn() }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn(), captureMessage }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (await import("@/test/after")).deferAfter,
+}));
 
 /** Who the database knows: a doctor's phone, or a live signup's. */
 const known = { doctor: true, pending: false, error: false };
@@ -86,8 +91,12 @@ describe("send-otp hook route", () => {
     it("sends to a number with a live signup", async () => {
       Object.assign(known, { doctor: false, pending: true });
       const { POST } = await import("./route");
+      inserts.length = 0;
       expect((await POST(hookRequest(PAYLOAD))).status).toBe(200);
       expect(send).toHaveBeenCalled();
+      // Counted once sent, after the answer (metrics_daily's SMS count).
+      await runAfter();
+      expect(inserts).toContainEqual(["usage_events", expect.objectContaining({ kind: "sms_sent" })]);
     });
 
     it("refuses a number with no account and no signup, even on a signed call", async () => {

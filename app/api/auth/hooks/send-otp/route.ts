@@ -10,6 +10,7 @@
 // The OTP value must never reach a log line, an error message, or Sentry.
 
 import * as Sentry from "@sentry/nextjs";
+import { after } from "next/server";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { getOtpSender, OtpProviderError } from "@/lib/otp";
 import { isKnownRecipient } from "@/lib/otp/recipients";
@@ -17,6 +18,7 @@ import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { raiseAlert } from "@/lib/alerts";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
+import { recordEvent } from "@/lib/usage";
 
 // nodejs is already the default in Next 16, but webhook.ts needs node:crypto:
 // pin it so a future default flip to edge can't silently break signing.
@@ -128,6 +130,8 @@ export async function POST(req: Request) {
   try {
     const sender = getOtpSender();
     await sender.send(e164, code);
+    // Counted after answering: Supabase waits on this hook.
+    after(() => recordEvent(createSupabaseServiceClient(), "sms_sent"));
     return hookResponse(200);
   } catch (err) {
     // OtpProviderError messages carry Meta's error code and message, never

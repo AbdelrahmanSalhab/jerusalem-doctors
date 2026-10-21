@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { Attention, BarList, DailyBars, Section, Tile, TileGrid } from "./StatsParts";
+import { type MetricsDay, UsageSection } from "./UsageSection";
 
 export const dynamic = "force-dynamic";
 
@@ -23,9 +24,11 @@ export default async function AdminStatsPage() {
   // The (admin) layout's check alone is not enough: Next can render this
   // page without re-running the layout. requireAdmin is request-cached.
   await requireAdmin();
-  const [s, sms] = await Promise.all([
-    fetchAdminStats(createSupabaseServiceClient()),
+  const service = createSupabaseServiceClient();
+  const [s, sms, metrics] = await Promise.all([
+    fetchAdminStats(service),
     smsCredit(),
+    service.from("metrics_daily").select("day, db_bytes, counts").order("day", { ascending: false }).limit(14),
   ]);
   const d = s.doctors;
   const a = s.attention;
@@ -290,6 +293,8 @@ export default async function AdminStatsPage() {
           />
         </TileGrid>
       </Section>
+
+      <UsageSection days={(metrics.data ?? []) as MetricsDay[]} />
     </main>
   );
 }

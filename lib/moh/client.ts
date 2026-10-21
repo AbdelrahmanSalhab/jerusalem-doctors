@@ -43,6 +43,9 @@ export class MohClient {
   private readonly timeoutMs: number;
   private readonly retries: number;
   private readonly fetch: typeof fetch;
+  /** Requests this client has sent, retries included: the registry's real
+   *  cost, recorded by the nightly sync (metrics_daily). */
+  requests = 0;
 
   constructor(options: MohClientOptions = {}) {
     this.base = (options.base ?? process.env.MOH_API_BASE ?? DEFAULT_BASE).replace(
@@ -111,6 +114,7 @@ export class MohClient {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
       try {
+        this.requests++;
         const res = await this.fetch(url, {
           method: "GET",
           signal: ctrl.signal,

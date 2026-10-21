@@ -41,6 +41,7 @@ const POLICY: Record<string, Policy> = {
   "POST /api/auth/hooks/send-otp": "hook",
   "POST /api/auth/logout": "public",
   "GET /api/cron/institutions": "cron",
+  "GET /api/cron/metrics": "cron",
   "GET /api/cron/sms-balance": "cron",
   "GET /api/cron/sync-moh": "cron",
   "GET /api/institutions": "public",

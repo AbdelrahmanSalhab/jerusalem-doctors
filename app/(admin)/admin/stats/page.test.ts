@@ -34,9 +34,23 @@ const SAMPLE: AdminStats = {
   moh_sync: { action: "moh_sync_completed", at: "2026-10-19T03:00:00Z" },
 };
 
+const METRICS = [
+  { day: "2026-10-20", db_bytes: 13_631_488, counts: { searches: 41, sms_sent: 12, logins: 5, registry_requests: 2 } },
+  { day: "2026-10-19", db_bytes: 13_000_000, counts: { searches: 30, sms_sent: 25, logins: 4 } },
+];
 vi.mock("@/lib/auth/session", () => ({ requireAdmin: vi.fn(async () => ({ id: "a1" })) }));
 vi.mock("@/lib/supabase/service", () => ({
-  createSupabaseServiceClient: () => ({ rpc: vi.fn(async () => ({ data: SAMPLE, error: null })) }),
+  createSupabaseServiceClient: () => ({
+    rpc: vi.fn(async () => ({ data: SAMPLE, error: null })),
+    // metrics_daily, newest first.
+    from: () => {
+      const chain: Record<string, unknown> = {
+        then: (ok: (v: unknown) => unknown) => Promise.resolve({ data: METRICS, error: null }).then(ok),
+      };
+      for (const m of ["select", "order", "limit"]) chain[m] = () => chain;
+      return chain;
+    },
+  }),
 }));
 vi.mock("@/lib/otp/sms4free", () => ({ fetchAvailableSms: vi.fn(async () => 120) }));
 
@@ -45,6 +59,12 @@ describe("/admin/stats", () => {
     const { default: Page } = await import("./page");
     const html = renderToStaticMarkup(await Page());
     expect(html).toContain("يحتاج انتباهك");
+    // Measured usage against the free-plan limits.
+    expect(html).toContain("الاستخدام الفعلي");
+    expect(html).toContain("13.0 MB");
+    expect(html).toContain("3٪ من 500.0 MB");
+    expect(html).toContain("من حد يومي 200");
+    expect(html).toContain("2026-10-20");
     expect(html).toContain("120"); // low SMS credit is flagged
     expect(html).toContain("فلسطيني فقط");
     expect(html).toContain("9 · 23%"); // 9 of 40 PS-only
