@@ -42,11 +42,28 @@ jobs:
       - uses: supabase/setup-cli@v3
         with:
           version: 2.121.0
-      # Supabase spends most of its minute pulling images, so it starts first
+      # The Docker images (Supabase's and Redis's) come from our own Actions
+      # cache, not the registries: a registry's pull limit once failed a run
+      # before any test started. The key changes daily, so images are
+      # refreshed once a day; a miss falls back to the newest earlier copy
+      # and only what it lacks is downloaded. Only main saves it (a PR reads
+      # main's), so branches do not fill the repository's cache quota.
+      - name: Today's image cache key
+        id: images
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - name: Restore Docker images
+        id: images-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/images.tar
+          key: docker-images-supabase-2.121.0-${{ steps.images.outputs.day }}
+          restore-keys: docker-images-supabase-2.121.0-
+      # Supabase spends most of its minute getting images, so it starts first
       # and in the background while npm, the browsers and the build run.
       - name: Start Supabase in the background (every migration from zero)
         run: |
-          (supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor \
+          (if [ -f "$RUNNER_TEMP/images.tar" ]; then docker load -q -i "$RUNNER_TEMP/images.tar"; fi \
+            && supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor \
             && supabase seed buckets; echo $? > "$RUNNER_TEMP/supabase.exit") > "$RUNNER_TEMP/supabase.log" 2>&1 &
       - uses: actions/setup-node@v7
         with:
@@ -77,6 +94,14 @@ jobs:
             if [ "$code" != "0" ]; then echo "$job failed ($code):"; cat "$RUNNER_TEMP/$job.log"; exit 1; fi
             tail -3 "$RUNNER_TEMP/$job.log"
           done
+      - name: Save today's Docker images
+        if: github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
+        run: docker save -o "$RUNNER_TEMP/images.tar" $(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>')
+      - uses: actions/cache/save@v6
+        if: github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/images.tar
+          key: docker-images-supabase-2.121.0-${{ steps.images.outputs.day }}
       - run: npx playwright test
         env:
           E2E_PREBUILT: "1"
