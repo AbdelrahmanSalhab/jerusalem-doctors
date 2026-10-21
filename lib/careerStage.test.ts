@@ -112,6 +112,10 @@ describe("workplaceForStage", () => {
     const w = { workplace_type: "hmo" as const, ...BLANK };
     expect(workplaceForStage(w, "resident")).toBe(w);
   });
+  it("keeps a صندوق مرضى workplace when a resident becomes a specialist", () => {
+    const w = { workplace_type: "hmo" as const, ...BLANK };
+    expect(workplaceForStage(w, "specialist")).toBe(w);
+  });
 });
 
 describe("STAGE_OPTIONS", () => {
@@ -129,12 +133,11 @@ describe("STAGE_OPTIONS", () => {
     expect(STAGE_BY_KEY.specialist.defaultWorkplaceType).toBe("hospital");
   });
 
-  it("keeps عيادة away from residents and صندوق مرضى to residents", () => {
+  it("keeps عيادة away from residents, and offers صندوق مرضى to every stage", () => {
     expect(STAGE_BY_KEY.resident.workplaceTypes).not.toContain("clinic");
-    for (const stage of ["general", "specialist"] as const) {
-      expect(STAGE_BY_KEY[stage].workplaceTypes).not.toContain("hmo");
-    }
+    for (const o of STAGE_OPTIONS) expect(o.workplaceTypes).toContain("hmo");
   });
+
 
   it("asks for a residency year only from residents", () => {
     expect(
