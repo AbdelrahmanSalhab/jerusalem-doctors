@@ -7,7 +7,7 @@
 // the hour is only a backstop for an edit made outside the app (SQL editor).
 
 import { revalidateTag, unstable_cache } from "next/cache";
-import { fetchDirectoryCounts, fetchFeatured } from "@/lib/directory";
+import { fetchDirectoryCounts, fetchFeatured, fetchRecent } from "@/lib/directory";
 import { fetchInstitutions } from "@/lib/institutions";
 import { fetchActiveSpecialties } from "@/lib/specialties/catalogue";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -54,12 +54,16 @@ export function specialtiesChanged(): void {
   clear("specialties");
 }
 
-/** What every doctor's dashboard shows the same: the featured doctors and
- *  the counts. */
+/** What every doctor's dashboard shows the same: the featured doctors, the
+ *  counts, and who joined this week (ranked per viewer on the page). */
 async function directoryOverview() {
   const service = createSupabaseServiceClient();
-  const [featured, counts] = await Promise.all([fetchFeatured(service), fetchDirectoryCounts(service)]);
-  return { featured, counts };
+  const [featured, counts, recent] = await Promise.all([
+    fetchFeatured(service),
+    fetchDirectoryCounts(service),
+    fetchRecent(service),
+  ]);
+  return { featured, counts, recent };
 }
 /** 0 turns this cache off: the e2e run sets it, because its tests change
  *  doctors straight in the database, where nothing clears the tag. */

@@ -36,8 +36,11 @@ export function DashboardSearch({
   featured,
   listed,
   domainCounts,
+  recent,
 }: {
   specialties: Specialty[];
+  /** «جديد هذا الأسبوع», already ranked for this viewer. */
+  recent: SearchHit[];
   featured: FeaturedDoctors;
   /** Doctors in the directory, for the line under the search box. */
   listed: number | null;
@@ -186,6 +189,7 @@ export function DashboardSearch({
       <ResultsRegion
         state={!q.trim() && !specialtyId ? { status: "idle" } : state}
         featured={featured}
+        recent={recent}
         view={view}
         setView={setViewPersisted}
       />
@@ -196,16 +200,18 @@ export function DashboardSearch({
 function ResultsRegion({
   state,
   featured,
+  recent,
   view,
   setView,
 }: {
   state: SearchState;
   featured: FeaturedDoctors;
+  recent: SearchHit[];
   view: ViewMode;
   setView: (v: ViewMode) => void;
 }) {
   if (state.status === "idle") {
-    const hasFeatured = featured.doctor || featured.graduates.length > 0;
+    const hasFeatured = featured.doctor || featured.graduates.length > 0 || recent.length > 0;
     return (
       <div className="space-y-8">
         {!hasFeatured && (
@@ -216,6 +222,17 @@ function ResultsRegion({
         {featured.doctor && (
           <FeaturedSection title="طبيب نفتخر به">
             <DoctorCard doctor={featured.doctor} />
+          </FeaturedSection>
+        )}
+        {recent.length > 0 && (
+          <FeaturedSection title="جديد هذا الأسبوع">
+            <ul className="overflow-hidden rounded-lg border border-foreground/15 bg-background">
+              {recent.map((d) => (
+                <li key={d.id}>
+                  <DoctorRow doctor={d} />
+                </li>
+              ))}
+            </ul>
           </FeaturedSection>
         )}
         {featured.graduates.length > 0 && (

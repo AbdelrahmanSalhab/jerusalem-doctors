@@ -2,6 +2,7 @@ import Link from "next/link";
 import { DashboardSearch } from "./DashboardSearch";
 import { ViewerProvider } from "@/components/ViewerContext";
 import { cachedDirectoryOverview, cachedSpecialties } from "@/lib/cachedReads";
+import { rankRecent } from "@/lib/directory";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
   const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview()]);
   const me = await requireDoctor();
   const [
-    [specialties, { featured, counts }],
+    [specialties, { featured, counts, recent }],
     { data: myWorkplaces },
     { data: mySpecialties },
   ] =
@@ -25,7 +26,7 @@ export default async function DashboardPage() {
       reads,
       service
         .from("doctor_workplaces")
-        .select("name, workplace_type, address, phone, is_primary, sort_order")
+        .select("name, workplace_type, address, phone, is_primary, sort_order, institution_id")
         .eq("doctor_id", me.id),
       service.from("doctor_specialties").select("specialty_id").eq("doctor_id", me.id),
     ]);
@@ -43,6 +44,22 @@ export default async function DashboardPage() {
         : (mySpecialties ?? []).map((r) => specialtyName(r.specialty_id)).filter(Boolean).join(" و") || null,
     workplace: primary?.name ?? null,
   };
+  // «جديد هذا الأسبوع»: colleagues in my specialty area or at my hospital
+  // or fund first.
+  const domainOfId = (id: string) => {
+    const s = specialties.find((x) => x.id === id);
+    return s ? (s.parent_id ?? s.id) : undefined;
+  };
+  const domainByName = new Map(specialties.map((s) => [s.name_ar, s.parent_id ?? s.id]));
+  const newThisWeek = rankRecent(
+    recent,
+    {
+      id: me.id,
+      domains: new Set((mySpecialties ?? []).map((r) => domainOfId(r.specialty_id)).filter((x): x is string => !!x)),
+      institutions: new Set((myWorkplaces ?? []).map((w) => w.institution_id).filter((x): x is string => !!x)),
+    },
+    (name) => domainByName.get(name),
+  );
   // Staff accounts (admin, hidden from the directory) have no card to improve.
   const gaps = me.is_admin && !me.is_visible ? [] : profileGaps(me, myWorkplaces ?? []);
 
@@ -96,6 +113,7 @@ export default async function DashboardPage() {
           featured={featured}
           listed={counts.listed}
           domainCounts={counts.byDomain}
+          recent={newThisWeek}
         />
       </ViewerProvider>
     </main>

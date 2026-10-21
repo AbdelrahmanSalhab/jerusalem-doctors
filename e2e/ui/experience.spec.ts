@@ -38,10 +38,12 @@ test.describe("as a doctor", () => {
 
     test("show only while the graduate is still looking for work", async ({ page }) => {
       await page.goto("/dashboard");
-      await expect(page.getByText("خريج مميز").first()).toBeVisible();
+      // The featured section only: as a new doctor he is also in «جديد هذا الأسبوع».
+      const featured = page.getByRole("region", { name: "أطباء مميزون يبحثون عن عمل" });
+      await expect(featured.getByText("خريج مميز").first()).toBeVisible();
       await serviceClient().from("doctors").update({ seeking_work: false }).eq("id", grad.id);
       await page.reload();
-      await expect(page.getByText("خريج مميز")).toHaveCount(0);
+      await expect(featured.getByText("خريج مميز")).toHaveCount(0);
     });
   });
 });
