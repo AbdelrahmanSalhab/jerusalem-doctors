@@ -29,6 +29,7 @@ const TITLE: Record<string, string> = {
   institutions_relinked: "فحص يومي للمستشفيات",
   moh_sync_completed: "مزامنة سجل وزارة الصحة",
   moh_sync_failed: "فشل مزامنة سجل وزارة الصحة",
+  license_missing_from_registry: "الترخيص لم يعد في سجل الوزارة",
 };
 
 /** Every action the log knows a name for, in the order above. */
@@ -160,6 +161,7 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       return [
         `تراخيص محدَّثة: ${m.rows_upserted ?? 0}`,
         // Our doctors' licences the registry no longer lists.
+        m.scope === "full" ? "السجل كاملًا" : "",
         typeof m.missing === "number" && m.missing > 0 ? `غير موجودة في السجل: ${m.missing}` : "",
         typeof m.duration_ms === "number" ? `${Math.round(m.duration_ms / 1000)} ثانية` : "",
       ]
@@ -224,6 +226,8 @@ const FIELD_LABEL: Record<string, string> = {
   unmatched: "أسماء غير مربوطة",
   rows_upserted: "تراخيص محدَّثة",
   missing: "تراخيص لم تعد في السجل",
+  flagged: "أُحيلت للمراجعة",
+  scope: "النطاق",
   duration_ms: "المدة",
   error: "الخطأ",
   id: "المؤسسة",
@@ -271,6 +275,7 @@ export function auditFields(row: AuditRow, institutionName: (id: string) => stri
         return { label, value: isLicenseStatus(v) ? licenseStatusSentence(v) : String(v) };
       }
       if (k === "career_stage") return { label, value: STAGE[String(v)] ?? String(v) };
+      if (k === "scope") return { label, value: v === "full" ? "السجل كاملًا" : "تراخيص أطبائنا فقط" };
       if (k === "featured") return { label, value: FEATURED_LABEL[v as FeaturedKind] ?? String(v) };
       if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };
       if (k === "auth_sync") return { label, value: AUTH_SYNC[String(v)] ?? String(v) };

@@ -35,3 +35,15 @@ describe("findByLicenses", () => {
     }
   });
 });
+
+describe("findAll", () => {
+  it("pages through the registry until a short page", async () => {
+    const pages = [[{}, {}], [{}, {}], [{}]];
+    const fetchImpl = vi.fn(async () => ok(pages.shift() ?? []));
+    const rows = await new MohClient({ fetchImpl }).findAll(2, 0);
+    expect(rows).toHaveLength(5);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    const offsets = fetchImpl.mock.calls.map((c) => new URL((c as unknown as [string])[0]).searchParams.get("offset"));
+    expect(offsets).toEqual(["0", "2", "4"]);
+  });
+});

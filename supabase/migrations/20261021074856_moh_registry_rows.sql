@@ -10,9 +10,8 @@
 -- column any more; it goes in a later migration, once no deployed code
 -- selects it.
 --
--- The table also stops being a copy of the whole registry: it now holds only
--- the licences the app has looked up (signups, admin checks) and the nightly
--- sync keeps only our own doctors' (app/api/cron/sync-moh).
+-- The sync now copies the whole registry weekly and only our doctors'
+-- licences on other nights (app/api/cron/sync-moh).
 -- Apply in the Supabase SQL editor. Safe to run more than once.
 
 alter table public.moh_practitioners

@@ -116,12 +116,23 @@ curl -i -X POST https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp \
 
 ### MoH license sync stops working
 
-How the registry is used: `moh_practitioners` holds only licences we have
-looked up, not a copy of the registry. A signup asks data.gov.il for its own
-licence (one request, kept afterwards), and the nightly cron (04:00 UTC, after
-the ministry republishes at about 03:12) asks for our doctors' licences only,
-300 per request, then drops every other row. A 403 or 429 is never retried:
-the next night tries again.
+How the registry is used: `moh_practitioners` is our copy of it, one row per
+licence with every specialty certificate. The cron runs nightly at 04:00 UTC
+(the ministry republishes at about 03:12):
+- once a week it reads the whole registry, about 65 requests a second apart,
+  and drops licences the registry no longer lists
+- other nights it asks only for our doctors' licences, 300 per request
+
+A signup checks the copy first; a licence issued since the last sweep gets
+one live request and is kept. A 403 or 429 is never retried: the next night
+tries again. A sweep that would shrink the copy by over 10%, or that misses
+more than half our doctors' licences, is refused and logged as a failure.
+
+When one of our doctors' licences is no longer in the registry, its status
+becomes `not_found` (so the doctor shows under "ترخيص يحتاج مراجعة"), an
+audit entry `license_missing_from_registry` is written, and Sentry gets a
+warning. Nothing is hidden automatically: re-check the licence from the
+doctor's panel and decide.
 
 **Symptoms:** New signups land with `license_verification_status = 'not_found'` more often than usual.
 

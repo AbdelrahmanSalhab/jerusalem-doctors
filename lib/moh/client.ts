@@ -1,11 +1,13 @@
 // Israel MoH practitioners registry, CKAN client (plan §13).
 //
-// One endpoint: GET {base}/action/datastore_search with a list of licences in
-// `filters`. CKAN returns { success, result }.
+// One endpoint: GET {base}/action/datastore_search, with a list of licences
+// in `filters`, or paged through the whole registry. CKAN returns
+// { success, result }.
 //
 // The registry is the source we cannot do without, so it is asked as little
-// as possible: only for licences someone is signing up with or an admin is
-// checking, and once a night for our own doctors (app/api/cron/sync-moh).
+// as possible: our own doctors' licences nightly, the whole registry weekly
+// (paced), and a licence nobody has seen yet when someone signs up with it
+// (app/api/cron/sync-moh, lib/moh/match.ts).
 
 const DEFAULT_BASE = "https://data.gov.il/api/3";
 const DEFAULT_RESOURCE_ID = "9c64c522-bbc2-48fe-96fb-3b2a8626f59e";
@@ -82,6 +84,25 @@ export class MohClient {
       out.push(...json.result.records);
     }
     return out;
+  }
+
+  /**
+   * The whole registry, a page at a time with a pause between pages: about
+   * 65 requests, made once a week.
+   */
+  async findAll(pageSize = 1000, pauseMs = 1000): Promise<MohRecord[]> {
+    const out: MohRecord[] = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const params = new URLSearchParams({ resource_id: this.resourceId, limit: String(pageSize), offset: String(offset) });
+      const json = await this.requestJSON<{
+        success: boolean;
+        result: { records: MohRecord[] };
+      }>(`${this.base}/action/datastore_search?${params}`);
+      if (!json.success) throw new Error("CKAN response success=false");
+      out.push(...json.result.records);
+      if (json.result.records.length < pageSize) return out;
+      await sleep(pauseMs);
+    }
   }
 
   private async requestJSON<T>(url: string): Promise<T> {

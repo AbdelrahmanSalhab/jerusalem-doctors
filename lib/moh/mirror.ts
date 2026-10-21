@@ -1,5 +1,5 @@
-// Reads of `moh_practitioners`, the registry rows we have looked up (our
-// doctors' licences and recent signups'), for showing an admin what
+// Reads of `moh_practitioners`, our copy of the registry, for showing an
+// admin what
 // the registry actually says about a licence.
 //
 // Separate from match.ts on purpose: the matcher answers "does this name fit

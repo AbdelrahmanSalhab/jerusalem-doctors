@@ -1,9 +1,10 @@
 // License-verification matcher (plan §13).
 //
 // Inputs:  user-typed license number + Hebrew first/family name.
-// Source:  `moh_practitioners`, the licences already looked up, then one live
-//          CKAN request for a licence we have not seen, whose answer is kept
-//          there so the next check of the same licence costs nothing.
+// Source:  `moh_practitioners`, our copy of the registry (refreshed weekly in
+//          full, nightly for our doctors), then one live CKAN request for a
+//          licence issued since, whose answer is kept there so the next check
+//          of the same licence costs nothing.
 // Output:  one of four discrete statuses, with the registry's own spelling
 //          included on mismatches so the UI can prompt "did you mean…?".
 
