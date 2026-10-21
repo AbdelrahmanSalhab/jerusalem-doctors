@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardChips, toSearchHits } from "@/lib/directory";
+import { cardChips, rankRecent, type SearchHit, toSearchHits } from "@/lib/directory";
 
 const ROW = {
   id: "d1",
@@ -60,5 +60,28 @@ describe("cardChips", () => {
 
   it("ignores certificates for any other stage", () => {
     expect(cardChips({ ...gp, career_stage: "specialist" as const })).toEqual(["الطب العام"]);
+  });
+});
+
+describe("rankRecent", () => {
+  const hit = (id: string, specialties: string[], institutions: string[] = []) =>
+    ({ id, specialties, workplaces: institutions.map((i) => ({ institution_id: i })) }) as unknown as SearchHit;
+  const domainOf = (name: string) => ({ القلب: "internal", الباطنية: "internal", الأطفال: "peds" })[name];
+  const me = { id: "me", domains: new Set(["internal"]), institutions: new Set(["makassed"]) };
+
+  it("puts my specialty area first, then my hospital, newest first within each, and leaves me out", () => {
+    const recent = [
+      hit("newest-other", ["الأطفال"]),
+      hit("me", ["القلب"]),
+      hit("same-hospital", ["الأطفال"], ["makassed"]),
+      hit("same-domain", ["القلب"]),
+      hit("both", ["الباطنية"], ["makassed"]),
+    ];
+    expect(rankRecent(recent, me, domainOf).map((d) => d.id)).toEqual(["both", "same-domain", "same-hospital", "newest-other"]);
+  });
+
+  it("shows at most six", () => {
+    const many = Array.from({ length: 10 }, (_, i) => hit(`d${i}`, ["الأطفال"]));
+    expect(rankRecent(many, me, domainOf)).toHaveLength(6);
   });
 });

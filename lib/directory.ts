@@ -16,6 +16,8 @@ export interface SearchWorkplace {
   hours: string | null;
   phone: string | null;
   is_primary: boolean;
+  /** The hospital or fund it is linked to; absent from search results. */
+  institution_id?: string | null;
 }
 
 export interface SearchHit {
@@ -87,7 +89,7 @@ export function directoryQuery(service: SupabaseClient) {
       doctor_specialties(
         specialty:specialties(id, name_ar)
       ),
-      doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order)
+      doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order, institution_id)
     `,
     )
     .eq("is_active", true)
@@ -148,6 +150,7 @@ function toSearchHit(d: DirectoryRow): SearchHit {
       hours: w.hours,
       phone: w.phone,
       is_primary: w.is_primary,
+      ...(w.institution_id !== undefined && { institution_id: w.institution_id }),
     }));
 
   return {
@@ -218,6 +221,42 @@ export async function fetchDirectoryCounts(service: SupabaseClient): Promise<Dir
   const d = data as { listed: number; by_domain: Record<string, number>; by_institution?: Record<string, number> };
   // by_institution is absent until migration 20261021124944 is applied.
   return { listed: d.listed, byDomain: d.by_domain, byInstitution: d.by_institution ?? {} };
+}
+
+/** «جديد هذا الأسبوع» shows at most this many. */
+export const RECENT_MAX = 6;
+/** Read before ranking for the viewer, so a closer match further back can
+ *  still make the cut. */
+const RECENT_POOL = 24;
+
+/** Listed doctors who joined in the last 7 days, newest first. Empty on a
+ *  failed read: the section just does not show. */
+export async function fetchRecent(service: SupabaseClient): Promise<SearchHit[]> {
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const { data, error } = await directoryQuery(service)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(RECENT_POOL);
+  if (error) console.error("[directory] recent read failed", error);
+  return toSearchHits(data);
+}
+
+/** The viewer's own colleagues first: sharing a specialty area counts most,
+ *  then a hospital or fund; ties stay newest first. The viewer is left out. */
+export function rankRecent(
+  recent: SearchHit[],
+  me: { id: string; domains: ReadonlySet<string>; institutions: ReadonlySet<string> },
+  domainOf: (specialtyName: string) => string | undefined,
+): SearchHit[] {
+  const score = (d: SearchHit) =>
+    (d.specialties.some((s) => me.domains.has(domainOf(s) ?? "")) ? 2 : 0) +
+    (d.workplaces.some((w) => w.institution_id && me.institutions.has(w.institution_id)) ? 1 : 0);
+  return recent
+    .filter((d) => d.id !== me.id)
+    .map((d, i) => ({ d, i, s: score(d) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .slice(0, RECENT_MAX)
+    .map((x) => x.d);
 }
 
 /** A failed read hides the sections rather than failing the dashboard. */

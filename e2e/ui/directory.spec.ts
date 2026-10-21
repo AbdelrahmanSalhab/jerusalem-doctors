@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { stateFile } from "../helpers";
-import { LISTED, NEVER_LISTED, serviceClient } from "../seed";
+import { createDoctor, LISTED, NEVER_LISTED, serviceClient } from "../seed";
 
 test.use({ storageState: stateFile("doctor") });
 
@@ -51,6 +51,27 @@ test("the specialty filter narrows the list @phone", async ({ page }) => {
   await expect(page.getByText("مريم عودة").first()).toBeVisible();
   await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
   await expect(page.getByText("يوسف حداد")).toHaveCount(0);
+});
+
+test.describe("new this week", () => {
+  const made: Awaited<ReturnType<typeof createDoctor>>[] = [];
+  test.beforeAll(async () => {
+    // سامر (the signed-in doctor) is a cardiologist: القلب sits under الباطنية.
+    made.push(await createDoctor({ first: "جديد", family: "أطفال", specialties: ["الأطفال"] }));
+    made.push(await createDoctor({ first: "جديد", family: "باطنية", specialties: ["الباطنية"] }));
+  });
+  test.afterAll(async () => {
+    for (const d of made) await d.remove();
+  });
+
+  test("lists colleagues who joined this week, my specialty area first, never me @phone", async ({ page }) => {
+    await page.goto("/dashboard");
+    const section = page.getByRole("region", { name: "جديد هذا الأسبوع" });
+    await expect(section).toBeVisible();
+    await expect(section.getByRole("listitem").first()).toContainText("جديد باطنية");
+    await expect(section.getByText("جديد أطفال").first()).toBeVisible();
+    await expect(section.getByText("سامر ناصر")).toHaveCount(0);
+  });
 });
 
 test("the filter panel narrows by career stage and looking for work, with no text @phone", async ({ page }) => {
