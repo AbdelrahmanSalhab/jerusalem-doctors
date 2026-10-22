@@ -27,8 +27,11 @@ test.describe("licence correction", () => {
     await expect
       .poll(async () => (await serviceClient().from("doctors").select("license_number, license_verification_status").eq("id", doctor.id).single()).data)
       .toEqual({ license_number: "510030", license_verification_status: "verified" });
-    const { data: audit } = await serviceClient().from("audit_logs").select("action").eq("target_doctor_id", doctor.id);
-    expect(audit!.map((a) => a.action)).toContain("admin_license_corrected");
+    // The route writes the activity log after saving the licence, so the
+    // entry can land a moment after the row above.
+    await expect
+      .poll(async () => (await serviceClient().from("audit_logs").select("action").eq("target_doctor_id", doctor.id)).data?.map((a) => a.action))
+      .toContain("admin_license_corrected");
   });
 });
 
