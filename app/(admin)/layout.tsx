@@ -13,7 +13,7 @@ export default async function AdminLayout({
   // requireAdmin() returns 404 for non-admins, so the panel's existence is
   // not leaked to regular users.
   await requireAdmin();
-  const [alerts, requests] = await Promise.all([recentAlerts(), openRequests()]);
+  const [alerts, requests, reports] = await Promise.all([recentAlerts(), openRequests(), openReports()]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -30,6 +30,12 @@ export default async function AdminLayout({
               label: "طلبات الأرقام",
               badge: requests,
               badgeLabel: `${requests} بانتظار الرد`,
+            },
+            {
+              href: "/admin/reports",
+              label: "البلاغات",
+              badge: reports,
+              badgeLabel: `${reports} بلاغ مفتوح`,
             },
             { href: "/admin/audit", label: "سجل النشاط" },
             {
@@ -64,6 +70,15 @@ async function recentAlerts(): Promise<number> {
 async function openRequests(): Promise<number> {
   const { count, error } = await createSupabaseServiceClient()
     .from("number_requests")
+    .select("id", { count: "exact", head: true })
+    .is("resolved_at", null);
+  return error ? 0 : (count ?? 0);
+}
+
+/** Profile reports no admin has closed yet (app/(admin)/admin/reports). */
+async function openReports(): Promise<number> {
+  const { count, error } = await createSupabaseServiceClient()
+    .from("profile_reports")
     .select("id", { count: "exact", head: true })
     .is("resolved_at", null);
   return error ? 0 : (count ?? 0);

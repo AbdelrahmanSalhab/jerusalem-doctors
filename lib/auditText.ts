@@ -36,6 +36,8 @@ const TITLE: Record<string, string> = {
   signup_verified: "تسجيل جديد",
   delete_requested: "طلب حذف حساب",
   number_request_resolved: "إرسال رقم طبيب مطلوب",
+  profile_reported: "بلاغ عن ملف",
+  profile_report_resolved: "إغلاق بلاغ",
   admin_doctor_updated: "تعديل من الإدارة",
   admin_doctor_profile_edited: "تعديل الملف من الإدارة",
   admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
@@ -151,6 +153,10 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       return "أُخفي من البحث، بانتظار إتمام الحذف";
     case "number_request_resolved":
       return quote(m.query);
+    case "profile_reported":
+      return m.source === "card" ? "من بطاقة طبيب" : "من نموذج الإبلاغ";
+    case "profile_report_resolved":
+      return quote(m.note);
     case "admin_doctor_updated":
       return doctorChanges(m).join(" · ");
     case "admin_doctor_profile_edited":
@@ -260,6 +266,8 @@ const FIELD_LABEL: Record<string, string> = {
   names: "الأسماء",
   key: "النوع",
   flagged: "أُحيلت للمراجعة",
+  report_id: "رقم البلاغ",
+  note: "الملاحظة",
   doctor_ids: "أرقام حسابات الأطباء",
   licenses: "أرقام التراخيص",
   scope: "النطاق",
@@ -318,6 +326,9 @@ function metadataFields(row: AuditRow, institutionName: (id: string) => string |
       if (k === "career_stage") return { label, value: STAGE[String(v)] ?? String(v) };
       if (k === "alert") return { label, value: isAlertCode(v) ? ALERTS[v].ar : String(v) };
       if (k === "level") return { label, value: LEVEL[String(v)] ?? String(v) };
+      if (k === "source" && (v === "card" || v === "public")) {
+        return { label: "المصدر", value: v === "card" ? "بطاقة طبيب" : "نموذج الإبلاغ" };
+      }
       if (k === "scope") return { label, value: v === "full" ? "السجل كاملًا" : "تراخيص أطبائنا فقط" };
       if (k === "featured") return { label, value: FEATURED_LABEL[v as FeaturedKind] ?? String(v) };
       if (k === "kind") return { label, value: KIND[String(v)] ?? String(v) };
