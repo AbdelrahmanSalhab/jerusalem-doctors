@@ -29,7 +29,6 @@ export const RATE_LIMITS = {
   signupResend: { limit: 3, window: "10 m" },
   signupResendIp: { limit: 20, window: "10 m" },
   signupCheckLicense: { limit: 100, window: "1 h" },
-  signupCheckUnique: { limit: 200, window: "1 h" },
   loginStart: { limit: 5, window: "1 h" },
   loginStartIp: { limit: 30, window: "1 h" },
   loginVerify: { limit: 5, window: "10 m" },

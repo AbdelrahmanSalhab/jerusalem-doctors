@@ -251,10 +251,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (phoneOwner.error && phoneOwner.error.code !== "PGRST116") throw phoneOwner.error;
   const ownerId: string | null = phoneOwner.data?.id ?? null;
 
-  // Defensive uniqueness re-check against race with check-unique. License
-  // numbers are only unique within their own issuing region, and a license
-  // number can't be reused across doctors regardless of which slot
-  // (primary/secondary) it's registered in. Licenses are public in the MoH
+  // Licence uniqueness. License numbers are only unique within their own
+  // issuing region, and a license number can't be reused across doctors
+  // regardless of which slot (primary/secondary) it's registered in. Licenses are public in the MoH
   // registry, so naming this duplicate gives nothing away.
   const licensePairs = [{ region, license }];
   if (hasSecondary) licensePairs.push({ region: secondaryRegion!, license: secondaryLicense! });

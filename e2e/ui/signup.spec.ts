@@ -82,3 +82,13 @@ test("a licence the registry does not have waits for an admin", async ({ page })
   const { data } = await serviceClient().from("doctors").select("is_admin_approved").eq("phone_e164", PHONES.unknown).single();
   expect(data!.is_admin_approved).toBe(false);
 });
+
+// Runs after the test above, which registered PHONES.unknown.
+test("signing up again with a registered number signs its owner in and says so", async ({ page }) => {
+  await signUp(page, { phone: PHONES.unknown, license: "599998", arabic: ["مكرر", "الرقم"], hebrew: ["מכרר", "אלרקם"] });
+  await expect(page).toHaveURL(/\/dashboard\?existing=1/);
+  await expect(page.getByText("هذا الرقم مسجَّل مسبقًا.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "مرحبًا د. مجهول" })).toBeVisible();
+  const { count } = await serviceClient().from("doctors").select("id", { count: "exact", head: true }).eq("phone_e164", PHONES.unknown);
+  expect(count).toBe(1);
+});

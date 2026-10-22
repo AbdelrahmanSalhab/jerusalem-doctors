@@ -119,10 +119,9 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     setSubmitting(true);
 
     try {
-      // Uniqueness is re-checked server-side in /signup/start, so we don't
-      // need a separate /check-unique call here. Cuts one Turnstile-gated
-      // round-trip and avoids the single-use token problem (each verified
-      // token is consumed by Cloudflare; multiple calls per submit fail).
+      // Uniqueness is checked server-side in /signup/start, not in a call
+      // of its own: each Turnstile token is single-use, so a second
+      // Turnstile-gated call per submit would fail.
 
       // The MoH cross-check only covers the Israeli registry, PS-track
       // signups have nothing to check against, so they skip straight to
