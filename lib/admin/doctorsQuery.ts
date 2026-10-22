@@ -12,6 +12,7 @@ export const DOCTOR_FILTERS = [
   { key: "pending", label: "بانتظار القبول" },
   { key: "license", label: "ترخيص يحتاج مراجعة" },
   { key: "stage", label: "مقيم والسجل يقول أخصائي" },
+  { key: "clinic", label: "عيادة بلا عنوان أو هاتف" },
   { key: "hidden", label: "مخفي من الدليل" },
   { key: "suspended", label: "حساب مغلق / طلب حذف" },
   { key: "approved", label: "مقبولون" },

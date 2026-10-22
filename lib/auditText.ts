@@ -14,11 +14,20 @@ export interface AuditRow {
 
 const LEVEL: Record<string, string> = { info: "للعلم", warning: "تحذير", error: "عاجل" };
 
-/** "عاجل · بلغت الرسائل الحد اليومي …", with the one number that matters. */
+/** Names shown in an alert's one-line summary before "و N غيرها". */
+const ALERT_NAMES_SHOWN = 3;
+
+/** "عاجل · بلغت الرسائل الحد اليومي …", with who or what it is about, or
+ *  else the one number that matters. */
 function alertDetail(m: Record<string, unknown>): string {
   const what = isAlertCode(m.alert) ? ALERTS[m.alert].ar : String(m.alert ?? "");
-  const n = [m.balance, m.count, m.flagged].find((x) => typeof x === "number");
-  return [LEVEL[String(m.level)], what, n === undefined ? "" : String(n)].filter(Boolean).join(" · ");
+  const names = Array.isArray(m.names) ? (m.names as string[]) : [];
+  const more = names.length - ALERT_NAMES_SHOWN;
+  const about =
+    names.length > 0
+      ? names.slice(0, ALERT_NAMES_SHOWN).join("، ") + (more > 0 ? ` و${more} غيرها` : "")
+      : [m.balance, m.count, m.flagged].find((x) => typeof x === "number");
+  return [LEVEL[String(m.level)], what, about === undefined ? "" : String(about)].filter(Boolean).join(" · ");
 }
 
 const STAGE: Record<string, string> = { resident: "طبيب مقيم", specialist: "طبيب أخصائي" };
@@ -248,6 +257,8 @@ const FIELD_LABEL: Record<string, string> = {
   names: "الأسماء",
   key: "النوع",
   flagged: "أُحيلت للمراجعة",
+  doctor_ids: "أرقام حسابات الأطباء",
+  licenses: "أرقام التراخيص",
   scope: "النطاق",
   duration_ms: "المدة",
   error: "الخطأ",
@@ -279,6 +290,12 @@ export interface AuditField {
 
 /** Everything an entry stored, labelled in Arabic, for the expanded view. */
 export function auditFields(row: AuditRow, institutionName: (id: string) => string | undefined): AuditField[] {
+  const code = row.metadata?.alert;
+  const todo = row.action === "alert" && isAlertCode(code) ? [{ label: "ما العمل", value: ALERTS[code].todo }] : [];
+  return [...metadataFields(row, institutionName), ...todo];
+}
+
+function metadataFields(row: AuditRow, institutionName: (id: string) => string | undefined): AuditField[] {
   return Object.entries(row.metadata ?? {})
     .filter(([k]) => !HIDDEN_FIELDS.has(k))
     .map(([k, v]): AuditField => {

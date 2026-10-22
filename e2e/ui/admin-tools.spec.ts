@@ -76,6 +76,35 @@ test.describe("residents the registry lists as specialists", () => {
   });
 });
 
+test.describe("clinics without an address or phone", () => {
+  const made: Awaited<ReturnType<typeof createDoctor>>[] = [];
+  test.beforeAll(async () => {
+    made.push(
+      await createDoctor({
+        first: "عيادة-ناقصة",
+        family: "فحص",
+        workplaces: [{ name: "عيادة بلا هاتف", type: "clinic", address: "شارع صلاح الدين 5" }],
+      }),
+      await createDoctor({
+        first: "عيادة-كاملة",
+        family: "فحص",
+        workplaces: [{ name: "عيادة كاملة", type: "clinic", address: "شارع صلاح الدين 6", phone: "02-6271235" }],
+      }),
+    );
+  });
+  test.afterAll(async () => {
+    for (const d of made) await d.remove();
+  });
+
+  test("the stats line leads to the doctors behind it", async ({ page }) => {
+    await page.goto("/admin/stats");
+    await page.getByRole("listitem").filter({ hasText: "بلا عنوان أو هاتف" }).getByRole("link", { name: "عرض" }).click();
+    await expect(page).toHaveURL(/status=clinic/);
+    await expect(page.getByText("عيادة-ناقصة فحص").first()).toBeVisible();
+    await expect(page.getByText("عيادة-كاملة فحص")).toHaveCount(0);
+  });
+});
+
 test.describe("alerts", () => {
   test.beforeAll(async () => {
     // Only this test's alerts: earlier tests raise real ones.

@@ -165,6 +165,13 @@ describe("/admin doctors list", () => {
     expect(nots).toContainEqual(["registry_specialty", "is", null]);
   });
 
+  it("finds doctors with a clinic missing its address or phone", async () => {
+    await render({ status: "clinic" });
+    expect(eqArgs()).toContainEqual(["clinic_missing_details", true]);
+    const ors = calls.filter((c) => c.table === "doctors" && c.method === "or").map((c) => String(c.args[0]));
+    expect(ors).toContain("is_admin.eq.false,is_visible.eq.true");
+  });
+
   it("asks for the right slice of rows on a later page", async () => {
     await render({ page: "3" });
     const ranges = calls.filter((c) => c.table === "doctors" && c.method === "range").map((c) => c.args);

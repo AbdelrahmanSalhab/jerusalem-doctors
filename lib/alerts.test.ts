@@ -23,6 +23,14 @@ describe("raiseAlert", () => {
     ]);
   });
 
+  it("keeps names out of Sentry but in the activity log", async () => {
+    await raiseAlert(service, "licenses_missing", { extra: { flagged: 1 }, logOnly: { names: ["إياس سلهب (200001)"] } });
+    expect(captureMessage).toHaveBeenCalledWith(ALERTS.licenses_missing.sentry, expect.objectContaining({ extra: { flagged: 1 } }));
+    expect(db.argsOf("audit_logs", "insert")).toEqual([
+      [{ action: "alert", metadata: { alert: "licenses_missing", level: "warning", flagged: 1, names: ["إياس سلهب (200001)"] } }],
+    ]);
+  });
+
   it("uses the alert's own level unless told otherwise", async () => {
     await raiseAlert(service, "doctor_waiting");
     expect(captureMessage).toHaveBeenCalledWith(ALERTS.doctor_waiting.sentry, expect.objectContaining({ level: "info" }));
@@ -39,6 +47,17 @@ describe("an alert in the activity log", () => {
         { label: "التنبيه", value: ALERTS.sms_cap_reached.ar },
         { label: "الأهمية", value: "عاجل" },
       ]),
+    );
+  });
+
+  it("says what to do about it", () => {
+    expect(auditFields(row, () => undefined)).toContainEqual({ label: "ما العمل", value: ALERTS.sms_cap_reached.todo });
+  });
+
+  it("names who it is about, then how many more", () => {
+    const names = ["أ (1)", "ب (2)", "ج (3)", "د (4)", "هـ (5)"];
+    expect(auditDetail({ action: "alert", metadata: { alert: "licenses_missing", level: "warning", flagged: 5, names } }, () => undefined)).toBe(
+      "تحذير · تراخيص أطباء لم تعد في سجل وزارة الصحة · أ (1)، ب (2)، ج (3) و2 غيرها",
     );
   });
 
