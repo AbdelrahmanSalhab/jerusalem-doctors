@@ -76,9 +76,12 @@ jobs:
           path: ~/.cache/ms-playwright
           # ImageOS (ubuntu24, ubuntu26, ...): browser builds are per OS release.
           key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ hashFiles('package-lock.json') }}
+      # --with-deps installs system packages with apt; a stalled Ubuntu
+      # mirror once hung the run silently until the job timed out. Ten
+      # minutes, then the wait below fails and prints this log.
       - name: Install browsers in the background
         run: |
-          (npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
+          (timeout 600 npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
       - name: Build the app against the test stack
         run: |
           # e2e/env.ts is the one list of the test stack's settings.
