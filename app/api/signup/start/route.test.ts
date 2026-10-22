@@ -300,21 +300,28 @@ describe("POST /api/signup/start: emergency switch", () => {
   });
 });
 
-describe("POST /api/signup/start: expired pending rows", () => {
+describe("POST /api/signup/start: old unfinished signups", () => {
   beforeEach(() => {
     purges.length = 0;
     purgeError = null;
   });
 
-  it("purges pending signups that have already expired", async () => {
+  it("purges unfinished signups older than 30 days, keeping newer ones for a reminder", async () => {
     const before = Date.now();
     const r = await start({ license_number: "23456" });
     expect(r.status).toBe(200);
     expect(purges).toHaveLength(1);
     const [col, cutoff] = purges[0];
-    expect(col).toBe("expires_at");
-    expect(Date.parse(cutoff)).toBeGreaterThanOrEqual(before - 1000);
-    expect(Date.parse(cutoff)).toBeLessThanOrEqual(Date.now());
+    expect(col).toBe("created_at");
+    const DAY = 86_400_000;
+    expect(Date.parse(cutoff)).toBeGreaterThanOrEqual(before - 30 * DAY - 1000);
+    expect(Date.parse(cutoff)).toBeLessThanOrEqual(Date.now() - 30 * DAY);
+  });
+
+  it("keeps the form as typed, for the reminder's link", async () => {
+    await start({ license_number: "23456", resume_form: { arabic_first_name: "سارة", phone: "0521234567" } });
+    const inserted = pendingInserts.at(-1) as { payload: { resume_form?: unknown } };
+    expect(inserted.payload.resume_form).toEqual({ arabic_first_name: "سارة", phone: "0521234567" });
   });
 
   it("still starts the signup when the purge fails", async () => {

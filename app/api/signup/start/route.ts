@@ -8,6 +8,7 @@
 
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
+import { purgeUnfinished, RESUME_FORM_MAX_BYTES } from "@/lib/signup/unfinished";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import {
@@ -75,6 +76,9 @@ const Body = z
     turnstile_token: z.string().optional(),
     // Soft-match override flow: client confirms registry name; we record it.
     override_name_mismatch: z.boolean().optional(),
+    // The form as typed, kept so a reminder can reopen it filled in
+    // (lib/signup/unfinished.ts). Never read for the account itself.
+    resume_form: z.record(z.string(), z.unknown()).optional(),
   })
   .refine(
     (b) => Boolean(b.secondary_license_region) === Boolean(b.secondary_license_number),
@@ -399,6 +403,10 @@ export const POST = withJsonErrors(async (req: Request) => {
         verified.status,
         parsed.override_name_mismatch,
       ),
+      // Dropped rather than refused when too big: it is only a convenience.
+      ...(parsed.resume_form && JSON.stringify(parsed.resume_form).length <= RESUME_FORM_MAX_BYTES
+        ? { resume_form: parsed.resume_form }
+        : {}),
       secondary_license_verification_status: secondaryVerified
         ? licenseStatusToColumn(secondaryVerified.status, false)
         : null,
@@ -418,16 +426,11 @@ async function startPendingSignup(
   const now = Date.now();
   const expiresAt = new Date(now + PENDING_TTL_MS).toISOString();
 
-  // Abandoned signups would otherwise keep their phone, names and license in
-  // pending_signups forever. Each new signup clears the expired ones; a
-  // failed purge is retried by the next signup, so it never blocks this one.
-  const purge = await service
-    .from("pending_signups")
-    .delete()
-    .lt("expires_at", new Date(now).toISOString());
-  if (purge.error) {
-    console.error("[signup/start] expired pending purge failed", purge.error);
-  }
+  // Unfinished signups are kept KEEP_DAYS for an admin's reminder, then go:
+  // here and in the daily cron. A failed purge never blocks this signup.
+  await purgeUnfinished(service, now).catch((err) => {
+    console.error("[signup/start] unfinished signups purge failed", err);
+  });
 
   const insert = await service
     .from("pending_signups")
