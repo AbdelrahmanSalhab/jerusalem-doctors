@@ -35,6 +35,7 @@ const STAGE: Record<string, string> = { resident: "طبيب مقيم", specialis
 const TITLE: Record<string, string> = {
   signup_verified: "تسجيل جديد",
   delete_requested: "طلب حذف حساب",
+  number_request_resolved: "إرسال رقم طبيب مطلوب",
   admin_doctor_updated: "تعديل من الإدارة",
   admin_doctor_profile_edited: "تعديل الملف من الإدارة",
   admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
@@ -148,6 +149,8 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
     }
     case "delete_requested":
       return "أُخفي من البحث، بانتظار إتمام الحذف";
+    case "number_request_resolved":
+      return quote(m.query);
     case "admin_doctor_updated":
       return doctorChanges(m).join(" · ");
     case "admin_doctor_profile_edited":

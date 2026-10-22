@@ -38,6 +38,8 @@ export const RATE_LIMITS = {
   loginResendIp: { limit: 20, window: "10 m" },
   search: { limit: 30, window: "1 m" },
   contactClick: { limit: 60, window: "1 m" },
+  // "Ask the admins for this doctor's number": each one is a person's work.
+  numberRequest: { limit: 10, window: "1 d" },
   profilePatch: { limit: 10, window: "1 h" },
   // An admin re-checking licences against the ministry registry. Generous,
   // but a loop in the panel must not hammer data.gov.il.
