@@ -33,6 +33,8 @@ const POLICY: Record<string, Policy> = {
   "DELETE /api/admin/doctors/[id]/photo": "admin",
   "PATCH /api/admin/doctors/[id]/profile": "admin",
   "DELETE /api/admin/doctors/[id]": "admin",
+  "POST /api/admin/pending-signups/[id]": "admin",
+  "DELETE /api/admin/pending-signups/[id]": "admin",
   "PATCH /api/admin/institutions/[id]": "admin",
   "PATCH /api/admin/number-requests/[id]": "admin",
   "DELETE /api/admin/institutions/[id]": "admin",

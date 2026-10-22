@@ -3,10 +3,26 @@ import { SignupForm } from "./SignupForm";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { cachedSpecialties } from "@/lib/cachedReads";
 import { SupportContact } from "@/components/SupportContact";
+import { readResumeForm } from "@/lib/signup/unfinished";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
-export default async function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // A reminder's link (/admin/signups) reopens the form as the doctor left it.
+  const resume = (await searchParams).resume;
+  const resumed =
+    typeof resume === "string"
+      ? await readResumeForm(createSupabaseServiceClient(), resume).catch((err: unknown) => {
+          console.error("[signup] resume read failed", err);
+          return null;
+        })
+      : undefined;
+
   const { data: specialties, error } = await cachedSpecialties().then(
     (data) => ({ data, error: null }),
     (error: unknown) => ({ data: null, error }),
@@ -44,7 +60,18 @@ export default async function SignupPage() {
         </section>
       )}
 
-      <SignupForm specialties={specialties} />
+      {resumed && (
+        <p role="status" className="mb-6 rounded border border-info-line bg-info-bg p-4 text-sm text-info">
+          فتحنا النموذج كما تركته. راجعه، وافق على الشروط، ثم أرسل لتصلك رسالة التحقق.
+        </p>
+      )}
+      {resumed === null && (
+        <p role="status" className="mb-6 rounded border border-warn-line bg-warn-bg p-4 text-sm text-warn">
+          انتهت صلاحية هذا الرابط. يمكنك التسجيل من جديد هنا.
+        </p>
+      )}
+
+      <SignupForm specialties={specialties} initial={resumed ?? undefined} />
       <SupportContact />
     </main>
   );

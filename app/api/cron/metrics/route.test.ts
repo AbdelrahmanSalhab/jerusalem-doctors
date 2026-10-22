@@ -3,10 +3,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { rpc, raiseAlert } = vi.hoisted(() => ({
+const { rpc, raiseAlert, purgeUnfinished } = vi.hoisted(() => ({
   rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({ data: { db_bytes: 0 }, error: null })),
   raiseAlert: vi.fn(async () => {}),
+  purgeUnfinished: vi.fn(async () => 2),
 }));
+vi.mock("@/lib/signup/unfinished", () => ({ purgeUnfinished }));
 vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({ rpc }) }));
 vi.mock("@/lib/alerts", () => ({ raiseAlert }));
 vi.mock("@/lib/api/cronAuth", () => ({ verifyCronAuth: () => null }));
@@ -26,6 +28,12 @@ describe("GET /api/cron/metrics", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("deletes unfinished signups past their 30 days", async () => {
+    const body = await (await run()).json();
+    expect(purgeUnfinished).toHaveBeenCalledOnce();
+    expect(body).toMatchObject({ unfinished_deleted: 2 });
   });
 
   it("stays quiet below 70% of the database limit", async () => {

@@ -31,6 +31,7 @@ export default async function AdminLayout({
               badge: requests,
               badgeLabel: `${requests} بانتظار الرد`,
             },
+            { href: "/admin/signups", label: "تسجيلات لم تكتمل" },
             { href: "/admin/audit", label: "سجل النشاط" },
             {
               href: "/admin/audit?action=alert",

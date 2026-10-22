@@ -149,5 +149,8 @@ export function buildStartBody(
       : null,
     override_name_mismatch: overrideMismatch,
     turnstile_token: turnstileToken,
+    // Kept with the unfinished signup, so a reminder's link can reopen the
+    // form as the doctor left it (lib/signup/unfinished.ts).
+    resume_form: { ...form, consent: false },
   };
 }

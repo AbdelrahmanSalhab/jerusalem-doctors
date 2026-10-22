@@ -115,8 +115,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
 
+  // The code has expired; the signup itself stays, unfinished, for an
+  // admin's reminder (lib/signup/unfinished.ts).
   if (new Date(pending.data.expires_at).getTime() < Date.now()) {
-    await service.from("pending_signups").delete().eq("id", pending.data.id);
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
 
@@ -270,7 +271,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     }
   }
 
-  await service.from("pending_signups").delete().eq("id", pending.data.id);
+  // Every unfinished attempt from this phone, not just this one: the doctor
+  // is in, so none of them is waiting for a reminder.
+  await service.from("pending_signups").delete().eq("phone_e164", pending.data.phone_e164);
 
   await writeAudit(service, {
     actor_doctor_id: insert.data.id,

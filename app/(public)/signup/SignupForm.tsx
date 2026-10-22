@@ -44,9 +44,16 @@ import { Section, TextField } from "./SignupFields";
 
 type Specialty = SpecialtyNode & { code: string | null };
 
-export function SignupForm({ specialties }: { specialties: Specialty[] }) {
+export function SignupForm({
+  specialties,
+  initial,
+}: {
+  specialties: Specialty[];
+  /** A reminder's link reopening an unfinished signup (lib/signup/unfinished.ts). */
+  initial?: FormState;
+}) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(INITIAL);
+  const [form, setForm] = useState<FormState>(initial ?? INITIAL);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
