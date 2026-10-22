@@ -101,7 +101,8 @@ export default async function AdminStatsPage() {
             />
             <Attention
               count={a.clinics_missing_details}
-              text={`عيادة من ${a.clinics} بلا عنوان أو هاتف.`}
+              text={`عيادة من ${a.clinics} بلا عنوان أو هاتف. ذكّر الطبيب بإكمالها أو أكملها من ملفه.`}
+              href="/admin?status=clinic"
             />
           </ul>
         )}

@@ -105,6 +105,10 @@ function applyFilter<
       // Marked طبيب مقيم, but the registry lists a specialty, which it only
       // does once the board certificate is granted (registry_specialty()).
       return query.eq("career_stage", "resident").not("registry_specialty", "is", null);
+    case "clinic":
+      // The doctors behind /admin/stats' «عيادة بلا عنوان أو هاتف» count
+      // (clinic_missing_details()), without the non-doctor admin rows.
+      return query.eq("clinic_missing_details", true).or(REAL_DOCTOR);
     case "all":
       return query;
   }

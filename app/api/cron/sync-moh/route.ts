@@ -83,6 +83,7 @@ export const GET = withJsonErrors(async (req: Request) => {
 
 interface OurDoctor {
   id: string;
+  name: string;
   licenses: { slot: "primary" | "secondary"; number: number; status: string | null }[];
 }
 
@@ -91,7 +92,7 @@ async function ourDoctors(supabase: Service): Promise<OurDoctor[]> {
   const { data, error } = await supabase
     .from("doctors")
     .select(
-      "id, license_number, license_region, license_verification_status, secondary_license_number, secondary_license_region, secondary_license_verification_status",
+      "id, arabic_full_name, license_number, license_region, license_verification_status, secondary_license_number, secondary_license_region, secondary_license_verification_status",
     )
     // Not the non-doctor admin rows: their licence is a placeholder (the same
     // rule as the admin list's licence filter).
@@ -100,6 +101,7 @@ async function ourDoctors(supabase: Service): Promise<OurDoctor[]> {
   const serial = (region: string | null, n: string | null) => (region === "IL" && n && /^\d{1,9}$/.test(n) ? Number(n) : null);
   return (data ?? []).map((d) => ({
     id: d.id,
+    name: d.arabic_full_name,
     licenses: [
       { slot: "primary" as const, number: serial(d.license_region, d.license_number), status: d.license_verification_status },
       {
@@ -156,7 +158,7 @@ async function dropUnlisted(supabase: Service, full: boolean, started: Date, mis
 /** Marks our doctors' licences the registry no longer lists, once each. */
 async function flagMissing(supabase: Service, doctors: OurDoctor[], missing: Set<number>): Promise<number> {
   const column = { primary: "license_verification_status", secondary: "secondary_license_verification_status" };
-  let flagged = 0;
+  const flagged: { doctor: OurDoctor; license: number }[] = [];
   for (const d of doctors) {
     for (const l of d.licenses) {
       if (!missing.has(l.number) || l.status === "not_found") continue;
@@ -167,9 +169,20 @@ async function flagMissing(supabase: Service, doctors: OurDoctor[], missing: Set
         target_doctor_id: d.id,
         metadata: { slot: l.slot, license_number: String(l.number), license_status_before: l.status },
       });
-      flagged++;
+      flagged.push({ doctor: d, license: l.number });
     }
   }
-  if (flagged > 0) await raiseAlert(supabase, "licenses_missing", { extra: { flagged } });
-  return flagged;
+  if (flagged.length > 0) {
+    // Who and which licence, so the alert can be acted on. Sentry gets ids,
+    // the activity log the names.
+    await raiseAlert(supabase, "licenses_missing", {
+      extra: {
+        flagged: flagged.length,
+        doctor_ids: flagged.map((f) => f.doctor.id),
+        licenses: flagged.map((f) => String(f.license)),
+      },
+      logOnly: { names: flagged.map((f) => `${f.doctor.name} (${f.license})`) },
+    });
+  }
+  return flagged.length;
 }
