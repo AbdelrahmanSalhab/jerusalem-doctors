@@ -19,6 +19,10 @@ updates:
         patterns: ["@supabase/*"]
       sentry:
         patterns: ["@sentry/*"]
+      # react and react-dom must be the exact same version, or React refuses
+      # to render (#132 bumped react alone).
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
       test:
         patterns: ["vitest", "@vitest/*", "@playwright/*", "playwright"]
   - package-ecosystem: github-actions
