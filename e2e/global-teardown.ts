@@ -11,6 +11,10 @@ import { personalDataIn, sentEnvelopes } from "./sentryPrivacy";
 /** Lines in the server log worth a look. */
 const SERVER_NOISE = /error|warn|⚠|unhandled|failed/i;
 
+/** Text safe inside a Markdown table cell's code span: backslashes first,
+ *  then pipes and backticks. */
+const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/`/g, "'");
+
 export default async function globalTeardown() {
   // Everything the app sent to Sentry during the whole run, browser and
   // server, after every test (e2e/sentryPrivacy.ts). Fails the run.
@@ -50,13 +54,13 @@ export default async function globalTeardown() {
   if (groups.size > 0) {
     lines.push("| Count | Browser | Pages | Tests |", "|---|---|---|---|");
     for (const [k, g] of [...groups].sort((a, b) => b[1].count - a[1].count)) {
-      lines.push(`| ${g.count} | \`${k.replace(/\|/g, "\\|")}\` | ${[...g.pages].slice(0, 3).join(", ")} | ${g.tests.size} |`);
+      lines.push(`| ${g.count} | \`${cell(k)}\` | ${[...g.pages].slice(0, 3).join(", ")} | ${g.tests.size} |`);
     }
     lines.push("");
   }
   if (serverGroups.size > 0) {
     lines.push("| Count | Server log |", "|---|---|");
-    for (const [l, n] of [...serverGroups].sort((a, b) => b[1] - a[1])) lines.push(`| ${n} | \`${l.replace(/\|/g, "\\|")}\` |`);
+    for (const [l, n] of [...serverGroups].sort((a, b) => b[1] - a[1])) lines.push(`| ${n} | \`${cell(l)}\` |`);
   }
   const md = lines.join("\n") + "\n";
   writeFileSync(path.join(DIAG_DIR, "..", "diagnostics.md"), md);
