@@ -70,14 +70,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The runner's ImageOS (ubuntu24, ubuntu26, ...): browser builds are per
+      # OS release. It is a shell variable, not in the `env` context, which
+      # left it out of the key.
+      - name: OS release
+        id: os
+        run: echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          # ImageOS (ubuntu24, ubuntu26, ...): browser builds are per OS release.
-          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ steps.os.outputs.image }}-${{ hashFiles('package-lock.json') }}
+      # --with-deps installs WebKit's libraries with apt every run (the image
+      # lacks some). The runner's default mirror, azure.archive.ubuntu.com,
+      # sometimes trickles at ~60 kB/s, which no apt timeout catches, and the
+      # install took 7 to 20 minutes (actions/runner-images#14823). The
+      # canonical archive instead.
       - name: Install browsers in the background
         run: |
+          sudo find /etc/apt \( -name sources.list -o -name '*.sources' -o -name apt-mirrors.txt \) \
+            -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} +
+          grep -rhoE "https?://[a-z.]*archive\.ubuntu\.com" /etc/apt/ | sort | uniq -c || true
           (npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
       - name: Build the app against the test stack
         run: |
@@ -97,6 +110,8 @@ jobs:
             done
             code=$(cat "$RUNNER_TEMP/$job.exit")
             if [ "$code" != "0" ]; then echo "$job failed ($code):"; cat "$RUNNER_TEMP/$job.log"; exit 1; fi
+            # apt's "Fetched … in …s (… kB/s)" shows the mirror's speed.
+            grep -h "^Fetched" "$RUNNER_TEMP/$job.log" || true
             tail -3 "$RUNNER_TEMP/$job.log"
           done
       - name: Save today's Docker images
