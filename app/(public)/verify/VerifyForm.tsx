@@ -118,7 +118,9 @@ export function VerifyForm() {
       // guarantee the SiteHeader picks up the authenticated session.
       clearHandoff(SS_PHONE);
       clearHandoff(SS_SESSION);
-      window.location.replace("/dashboard");
+      // A signup whose phone already had an account signed its owner in
+      // instead; the dashboard says so.
+      window.location.replace(data?.existing_account ? "/dashboard?existing=1" : "/dashboard");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ في الاتصال بالخادم.");

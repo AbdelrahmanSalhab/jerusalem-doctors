@@ -1,6 +1,6 @@
 // POST /api/signup/check-license
 // Cross-checks (license, Hebrew name) against the MoH registry mirror
-// (data.gov.il, see plan §13). Called after check-unique, before /start.
+// (data.gov.il, see plan §13). Called before /start.
 //
 // Outcomes:
 //   { status: "verified" }, proceed to /start, auto-approve later

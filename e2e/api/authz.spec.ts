@@ -56,7 +56,6 @@ const POLICY: Record<string, Policy> = {
   "POST /api/number-requests": "doctor",
   "GET /api/search": "doctor",
   "POST /api/signup/check-license": "public",
-  "POST /api/signup/check-unique": "public",
   "POST /api/signup/resend": "public",
   "POST /api/signup/start": "public",
   "POST /api/signup/verify": "public",
