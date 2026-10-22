@@ -1,6 +1,6 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
+import localFont from "next/font/local";
 import { headers } from "next/headers";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -14,17 +14,33 @@ import "./globals.css";
 // Three weights, not four: 500 (font-medium) is so close to 400 that it was
 // a whole extra file per script for a barely visible difference, and the
 // browser now draws font-medium with the 400 file.
-const plexLatin = IBM_Plex_Sans({
+//
+// The files live in app/fonts (Fontsource's subsets, SIL OFL, see OFL.txt)
+// rather than coming from Google at build time: a Google outage used to fail
+// the build. No generated Arial fallback face: it would draw Arabic before
+// the Arabic face is reached (globals.css lists the two faces instead).
+const plexLatin = localFont({
   variable: "--font-latin",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
+  src: [
+    { path: "./fonts/ibm-plex-sans-latin-400-normal.woff2", weight: "400" },
+    { path: "./fonts/ibm-plex-sans-latin-600-normal.woff2", weight: "600" },
+    { path: "./fonts/ibm-plex-sans-latin-700-normal.woff2", weight: "700" },
+  ],
   display: "swap",
+  adjustFontFallback: false,
+  // Latin is only phone numbers, emails and the odd word: not worth
+  // preloading on every page. The Arabic faces are, the pages being Arabic.
+  preload: false,
 });
-const plex = IBM_Plex_Sans_Arabic({
+const plex = localFont({
   variable: "--font-arabic",
-  subsets: ["arabic"],
-  weight: ["400", "600", "700"],
+  src: [
+    { path: "./fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2", weight: "400" },
+    { path: "./fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2", weight: "600" },
+    { path: "./fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2", weight: "700" },
+  ],
   display: "swap",
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {

@@ -19,7 +19,9 @@ export class MockOtpSender implements OtpSender {
   async send(phoneE164: string, code: string): Promise<OtpSendResult> {
     // stderr so it shows up in `next dev` output and is never mistaken for a
     // real delivery channel.
-    console.error(`[mock-otp] code ${code} for ${phoneE164} (not sent)`);
+    // One line per code, whatever the values hold.
+    const oneLine = (v: string) => v.replace(/[\r\n]/g, " ");
+    console.error(`[mock-otp] code ${oneLine(code)} for ${oneLine(phoneE164)} (not sent)`);
     return { messageRef: `mock:${phoneE164}` };
   }
 }
