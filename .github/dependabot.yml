@@ -12,6 +12,12 @@ updates:
     ignore:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # From 2.2 its scripts use an Upstash-only Redis flag
+      # (allow-key-locking) that the plain Redis behind CI's e2e rejects, so
+      # every sign-in in the tests fails (#133). Patches only, until the test
+      # stack can run them.
+      - dependency-name: "@upstash/ratelimit"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       types:
         patterns: ["@types/*"]
@@ -19,6 +25,10 @@ updates:
         patterns: ["@supabase/*"]
       sentry:
         patterns: ["@sentry/*"]
+      # react and react-dom must be the exact same version, or React refuses
+      # to render (#132 bumped react alone).
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
       test:
         patterns: ["vitest", "@vitest/*", "@playwright/*", "playwright"]
   - package-ecosystem: github-actions
