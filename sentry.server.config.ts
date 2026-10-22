@@ -18,5 +18,8 @@ if (dsn) {
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
     beforeSendSpan: scrubSpan,
+    // Pinned: SENTRY_TRACE_LIFECYCLE=static would make Sentry skip a plain
+    // beforeSendSpan and send spans unscrubbed.
+    traceLifecycle: "stream",
   });
 }

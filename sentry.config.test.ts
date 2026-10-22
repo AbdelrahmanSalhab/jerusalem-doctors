@@ -28,6 +28,7 @@ describe.each([["server", "./sentry.server.config"], ["edge", "./sentry.edge.con
       expect(opts.beforeSend).toBe(scrub.scrubEvent);
       expect(opts.beforeBreadcrumb).toBe(scrub.scrubBreadcrumb);
       expect(opts.beforeSendSpan).toBe(scrub.scrubSpan);
+      expect(opts.traceLifecycle).toBe("stream");
       expect(opts).not.toHaveProperty("sendDefaultPii");
     });
   },

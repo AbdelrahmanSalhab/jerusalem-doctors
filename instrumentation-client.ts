@@ -15,6 +15,9 @@ if (dsn) {
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
     beforeSendSpan: scrubSpan,
+    // Pinned: SENTRY_TRACE_LIFECYCLE=static would make Sentry skip a plain
+    // beforeSendSpan and send spans unscrubbed.
+    traceLifecycle: "stream",
     // No session replay, keeps bundle smaller and avoids capturing screen
     // content of doctor profiles.
     replaysSessionSampleRate: 0,
