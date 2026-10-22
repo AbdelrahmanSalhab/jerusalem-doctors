@@ -2,10 +2,6 @@
 // + edge runtimes. The client-side init is in `instrumentation-client.ts`.
 
 export async function register() {
-  // Next's own span for each server fetch names it by its full URL, query
-  // included (PostgREST filters with licences and phone lists), which no
-  // Sentry setting filters. Sentry records the same fetches without the query.
-  process.env.NEXT_OTEL_FETCH_DISABLED = "1";
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");
   }

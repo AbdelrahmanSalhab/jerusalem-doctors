@@ -41,6 +41,9 @@ export type Role = keyof typeof ACCOUNTS;
 /** Accounts a single test creates and removes (e.g. the deletion request). */
 export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test"];
 
+/** Sentry's ingest, served by e2e/stubs.mjs. */
+export const SENTRY_STUB_DSN = `${STUB_URL.replace("://", "://e2e@")}/1`;
+
 /** Everything the app reads from its environment, for both build and start. */
 export function appEnv(): Record<string, string> {
   return {
@@ -66,6 +69,10 @@ export function appEnv(): Record<string, string> {
     // Tests change doctors straight in the database (lib/cachedReads.ts).
     DIRECTORY_CACHE_SECONDS: "0",
     MOH_API_BASE: `${STUB_URL}/api/3`,
+    // Sentry on, sending to the stub, so a test can read what would leave
+    // (e2e/ui/sentry-privacy.spec.ts).
+    SENTRY_DSN: SENTRY_STUB_DSN,
+    NEXT_PUBLIC_SENTRY_DSN: SENTRY_STUB_DSN,
     NEXT_TELEMETRY_DISABLED: "1",
   };
 }

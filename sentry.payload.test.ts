@@ -4,7 +4,7 @@
 // proves what leaves.
 
 import { createRequire } from "node:module";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { PRIVATE_DATA_COLLECTION, scrubBreadcrumb, scrubEvent, scrubSpan } from "@/lib/sentryScrub";
 
 const require = createRequire(import.meta.url);
@@ -30,7 +30,6 @@ const PERSONAL = [PHONE, PHONE_INTL, PHONE_LOGGED, LICENCE, NAME, encodeURICompo
 
 beforeAll(async () => {
   process.env.NEXT_RUNTIME = "nodejs";
-  process.env.NEXT_OTEL_FETCH_DISABLED = "1";
   const Sentry = require("@sentry/nextjs");
   const { createTransport } = require("@sentry/core");
   Sentry.init({
@@ -64,10 +63,15 @@ beforeAll(async () => {
     })).text();
     try {
       const secretLocal = `${LOCAL}_${PHONE}`;
-      throw new Error(`boom ${secretLocal.length}`);
+      // The phone in the message is only masked by beforeSend.
+      throw new Error(`boom ${secretLocal.length} for ${PHONE}`);
     } catch (e) {
       Sentry.captureException(e);
     }
+    // How supabase-js errors arrive: plain objects whose details quote the row.
+    Sentry.captureException({ code: "23505", message: "duplicate key", details: `Key (license_number)=(${LICENCE}) for ${NAME}`, hint: null });
+    // A span named with a query, which only beforeSendSpan strips.
+    Sentry.startSpan({ name: `GET /report?license=${LICENCE}&name=${NAME}`, forceTransaction: true }, () => {});
     res.end("ok");
   });
   await new Promise<void>((r) => server.listen(0, r));
@@ -90,10 +94,6 @@ beforeAll(async () => {
   payload = sent.join("\n");
   if (process.env.SENTRY_PAYLOAD_DUMP) (await import("node:fs")).writeFileSync(process.env.SENTRY_PAYLOAD_DUMP, payload);
 }, 30_000);
-
-afterAll(() => {
-  delete process.env.NEXT_OTEL_FETCH_DISABLED;
-});
 
 describe("what Sentry would send for a request full of personal data", () => {
   it("sends something: the error and the request's spans", () => {

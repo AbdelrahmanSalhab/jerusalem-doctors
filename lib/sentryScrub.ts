@@ -24,6 +24,10 @@ const PII_KEYS = new Set([
   "reporter_name",
   "reporter_contact",
   "contact",
+  "license",
+  // A Postgres error's details and hint quote the row or key it failed on.
+  "details",
+  "hint",
   "otp",
   "otp_code",
   "sms",
@@ -40,16 +44,30 @@ const PII_KEYS = new Set([
   "cron_secret",
 ]);
 
-// +972 / +970 (with +, %2B or bare) followed by 8-9 digits, or a local 05x
-// number. Not when glued to a hex digit or hyphen, so ids such as
-// "5f3c2972-..." are left intact; but right after a percent-escape it is a
-// number again, as in PostgREST lists (`in.%28%2B972501234567%2C...`).
-const PHONE =
-  /(?:(?<=%[0-9A-Fa-f]{2})|(?<![\dA-Fa-f-]))(?:%2B|\+)?97[02][-\s]?\d{1,2}[-\s]?\d{3}[-\s]?\d{4}(?!\d)|(?:(?<=%[0-9A-Fa-f]{2})|\b)05\d[-\s]?\d{3}[-\s]?\d{4}\b/g;
+// Israeli and Palestinian numbers: +972 / +970 (with +, 00, %2B or bare),
+// local mobiles (05x) and landlines (02, 03, 04, 08, 09), with -, space, .
+// or (..) between the groups. Not when glued to a hex digit, letter or
+// hyphen, so ids such as "5f3c2972-..." are left intact; but right after a
+// percent-escape it is a number again, as in PostgREST lists
+// (`in.%28%2B972501234567%2C...`).
+const AFTER_ESCAPE = String.raw`(?<=%[0-9A-Fa-f]{2})`;
+const SEP = String.raw`[-\s.]?`;
+const PHONE = new RegExp(
+  [
+    String.raw`(?:${AFTER_ESCAPE}|(?<![\dA-Fa-f-]))(?:%2B|\+|00)?97[02]${SEP}\(?\d{1,2}\)?${SEP}\d{3}${SEP}\d{4}(?!\d)`,
+    String.raw`(?:${AFTER_ESCAPE}|(?<![\dA-Za-z-]))\(?0(?:5\d|[2-489])\)?${SEP}\d{3}${SEP}\d{4}(?!\d)`,
+  ].join("|"),
+  "g",
+);
+
+// Sentry describes a clicked or measured element by a CSS selector that
+// includes these attributes, and the app puts doctors' names in them (a
+// photo's alt). The attribute stays, its value goes.
+const SELECTOR_ATTR = /\[(alt|title|aria-label|name|placeholder|value)="(?:[^"\\]|\\.)*"\]/g;
 
 /** Masks phone numbers, typed in Arabic-Indic digits too. */
 export function scrubString(s: string): string {
-  return toAsciiDigits(s).replace(PHONE, "[phone]");
+  return toAsciiDigits(s).replace(SELECTOR_ATTR, "[$1]").replace(PHONE, "[phone]");
 }
 
 /** Keys that are secret wherever they appear, including dotted span
@@ -78,7 +96,17 @@ export function scrubPii<T>(value: T, seen = new WeakSet<object>()): T {
   return out as T;
 }
 
-export const scrubEvent = (event: ErrorEvent): ErrorEvent => scrubPii(event);
+/** Sentry sends a thrown or captured non-Error (supabase-js returns its
+ *  errors as plain objects) whole, as extra.__serialized__: only its code
+ *  goes, since its message and details can quote the row. */
+export function scrubEvent(event: ErrorEvent): ErrorEvent {
+  const serialized = event.extra?.__serialized__;
+  const kept =
+    serialized && typeof serialized === "object"
+      ? { ...event, extra: { ...event.extra, __serialized__: { code: (serialized as { code?: unknown }).code ?? null } } }
+      : event;
+  return scrubPii(kept);
+}
 
 /** A console.* call becomes a breadcrumb that keeps every logged value, such
  *  as a Postgres error whose details quote the failing row (a name, a
@@ -93,7 +121,7 @@ export function scrubBreadcrumb(crumb: Breadcrumb): Breadcrumb {
 /** Span fields that hold a URL or path: Next's own spans (http.target,
  *  http.url, a fetch span's name) keep the query string, which carries
  *  search terms, licences and phone lists. */
-const URL_FIELDS = new Set(["http.target", "http.url", "url.full", "url.query", "http.query", "url"]);
+const URL_FIELDS = new Set(["http.target", "http.url", "url.full", "url.query", "http.query", "url", "sentry.segment.name"]);
 const withoutQuery = (v: unknown) => (typeof v === "string" ? v.replace(/\?\S*/, "") : v);
 
 /** Spans carry request URLs and query attributes too (beforeSend skips
