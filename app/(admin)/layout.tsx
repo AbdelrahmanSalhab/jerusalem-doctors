@@ -13,7 +13,7 @@ export default async function AdminLayout({
   // requireAdmin() returns 404 for non-admins, so the panel's existence is
   // not leaked to regular users.
   await requireAdmin();
-  const alerts = await recentAlerts();
+  const [alerts, requests] = await Promise.all([recentAlerts(), openRequests()]);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -25,6 +25,12 @@ export default async function AdminLayout({
             { href: "/admin/stats", label: "الإحصائيات" },
             { href: "/admin/institutions", label: "المستشفيات" },
             { href: "/admin/specialties", label: "التخصصات" },
+            {
+              href: "/admin/requests",
+              label: "طلبات الأرقام",
+              badge: requests,
+              badgeLabel: `${requests} بانتظار الرد`,
+            },
             { href: "/admin/audit", label: "سجل النشاط" },
             {
               href: "/admin/audit?action=alert",
@@ -51,5 +57,14 @@ async function recentAlerts(): Promise<number> {
     .in("metadata->>level", ["warning", "error"])
     .gte("created_at", new Date(Date.now() - 86_400_000).toISOString());
   // A badge is not worth failing the admin panel over.
+  return error ? 0 : (count ?? 0);
+}
+
+/** Number requests no admin has answered yet (app/(admin)/admin/requests). */
+async function openRequests(): Promise<number> {
+  const { count, error } = await createSupabaseServiceClient()
+    .from("number_requests")
+    .select("id", { count: "exact", head: true })
+    .is("resolved_at", null);
   return error ? 0 : (count ?? 0);
 }

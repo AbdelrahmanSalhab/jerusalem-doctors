@@ -274,9 +274,11 @@ function ResultsRegion({
 
   if (state.results.length === 0) {
     return (
-      <p className="rounded border border-foreground/15 bg-foreground/5 p-8 text-center text-foreground/70">
-        لا توجد نتائج مطابقة.
-      </p>
+      <div className="rounded border border-foreground/15 bg-foreground/5 p-8 text-center text-foreground/70">
+        <p>لا توجد نتائج مطابقة.</p>
+        {/* Only for a typed name: a filter-only search names nobody to ask for. */}
+        {state.q && <NumberRequest key={state.q} q={state.q} />}
+      </div>
     );
   }
 
@@ -343,6 +345,55 @@ function ResultsRegion({
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+/** A search that found nobody: ask the admins for that doctor's number
+ *  (app/api/number-requests). They answer over WhatsApp. */
+function NumberRequest({ q }: { q: string }) {
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error" | "rate_limited">("idle");
+
+  const send = async () => {
+    setStatus("sending");
+    try {
+      const res = await fetch("/api/number-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q }),
+      });
+      setStatus(res.ok ? "sent" : res.status === 429 ? "rate_limited" : "error");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "sent") {
+    return (
+      <p role="status" className="mt-4 text-sm font-medium text-foreground">
+        وصل طلبك للإدارة، وسنرسل لك الرقم عبر واتساب.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 flex flex-col items-center gap-2 text-sm">
+      <p>لم تجد الطبيب الذي تبحث عنه؟</p>
+      <button
+        type="button"
+        onClick={send}
+        disabled={status === "sending"}
+        className="rounded-md bg-primary px-4 py-2 font-medium text-primary-fg disabled:opacity-50"
+      >
+        اطلب رقمه من الإدارة
+      </button>
+      {(status === "error" || status === "rate_limited") && (
+        <p role="alert" className="text-danger">
+          {status === "rate_limited"
+            ? "أرسلت طلبات كثيرة اليوم. حاول غدًا."
+            : "تعذّر إرسال الطلب. الرجاء المحاولة لاحقًا."}
+        </p>
       )}
     </div>
   );
