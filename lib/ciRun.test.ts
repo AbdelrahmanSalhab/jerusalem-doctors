@@ -10,6 +10,12 @@ describe("ciRunOf", () => {
     expect(ciRunOf(req(`${run}/attempts/2`))).toBe(`${run}/attempts/2`);
   });
 
+  it("reads a repo script's URL (the production timing script)", () => {
+    const script = "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/blob/main/scripts/perf/measure.ts";
+    expect(ciRunOf(req(script))).toBe(script);
+    expect(ciRunOf(req("https://github.com/a/b/blob/main/app/page.tsx"))).toBeNull();
+  });
+
   it("ignores a missing header and anything not shaped like a run", () => {
     expect(ciRunOf(req())).toBeNull();
     expect(ciRunOf(req("yes"))).toBeNull();

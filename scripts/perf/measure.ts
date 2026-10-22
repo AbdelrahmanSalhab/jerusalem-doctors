@@ -30,6 +30,9 @@ interface Path {
 }
 
 const enc = encodeURIComponent;
+/** Marks every request as this script's, so its sign-in shows as an
+ *  automated test and its searches stay out of the usage stats (lib/ciRun.ts). */
+const MARK = ["-H", "x-ci-run: https://github.com/AbdelrahmanSalhab/jerusalem-doctors/blob/main/scripts/perf/measure.ts"];
 const PATHS: Path[] = [
   { group: "public", path: "/" },
   { group: "public", path: "/login" },
@@ -70,7 +73,7 @@ interface Sample {
 function curl(jar: string, path: string): Sample {
   const out = execFileSync(
     "curl",
-    ["-s", "-o", "/dev/null", "-D", "-", "-b", jar, "-c", jar, "-w", `\n@@ ${FORMAT}`, `${BASE}${path}`],
+    ["-s", "-o", "/dev/null", "-D", "-", ...MARK, "-b", jar, "-c", jar, "-w", `\n@@ ${FORMAT}`, `${BASE}${path}`],
     { encoding: "utf8" },
   );
   const [headers, metrics] = out.split("\n@@ ");
@@ -83,7 +86,7 @@ function signIn(jar: string): void {
   const res = execFileSync(
     "curl",
     [
-      "-s", "-o", "/dev/null", "-w", "%{http_code}", "-c", jar,
+      "-s", "-o", "/dev/null", "-w", "%{http_code}", ...MARK, "-c", jar,
       "-H", "Content-Type: application/json",
       "-d", JSON.stringify({ email: EMAIL, password: PASSWORD }),
       `${BASE}/api/login/password`,
