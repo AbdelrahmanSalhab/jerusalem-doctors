@@ -3,7 +3,7 @@
 // route that is not in POLICY fails the first test, so it cannot ship without
 // someone deciding who may call it.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
 import { ANON_KEY, BASE_URL, CRON_SECRET, STUB_URL, SUPABASE_URL, type Role } from "../env";
@@ -73,10 +73,11 @@ const DESTRUCTIVE = new Set(["POST /api/profile/delete-request", "POST /api/auth
 const API_DIR = path.join(__dirname, "../../app/api");
 
 function shippedRoutes(dir = API_DIR): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const full = path.join(dir, name);
-    if (statSync(full).isDirectory()) return shippedRoutes(full);
-    if (name !== "route.ts") return [];
+  // The entry's own type, rather than a stat of the path afterwards.
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return shippedRoutes(full);
+    if (entry.name !== "route.ts") return [];
     const url = "/api/" + path.relative(API_DIR, path.dirname(full)).split(path.sep).join("/");
     const methods = [...readFileSync(full, "utf8").matchAll(/export (?:const|async function) (GET|POST|PUT|PATCH|DELETE)\b/g)];
     return methods.map((m) => `${m[1]} ${url}`);
