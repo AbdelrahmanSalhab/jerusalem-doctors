@@ -1,0 +1,20 @@
+# Weekly update PRs for npm packages and GitHub Actions, grouped so a week
+# brings a handful of PRs rather than one per package. Each runs the usual CI.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    groups:
+      types:
+        patterns: ["@types/*"]
+      supabase:
+        patterns: ["@supabase/*"]
+      sentry:
+        patterns: ["@sentry/*"]
+      test:
+        patterns: ["vitest", "@vitest/*", "@playwright/*", "playwright"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
