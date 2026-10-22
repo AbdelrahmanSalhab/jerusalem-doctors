@@ -95,11 +95,11 @@
   --color-danger-bg: var(--danger-bg);
   --color-danger-line: var(--danger-line);
   --color-danger-solid: var(--danger-solid);
-  /* The two faces by name (next/font loads them). Not via the next/font
-     variables: each also lists a generated "Fallback" face that is plain
-     Arial for every character, which would draw Arabic before the Arabic
-     face is reached. Latin face first: it covers Latin only. */
-  --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  /* The two faces from app/layout.tsx (next/font/local, no generated
+     fallback face, which would be plain Arial for every character and draw
+     Arabic before the Arabic face is reached). Latin face first: it covers
+     Latin only. */
+  --font-sans: var(--font-latin), var(--font-arabic), system-ui, sans-serif;
 }
 
 body {
