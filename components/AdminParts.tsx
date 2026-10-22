@@ -30,12 +30,15 @@ export function Tile({
   sub,
   href,
   tone = "plain",
+  current = false,
 }: {
   label: string;
   value: number | string;
   sub?: string;
   href?: string;
   tone?: "plain" | "warn";
+  /** The tile is the filter on screen. */
+  current?: boolean;
 }) {
   const body = (
     <>
@@ -46,9 +49,10 @@ export function Tile({
   );
   const cls =
     "flex flex-col gap-0.5 rounded-lg border p-3 " +
-    (tone === "warn" ? "border-warn-line bg-warn-bg text-warn" : "border-line bg-surface");
+    (tone === "warn" ? "border-warn-line bg-warn-bg text-warn" : "border-line bg-surface") +
+    (current ? " ring-2 ring-foreground" : "");
   return href ? (
-    <Link href={href} className={cls + " hover:border-foreground/40"}>
+    <Link href={href} aria-current={current ? "page" : undefined} className={cls + " hover:border-foreground/40"}>
       {body}
     </Link>
   ) : (

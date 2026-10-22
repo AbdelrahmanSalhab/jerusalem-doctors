@@ -15,6 +15,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import {
   ADMIN_PAGE_SIZE,
   adminDoctorsHref,
+  DOCTOR_FILTERS,
   pageCount,
   pageRange,
   parseAdminDoctorsParams,
@@ -61,24 +62,13 @@ const LICENCE_NEEDS_REVIEW = "license_verification_status.is.null,license_verifi
  *  them out the same way). */
 const REAL_DOCTOR = "is_admin.eq.false,is_visible.eq.true";
 
-/** The tiles above the list, each a shortcut into the matching filter. */
-async function counts(service: SupabaseClient) {
+/** Doctors behind each filter, for its box or pill. The same conditions as
+ *  the filters, so a number is the length of the list it opens. One head-only count
+ *  each, all in parallel. */
+async function counts(service: SupabaseClient): Promise<Record<DoctorFilter, number>> {
   const rows = () => service.from("doctors").select("id", { count: "exact", head: true });
-
-  // The same conditions as the filters they open, so a tile's number is the
-  // length of the list behind it.
-  const [all, pending, licence, hidden] = await Promise.all([
-    rows(),
-    applyFilter(rows(), "pending"),
-    applyFilter(rows(), "license"),
-    applyFilter(rows(), "hidden"),
-  ]);
-  return {
-    all: all.count ?? 0,
-    pending: pending.count ?? 0,
-    licence: licence.count ?? 0,
-    hidden: hidden.count ?? 0,
-  };
+  const results = await Promise.all(DOCTOR_FILTERS.map((f) => applyFilter(rows(), f.key)));
+  return Object.fromEntries(DOCTOR_FILTERS.map((f, i) => [f.key, results[i].count ?? 0])) as Record<DoctorFilter, number>;
 }
 
 function applyFilter<
@@ -148,7 +138,7 @@ export default async function AdminDoctorsPage({
     }
   }
 
-  const [listed, tiles, detail, specialties] = await Promise.all([
+  const [listed, filterCounts, detail, specialties] = await Promise.all([
     query,
     counts(service),
     params.doctorId ? fetchDoctorDetail(service, params.doctorId) : Promise.resolve(null),
@@ -176,26 +166,24 @@ export default async function AdminDoctorsPage({
         </p>
       </header>
 
+      {/* The main filters, as counts; the rest are pills under the search. */}
       <TileGrid>
-        <Tile label="كل الأطباء" value={tiles.all} href={adminDoctorsHref({ filter: "all", q: "", page: 1 })} />
-        <Tile
-          label="بانتظار القبول"
-          value={tiles.pending}
-          href={adminDoctorsHref({ filter: "pending", q: "", page: 1 })}
-          tone={tiles.pending > 0 ? "warn" : "plain"}
-        />
-        <Tile
-          label="ترخيص يحتاج مراجعة"
-          value={tiles.licence}
-          href={adminDoctorsHref({ filter: "license", q: "", page: 1 })}
-          tone={tiles.licence > 0 ? "warn" : "plain"}
-        />
-        <Tile label="مخفي من الدليل" value={tiles.hidden} href={adminDoctorsHref({ filter: "hidden", q: "", page: 1 })} />
+        {DOCTOR_FILTERS.filter((f) => "tile" in f).map((f) => (
+          <Tile
+            key={f.key}
+            label={f.label}
+            value={filterCounts[f.key]}
+            href={adminDoctorsHref({ filter: f.key, q: "", page: 1 })}
+            tone={"attention" in f && filterCounts[f.key] > 0 ? "warn" : "plain"}
+            current={f.key === params.filter}
+          />
+        ))}
       </TileGrid>
 
       <DoctorsList
         rows={rows}
         filter={params.filter}
+        counts={filterCounts}
         q={params.q}
         page={params.page}
         pages={pageCount(total, ADMIN_PAGE_SIZE)}

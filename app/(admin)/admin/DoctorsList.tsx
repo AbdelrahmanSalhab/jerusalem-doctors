@@ -50,6 +50,7 @@ export interface Notice {
 export function DoctorsList({
   rows,
   filter,
+  counts,
   q,
   page,
   pages,
@@ -57,6 +58,8 @@ export function DoctorsList({
 }: {
   rows: DoctorRowData[];
   filter: DoctorFilter;
+  /** Doctors behind each filter. */
+  counts: Record<DoctorFilter, number>;
   q: string;
   page: number;
   pages: number;
@@ -111,35 +114,14 @@ export function DoctorsList({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <nav aria-label="تصنيف الأطباء" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {DOCTOR_FILTERS.map((f) => {
-            const active = f.key === filter;
-            return (
-              <Link
-                key={f.key}
-                href={adminDoctorsHref({ filter: f.key, q, page: 1 })}
-                aria-current={active ? "page" : undefined}
-                className={
-                  "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors " +
-                  (active
-                    ? "border-foreground bg-foreground/5 font-semibold"
-                    : "border-line bg-surface text-muted hover:border-foreground/40 hover:text-foreground")
-                }
-              >
-                {f.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <form onSubmit={submitSearch} className="flex gap-2">
+      <div className="flex flex-col gap-3">
+        <form onSubmit={submitSearch} className="flex gap-2 sm:max-w-md">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="بحث بالاسم، الترخيص، أو الهاتف"
             aria-label="بحث في الأطباء"
-            className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-base sm:w-64"
+            className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-base"
           />
           <button
             type="submit"
@@ -148,6 +130,35 @@ export function DoctorsList({
             بحث
           </button>
         </form>
+
+        {/* The filters without a box above (the page's tiles). Each pill shows
+            how many doctors it opens; one that is work for an admin turns
+            amber while it has any. Wraps rather than scrolling sideways. */}
+        <nav aria-label="تصنيفات أخرى" className="flex flex-wrap gap-1.5">
+          {DOCTOR_FILTERS.filter((f) => !("tile" in f)).map((f) => {
+            const active = f.key === filter;
+            const n = counts[f.key];
+            const waiting = "attention" in f && n > 0;
+            return (
+              <Link
+                key={f.key}
+                href={adminDoctorsHref({ filter: f.key, q, page: 1 })}
+                aria-current={active ? "page" : undefined}
+                className={
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors " +
+                  (active
+                    ? "border-foreground bg-foreground/5 font-semibold"
+                    : waiting
+                      ? "border-warn-line bg-warn-bg text-warn hover:border-warn-solid"
+                      : "border-line bg-surface text-muted hover:border-foreground/40 hover:text-foreground")
+                }
+              >
+                {f.label}
+                <span className={"tabular-nums " + (waiting ? "font-semibold" : "text-xs opacity-70")}>{n}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
 
       {notice && (

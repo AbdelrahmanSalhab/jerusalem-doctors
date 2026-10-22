@@ -7,13 +7,15 @@
 
 export const ADMIN_PAGE_SIZE = 25;
 
+/** `tile`: shown as a count box above the list rather than a pill.
+ *  `attention`: a non-zero count is work waiting for an admin. */
 export const DOCTOR_FILTERS = [
-  { key: "all", label: "الكل" },
-  { key: "pending", label: "بانتظار القبول" },
-  { key: "license", label: "ترخيص يحتاج مراجعة" },
-  { key: "stage", label: "مقيم والسجل يقول أخصائي" },
-  { key: "clinic", label: "عيادة بلا عنوان أو هاتف" },
-  { key: "hidden", label: "مخفي من الدليل" },
+  { key: "all", label: "كل الأطباء", tile: true },
+  { key: "pending", label: "بانتظار القبول", tile: true, attention: true },
+  { key: "license", label: "ترخيص يحتاج مراجعة", tile: true, attention: true },
+  { key: "stage", label: "مقيم والسجل يقول أخصائي", attention: true },
+  { key: "clinic", label: "عيادة بلا عنوان أو هاتف", attention: true },
+  { key: "hidden", label: "مخفي من الدليل", tile: true },
   { key: "suspended", label: "حساب مغلق / طلب حذف" },
   { key: "approved", label: "مقبولون" },
 ] as const;
