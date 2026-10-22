@@ -211,3 +211,63 @@ test.describe("activity log", () => {
     await expect(page.getByText(/حدثًا في السجل/)).toBeVisible();
   });
 });
+
+test.describe("unfinished signups", () => {
+  const PHONE = "+972529990001";
+  let id: string;
+  test.beforeAll(async () => {
+    const db = serviceClient();
+    await db.from("pending_signups").delete().eq("phone_e164", PHONE);
+    const { data, error } = await db
+      .from("pending_signups")
+      .insert({
+        phone_e164: PHONE,
+        // Its code expired long ago; the signup stays for the reminder.
+        expires_at: new Date(Date.now() - 3_600_000).toISOString(),
+        payload: {
+          phone_e164: PHONE,
+          arabic_first_name: "ناقص",
+          arabic_family_name: "التسجيل",
+          license_number: "599997",
+          license_region: "IL",
+          license_verification_status: "not_found",
+          specialty_ids: [],
+          resume_form: { phone: "0529990001", license_number: "599997", arabic_first_name: "ناقص", arabic_family_name: "التسجيل" },
+        },
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    id = data!.id;
+  });
+  test.afterAll(async () => {
+    await serviceClient().from("pending_signups").delete().eq("phone_e164", PHONE);
+  });
+
+  test("an admin reminds the doctor, whose link reopens the form filled in", async ({ page, browser }) => {
+    await page.goto("/admin/signups");
+    await expect(page.getByText("د. ناقص التسجيل")).toBeVisible();
+
+    // The button opens WhatsApp in a new tab; the link it carries is what matters.
+    const res = await page.request.post(`/api/admin/pending-signups/${id}`);
+    expect(res.status()).toBe(200);
+    const text = new URL((await res.json()).whatsapp).searchParams.get("text")!;
+    const link = new URL(/https?:\/\/\S+\/signup\?resume=[\w-]+/.exec(text)![0]);
+
+    const visitor = await browser.newContext();
+    const p = await visitor.newPage();
+    await p.goto(link.pathname + link.search);
+    await expect(p.getByText("فتحنا النموذج كما تركته")).toBeVisible();
+    await expect(p.getByLabel(/^رقم الترخيص/)).toHaveValue("599997");
+    await p.goto("/signup?resume=not-a-real-token-at-all-0000");
+    await expect(p.getByText("انتهت صلاحية هذا الرابط")).toBeVisible();
+    await visitor.close();
+
+    await page.reload();
+    const row = page.getByRole("listitem").filter({ hasText: "ناقص التسجيل" });
+    await expect(row.getByText(/ذُكّر/)).toBeVisible();
+    page.once("dialog", (d) => d.accept());
+    await row.getByRole("button", { name: "حذف" }).click();
+    await expect(page.getByText("د. ناقص التسجيل")).toHaveCount(0);
+  });
+});

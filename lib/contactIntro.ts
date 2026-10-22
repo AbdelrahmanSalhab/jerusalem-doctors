@@ -5,6 +5,8 @@
 import { DEFAULT_WHATSAPP_PREFILLED } from "@/lib/whatsapp";
 
 export interface Viewer {
+  /** The viewer's own doctor id: their own card offers no report button. */
+  id?: string;
   firstName: string;
   familyName: string;
   /** e.g. "الباطنية" or "طب عام"; omitted when unknown. */

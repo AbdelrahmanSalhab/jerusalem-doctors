@@ -44,10 +44,20 @@ import { Section, TextField } from "./SignupFields";
 
 type Specialty = SpecialtyNode & { code: string | null };
 
-export function SignupForm({ specialties }: { specialties: Specialty[] }) {
+export function SignupForm({
+  specialties,
+  initial,
+}: {
+  specialties: Specialty[];
+  /** A reminder's link reopening an unfinished signup (lib/signup/unfinished.ts). */
+  initial?: FormState;
+}) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(INITIAL);
+  const [form, setForm] = useState<FormState>(initial ?? INITIAL);
   const [error, setError] = useState<string | null>(null);
+  /** The licence /start refused as already registered: the error then
+   *  offers the report form (#30), in case someone else took it. */
+  const [takenLicense, setTakenLicense] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
   const goTo = (n: number) => {
@@ -114,15 +124,15 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
     }
     if (missing.length > 0) return;
     setError(null);
+    setTakenLicense(null);
     setFieldErrors({});
     setRegistryName(null);
     setSubmitting(true);
 
     try {
-      // Uniqueness is re-checked server-side in /signup/start, so we don't
-      // need a separate /check-unique call here. Cuts one Turnstile-gated
-      // round-trip and avoids the single-use token problem (each verified
-      // token is consumed by Cloudflare; multiple calls per submit fail).
+      // Uniqueness is checked server-side in /signup/start, not in a call
+      // of its own: each Turnstile token is single-use, so a second
+      // Turnstile-gated call per submit would fail.
 
       // The MoH cross-check only covers the Israeli registry, PS-track
       // signups have nothing to check against, so they skip straight to
@@ -192,6 +202,7 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
         turnstileRef.current?.reset();
         if (startBody?.fields) showFieldErrors(startBody.fields);
         setError(fieldErrorMessage(startBody?.fields) ?? apiErrorMessage(startBody?.code));
+        setTakenLicense(startBody?.code === "duplicate" ? form.license_number : null);
         setSubmitting(false);
         return;
       }
@@ -398,6 +409,14 @@ export function SignupForm({ specialties }: { specialties: Specialty[] }) {
       {error && (
         <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
+          {takenLicense && (
+            <>
+              {" "}
+              <a href={`/report?license=${encodeURIComponent(takenLicense)}`} className="font-semibold underline">
+                ليس أنت؟ أبلغ الإدارة
+              </a>
+            </>
+          )}
         </p>
       )}
 

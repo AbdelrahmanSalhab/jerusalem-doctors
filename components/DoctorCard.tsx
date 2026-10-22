@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/Avatar";
 import { ContactButtons } from "@/components/ContactButtons";
+import { ReportProfileButton } from "@/components/ReportProfileButton";
 import { clinicTelHref } from "@/lib/workplace";
 import { cardChips, cardServices, RETIRED_LABEL, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
@@ -123,6 +124,7 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
       )}
 
       <ContactButtons doctor={doctor} />
+      <ReportProfileButton doctorId={doctor.id} name={name} />
     </article>
   );
 }
