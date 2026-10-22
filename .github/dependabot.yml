@@ -6,6 +6,12 @@ updates:
     directory: /
     schedule: { interval: weekly, day: monday }
     open-pull-requests-limit: 5
+    # Node's types follow the Node we run (22, as on Vercel and in CI), not
+    # the newest Node: newer types allow APIs that do not exist at runtime.
+    # Raise this together with the Node version.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       types:
         patterns: ["@types/*"]
