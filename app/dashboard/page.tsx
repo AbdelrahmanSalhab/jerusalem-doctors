@@ -9,7 +9,14 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Signup with a phone that already has an account signs its owner in
+  // (signup/verify); /verify sends them here with ?existing=1 to say so.
+  const existing = (await searchParams).existing === "1";
   // Started before the auth check so the two don't run back to back; nothing
   // is rendered unless requireDoctor() passes. What every doctor sees the
   // same (specialties, featured doctors, counts) comes from the cache
@@ -36,6 +43,7 @@ export default async function DashboardPage() {
     (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order,
   )[0];
   const viewer = {
+    id: me.id,
     firstName: me.arabic_first_name,
     familyName: me.arabic_family_name,
     specialty:
@@ -73,6 +81,16 @@ export default async function DashboardPage() {
           ابحث عن طبيب بالاسم، التخصص، أو التخصص الفرعي
         </p>
       </header>
+
+      {existing && (
+        <p role="status" className="rounded-md border border-info-line bg-info-bg p-4 text-sm text-info">
+          <strong className="font-semibold">هذا الرقم مسجَّل مسبقًا.</strong> أدخلناك إلى حسابك
+          بدل إنشاء حساب جديد. ليس حسابك؟{" "}
+          <Link href="/report" className="font-semibold underline">
+            أبلغ الإدارة
+          </Link>
+        </p>
+      )}
 
       {!me.is_admin_approved && !me.is_admin && (
         <p

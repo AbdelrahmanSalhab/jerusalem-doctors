@@ -155,10 +155,10 @@ describe("POST /api/signup/verify", () => {
     expect((await call(BODY)).status).toBe(500);
   });
 
-  it("deletes an expired session and answers 410", async () => {
+  it("answers 410 for an expired code but keeps the signup for a reminder", async () => {
     db.queue("pending_signups", pending({ expires_at: new Date(Date.now() - 1000).toISOString() }), CLAIMED);
     expect((await call(BODY)).status).toBe(410);
-    expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);
+    expect(db.argsOf("pending_signups", "delete")).toHaveLength(0);
     expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 

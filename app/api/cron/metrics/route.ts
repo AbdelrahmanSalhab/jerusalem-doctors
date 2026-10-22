@@ -1,7 +1,9 @@
 // GET /api/cron/metrics, daily at 00:30 UTC: records the day before in
 // metrics_daily (record_daily_metrics(), migration 20261021102333), so
 // /admin/stats shows measured usage instead of estimates, and raises an alert
-// when the database passes 70% of Supabase's free plan.
+// when the database passes 70% of Supabase's free plan. Also the daily
+// housekeeping: unfinished signups older than 30 days are deleted
+// (lib/signup/unfinished.ts), so they go even on days nobody signs up.
 //
 // Auth: header `Authorization: Bearer ${CRON_SECRET}` (Vercel Cron).
 
@@ -9,6 +11,7 @@ import { verifyCronAuth } from "@/lib/api/cronAuth";
 import { jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { raiseAlert } from "@/lib/alerts";
 import { DB_LIMIT_BYTES } from "@/lib/limits";
+import { purgeUnfinished } from "@/lib/signup/unfinished";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -27,5 +30,6 @@ export const GET = withJsonErrors(async (req: Request) => {
   if (db_bytes > DB_LIMIT_BYTES * 0.7) {
     await raiseAlert(service, "db_size_high", { extra: { db_bytes, limit_bytes: DB_LIMIT_BYTES } });
   }
-  return jsonOk({ ok: true, day, db_bytes });
+  const unfinished_deleted = await purgeUnfinished(service);
+  return jsonOk({ ok: true, day, db_bytes, unfinished_deleted });
 });
