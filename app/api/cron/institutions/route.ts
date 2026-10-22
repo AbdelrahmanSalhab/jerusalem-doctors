@@ -27,7 +27,11 @@ export const GET = withJsonErrors(async (req: Request) => {
   if (unmatched.length > 0) {
     // One issue per day's list; the alert rule in the runbook turns it into
     // an email. Names are institutions, not people.
-    await raiseAlert(service, "unknown_workplaces", { extra: { count: unmatched.length, names: unmatched.slice(0, 30) } });
+    await raiseAlert(service, "unknown_workplaces", {
+      extra: { count: unmatched.length },
+      // Names doctors typed: the activity log only, not Sentry.
+      logOnly: { institutions: unmatched.slice(0, 30) },
+    });
   }
   await writeAudit(service, {
     action: "institutions_relinked",

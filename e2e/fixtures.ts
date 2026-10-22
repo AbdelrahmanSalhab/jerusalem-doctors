@@ -19,6 +19,8 @@ export const DIAG_DIR = path.join(__dirname, ".results", "diagnostics");
 
 /** Noise a test may produce on purpose, matched against kind + text. */
 const EXPECTED: RegExp[] = [
+  // The Sentry privacy test throws one in the page on purpose.
+  /sentry privacy probe/,
   // The login tests send a wrong password and a closed account on purpose.
   /^http 401 POST \/api\/login\/password/,
   // Visiting /admin as a doctor is a 404 by design.

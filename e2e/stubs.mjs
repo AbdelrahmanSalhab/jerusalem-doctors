@@ -7,12 +7,18 @@
 //   POST /sms4free/send             SMS4FREE's send API (lib/otp/sms4free.ts);
 //                                   answers {status: 1} and keeps the message
 //   GET  /sms4free/messages?to=05…  what was "sent" to a number, newest last
+//   POST /api/<project>/envelope/   Sentry's ingest: the app's server and
+//                                   browser send here in e2e (SENTRY_DSN), so a
+//                                   test can read exactly what would leave
+//   GET  /sentry/envelopes          everything received so far, as text
 import { createServer } from "node:http";
+import { gunzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 
 const REGISTRY = JSON.parse(readFileSync(new URL("./registry.json", import.meta.url), "utf8"));
 const PORT = Number(process.env.STUB_PORT ?? 3124);
 const sent = [];
+const envelopes = [];
 
 const json = (res, body, status = 200) => {
   res.statusCode = status;
@@ -48,6 +54,27 @@ createServer((req, res) => {
       json(res, { status: 1, message: "ok" });
     });
     return;
+  }
+  if (/^\/api\/\d+\/envelope\/?$/.test(url.pathname) && req.method === "POST") {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      const raw = Buffer.concat(chunks);
+      try {
+        envelopes.push((req.headers["content-encoding"] === "gzip" ? gunzipSync(raw) : raw).toString());
+      } catch {
+        // Kept as received rather than taking the stub (and the SMS tests) down.
+        envelopes.push(raw.toString("latin1"));
+      }
+      // The browser posts cross-origin.
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      json(res, {});
+    });
+    return;
+  }
+  if (url.pathname === "/sentry/envelopes") {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.end(envelopes.join("\n"));
   }
   if (url.pathname === "/sms4free/messages") {
     return json(res, sent.filter((m) => m.to === url.searchParams.get("to")));

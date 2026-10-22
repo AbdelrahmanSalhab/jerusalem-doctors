@@ -6,11 +6,17 @@ import { appendFileSync, existsSync, readdirSync, readFileSync, writeFileSync } 
 import path from "node:path";
 import { DIAG_DIR, isExpected, type Issue } from "./fixtures";
 import { SERVER_LOG } from "./helpers";
+import { personalDataIn, sentEnvelopes } from "./sentryPrivacy";
 
 /** Lines in the server log worth a look. */
 const SERVER_NOISE = /error|warn|⚠|unhandled|failed/i;
 
 export default async function globalTeardown() {
+  // Everything the app sent to Sentry during the whole run, browser and
+  // server, after every test (e2e/sentryPrivacy.ts). Fails the run.
+  const leaks = personalDataIn(await sentEnvelopes().catch(() => ""));
+  if (leaks.length > 0) throw new Error(`Personal data reached Sentry during the e2e run: ${leaks.join(", ")}`);
+
   const groups = new Map<string, { count: number; tests: Set<string>; pages: Set<string> }>();
   /** Known noise (fixtures.ts EXPECTED), counted but not listed. */
   let expected = 0;

@@ -21,7 +21,9 @@ const ALERT_NAMES_SHOWN = 3;
  *  else the one number that matters. */
 function alertDetail(m: Record<string, unknown>): string {
   const what = isAlertCode(m.alert) ? ALERTS[m.alert].ar : String(m.alert ?? "");
-  const names = Array.isArray(m.names) ? (m.names as string[]) : [];
+  // People's names (logOnly) or, for unknown_workplaces, institution names.
+  const list = m.names ?? m.institutions;
+  const names = Array.isArray(list) ? (list as string[]) : [];
   const more = names.length - ALERT_NAMES_SHOWN;
   const about =
     names.length > 0
@@ -270,6 +272,7 @@ const FIELD_LABEL: Record<string, string> = {
   limit: "الحد اليومي",
   count: "العدد",
   names: "الأسماء",
+  institutions: "الأسماء",
   key: "النوع",
   flagged: "أُحيلت للمراجعة",
   report_id: "رقم البلاغ",

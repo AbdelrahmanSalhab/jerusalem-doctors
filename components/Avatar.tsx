@@ -33,6 +33,9 @@ export function Avatar({
       <Image
         src={url}
         alt={alt}
+        // Sentry names a clicked element by this label instead of a selector
+        // carrying the alt, which is the doctor's name.
+        data-sentry-element="doctor-photo"
         width={dim}
         height={dim}
         className={`${cls} shrink-0 rounded-full object-cover`}
