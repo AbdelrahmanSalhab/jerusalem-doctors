@@ -76,12 +76,9 @@ jobs:
           path: ~/.cache/ms-playwright
           # ImageOS (ubuntu24, ubuntu26, ...): browser builds are per OS release.
           key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ hashFiles('package-lock.json') }}
-      # --with-deps installs system packages with apt; a stalled Ubuntu
-      # mirror once hung the run silently until the job timed out. Ten
-      # minutes, then the wait below fails and prints this log.
       - name: Install browsers in the background
         run: |
-          (timeout 600 npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
+          (npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
       - name: Build the app against the test stack
         run: |
           # e2e/env.ts is the one list of the test stack's settings.
@@ -89,10 +86,15 @@ jobs:
       - run: npm run build
       - name: Start Redis for rate limits
         run: docker compose -f e2e/docker-compose.yml -p jd-e2e up -d --wait
+      # Ten minutes at most: a stalled install (apt under --with-deps) once
+      # hung the job silently until it timed out. This prints its log instead.
       - name: Wait for Supabase and the browsers
         run: |
           for job in supabase browsers; do
-            until [ -f "$RUNNER_TEMP/$job.exit" ]; do sleep 2; done
+            until [ -f "$RUNNER_TEMP/$job.exit" ]; do
+              if [ $SECONDS -gt 600 ]; then echo "$job still running after 10 minutes:"; cat "$RUNNER_TEMP/$job.log"; exit 1; fi
+              sleep 2
+            done
             code=$(cat "$RUNNER_TEMP/$job.exit")
             if [ "$code" != "0" ]; then echo "$job failed ($code):"; cat "$RUNNER_TEMP/$job.log"; exit 1; fi
             tail -3 "$RUNNER_TEMP/$job.log"
