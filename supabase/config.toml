@@ -277,6 +277,7 @@ max_frequency = "5s"
 [auth.sms.test_otp]
 972521110001 = "123456"
 972521110002 = "123456"
+972521110003 = "123456"
 
 # Configure logged in session timeouts.
 # [auth.sessions]

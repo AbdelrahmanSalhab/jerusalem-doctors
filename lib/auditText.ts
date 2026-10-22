@@ -38,6 +38,8 @@ const TITLE: Record<string, string> = {
   number_request_resolved: "إرسال رقم طبيب مطلوب",
   profile_reported: "بلاغ عن ملف",
   profile_report_resolved: "إغلاق بلاغ",
+  unfinished_signup_reminded: "تذكير بتسجيل لم يكتمل",
+  unfinished_signup_deleted: "حذف تسجيل لم يكتمل",
   admin_doctor_updated: "تعديل من الإدارة",
   admin_doctor_profile_edited: "تعديل الملف من الإدارة",
   admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
@@ -157,6 +159,9 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       return m.source === "card" ? "من بطاقة طبيب" : "من نموذج الإبلاغ";
     case "profile_report_resolved":
       return quote(m.note);
+    case "unfinished_signup_reminded":
+    case "unfinished_signup_deleted":
+      return typeof m.name === "string" ? `د. ${m.name}` : "";
     case "admin_doctor_updated":
       return doctorChanges(m).join(" · ");
     case "admin_doctor_profile_edited":
@@ -248,6 +253,7 @@ const FIELD_LABEL: Record<string, string> = {
   residency_start_year: "سنة بداية التخصص",
   featured: "العرض في لوحة البحث",
   name_ar: "الاسم",
+  name: "الاسم",
   name_he: "الاسم بالعبرية",
   kind: "النوع",
   aliases: "طرق الكتابة",

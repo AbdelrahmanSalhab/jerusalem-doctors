@@ -37,6 +37,7 @@ export default async function AdminLayout({
               badge: reports,
               badgeLabel: `${reports} بلاغ مفتوح`,
             },
+            { href: "/admin/signups", label: "تسجيلات لم تكتمل" },
             { href: "/admin/audit", label: "سجل النشاط" },
             {
               href: "/admin/audit?action=alert",

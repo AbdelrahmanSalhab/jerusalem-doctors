@@ -5,10 +5,10 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { flushRateLimits } from "../global-setup";
-import { serviceClient } from "../seed";
+import { createDoctor, serviceClient } from "../seed";
 
 /** Numbers supabase/config.toml maps to the code 123456. */
-const PHONES = { matched: "+972521110001", unknown: "+972521110002" };
+const PHONES = { matched: "+972521110001", unknown: "+972521110002", returning: "+972521110003" };
 
 test.beforeEach(flushRateLimits);
 
@@ -83,12 +83,14 @@ test("a licence the registry does not have waits for an admin", async ({ page })
   expect(data!.is_admin_approved).toBe(false);
 });
 
-// Runs after the test above, which registered PHONES.unknown.
+// Its own number and account: Auth sends one code per number every 5
+// seconds, so reusing the test above's number made this one flaky.
 test("signing up again with a registered number signs its owner in and says so", async ({ page }) => {
-  await signUp(page, { phone: PHONES.unknown, license: "599998", arabic: ["مكرر", "الرقم"], hebrew: ["מכרר", "אלרקם"] });
+  await createDoctor({ first: "عائد", family: "الرقم", phone: PHONES.returning });
+  await signUp(page, { phone: PHONES.returning, license: "599998", arabic: ["مكرر", "الرقم"], hebrew: ["מכרר", "אלרקם"] });
   await expect(page).toHaveURL(/\/dashboard\?existing=1/);
   await expect(page.getByText("هذا الرقم مسجَّل مسبقًا.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "مرحبًا د. مجهول" })).toBeVisible();
-  const { count } = await serviceClient().from("doctors").select("id", { count: "exact", head: true }).eq("phone_e164", PHONES.unknown);
+  await expect(page.getByRole("heading", { name: "مرحبًا د. عائد" })).toBeVisible();
+  const { count } = await serviceClient().from("doctors").select("id", { count: "exact", head: true }).eq("phone_e164", PHONES.returning);
   expect(count).toBe(1);
 });
