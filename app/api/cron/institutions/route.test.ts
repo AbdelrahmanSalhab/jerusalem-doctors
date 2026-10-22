@@ -35,7 +35,8 @@ describe("GET /api/cron/institutions", () => {
     expect(await res.json()).toEqual({ ok: true, changed: 2, unmatched: 1 });
     expect(captureMessage).toHaveBeenCalledWith(
       "Workplace names not in the institutions list",
-      expect.objectContaining({ extra: { count: 1, institutions: [{ name: "هداسا", count: 1 }] } }),
+      // The count only: the names doctors typed stay in the activity log.
+      expect.objectContaining({ extra: { count: 1 } }),
     );
   });
 

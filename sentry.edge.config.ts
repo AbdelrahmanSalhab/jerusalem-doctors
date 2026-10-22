@@ -8,7 +8,9 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
-    tracesSampleRate: 0.1,
+    // Errors only: no performance tracing, so no request or render data
+    // leaves as spans. The span scrubbing below stays as a safety net.
+    tracesSampleRate: 0,
     dataCollection: PRIVATE_DATA_COLLECTION,
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,

@@ -26,7 +26,9 @@ describe.each([["server", "./sentry.server.config"], ["edge", "./sentry.edge.con
       const opts = init.mock.calls[0][0];
       expect(opts.dataCollection).toBe(scrub.PRIVATE_DATA_COLLECTION);
       expect(opts.beforeSend).toBe(scrub.scrubEvent);
-      expect(opts.beforeBreadcrumb).toBe(scrub.scrubBreadcrumb);
+      // The browser keeps no click or console breadcrumbs at all.
+      expect(opts.beforeBreadcrumb).toBe(file === "./instrumentation-client" ? scrub.browserBreadcrumb : scrub.scrubBreadcrumb);
+      expect(opts.tracesSampleRate).toBe(0);
       expect(opts.beforeSendSpan).toBe(scrub.scrubSpan);
       expect(opts.traceLifecycle).toBe("stream");
       expect(opts).not.toHaveProperty("sendDefaultPii");

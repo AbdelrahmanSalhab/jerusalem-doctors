@@ -1,20 +1,18 @@
-// What the real app sends to Sentry, browser and server, from this whole e2e
-// run: e2e/env.ts points SENTRY_DSN at the stub, which keeps every envelope.
-// None of it may carry a doctor's name, phone, licence or email.
+// What the real app sends to Sentry, browser and server: e2e/env.ts points
+// SENTRY_DSN at the stub, which keeps every envelope. None of it may carry a
+// doctor's name, phone, licence or email (e2e/sentryPrivacy.ts); the global
+// teardown checks the whole run's envelopes the same way.
 //
-// Sentry describes a click by the element's selector, attributes included,
-// and the app puts names in them (a photo's alt). Seeded doctors have no
-// photo, so the test adds an element named like one to the real page, clicks
-// it, and throws an error there, which sends that click as a breadcrumb.
+// The browser keeps no click breadcrumbs: Sentry would describe a click by
+// the element's selector, attributes included, and the app puts names in
+// them (a photo's alt). The test clicks an element named like a doctor and
+// throws an error in the page: the error must arrive, the click must not.
 
 import { expect, test } from "../fixtures";
-import { STUB_URL } from "../env";
 import { stateFile } from "../helpers";
-import { DOCTORS } from "../seed";
+import { personalDataIn, sentEnvelopes as envelopes } from "../sentryPrivacy";
 
 test.use({ storageState: stateFile("doctor") });
-
-const envelopes = async () => (await fetch(`${STUB_URL}/sentry/envelopes`)).text();
 
 test("nothing personal reaches Sentry, even a clicked element's name", async ({ page }) => {
   await page.goto("/dashboard");
@@ -34,18 +32,10 @@ test("nothing personal reaches Sentry, even a clicked element's name", async ({ 
     });
   });
 
-  // The probe's event, with the click on the photo among its breadcrumbs.
+  // The probe's event arrives, without the click.
   await expect.poll(envelopes, { timeout: 15_000 }).toContain("sentry privacy probe");
   const sent = await envelopes();
-  expect(sent).toContain("ui.click");
-  expect(sent).toMatch(/button[^"]*\[aria-label\]/);
+  expect(sent).not.toContain("ui.click");
 
-  const personal = DOCTORS.flatMap((d) => [
-    `${d.first} ${d.family}`,
-    d.phone,
-    d.phone.replace("+972", "0"),
-    d.license,
-    ...(d.email ? [d.email] : []),
-  ]);
-  for (const value of personal) expect(sent, `Sentry was sent ${value}`).not.toContain(value);
+  expect(personalDataIn(sent), "personal data sent to Sentry").toEqual([]);
 });

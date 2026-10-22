@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ErrorEvent } from "@sentry/nextjs";
-import { PRIVATE_DATA_COLLECTION, scrubBreadcrumb, scrubEvent, scrubPii, scrubSpan, scrubString } from "./sentryScrub";
+import { browserBreadcrumb, PRIVATE_DATA_COLLECTION, scrubBreadcrumb, scrubEvent, scrubPii, scrubSpan, scrubString } from "./sentryScrub";
 
 describe("Sentry scrubbing", () => {
   it("masks phone numbers inside strings and URLs", () => {
@@ -129,5 +129,50 @@ describe("gaps a second review found", () => {
   it("strips the query from the span's segment name too", () => {
     const span = scrubSpan({ name: "GET /admin?q=Iyas", attributes: { "sentry.segment.name": "GET /admin?q=Iyas" } });
     expect(span).toEqual({ name: "GET /admin", attributes: { "sentry.segment.name": "GET /admin" } });
+  });
+});
+
+describe("gaps a third review found", () => {
+  it("drops a selector value even when it holds quotes or ends in a backslash (Sentry does not escape them)", () => {
+    expect(scrubString('div > img.rounded-full[alt="د. "أبو" علي"]')).toBe("div > img.rounded-full[alt]");
+    expect(scrubString('img[alt="Ali \\"]')).toBe("img[alt]");
+    expect(scrubString('h1[title="ד"ר כהן"] > button[aria-label="x"][type="button"]')).toBe('h1[title] > button[aria-label][type="button"]');
+    expect(scrubString('[HTMLElement: img[alt="سامر ناصر"]]')).toBe("[HTMLElement: img[alt]]");
+  });
+
+  it("drops the input Postgres quotes back, also inside the app's own error messages", () => {
+    expect(scrubString('doctors read failed: invalid input syntax for type uuid: "Iyas Salhab"')).toBe(
+      'doctors read failed: invalid input syntax for type uuid: "[value]"',
+    );
+    expect(scrubString('invalid input value for enum career_stage: "إياس"')).toBe('invalid input value for enum career_stage: "[value]"');
+  });
+
+  it("replaces a captured object's text, which Sentry builds from its message", () => {
+    const event = scrubEvent({
+      exception: { values: [{ type: "Error", value: 'invalid input syntax for type uuid: "MSGNAME"', mechanism: { type: "generic", handled: true, synthetic: true } }] },
+      extra: { __serialized__: { code: "22P02", message: 'invalid input syntax for type uuid: "MSGNAME"' } },
+    } as unknown as ErrorEvent);
+    expect(event.exception?.values?.[0].value).toBe("captured object (code 22P02)");
+    expect(JSON.stringify(event)).not.toContain("MSGNAME");
+  });
+
+  it("drops span fields that are nothing but a query string", () => {
+    const span = scrubSpan({ name: "GET /search", attributes: { "url.query": "q=Iyas", "http.query": "name=Iyas", "http.route": "/search" } });
+    expect(span.attributes).toEqual({ "http.route": "/search" });
+  });
+
+  it("masks the remaining phone formats", () => {
+    for (const phone of ["+972 (0)52-123-4567", "+972-52-123-45-67", "077-1234567", "052%20123%204567", "052+123+4567"]) {
+      expect(scrubString(`at ${phone} now`), phone).toBe("at [phone] now");
+    }
+  });
+});
+
+describe("browser breadcrumbs", () => {
+  it("keeps no clicks or console output, and scrubs the rest", () => {
+    expect(browserBreadcrumb({ category: "ui.click", message: "img[alt]" })).toBeNull();
+    expect(browserBreadcrumb({ category: "ui.input", message: "input" })).toBeNull();
+    expect(browserBreadcrumb({ category: "console", message: "x" })).toBeNull();
+    expect(browserBreadcrumb({ category: "navigation", data: { to: "/search?q=0521234567" } })).toEqual({ category: "navigation", data: { to: "/search?q=[phone]" } });
   });
 });

@@ -60,7 +60,12 @@ createServer((req, res) => {
     req.on("data", (c) => chunks.push(c));
     req.on("end", () => {
       const raw = Buffer.concat(chunks);
-      envelopes.push((req.headers["content-encoding"] === "gzip" ? gunzipSync(raw) : raw).toString());
+      try {
+        envelopes.push((req.headers["content-encoding"] === "gzip" ? gunzipSync(raw) : raw).toString());
+      } catch {
+        // Kept as received rather than taking the stub (and the SMS tests) down.
+        envelopes.push(raw.toString("latin1"));
+      }
       // The browser posts cross-origin.
       res.setHeader("Access-Control-Allow-Origin", "*");
       json(res, {});

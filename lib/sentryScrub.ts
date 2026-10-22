@@ -51,23 +51,40 @@ const PII_KEYS = new Set([
 // percent-escape it is a number again, as in PostgREST lists
 // (`in.%28%2B972501234567%2C...`).
 const AFTER_ESCAPE = String.raw`(?<=%[0-9A-Fa-f]{2})`;
-const SEP = String.raw`[-\s.]?`;
+// Between groups: -, space, dot, a + or %20 from a URL, or nothing.
+const SEP = String.raw`(?:[-\s.+]|%20)?`;
+// The last seven digits as 3+4 or 3+2+2.
+const TAIL = String.raw`\d{3}${SEP}(?:\d{4}|\d{2}${SEP}\d{2})`;
 const PHONE = new RegExp(
   [
-    String.raw`(?:${AFTER_ESCAPE}|(?<![\dA-Fa-f-]))(?:%2B|\+|00)?97[02]${SEP}\(?\d{1,2}\)?${SEP}\d{3}${SEP}\d{4}(?!\d)`,
-    String.raw`(?:${AFTER_ESCAPE}|(?<![\dA-Za-z-]))\(?0(?:5\d|[2-489])\)?${SEP}\d{3}${SEP}\d{4}(?!\d)`,
+    // +972 52..., 00972 (0)52..., %2B972 2 ...
+    String.raw`(?:${AFTER_ESCAPE}|(?<![\dA-Fa-f-]))(?:%2B|\+|00)?97[02]${SEP}(?:\(0\)${SEP})?\(?\d{1,2}\)?${SEP}${TAIL}(?!\d)`,
+    // Mobiles 05x, 07x numbers, landlines 02/03/04/08/09.
+    String.raw`(?:${AFTER_ESCAPE}|(?<![\dA-Za-z.-]))\(?0(?:5\d|7\d|[2-489])\)?${SEP}${TAIL}(?!\d)`,
   ].join("|"),
   "g",
 );
 
 // Sentry describes a clicked or measured element by a CSS selector that
 // includes these attributes, and the app puts doctors' names in them (a
-// photo's alt). The attribute stays, its value goes.
-const SELECTOR_ATTR = /\[(alt|title|aria-label|name|placeholder|value)="(?:[^"\\]|\\.)*"\]/g;
+// photo's alt). The attribute stays, its value goes. Sentry does not escape
+// quotes in the value (a Hebrew ד"ר, a quoted nickname), so the value runs to
+// the `"]` that ends the selector part: another attribute, a class or id, the
+// next element (` > `), or the end.
+const SELECTOR_ATTR = /\[(alt|title|aria-label|name|placeholder|value)="[\s\S]*?"\](?=\[|\.|#|\s>\s|\]|\s|$)/g;
 
-/** Masks phone numbers, typed in Arabic-Indic digits too. */
+// Postgres quotes the input it rejects ("invalid input syntax for type uuid:
+// "..."", "invalid input value for enum ...: "...""), and the app wraps those
+// messages in its own errors.
+const PG_QUOTED_INPUT = /(invalid input (?:syntax|value) for [^:]*: )"[^"]*"/g;
+
+/** Masks phone numbers (typed in Arabic-Indic digits too), names in element
+ *  selectors, and the input Postgres quotes back. */
 export function scrubString(s: string): string {
-  return toAsciiDigits(s).replace(SELECTOR_ATTR, "[$1]").replace(PHONE, "[phone]");
+  return toAsciiDigits(s)
+    .replace(SELECTOR_ATTR, "[$1]")
+    .replace(PG_QUOTED_INPUT, '$1"[value]"')
+    .replace(PHONE, "[phone]");
 }
 
 /** Keys that are secret wherever they appear, including dotted span
@@ -101,11 +118,17 @@ export function scrubPii<T>(value: T, seen = new WeakSet<object>()): T {
  *  goes, since its message and details can quote the row. */
 export function scrubEvent(event: ErrorEvent): ErrorEvent {
   const serialized = event.extra?.__serialized__;
-  const kept =
-    serialized && typeof serialized === "object"
-      ? { ...event, extra: { ...event.extra, __serialized__: { code: (serialized as { code?: unknown }).code ?? null } } }
-      : event;
-  return scrubPii(kept);
+  if (!serialized || typeof serialized !== "object") return scrubPii(event);
+  // The object's message also becomes the exception's text: replace it too.
+  const code = (serialized as { code?: unknown }).code ?? null;
+  const values = event.exception?.values?.map((v) =>
+    v.mechanism?.synthetic ? { ...v, value: `captured object (code ${code ?? "none"})` } : v,
+  );
+  return scrubPii({
+    ...event,
+    extra: { ...event.extra, __serialized__: { code } },
+    ...(values ? { exception: { ...event.exception, values } } : {}),
+  });
 }
 
 /** A console.* call becomes a breadcrumb that keeps every logged value, such
@@ -118,10 +141,20 @@ export function scrubBreadcrumb(crumb: Breadcrumb): Breadcrumb {
   return scrubPii(kept);
 }
 
+/** The browser keeps no click or console breadcrumbs at all: they describe
+ *  what a doctor did and saw (an element named by a colleague's name), and
+ *  Sentry is here for errors. The rest is scrubbed as on the server. */
+export function browserBreadcrumb(crumb: Breadcrumb): Breadcrumb | null {
+  if (crumb.category?.startsWith("ui.") || crumb.category === "console") return null;
+  return scrubBreadcrumb(crumb);
+}
+
 /** Span fields that hold a URL or path: Next's own spans (http.target,
  *  http.url, a fetch span's name) keep the query string, which carries
  *  search terms, licences and phone lists. */
-const URL_FIELDS = new Set(["http.target", "http.url", "url.full", "url.query", "http.query", "url", "sentry.segment.name"]);
+const URL_FIELDS = new Set(["http.target", "http.url", "url.full", "url", "sentry.segment.name"]);
+/** Fields that are nothing but a query string: dropped whole. */
+const QUERY_FIELDS = new Set(["url.query", "http.query"]);
 const withoutQuery = (v: unknown) => (typeof v === "string" ? v.replace(/\?\S*/, "") : v);
 
 /** Spans carry request URLs and query attributes too (beforeSend skips
@@ -129,7 +162,11 @@ const withoutQuery = (v: unknown) => (typeof v === "string" ? v.replace(/\?\S*/,
 export function scrubSpan<T extends { name?: string; attributes?: Record<string, unknown> }>(span: T): T {
   try {
     const attributes = span.attributes
-      ? Object.fromEntries(Object.entries(span.attributes).map(([k, v]) => [k, URL_FIELDS.has(k) ? withoutQuery(v) : v]))
+      ? Object.fromEntries(
+          Object.entries(span.attributes)
+            .filter(([k]) => !QUERY_FIELDS.has(k))
+            .map(([k, v]) => [k, URL_FIELDS.has(k) ? withoutQuery(v) : v]),
+        )
       : span.attributes;
     return scrubPii({ ...span, name: withoutQuery(span.name), attributes });
   } catch {
