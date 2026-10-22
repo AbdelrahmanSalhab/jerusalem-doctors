@@ -2,9 +2,10 @@
 // run: e2e/env.ts points SENTRY_DSN at the stub, which keeps every envelope.
 // None of it may carry a doctor's name, phone, licence or email.
 //
-// Here a doctor clicks a colleague's photo, whose alt is the colleague's
-// name (Sentry describes clicks by a selector with the alt), and then an
-// error is thrown in the page, which sends that click as a breadcrumb.
+// Sentry describes a click by the element's selector, attributes included,
+// and the app puts names in them (a photo's alt). Seeded doctors have no
+// photo, so the test adds an element named like one to the real page, clicks
+// it, and throws an error there, which sends that click as a breadcrumb.
 
 import { expect, test } from "../fixtures";
 import { STUB_URL } from "../env";
@@ -15,10 +16,18 @@ test.use({ storageState: stateFile("doctor") });
 
 const envelopes = async () => (await fetch(`${STUB_URL}/sentry/envelopes`)).text();
 
-test("nothing personal reaches Sentry, even a clicked photo's name", async ({ page }) => {
+test("nothing personal reaches Sentry, even a clicked element's name", async ({ page }) => {
   await page.goto("/dashboard");
   await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("ليلى");
-  await page.getByRole("img", { name: "ليلى الخطيب" }).first().click();
+  await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+  await page.evaluate(() => {
+    const b = document.createElement("button");
+    b.setAttribute("aria-label", "ليلى الخطيب");
+    b.title = "ليلى الخطيب";
+    b.textContent = "probe";
+    document.body.append(b);
+  });
+  await page.getByRole("button", { name: "ليلى الخطيب" }).click();
   await page.evaluate(() => {
     setTimeout(() => {
       throw new Error("sentry privacy probe");
@@ -29,7 +38,7 @@ test("nothing personal reaches Sentry, even a clicked photo's name", async ({ pa
   await expect.poll(envelopes, { timeout: 15_000 }).toContain("sentry privacy probe");
   const sent = await envelopes();
   expect(sent).toContain("ui.click");
-  expect(sent).toMatch(/img[^"]*\[alt\]/);
+  expect(sent).toMatch(/button[^"]*\[aria-label\]/);
 
   const personal = DOCTORS.flatMap((d) => [
     `${d.first} ${d.family}`,
