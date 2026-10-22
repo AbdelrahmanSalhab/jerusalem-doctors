@@ -63,8 +63,8 @@ const LICENCE_NEEDS_REVIEW = "license_verification_status.is.null,license_verifi
 const REAL_DOCTOR = "is_admin.eq.false,is_visible.eq.true";
 
 /** Doctors behind each filter, for its box or pill. The same conditions as
- *  the filters, so a number is the length of the list it opens. One head-only count
- *  each, all in parallel. */
+ *  the filters, so a number is the length of the list it opens. One
+ *  head-only count each, all in parallel. */
 async function counts(service: SupabaseClient): Promise<Record<DoctorFilter, number>> {
   const rows = () => service.from("doctors").select("id", { count: "exact", head: true });
   const results = await Promise.all(DOCTOR_FILTERS.map((f) => applyFilter(rows(), f.key)));
