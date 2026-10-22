@@ -21,6 +21,8 @@ const PUBLIC_EXACT = new Set([
   "/signup",
   "/verify",
   "/privacy",
+  // Reporting a profile: the doctor it impersonates may have no account.
+  "/report",
   "/health",
   "/favicon.ico",
   "/robots.txt",

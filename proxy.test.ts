@@ -8,6 +8,7 @@ describe("isPublic", () => {
     "/signup",
     "/verify",
     "/privacy",
+    "/report",
     "/health",
     "/api/search",
     "/_next/data/x",

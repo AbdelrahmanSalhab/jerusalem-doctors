@@ -39,6 +39,9 @@ export const RATE_LIMITS = {
   contactClick: { limit: 60, window: "1 m" },
   // "Ask the admins for this doctor's number": each one is a person's work.
   numberRequest: { limit: 10, window: "1 d" },
+  // "This profile is not who it says": rare, and each one is a review.
+  profileReport: { limit: 5, window: "1 d" },
+  profileReportIp: { limit: 5, window: "1 h" },
   profilePatch: { limit: 10, window: "1 h" },
   // An admin re-checking licences against the ministry registry. Generous,
   // but a loop in the panel must not hammer data.gov.il.

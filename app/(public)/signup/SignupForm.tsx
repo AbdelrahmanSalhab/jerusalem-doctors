@@ -55,6 +55,9 @@ export function SignupForm({
   const router = useRouter();
   const [form, setForm] = useState<FormState>(initial ?? INITIAL);
   const [error, setError] = useState<string | null>(null);
+  /** The licence /start refused as already registered: the error then
+   *  offers the report form (#30), in case someone else took it. */
+  const [takenLicense, setTakenLicense] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
   const goTo = (n: number) => {
@@ -121,6 +124,7 @@ export function SignupForm({
     }
     if (missing.length > 0) return;
     setError(null);
+    setTakenLicense(null);
     setFieldErrors({});
     setRegistryName(null);
     setSubmitting(true);
@@ -198,6 +202,7 @@ export function SignupForm({
         turnstileRef.current?.reset();
         if (startBody?.fields) showFieldErrors(startBody.fields);
         setError(fieldErrorMessage(startBody?.fields) ?? apiErrorMessage(startBody?.code));
+        setTakenLicense(startBody?.code === "duplicate" ? form.license_number : null);
         setSubmitting(false);
         return;
       }
@@ -404,6 +409,14 @@ export function SignupForm({
       {error && (
         <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">
           {error}
+          {takenLicense && (
+            <>
+              {" "}
+              <a href={`/report?license=${encodeURIComponent(takenLicense)}`} className="font-semibold underline">
+                ليس أنت؟ أبلغ الإدارة
+              </a>
+            </>
+          )}
         </p>
       )}
 

@@ -43,6 +43,7 @@ export default async function DashboardPage({
     (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order,
   )[0];
   const viewer = {
+    id: me.id,
     firstName: me.arabic_first_name,
     familyName: me.arabic_family_name,
     specialty:
@@ -84,7 +85,10 @@ export default async function DashboardPage({
       {existing && (
         <p role="status" className="rounded-md border border-info-line bg-info-bg p-4 text-sm text-info">
           <strong className="font-semibold">هذا الرقم مسجَّل مسبقًا.</strong> أدخلناك إلى حسابك
-          بدل إنشاء حساب جديد.
+          بدل إنشاء حساب جديد. ليس حسابك؟{" "}
+          <Link href="/report" className="font-semibold underline">
+            أبلغ الإدارة
+          </Link>
         </p>
       )}
 
