@@ -8,6 +8,7 @@
 
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
+import { isResidentAndRetired, RESIDENT_NOT_RETIRED } from "@/lib/careerStage";
 import { purgeUnfinished, RESUME_FORM_MAX_BYTES } from "@/lib/signup/unfinished";
 import { withHmoIds } from "@/lib/institutions";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
@@ -88,6 +89,10 @@ const Body = z
   .refine((b) => b.secondary_license_region !== b.license_region, {
     message: "الترخيص الإضافي يجب أن يكون من الجهة الأخرى",
     path: ["secondary_license_region"],
+  })
+  .refine((b) => !isResidentAndRetired(b.career_stage, b.retired), {
+    message: RESIDENT_NOT_RETIRED.error,
+    path: ["retired"],
   })
   // Residents rotate; a doctor looking for work or retired may have none.
   .refine(

@@ -204,6 +204,12 @@ describe("POST /api/signup/start: workplaces", () => {
     expect(r.status).toBe(200);
   });
 
+  it("refuses a resident who says they are retired", async () => {
+    const r = await start({ license_number: "23456", career_stage: "resident", residency_start_year: 2022, retired: true });
+    expect(r.status).toBe(400);
+    expect(r.body.fields).toMatchObject({ retired: "لا يمكن أن تكون طبيبًا مقيمًا ومتقاعدًا معًا." });
+  });
+
   it("lets a retired doctor sign up without a workplace", async () => {
     const r = await start({ license_number: "23456", retired: true, workplaces: [] });
     expect(r.status).toBe(200);

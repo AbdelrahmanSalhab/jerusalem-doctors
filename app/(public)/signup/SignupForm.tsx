@@ -19,6 +19,7 @@ import {
   residencyYearMax,
   STAGE_BY_KEY,
   type Stage,
+  RESIDENT_NOT_RETIRED,
 } from "@/lib/careerStage";
 import {
   SS_PHONE,
@@ -260,7 +261,12 @@ export function SignupForm({
         <>
         <Section title="المرحلة المهنية">
           <Field label="اختر ما ينطبق عليك" required error={fieldError("career_stage")}>
-            <StageRadios id="stage" value={form.stage} onChange={applyStage} />
+            <StageRadios
+              id="stage"
+              value={form.stage}
+              onChange={applyStage}
+              disabled={form.retired && form.stage !== "resident" ? { resident: RESIDENT_NOT_RETIRED.resident } : {}}
+            />
           </Field>
 
           {stageOpt?.requiresResidencyStartYear && (
@@ -294,6 +300,7 @@ export function SignupForm({
           <RetiredCheckbox
             checked={form.retired}
             onChange={(v) => update("retired", v)}
+            disabledReason={form.stage === "resident" && !form.retired ? RESIDENT_NOT_RETIRED.retired : undefined}
           />
         </Section>
 

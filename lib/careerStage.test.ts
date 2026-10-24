@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CAREER_STAGES,
+  isResidentAndRetired,
   careerStageBadge,
   findGeneralSpecialtyId,
   initialProfileStage,
@@ -219,5 +220,15 @@ describe("initialProfileStage", () => {
 
   it("stays undeclared when the catalog has no الطب العام row", () => {
     expect(initialProfileStage(null, ["g"], null)).toBeNull();
+  });
+});
+
+describe("isResidentAndRetired", () => {
+  it("is true only for a retired resident", () => {
+    expect(isResidentAndRetired("resident", true)).toBe(true);
+    expect(isResidentAndRetired("resident", false)).toBe(false);
+    expect(isResidentAndRetired("specialist", true)).toBe(false);
+    expect(isResidentAndRetired(null, true)).toBe(false);
+    expect(isResidentAndRetired(undefined, undefined)).toBe(false);
   });
 });

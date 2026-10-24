@@ -101,6 +101,21 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
   },
 ];
 
+/** طبيب مقيم and متقاعد never go together: a resident is in training. The
+ *  forms grey out whichever of the two isn't picked, with these reasons, and
+ *  the server refuses the pair (signup/start, profileRuleFailure). */
+export const RESIDENT_NOT_RETIRED = {
+  /** Under «طبيب مقيم» while متقاعد is ticked. */
+  resident: "لا يجتمع مع «متقاعد». ألغِ «متقاعد» أولًا إن كنت مقيمًا.",
+  /** Under «متقاعد» while طبيب مقيم is picked. */
+  retired: "لا يجتمع مع «طبيب مقيم».",
+  /** The server's answer to a request that sends both. */
+  error: "لا يمكن أن تكون طبيبًا مقيمًا ومتقاعدًا معًا.",
+} as const;
+
+export const isResidentAndRetired = (stage: CareerStage | null | undefined, retired: boolean | null | undefined) =>
+  stage === "resident" && Boolean(retired);
+
 export const STAGE_BY_KEY: Record<Stage, StageOption> = Object.fromEntries(
   STAGE_OPTIONS.map((o) => [o.stage, o]),
 ) as Record<Stage, StageOption>;

@@ -14,7 +14,7 @@ import {
   buildWorkplaceRows,
   ProfileFieldsSchema,
   saveProfileTransaction,
-  workplacesRuleFailure,
+  profileRuleFailure,
 } from "@/lib/profile/save";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -42,7 +42,7 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     });
   }
 
-  const ruleFailure = workplacesRuleFailure(parsed, me);
+  const ruleFailure = profileRuleFailure(parsed, me);
   if (ruleFailure) {
     return jsonError(ruleFailure.status, {
       error: ruleFailure.code,
