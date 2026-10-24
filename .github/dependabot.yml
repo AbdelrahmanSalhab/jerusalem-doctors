@@ -18,6 +18,14 @@ updates:
       # stack can run them.
       - dependency-name: "@upstash/ratelimit"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # ESLint 10 and TypeScript 7 wait for the lint tooling: eslint-config-next's
+      # react, import and jsx-a11y plugins declare ESLint 9 at most, and
+      # typescript-eslint refuses TypeScript 7.0 until 7.1's API (#138, #137,
+      # and the tracking issue).
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       types:
         patterns: ["@types/*"]
