@@ -94,3 +94,24 @@ test("signing up again with a registered number signs its owner in and says so",
   const { count } = await serviceClient().from("doctors").select("id", { count: "exact", head: true }).eq("phone_e164", PHONES.returning);
   expect(count).toBe(1);
 });
+
+test("a specialist sees their services after their specialty", async ({ page }) => {
+  await page.goto("/signup");
+  await page.getByLabel("رقم الهاتف").fill("0521110009");
+  await page.getByLabel(/^رقم الترخيص/).fill("599996");
+  await page.getByLabel("البريد الإلكتروني").fill("order@example.test");
+  await page.getByRole("button", { name: "التالي" }).click();
+  await page.getByLabel("الاسم بالعربية").fill("ترتيب");
+  await page.getByLabel("اسم العائلة بالعربية").fill("الأقسام");
+  await page.getByLabel(/^الاسم بالعبرية/).fill("סדר");
+  await page.getByLabel(/^اسم العائلة بالعبرية/).fill("סדר");
+  await page.getByRole("button", { name: "التالي" }).click();
+  await page.getByRole("radio", { name: /طبيب أخصائي/ }).check();
+
+  const headings = await page.getByRole("heading", { level: 2 }).allTextContents();
+  const specialty = headings.indexOf("التخصص");
+  const services = headings.findIndex((h) => h.startsWith("الخدمات والشهادات"));
+  expect(specialty).toBeGreaterThanOrEqual(0);
+  expect(services).toBeGreaterThan(specialty);
+});
+

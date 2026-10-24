@@ -297,21 +297,6 @@ export function SignupForm({
           />
         </Section>
 
-        {stageOpt?.showsCertificates && (
-          <Section title="الخدمات والشهادات (اختياري)">
-            <Field
-              label={form.stage === "general" ? "شهادات وخدمات (تظهر على بطاقتك بدل «الطب العام»)" : "الخدمات والإجراءات التي تقدّمها، مثلًا: تنظير القولون، حقن العين"}
-              htmlFor="certificates"
-            >
-              <CertificatesEditor
-                id="certificates"
-                value={form.certificates}
-                onChange={(v) => update("certificates", v)}
-              />
-            </Field>
-          </Section>
-      )}
-
       {showSpecialtyPicker && (
         <Section title="التخصص">
           <Field
@@ -335,6 +320,23 @@ export function SignupForm({
             placeholder="مثلاً: جراحة اليد"
           />
         </Section>
+      )}
+
+      {/* After the specialty: a resident's or specialist's services
+          follow from it. */}
+        {stageOpt?.showsCertificates && (
+          <Section title="الخدمات والشهادات (اختياري)">
+            <Field
+              label={form.stage === "general" ? "شهادات وخدمات (تظهر على بطاقتك بدل «الطب العام»)" : "الخدمات والإجراءات التي تقدّمها، مثلًا: تنظير القولون، حقن العين"}
+              htmlFor="certificates"
+            >
+              <CertificatesEditor
+                id="certificates"
+                value={form.certificates}
+                onChange={(v) => update("certificates", v)}
+              />
+            </Field>
+          </Section>
       )}
 
       <Section title="نبذة عني (اختياري)">
