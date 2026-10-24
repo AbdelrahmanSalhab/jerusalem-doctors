@@ -9,6 +9,10 @@
 -- name) and returns the fund's name for the card; directory_counts() counts
 -- the clinic's doctor for the fund.
 --
+-- Existing rows: a non-resident's صندوق مرضى workplace becomes a clinic that
+-- belongs to the fund it is linked to (or a plain clinic when it is linked
+-- to no fund), since the form no longer offers them the type.
+--
 -- Apply in the Supabase SQL editor before the code that uses it. Safe to run
 -- more than once.
 
@@ -23,6 +27,15 @@ begin
       check (hmo_id is null or workplace_type = 'clinic');
   end if;
 end $$;
+
+update public.doctor_workplaces w
+   set workplace_type = 'clinic',
+       hmo_id = (select i.id from public.institutions i
+                  where i.id = w.institution_id and i.kind = 'hmo')
+  from public.doctors d
+ where d.id = w.doctor_id
+   and w.workplace_type = 'hmo'
+   and d.career_stage is distinct from 'resident';
 
 -- The fund filter and the foreign key (deleting a fund).
 create index if not exists doctor_workplaces_hmo on public.doctor_workplaces (hmo_id)
