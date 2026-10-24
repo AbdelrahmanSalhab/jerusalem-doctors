@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
-import type { WorkplaceType } from "@/lib/workplace";
+import { hmoNameOf, type SavedWorkplace, type WorkplaceType } from "@/lib/workplace";
 
 export interface SearchWorkplace {
   name: string;
@@ -18,6 +18,8 @@ export interface SearchWorkplace {
   is_primary: boolean;
   /** The hospital or fund it is linked to; absent from search results. */
   institution_id?: string | null;
+  /** The health fund a clinic belongs to, by name. */
+  hmo?: string | null;
 }
 
 export interface SearchHit {
@@ -89,7 +91,7 @@ export function directoryQuery(service: SupabaseClient) {
       doctor_specialties(
         specialty:specialties(id, name_ar)
       ),
-      doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order, institution_id)
+      doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order, institution_id, hmo:institutions!doctor_workplaces_hmo_id_fkey(name_ar))
     `,
     )
     .eq("is_active", true)
@@ -119,7 +121,13 @@ interface DirectoryRow {
   doctor_specialties:
     | { specialty: { name_ar: string } | { name_ar: string }[] | null }[]
     | null;
-  doctor_workplaces: (SearchWorkplace & { sort_order: number })[] | null;
+  doctor_workplaces:
+    | (Omit<SearchWorkplace, "hmo"> & {
+        sort_order: number;
+        /** search_directory() gives the name; the PostgREST embed an object. */
+        hmo?: string | SavedWorkplace["hmo"];
+      })[]
+    | null;
 }
 
 export function toSearchHits(data: unknown): SearchHit[] {
@@ -150,6 +158,7 @@ function toSearchHit(d: DirectoryRow): SearchHit {
       hours: w.hours,
       phone: w.phone,
       is_primary: w.is_primary,
+      hmo: (typeof w.hmo === "string" ? w.hmo : hmoNameOf(w.hmo)) || null,
       ...(w.institution_id !== undefined && { institution_id: w.institution_id }),
     }));
 

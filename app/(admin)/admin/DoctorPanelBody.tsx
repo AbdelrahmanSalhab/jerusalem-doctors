@@ -14,7 +14,7 @@ import { auditTime } from "@/lib/auditText";
 import { careerStageBadge } from "@/lib/careerStage";
 import { FEATURED_LABEL } from "@/lib/directory";
 import type { DoctorDetail } from "@/lib/admin/doctorDetail";
-import { mapLinks, WORKPLACE_TYPE_LABEL, type WorkplaceType } from "@/lib/workplace";
+import { hmoNameOf, mapLinks, WORKPLACE_TYPE_LABEL, type WorkplaceType } from "@/lib/workplace";
 
 /** "19/10/2026 14:53" in Jerusalem time, or a dash. */
 function when(iso: string | null): string {
@@ -143,6 +143,7 @@ export function DoctorPanelBody({
                   </span>
                   <span className="text-muted">
                     {WORKPLACE_TYPE_LABEL[w.workplace_type as WorkplaceType] ?? w.workplace_type}
+                    {hmoNameOf(w.hmo) && ` · تابعة لـ${hmoNameOf(w.hmo)}`}
                     {w.details && ` · ${w.details}`}
                   </span>
                   {w.address && (

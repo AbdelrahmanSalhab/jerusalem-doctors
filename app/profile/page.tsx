@@ -3,6 +3,7 @@ import { requireDoctor } from "@/lib/auth/session";
 import { cachedSpecialties } from "@/lib/cachedReads";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { DoctorWorkplace } from "@/lib/db/types";
+import { SAVED_WORKPLACE_COLUMNS } from "@/lib/workplace";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function ProfilePage() {
         .eq("doctor_id", me.id),
       service
         .from("doctor_workplaces")
-        .select("name, workplace_type, details, address, hours, phone, is_primary, sort_order")
+        .select(SAVED_WORKPLACE_COLUMNS)
         .eq("doctor_id", me.id)
         .order("is_primary", { ascending: false })
         .order("sort_order", { ascending: true }),

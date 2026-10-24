@@ -9,6 +9,7 @@
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
 import { purgeUnfinished, RESUME_FORM_MAX_BYTES } from "@/lib/signup/unfinished";
+import { withHmoIds } from "@/lib/institutions";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import {
@@ -343,6 +344,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     address: string | null;
     hours: string | null;
     phone: string | null;
+    hmo: string | null;
     is_primary: boolean;
     sort_order: number;
   }[] = [];
@@ -361,6 +363,8 @@ export const POST = withJsonErrors(async (req: Request) => {
       address: w.address,
       hours: w.hours,
       phone: w.phone,
+      // A fund only belongs to a clinic.
+      hmo: w.workplace_type === "clinic" ? (w.hmo ?? null) : null,
       is_primary: w.is_primary,
       sort_order: i,
     });
@@ -397,7 +401,8 @@ export const POST = withJsonErrors(async (req: Request) => {
       retired: parsed.retired ?? false,
 
       specialty_ids: parsed.specialty_ids,
-      workplaces,
+      // A clinic's fund as the fund's id (signup/verify inserts these rows).
+      workplaces: await withHmoIds(service, workplaces),
 
       license_verification_status: licenseStatusToColumn(
         verified.status,

@@ -80,8 +80,9 @@ describe("workplaceForStage", () => {
     address: "شارع صلاح الدين ١٢",
     hours: "الأحد-الخميس ٩-٥",
     phone: "02-6271234",
+    hmo: "كلاليت",
   };
-  const BLANK = { details: "", address: "", hours: "", phone: "" };
+  const BLANK = { details: "", address: "", hours: "", phone: "", hmo: "" };
 
   it("coerces a type the stage doesn't offer, dropping the clinic fields", () => {
     expect(
@@ -112,9 +113,12 @@ describe("workplaceForStage", () => {
     const w = { workplace_type: "hmo" as const, ...BLANK };
     expect(workplaceForStage(w, "resident")).toBe(w);
   });
-  it("keeps a صندوق مرضى workplace when a resident becomes a specialist", () => {
+  it("turns a resident's صندوق مرضى into the specialist's default when they become one", () => {
     const w = { workplace_type: "hmo" as const, ...BLANK };
-    expect(workplaceForStage(w, "specialist")).toBe(w);
+    expect(workplaceForStage(w, "specialist")).toEqual({ ...w, workplace_type: "hospital" });
+  });
+  it("drops a clinic's fund when the row stops being a clinic", () => {
+    expect(workplaceForStage({ ...CLINIC, workplace_type: "hospital" }, "specialist")).toMatchObject({ hmo: "" });
   });
 });
 
@@ -133,9 +137,10 @@ describe("STAGE_OPTIONS", () => {
     expect(STAGE_BY_KEY.specialist.defaultWorkplaceType).toBe("hospital");
   });
 
-  it("keeps عيادة away from residents, and offers صندوق مرضى to every stage", () => {
-    expect(STAGE_BY_KEY.resident.workplaceTypes).not.toContain("clinic");
-    for (const o of STAGE_OPTIONS) expect(o.workplaceTypes).toContain("hmo");
+  it("offers صندوق مرضى to residents only, and عيادة to everyone else", () => {
+    expect(STAGE_BY_KEY.resident.workplaceTypes).toEqual(["hospital", "hmo"]);
+    expect(STAGE_BY_KEY.general.workplaceTypes).toEqual(["hospital", "clinic"]);
+    expect(STAGE_BY_KEY.specialist.workplaceTypes).toEqual(["hospital", "clinic"]);
   });
 
 

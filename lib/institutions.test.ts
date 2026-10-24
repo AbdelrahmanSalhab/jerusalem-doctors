@@ -1,5 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import { type Institution, institutionsMatching, matchInstitution, matchKey } from "./institutions";
+import { db } from "@/test/fakeSupabase";
+import { type Institution, institutionsMatching, matchInstitution, matchKey, withHmoIds } from "./institutions";
 import { INSTITUTIONS_SEED } from "./institutionsSeed";
 
 const LIST: Institution[] = INSTITUTIONS_SEED.map((s) => ({ id: s.name_ar, ...s }));
@@ -159,5 +161,34 @@ describe("institutionUsage", () => {
       },
       { name: "ايخيلوف", count: 1, doctors: [{ id: "staff", name: "إدارة الموقع" }] },
     ]);
+  });
+});
+
+describe("withHmoIds", () => {
+  const service = db.client as unknown as SupabaseClient;
+  const FUNDS = [
+    { id: "f1", name_ar: "كلاليت", name_he: "כללית", kind: "hmo", aliases: [] },
+    { id: "h1", name_ar: "كلاليت", name_he: "x", kind: "hospital", aliases: [] },
+  ];
+
+  it("turns a clinic's fund name into the fund's id, ignoring other kinds and unknown names", async () => {
+    db.reset();
+    db.queue("institutions", { data: FUNDS });
+    const rows = await withHmoIds(service, [
+      { name: "عيادة", hmo: "كلاليت" },
+      { name: "عيادة أخرى", hmo: "صندوق لا وجود له" },
+      { name: "هداسا", hmo: null },
+    ]);
+    expect(rows).toEqual([
+      { name: "عيادة", hmo_id: "f1" },
+      { name: "عيادة أخرى", hmo_id: null },
+      { name: "هداسا", hmo_id: null },
+    ]);
+  });
+
+  it("does not query when no row names a fund", async () => {
+    db.reset();
+    expect(await withHmoIds(service, [{ name: "هداسا", hmo: null }])).toEqual([{ name: "هداسا", hmo_id: null }]);
+    expect(db.calls).toHaveLength(0);
   });
 });

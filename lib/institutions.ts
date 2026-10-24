@@ -94,6 +94,21 @@ export async function fetchInstitutions(service: SupabaseClient): Promise<Instit
   return (data ?? []) as Institution[];
 }
 
+/**
+ * Workplace rows with the clinic's health fund as an id: each row's `hmo`
+ * (a fund's name as the form offered it) becomes `hmo_id`, the id of the
+ * health fund of that name, or null. Queries only when some row names one.
+ */
+export async function withHmoIds<R extends { hmo?: string | null }>(
+  service: SupabaseClient,
+  rows: readonly R[],
+): Promise<(Omit<R, "hmo"> & { hmo_id: string | null })[]> {
+  const funds = rows.some((r) => r.hmo)
+    ? new Map((await fetchInstitutions(service)).filter((i) => i.kind === "hmo").map((i) => [i.name_ar, i.id]))
+    : new Map<string, string>();
+  return rows.map(({ hmo, ...rest }) => ({ ...rest, hmo_id: (hmo && funds.get(hmo)) || null }));
+}
+
 interface WorkplaceRow {
   id: string;
   name: string;

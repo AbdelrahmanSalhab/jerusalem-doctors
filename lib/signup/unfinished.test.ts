@@ -16,6 +16,8 @@ describe("toFormState", () => {
     });
     expect(form).toMatchObject({ phone: "0521234567", arabic_first_name: "سارة", stage: "specialist", specialty_ids: ["a", "b"], seeking_work: true, consent: false });
     expect(form.workplaces[0].name).toBe("المقاصد");
+    // Saved before clinics had a fund.
+    expect(form.workplaces[0].hmo).toBe("");
   });
 
   it("falls back to the empty form for anything of the wrong shape", () => {

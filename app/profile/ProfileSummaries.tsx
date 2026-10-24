@@ -154,6 +154,7 @@ export function WorkplacesSummary({ workplaces }: { workplaces: WorkplaceEntry[]
             {WORKPLACE_TYPE_LABEL[w.workplace_type]}
           </span>
           <span>{w.name}</span>
+          {w.workplace_type === "clinic" && w.hmo && <span className="text-muted">تابعة لـ{w.hmo}</span>}
           {workplaceInfoLine(w) && (
             <span className="text-muted">({workplaceInfoLine(w)})</span>
           )}
