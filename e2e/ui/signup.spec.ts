@@ -95,7 +95,8 @@ test("signing up again with a registered number signs its owner in and says so",
   expect(count).toBe(1);
 });
 
-test("a specialist sees their services after their specialty", async ({ page }) => {
+/** Steps one and two with throwaway values, ending on the last step. */
+async function toLastStep(page: Page) {
   await page.goto("/signup");
   await page.getByLabel("رقم الهاتف").fill("0521110009");
   await page.getByLabel(/^رقم الترخيص/).fill("599996");
@@ -106,6 +107,10 @@ test("a specialist sees their services after their specialty", async ({ page }) 
   await page.getByLabel(/^الاسم بالعبرية/).fill("סדר");
   await page.getByLabel(/^اسم العائلة بالعبرية/).fill("סדר");
   await page.getByRole("button", { name: "التالي" }).click();
+}
+
+test("a specialist sees their services after their specialty", async ({ page }) => {
+  await toLastStep(page);
   await page.getByRole("radio", { name: /طبيب أخصائي/ }).check();
 
   const headings = await page.getByRole("heading", { level: 2 }).allTextContents();
@@ -115,3 +120,18 @@ test("a specialist sees their services after their specialty", async ({ page }) 
   expect(services).toBeGreaterThan(specialty);
 });
 
+test("a resident can't also be retired: each greys the other out and says why @phone", async ({ page }) => {
+  await toLastStep(page);
+  const resident = page.getByRole("radio", { name: /طبيب مقيم/ });
+  const retired = page.getByRole("checkbox", { name: /أنا طبيب متقاعد/ });
+
+  await resident.check();
+  await expect(retired).toBeDisabled();
+  await expect(page.getByText("لا يجتمع مع «طبيب مقيم».")).toBeVisible();
+
+  await page.getByRole("radio", { name: /طبيب أخصائي/ }).check();
+  await expect(retired).toBeEnabled();
+  await retired.check();
+  await expect(resident).toBeDisabled();
+  await expect(page.getByText("لا يجتمع مع «متقاعد». ألغِ «متقاعد» أولًا إن كنت مقيمًا.")).toBeVisible();
+});

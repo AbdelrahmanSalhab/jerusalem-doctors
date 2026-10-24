@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
+import { CAREER_STAGES, isResidentAndRetired, RESIDENCY_YEAR_MIN, RESIDENT_NOT_RETIRED } from "@/lib/careerStage";
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { relinkDoctor, withHmoIds } from "@/lib/institutions";
 import { normalizeArabic } from "@/lib/normalize/arabic";
@@ -76,17 +76,22 @@ export interface ProfileCurrent {
 }
 
 /**
- * A doctor may list no workplace only while they are a resident, looking for
- * one, or retired. Each of the three may come from this request or from the
- * stored row, so the state *after* the save is what the rule reads.
+ * Rules across fields, on the state *after* the save (each field may come
+ * from this request or from the stored row):
+ * - a resident is never retired (lib/careerStage.ts RESIDENT_NOT_RETIRED);
+ * - a doctor may list no workplace only while they are a resident, looking
+ *   for one, or retired.
  */
-export function workplacesRuleFailure(
+export function profileRuleFailure(
   p: ProfileFields,
   current: Pick<ProfileCurrent, "career_stage" | "seeking_work" | "retired">,
 ): SaveFailure | null {
   const stageAfterSave = p.career_stage !== undefined ? p.career_stage : current.career_stage;
   const seekingAfterSave = p.seeking_work ?? current.seeking_work;
   const retiredAfterSave = p.retired ?? current.retired;
+  if (isResidentAndRetired(stageAfterSave, retiredAfterSave)) {
+    return { status: 400, code: "invalid_body", fields: { retired: RESIDENT_NOT_RETIRED.error } };
+  }
   if (
     p.workplaces?.length === 0 &&
     stageAfterSave !== "resident" &&

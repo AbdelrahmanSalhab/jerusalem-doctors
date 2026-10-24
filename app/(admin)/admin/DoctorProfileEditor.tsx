@@ -29,6 +29,7 @@ import {
   STAGE_BY_KEY,
   stageFromCareerStage,
   type Stage,
+  RESIDENT_NOT_RETIRED,
 } from "@/lib/careerStage";
 import { profileFormError } from "@/lib/profile/validate";
 import type { SpecialtyChoice } from "@/lib/specialties/catalogue";
@@ -286,7 +287,11 @@ export function DoctorProfileEditor({
       </Block>
 
       <Block title="المرحلة المهنية">
-        <StageRadios value={stage} onChange={applyStage} />
+        <StageRadios
+              value={stage}
+              onChange={applyStage}
+              disabled={retired && stage !== "resident" ? { resident: RESIDENT_NOT_RETIRED.resident } : {}}
+            />
         {stageOpt?.requiresResidencyStartYear && (
           <Field label="سنة بداية التخصص">
             <input
@@ -302,7 +307,11 @@ export function DoctorProfileEditor({
           </Field>
         )}
         <SeekingWorkCheckbox checked={seekingWork} onChange={setSeekingWork} />
-        <RetiredCheckbox checked={retired} onChange={setRetired} />
+        <RetiredCheckbox
+          checked={retired}
+          onChange={setRetired}
+          disabledReason={stage === "resident" && !retired ? RESIDENT_NOT_RETIRED.retired : undefined}
+        />
       </Block>
 
       <Block title="التخصص">

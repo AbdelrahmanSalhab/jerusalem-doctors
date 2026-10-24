@@ -13,6 +13,16 @@ export const OPTION_CARD =
 /** The radio or checkbox inside an OPTION_CARD. */
 export const OPTION_INPUT = "mt-0.5 h-5 w-5 shrink-0 accent-foreground";
 
+/** An OPTION_CARD that can't be picked with the current answers: greyed,
+ *  with the reason under it (OptionDisabledReason). */
+export const OPTION_CARD_DISABLED =
+  "flex cursor-not-allowed items-start gap-3 rounded-lg border border-dashed border-line bg-surface p-3 opacity-60";
+
+/** Why an option is greyed out, in the warning colour, under its text. */
+export function OptionDisabledReason({ reason }: { reason: string }) {
+  return <span className="mt-1 block text-sm font-medium text-warn">{reason}</span>;
+}
+
 export function Field({
   label,
   htmlFor,
@@ -78,16 +88,20 @@ export function SeekingWorkCheckbox({
 export function RetiredCheckbox({
   checked,
   onChange,
+  disabledReason,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
+  /** Greys the option out and says why (lib/careerStage.ts RESIDENT_NOT_RETIRED). */
+  disabledReason?: string;
 }) {
   return (
-    <label className={OPTION_CARD}>
+    <label className={disabledReason ? OPTION_CARD_DISABLED : OPTION_CARD}>
       <input
         type="checkbox"
         className={OPTION_INPUT}
         checked={checked}
+        disabled={Boolean(disabledReason)}
         onChange={(e) => onChange(e.target.checked)}
       />
       <span>
@@ -96,6 +110,7 @@ export function RetiredCheckbox({
           تظهر عبارة &quot;طبيب متقاعد&quot; على بطاقتك، ولا يُطلب منك إدخال مكان عمل.
           يمكنك إلغاؤها في أي وقت من ملفك.
         </span>
+        {disabledReason && <OptionDisabledReason reason={disabledReason} />}
       </span>
     </label>
   );

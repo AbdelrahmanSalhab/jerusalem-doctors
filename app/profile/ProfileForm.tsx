@@ -26,6 +26,7 @@ import {
   STAGE_BY_KEY,
   type Stage,
   initialProfileStage,
+  RESIDENT_NOT_RETIRED,
 } from "@/lib/careerStage";
 import type { Doctor } from "@/lib/db/types";
 import { clinicsMissingDetails, profileFormError } from "@/lib/profile/validate";
@@ -239,7 +240,11 @@ export function ProfileForm({
       >
         {editingStage ? (
           <>
-            <StageRadios value={stage} onChange={applyStage} />
+            <StageRadios
+              value={stage}
+              onChange={applyStage}
+              disabled={retired && stage !== "resident" ? { resident: RESIDENT_NOT_RETIRED.resident } : {}}
+            />
             {stageOpt?.requiresResidencyStartYear && (
               <Field label="سنة بداية التخصص">
                 <input
@@ -268,7 +273,11 @@ export function ProfileForm({
           </ReadOnlyView>
         )}
         <SeekingWorkCheckbox checked={seekingWork} onChange={setSeekingWork} />
-        <RetiredCheckbox checked={retired} onChange={setRetired} />
+        <RetiredCheckbox
+          checked={retired}
+          onChange={setRetired}
+          disabledReason={stage === "resident" && !retired ? RESIDENT_NOT_RETIRED.retired : undefined}
+        />
       </Section>
 
       <Section

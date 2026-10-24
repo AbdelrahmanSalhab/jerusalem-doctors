@@ -200,6 +200,18 @@ describe("PATCH /api/profile: workplaces", () => {
     expect((await call({ seeking_work: false, workplaces: [] })).status).toBe(400);
   });
 
+  it("refuses a resident who is retired, whichever half the request brings", async () => {
+    me = { id: "doc-1", career_stage: "specialist", retired: true };
+    const res = await call({ career_stage: "resident", residency_start_year: 2022 });
+    expect(res.status).toBe(400);
+    expect((await res.json()).fields).toEqual({ retired: "لا يمكن أن تكون طبيبًا مقيمًا ومتقاعدًا معًا." });
+    me = { id: "doc-1", career_stage: "resident", retired: false };
+    expect((await call({ retired: true })).status).toBe(400);
+    // Undoing a stored pair is allowed.
+    me = { id: "doc-1", career_stage: "resident", retired: true };
+    expect((await call({ retired: false })).status).toBe(200);
+  });
+
   it("lets a retired doctor clear their workplaces", async () => {
     me = { id: "doc-1", career_stage: "specialist", retired: true };
     expect((await call({ workplaces: [] })).status).toBe(200);

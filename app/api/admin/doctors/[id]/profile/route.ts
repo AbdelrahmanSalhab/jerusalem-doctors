@@ -27,7 +27,7 @@ import {
   buildProfileUpdates,
   buildWorkplaceRows,
   saveProfileTransaction,
-  workplacesRuleFailure,
+  profileRuleFailure,
   type SaveFailure,
 } from "@/lib/profile/save";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
@@ -99,7 +99,7 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: { params: Promise<
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
   const current = found.data as unknown as CurrentRow;
 
-  const ruleFailure = workplacesRuleFailure(parsed, current);
+  const ruleFailure = profileRuleFailure(parsed, current);
   if (ruleFailure) return fail(ruleFailure);
 
   let workplaceRows: Record<string, unknown>[] | null = null;
