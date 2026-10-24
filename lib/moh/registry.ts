@@ -68,6 +68,7 @@ export function toRegistryRows(records: readonly MohRecord[], now = new Date()):
 
 export async function saveRegistryRows(service: SupabaseClient, rows: readonly RegistryRow[]): Promise<void> {
   if (rows.length === 0) return;
-  const { error } = await service.from("moh_practitioners").upsert(rows, { onConflict: "license_number" });
+  // A copy: upsert takes a mutable array (TypeScript 7 rejects the readonly one).
+  const { error } = await service.from("moh_practitioners").upsert([...rows], { onConflict: "license_number" });
   if (error) throw new Error(`moh_practitioners upsert failed: ${error.message}`);
 }
