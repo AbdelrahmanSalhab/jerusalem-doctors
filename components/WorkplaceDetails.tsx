@@ -14,13 +14,22 @@ export function WorkplaceDetails({ w }: { w: SearchWorkplace }) {
   const tel = clinicTelHref(w.phone);
   const maps = mapLinks(w.address);
 
+  const fund = w.workplace_type === "clinic" ? w.hmo?.trim() : "";
+
   if (!address && !hours && !phone) {
     const details = w.details?.trim();
-    return details ? <p className="mt-0.5 text-foreground/65">{details}</p> : null;
+    if (!details && !fund) return null;
+    return (
+      <div className="mt-0.5 flex flex-col gap-0.5 text-foreground/65">
+        {fund && <p>تابعة لـ{fund}</p>}
+        {details && <p>{details}</p>}
+      </div>
+    );
   }
 
   return (
     <div className="mt-0.5 flex flex-col gap-0.5 text-foreground/65">
+      {fund && <p>تابعة لـ{fund}</p>}
       {address && (
         <p>
           {address}

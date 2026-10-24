@@ -2,8 +2,8 @@
 
 // Workplace rows for /signup and /profile. What a row offers follows the
 // doctor's stage (lib/careerStage.ts): which types, whether its
-// عيادة asks for address/hours/phone (all optional), and whether any
-// workplace is required.
+// عيادة asks for address/hours/phone and the health fund it belongs to (all
+// optional), and whether any workplace is required.
 // Input ids (`workplace_<i>_<field>`) are what the missing-fields list
 // focuses.
 
@@ -75,6 +75,7 @@ export function WorkplaceEditor({
   const opt = stage ? STAGE_BY_KEY[stage] : null;
   const types = opt?.workplaceTypes ?? WORKPLACE_TYPES;
   const showsClinic = opt ? opt.showsClinicFields : true;
+  const funds = known.filter((k) => k.kind === "hmo").map((k) => k.name);
 
   const patch = (i: number, p: Partial<WorkplaceEntry>) =>
     onChange(workplaces.map((w, j) => (j === i ? { ...w, ...p } : w)));
@@ -198,6 +199,22 @@ export function WorkplaceEditor({
                     onChange={(e) => patch(i, { phone: toAsciiDigits(e.target.value) })}
                     placeholder="02-6271234"
                   />
+                </Field>
+                <Field label="تابعة لصندوق مرضى (اختياري)" htmlFor={id("hmo")}>
+                  <select
+                    id={id("hmo")}
+                    className="input"
+                    value={wp.hmo}
+                    onChange={(e) => patch(i, { hmo: e.target.value })}
+                  >
+                    <option value="">لا، عيادة مستقلة</option>
+                    {/* A saved fund stays selectable even if the list changed. */}
+                    {[...new Set([...funds, ...(wp.hmo ? [wp.hmo] : [])])].map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label={`${CLINIC_FIELD_LABEL.hours} (اختياري)`} htmlFor={id("hours")}>
                   <input

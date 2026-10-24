@@ -29,6 +29,8 @@ interface PendingWorkplace {
   details: string | null;
   /** Absent on rows written before 0012 (pending rows live 15 minutes). */
   address?: string | null;
+  /** A clinic's health fund (signup/start resolved the name to the id). */
+  hmo_id?: string | null;
   hours?: string | null;
   phone?: string | null;
   is_primary: boolean;
@@ -259,6 +261,7 @@ export const POST = withJsonErrors(async (req: Request) => {
         address: w.address ?? null,
         hours: w.hours ?? null,
         phone: w.phone ?? null,
+        hmo_id: w.hmo_id ?? null,
         is_primary: w.is_primary,
         sort_order: w.sort_order,
       })),

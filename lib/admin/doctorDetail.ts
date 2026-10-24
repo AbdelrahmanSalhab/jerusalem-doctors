@@ -11,6 +11,7 @@ import { explainLicense, type LicenseExplanation } from "@/lib/moh/explain";
 import { readMirrorFreshness, readMirrorRows } from "@/lib/moh/mirror";
 import { ilLicenseCandidates } from "@/lib/normalize/license";
 import type { AuditRow } from "@/lib/auditText";
+import { SAVED_WORKPLACE_COLUMNS } from "@/lib/workplace";
 
 export interface DetailWorkplace {
   name: string;
@@ -19,6 +20,8 @@ export interface DetailWorkplace {
   address: string | null;
   hours: string | null;
   phone: string | null;
+  /** The clinic's health fund (embedded from institutions). */
+  hmo?: { name_ar: string } | { name_ar: string }[] | null;
   is_primary: boolean;
   sort_order: number;
 }
@@ -123,7 +126,7 @@ export async function fetchDoctorDetail(
     service.from("doctor_specialties").select("specialty_id, specialty:specialties(name_ar)").eq("doctor_id", id),
     service
       .from("doctor_workplaces")
-      .select("name, workplace_type, details, address, hours, phone, is_primary, sort_order")
+      .select(SAVED_WORKPLACE_COLUMNS)
       .eq("doctor_id", id)
       .order("is_primary", { ascending: false })
       .order("sort_order", { ascending: true }),

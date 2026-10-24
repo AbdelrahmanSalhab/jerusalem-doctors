@@ -115,6 +115,9 @@ export const WorkplaceInputSchema = z.object({
   details: optionalText(300),
   address: optionalText(CLINIC_FIELD_MAX.address),
   hours: optionalText(CLINIC_FIELD_MAX.hours),
+  // The health fund a clinic belongs to, by its name in the institutions
+  // list; the server stores the fund's id (lib/institutions.ts hmoIdsByName).
+  hmo: optionalText(120),
   phone: z
     .string()
     .max(CLINIC_FIELD_MAX.phone)
@@ -135,6 +138,8 @@ export interface WorkplaceEntry {
   address: string;
   hours: string;
   phone: string;
+  /** A clinic's health fund, by name; "" when none. */
+  hmo: string;
   is_primary: boolean;
 }
 
@@ -148,6 +153,7 @@ export const emptyWorkplace = (
   address: "",
   hours: "",
   phone: "",
+  hmo: "",
   is_primary: isPrimary,
 });
 
@@ -159,9 +165,20 @@ export interface SavedWorkplace {
   address: string | null;
   hours: string | null;
   phone: string | null;
+  /** The clinic's health fund, by name (embedded from institutions). */
+  hmo?: { name_ar: string } | { name_ar: string }[] | null;
   is_primary: boolean;
   sort_order: number;
 }
+
+/** The fund name of a saved row's embed (a to-one embed the untyped client
+ *  may hand back as a list). */
+export const hmoNameOf = (hmo: SavedWorkplace["hmo"]): string =>
+  (Array.isArray(hmo) ? hmo[0]?.name_ar : hmo?.name_ar) ?? "";
+
+/** The select that reads a SavedWorkplace, fund name included. */
+export const SAVED_WORKPLACE_COLUMNS =
+  "name, workplace_type, details, address, hours, phone, is_primary, sort_order, hmo:institutions!doctor_workplaces_hmo_id_fkey(name_ar)";
 
 /** Saved rows as form entries (nulls as ""); one empty primary row if none. */
 export function toWorkplaceEntries(rows: readonly SavedWorkplace[]): WorkplaceEntry[] {
@@ -173,6 +190,7 @@ export function toWorkplaceEntries(rows: readonly SavedWorkplace[]): WorkplaceEn
     address: w.address ?? "",
     hours: w.hours ?? "",
     phone: w.phone ?? "",
+    hmo: hmoNameOf(w.hmo),
     is_primary: w.is_primary,
   }));
 }
@@ -189,6 +207,7 @@ export function cleanWorkplaces(rows: readonly WorkplaceEntry[]) {
       address: orNull(w.address),
       hours: orNull(w.hours),
       phone: orNull(w.phone),
+      hmo: w.workplace_type === "clinic" ? orNull(w.hmo) : null,
       is_primary: w.is_primary,
     }));
 }

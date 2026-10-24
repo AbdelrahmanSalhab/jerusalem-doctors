@@ -13,9 +13,11 @@
 // offered, which workplace types, whether a residency year is asked for:
 // lives in STAGE_OPTIONS so the two forms and the admin table agree.
 //
-// صندوق مرضى is open to every stage: most GPs and many specialists work at
-// one. When it was offered to residents only, specialists at Clalit or
-// Maccabi picked طبيب مقيم just to be able to list where they work.
+// صندوق مرضى as a workplace is for residents only: a resident (family
+// medicine, say) moves between clinics, and the fund is the one fixed link.
+// Everyone else works at a hospital or a clinic, and a clinic can say which
+// fund it belongs to (`hmo` on the workplace). Offering the fund itself to
+// every stage (#96) let any doctor list a fund instead of their clinic.
 
 import { type WorkplaceType, WORKPLACE_TYPES } from "@/lib/workplace";
 
@@ -59,7 +61,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     autoAttachesGeneralSpecialty: true,
     excludesGeneralSpecialty: false,
     requiresResidencyStartYear: false,
-    workplaceTypes: ["hospital", "clinic", "hmo"],
+    workplaceTypes: ["hospital", "clinic"],
     defaultWorkplaceType: "clinic",
     showsClinicFields: true,
     workplaceOptional: false,
@@ -91,7 +93,7 @@ export const STAGE_OPTIONS: readonly StageOption[] = [
     autoAttachesGeneralSpecialty: false,
     excludesGeneralSpecialty: true,
     requiresResidencyStartYear: false,
-    workplaceTypes: ["hospital", "clinic", "hmo"],
+    workplaceTypes: ["hospital", "clinic"],
     defaultWorkplaceType: "hospital",
     showsClinicFields: true,
     workplaceOptional: false,
@@ -174,8 +176,9 @@ export function careerStageBadge(
 
 /**
  * Coerce a workplace to what the stage allows: an illegal type falls back to
- * the stage's default, and the clinic fields (address, hours, phone and the
- * legacy `details`) are dropped whenever the resulting row hides them. Every
+ * the stage's default, and the clinic fields (address, hours, phone, the
+ * fund it belongs to and the legacy `details`) are dropped whenever the
+ * resulting row hides them. Every
  * type change goes through here, so switching عيادة → مستشفى can't leave
  * typed clinic hours in state and post them.
  */
@@ -191,11 +194,11 @@ export function workplaceForStage<
   if (type === w.workplace_type && (keepClinic || !hasClinic)) return w;
   return keepClinic
     ? { ...w, workplace_type: type }
-    : { ...w, workplace_type: type, details: "", address: "", hours: "", phone: "" };
+    : { ...w, workplace_type: type, details: "", address: "", hours: "", phone: "", hmo: "" };
 }
 
-type ClinicFields = { details: string; address: string; hours: string; phone: string };
-const CLINIC_KEYS = ["details", "address", "hours", "phone"] as const;
+type ClinicFields = { details: string; address: string; hours: string; phone: string; hmo: string };
+const CLINIC_KEYS = ["details", "address", "hours", "phone", "hmo"] as const;
 
 /**
  * What switching to a stage does to the rest of the form. Both profile forms
@@ -205,7 +208,7 @@ const CLINIC_KEYS = ["details", "address", "hours", "phone"] as const;
  * copies of it would not stay the same for long.
  */
 export function applyStageCascade<
-  T extends { name: string; workplace_type: WorkplaceType; details: string; address: string; hours: string; phone: string },
+  T extends { name: string; workplace_type: WorkplaceType } & ClinicFields,
 >(
   next: Stage,
   input: { specialtyIds: readonly string[]; workplaces: readonly T[]; generalSpecialtyId: string | null },

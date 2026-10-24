@@ -12,7 +12,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
-import { relinkDoctor } from "@/lib/institutions";
+import { relinkDoctor, withHmoIds } from "@/lib/institutions";
 import { normalizeArabic } from "@/lib/normalize/arabic";
 import { WorkplaceInputSchema } from "@/lib/workplace";
 
@@ -180,6 +180,9 @@ export function buildWorkplaceRows(
       address: w.address,
       hours: w.hours,
       phone: w.phone,
+      // A fund only belongs to a clinic; saveProfileTransaction turns the
+      // name into its id.
+      hmo: w.workplace_type === "clinic" ? w.hmo : null,
       is_primary: w.is_primary,
       sort_order: w.is_primary ? 0 : i + 1,
     }))
@@ -224,7 +227,8 @@ export async function saveProfileTransaction(
     p_updates: args.updates,
     // Deduped: a repeated id would hit the link table's key and fail the save.
     p_specialty_ids: args.specialtyIds ? [...new Set(args.specialtyIds)] : null,
-    p_workplaces: args.workplaceRows,
+    // A clinic's fund goes in as the fund's id.
+    p_workplaces: args.workplaceRows ? await withHmoIds(service, args.workplaceRows as { hmo?: string | null }[]) : null,
   });
   if (error) {
     const duplicate = (error as { code?: string }).code === UNIQUE_VIOLATION;

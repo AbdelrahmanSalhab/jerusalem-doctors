@@ -43,7 +43,10 @@ export function toFormState(raw: unknown): FormState {
     }
   }
   if (typeof src.stage === "string" && src.stage in STAGE_BY_KEY) out.stage = src.stage;
-  const workplaces = Array.isArray(src.workplaces) ? src.workplaces.filter(isWorkplace) : [];
+  // Snapshots from before clinics had a fund carry no `hmo`.
+  const workplaces = Array.isArray(src.workplaces)
+    ? src.workplaces.filter(isWorkplace).map((w) => ({ ...w, hmo: typeof w.hmo === "string" ? w.hmo : "" }))
+    : [];
   if (workplaces.length > 0) out.workplaces = workplaces;
   out.consent = false;
   return out as FormState;
