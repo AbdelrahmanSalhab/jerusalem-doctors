@@ -232,23 +232,24 @@ function ResultsRegion({
             <DoctorCard doctor={featured.doctor} />
           </FeaturedSection>
         )}
-        {recent.length > 0 && (
-          <FeaturedSection title="جديد هذا الأسبوع">
-            <ul className="overflow-hidden rounded-lg border border-foreground/15 bg-background">
-              {recent.map((d) => (
-                <li key={d.id}>
-                  <DoctorRow doctor={d} />
-                </li>
-              ))}
-            </ul>
-          </FeaturedSection>
-        )}
         {featured.graduates.length > 0 && (
           <FeaturedSection title="أطباء مميزون يبحثون عن عمل">
             <ul className={CARD_COLUMNS}>
               {featured.graduates.map((d) => (
                 <li key={d.id} className={CARD_COLUMN_ITEM}>
                   <DoctorCard doctor={d} />
+                </li>
+              ))}
+            </ul>
+          </FeaturedSection>
+        )}
+        {/* After the featured doctors: the admins' picks lead. */}
+        {recent.length > 0 && (
+          <FeaturedSection title="جديد هذا الأسبوع">
+            <ul className="overflow-hidden rounded-lg border border-foreground/15 bg-background">
+              {recent.map((d) => (
+                <li key={d.id}>
+                  <DoctorRow doctor={d} />
                 </li>
               ))}
             </ul>
