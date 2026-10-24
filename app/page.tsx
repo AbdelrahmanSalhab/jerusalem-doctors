@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { PublicSearchBar } from "@/components/PublicSearchBar";
 import { getCurrentDoctor } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,8 @@ export default async function HomePage() {
         <p className="max-w-xl text-pretty text-lg text-muted sm:text-xl">
           دليل مهني مغلق يجمع أطباء القدس: اعرف من يعمل أين، وتواصل مع الزميل المناسب بضغطة.
         </p>
+        {/* Searching asks a visitor to sign up or sign in. */}
+        <PublicSearchBar />
         <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <Link
             href="/signup"
