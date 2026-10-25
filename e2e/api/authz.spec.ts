@@ -26,6 +26,7 @@ type Policy =
   | "credentials";
 
 const POLICY: Record<string, Policy> = {
+  "GET /api/admin/migrations": "admin",
   "POST /api/admin/doctors/[id]/license/check": "admin",
   "POST /api/admin/doctors/[id]/license/save": "admin",
   "PATCH /api/admin/doctors/[id]": "admin",
