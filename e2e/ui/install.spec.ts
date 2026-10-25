@@ -5,8 +5,10 @@
 
 import { devices, type Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { BASE_URL } from "../env";
+import { ACCOUNTS, BASE_URL, PASSWORD } from "../env";
+import { flushRateLimits } from "../global-setup";
 import { stateFile } from "../helpers";
+import { serviceClient } from "../seed";
 
 test.use({ storageState: stateFile("doctor") });
 
@@ -19,12 +21,29 @@ function asDevice(name: string) {
 const IPHONE = asDevice("iPhone 13");
 const ANDROID = asDevice("Pixel 7");
 
+/** The newest usage event's id, so a test reads only the events it caused. */
+async function lastEventId(): Promise<number> {
+  const { data } = await serviceClient().from("usage_events").select("id").order("id", { ascending: false }).limit(1);
+  return data?.[0]?.id ?? 0;
+}
+/** Install events since `fromId`, as "kind guide [source]", in order. */
+async function installEvents(fromId: number): Promise<string[]> {
+  const { data } = await serviceClient()
+    .from("usage_events")
+    .select("kind, meta")
+    .gt("id", fromId)
+    .like("kind", "install_%")
+    .order("id");
+  return (data ?? []).map((e) => [e.kind, e.meta?.guide, e.meta?.source].filter(Boolean).join(" "));
+}
+
 const invite = (page: Page) => page.getByRole("region", { name: "أضف الدليل إلى هاتفك" });
 
 test.describe("on an iPhone", () => {
   test.use(IPHONE);
 
   test("the dashboard invites with instructions, and «لاحقًا» keeps it away @phone", async ({ page }) => {
+    const from = await lastEventId();
     await page.goto("/dashboard");
     await invite(page).getByRole("button", { name: "طريقة الإضافة" }).click();
     const help = page.getByRole("dialog", { name: "أضف الدليل إلى شاشتك الرئيسية" });
@@ -38,6 +57,46 @@ test.describe("on an iPhone", () => {
     await page.reload();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(invite(page)).toBeHidden();
+
+    // Each step counted (#150), with the browser family and the button.
+    await expect
+      .poll(() => installEvents(from))
+      .toEqual(["install_invite_shown ios-safari", "install_click ios-safari card", "install_invite_snoozed ios-safari"]);
+  });
+
+  test("opening the installed app is counted once a session, and offers nothing @phone", async ({ page }) => {
+    const from = await lastEventId();
+    // How Safari says the page is the home-screen app.
+    await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true }));
+    await page.goto("/dashboard");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(invite(page)).toHaveCount(0);
+    await page.getByRole("button", { name: /^حسابي/ }).click();
+    await expect(page.getByRole("menuitem", { name: /أضف الدليل/ })).toHaveCount(0);
+    await expect.poll(() => installEvents(from)).toEqual(["install_app_opened ios-safari"]);
+  });
+
+  test.describe("signed out", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+    test.beforeEach(flushRateLimits);
+
+    test("a launch that starts at the sign-in page is counted once signed in @phone", async ({ page }) => {
+      const from = await lastEventId();
+      await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true }));
+      await page.goto("/login/dev");
+      await page.getByLabel("البريد الإلكتروني").fill(ACCOUNTS.doctor);
+      await page.getByLabel("كلمة المرور").fill(PASSWORD);
+      await page.getByRole("button", { name: "تسجيل الدخول" }).click();
+      await expect(page).toHaveURL(/\/dashboard/);
+      await expect.poll(() => installEvents(from)).toEqual(["install_app_opened ios-safari"]);
+      // Still once a session.
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.waitForTimeout(300);
+      expect(await installEvents(from)).toEqual(["install_app_opened ios-safari"]);
+    });
   });
 
   test("«لاحقًا» closes it even where the browser refuses storage @phone", async ({ page }) => {

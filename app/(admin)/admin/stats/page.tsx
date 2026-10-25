@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { Attention, BarList, DailyBars, Section, Tile, TileGrid } from "./StatsParts";
+import { type FunnelRow, InstallSection } from "./InstallSection";
 import { type MetricsDay, UsageSection } from "./UsageSection";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +26,11 @@ export default async function AdminStatsPage() {
   // page without re-running the layout. requireAdmin is request-cached.
   await requireAdmin();
   const service = createSupabaseServiceClient();
-  const [s, sms, metrics] = await Promise.all([
+  const [s, sms, metrics, install] = await Promise.all([
     fetchAdminStats(service),
     smsCredit(),
     service.from("metrics_daily").select("day, db_bytes, counts").order("day", { ascending: false }).limit(14),
+    service.rpc("install_funnel", { p_days: 30 }),
   ]);
   const d = s.doctors;
   const a = s.attention;
@@ -155,6 +157,8 @@ export default async function AdminStatsPage() {
           <p className="text-sm text-muted">يبدأ العدّ من الآن؛ تظهر الأرقام مع أول ضغطة.</p>
         )}
       </Section>
+
+      <InstallSection rows={(install.data ?? []) as FunnelRow[]} />
 
       <Section
         title="التسجيل والدخول (آخر 7 أيام)"

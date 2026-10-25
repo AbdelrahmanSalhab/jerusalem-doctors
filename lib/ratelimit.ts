@@ -37,6 +37,8 @@ export const RATE_LIMITS = {
   loginResendIp: { limit: 20, window: "10 m" },
   search: { limit: 30, window: "1 m" },
   contactClick: { limit: 60, window: "1 m" },
+  // A handful per visit at most; more is a loop or someone filling the table.
+  installEvent: { limit: 20, window: "1 m" },
   // "Ask the admins for this doctor's number": each one is a person's work.
   numberRequest: { limit: 10, window: "1 d" },
   // "This profile is not who it says": rare, and each one is a review.

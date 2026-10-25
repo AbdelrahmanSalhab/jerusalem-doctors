@@ -101,7 +101,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col font-sans overflow-x-hidden">
         {/* Installing to the home screen: the account menu and the
             dashboard share it, and it must outlive page changes. */}
-        <InstallProvider>
+        <InstallProvider signedIn={Boolean(doctor?.is_active)}>
           <SiteHeader />
           <div className="flex-1">{children}</div>
           <SiteFooter />

@@ -112,7 +112,7 @@ export function AccountMenu({
                 // item is about to go: hand it to the account button.
                 toggle.current?.focus();
                 setOpen(false);
-                install.install();
+                install.install("menu");
               }}
               disabled={install.prompting}
               className={item}
