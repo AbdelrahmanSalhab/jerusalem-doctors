@@ -11,7 +11,12 @@
 //                                   browser send here in e2e (SENTRY_DSN), so a
 //                                   test can read exactly what would leave
 //   GET  /sentry/envelopes          everything received so far, as text
+//   GET  /github-oidc/jwks          GitHub Actions' signing keys, played by a key
+//                                   made at start (GITHUB_OIDC_JWKS_URL in e2e)
+//   POST /github-oidc/token         a token signed with it: the body's claims
+//                                   over a valid smoke-workflow set
 import { createServer } from "node:http";
+import { generateKeyPairSync, randomUUID, sign } from "node:crypto";
 import { gunzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 
@@ -19,6 +24,28 @@ const REGISTRY = JSON.parse(readFileSync(new URL("./registry.json", import.meta.
 const PORT = Number(process.env.STUB_PORT ?? 3124);
 const sent = [];
 const envelopes = [];
+const oidc = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const OIDC_KID = "e2e";
+
+function oidcToken(overrides) {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = {
+    iss: "https://token.actions.githubusercontent.com",
+    aud: "jerusalem-doctors-smoke",
+    iat: now,
+    exp: now + 300,
+    jti: randomUUID(),
+    repository: "AbdelrahmanSalhab/jerusalem-doctors",
+    workflow_ref: "AbdelrahmanSalhab/jerusalem-doctors/.github/workflows/smoke.yml@refs/heads/main",
+    event_name: "deployment_status",
+    run_id: "1",
+    runner_environment: "github-hosted",
+    ...overrides,
+  };
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const body = `${b64({ alg: "RS256", kid: OIDC_KID })}.${b64(claims)}`;
+  return `${body}.${sign("RSA-SHA256", Buffer.from(body), oidc.privateKey).toString("base64url")}`;
+}
 
 const json = (res, body, status = 200) => {
   res.statusCode = status;
@@ -44,6 +71,15 @@ function registry(url, res) {
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   if (url.pathname === "/health") return res.end("ok");
+  if (url.pathname === "/github-oidc/jwks") {
+    return json(res, { keys: [{ ...oidc.publicKey.export({ format: "jwk" }), kid: OIDC_KID, alg: "RS256", use: "sig" }] });
+  }
+  if (url.pathname === "/github-oidc/token" && req.method === "POST") {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => json(res, { value: oidcToken(body ? JSON.parse(body) : {}) }));
+    return;
+  }
   if (url.pathname === "/api/3/action/datastore_search") return registry(url, res);
   if (url.pathname === "/sms4free/send" && req.method === "POST") {
     let body = "";

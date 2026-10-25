@@ -1,5 +1,5 @@
 // Read-only checks against production (.github/workflows/smoke.yml). Signs
-// in with a real admin account through /login/dev; every same-origin request
+// in as the CI account with GitHub's token (/api/login/ci); every same-origin request
 // carries x-ci-run so the activity log marks it as a test and its searches
 // stay out of the stats (lib/ciRun.ts). Changes nothing.
 
@@ -22,7 +22,8 @@ export default defineConfig({
   // Sign in once (smoke.setup.ts), then run the checks with that session.
   projects: [
     // No retry: a refused sign-in retried is one more attempt against the limit.
-    { name: "setup", testMatch: /smoke\.setup\.ts/, retries: 0 },
+    { name: "setup", testMatch: /smoke\.setup\.ts/, retries: 0, teardown: "teardown" },
+    { name: "teardown", testMatch: /smoke\.teardown\.ts/, retries: 0 },
     { name: "smoke", testMatch: /production\.spec\.ts/, dependencies: ["setup"] },
   ],
 });

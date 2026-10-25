@@ -63,6 +63,10 @@ export const RATE_LIMITS = {
   smsDaily: { limit: SMS_DAILY_CAP, window: "1 d" },
   devLogin: { limit: 5, window: "15 m" },
   devLoginIp: { limit: 10, window: "15 m" },
+  // A GitHub token for the smoke check's sign-in, accepted once
+  // (app/api/login/ci); GitHub's tokens live for minutes.
+  ciLoginToken: { limit: 1, window: "15 m" },
+  ciLoginIp: { limit: 10, window: "15 m" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;
