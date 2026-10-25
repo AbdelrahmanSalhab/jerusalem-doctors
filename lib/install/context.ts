@@ -9,6 +9,13 @@
 // can't install at all. Detection from the user agent is imperfect, so the
 // manual help stays reachable from the menu whatever this says.
 
+/** Runs in <head> before the page's JavaScript: Chrome fires its one-time
+ *  install event as soon as the page is eligible, which on a repeat visit
+ *  can be before React has loaded. Kept for InstallProvider, which also
+ *  hears a later one through INSTALL_READY_EVENT. */
+export const INSTALL_READY_EVENT = "jd:install-ready";
+export const INSTALL_CAPTURE_SCRIPT = `window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__jdInstall=e;window.dispatchEvent(new Event("${INSTALL_READY_EVENT}"));});`;
+
 export type InstallGuide =
   /** iPhone or iPad, Safari: Share (or the page menu) → Add to Home Screen. */
   | "ios-safari"

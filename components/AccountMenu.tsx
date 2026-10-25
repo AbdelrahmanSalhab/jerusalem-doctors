@@ -101,7 +101,7 @@ export function AccountMenu({
             </Link>
           )}
           {/* Not inside the installed app, where it would offer itself. */}
-          {install?.ready && !install.standalone && (
+          {install?.ready && !install.standalone && !install.installed && (
             <button
               role="menuitem"
               type="button"
@@ -112,7 +112,7 @@ export function AccountMenu({
               disabled={install.prompting}
               className={item}
             >
-              أضف الدليل إلى هاتفي
+              {install.guide === "other" ? "أضف الدليل إلى جهازي" : "أضف الدليل إلى هاتفي"}
             </button>
           )}
           <button role="menuitem" type="button" onClick={logout} disabled={busy} className={item}>

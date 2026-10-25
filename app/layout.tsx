@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { InstallProvider } from "@/components/install/InstallProvider";
+import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install/context";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -84,6 +85,12 @@ export default async function RootLayout({
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
+        />
+        {/* Chrome's install event can come before React loads. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_SCRIPT }}
         />
       </head>
       <body className="min-h-full flex flex-col font-sans overflow-x-hidden">

@@ -29,6 +29,7 @@ export function InstallInvite() {
   const offerable =
     Boolean(install?.ready) &&
     !install?.standalone &&
+    !install?.installed &&
     (install?.canPrompt || install?.guide === "ios-safari" || install?.guide === "ios-other" || install?.guide === "in-app");
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function InstallInvite() {
     setShow(true);
   }, [offerable, show]);
 
-  if (!install || !show || install.standalone) return null;
+  if (!install || !show || install.standalone || install.installed) return null;
 
   const later = () => {
     snoozeInvite(browserStores());

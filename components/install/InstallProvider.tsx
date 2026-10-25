@@ -11,7 +11,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { InstallHelpDialog } from "@/components/install/InstallHelpDialog";
-import { installGuideFor, type InstallGuide } from "@/lib/install/context";
+import { INSTALL_READY_EVENT, installGuideFor, type InstallGuide } from "@/lib/install/context";
 
 /** Chromium's install event (not in TypeScript's DOM types). */
 interface BeforeInstallPromptEvent extends Event {
@@ -23,6 +23,8 @@ interface InstallState {
   /** False until the browser has been read (the server render knows nothing). */
   ready: boolean;
   standalone: boolean;
+  /** Installed during this visit (appinstalled): nothing more to offer here. */
+  installed: boolean;
   canPrompt: boolean;
   /** The native prompt is open: the button must not open it again. */
   prompting: boolean;
@@ -45,7 +47,14 @@ function isStandalone(): boolean {
 
 export function InstallProvider({ children }: { children: React.ReactNode }) {
   const deferred = useRef<BeforeInstallPromptEvent | null>(null);
-  const [state, setState] = useState({ ready: false, standalone: false, canPrompt: false, prompting: false, guide: "other" as InstallGuide });
+  const [state, setState] = useState({
+    ready: false,
+    standalone: false,
+    installed: false,
+    canPrompt: false,
+    prompting: false,
+    guide: "other" as InstallGuide,
+  });
   const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
@@ -55,27 +64,31 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState((s) => ({ ...s, ready: true, standalone: isStandalone(), guide: installGuideFor(navigator.userAgent, touchMac) }));
 
-    const onPrompt = (e: Event) => {
-      // Keep it for our own button rather than the browser's small bar.
-      e.preventDefault();
-      deferred.current = e as BeforeInstallPromptEvent;
+    // The <head> script (INSTALL_CAPTURE_SCRIPT) keeps the event for our
+    // own button rather than the browser's small bar, whenever it came.
+    const take = () => {
+      const w = window as Window & { __jdInstall?: BeforeInstallPromptEvent | null };
+      if (!w.__jdInstall) return;
+      deferred.current = w.__jdInstall;
+      w.__jdInstall = null;
       setState((s) => ({ ...s, canPrompt: true }));
     };
+    take();
     const onInstalled = () => {
       deferred.current = null;
-      setState((s) => ({ ...s, canPrompt: false }));
+      setState((s) => ({ ...s, canPrompt: false, installed: true }));
       setHelpOpen(false);
     };
     // The window can become the app (or stop being it) while open.
     const media = window.matchMedia("(display-mode: standalone)");
     const onVisible = () => document.visibilityState === "visible" && update();
 
-    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener(INSTALL_READY_EVENT, take);
     window.addEventListener("appinstalled", onInstalled);
     media.addEventListener("change", update);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener(INSTALL_READY_EVENT, take);
       window.removeEventListener("appinstalled", onInstalled);
       media.removeEventListener("change", update);
       document.removeEventListener("visibilitychange", onVisible);

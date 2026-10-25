@@ -44,11 +44,13 @@ test.describe("on Android, once Chrome offers to install", () => {
   test.use(ANDROID);
 
   test("«تثبيت» opens the native prompt once, then the invitation goes", async ({ page }) => {
-    await page.goto("/dashboard");
-    // Chrome fires the event once the page is eligible; here it is sent until
-    // the page (once hydrated) has picked it up.
-    await expect(async () => {
-      await page.evaluate(() => {
+    // Chrome fires the event once, as soon as the page is eligible: on a
+    // repeat visit that can be before React has loaded. Sent once here, as
+    // the page's body starts, so the <head> script has to have kept it.
+    await page.addInitScript(() => {
+      new MutationObserver((_, observer) => {
+        if (!document.body) return;
+        observer.disconnect();
         const event = new Event("beforeinstallprompt", { cancelable: true }) as Event & Record<string, unknown>;
         event.prompt = () => {
           const w = window as unknown as { prompted?: number };
@@ -57,9 +59,9 @@ test.describe("on Android, once Chrome offers to install", () => {
         };
         event.userChoice = Promise.resolve({ outcome: "accepted" });
         window.dispatchEvent(event);
-      });
-      await expect(invite(page).getByRole("button", { name: "تثبيت" })).toBeVisible({ timeout: 1000 });
-    }).toPass();
+      }).observe(document, { childList: true, subtree: true });
+    });
+    await page.goto("/dashboard");
     await invite(page).getByRole("button", { name: "تثبيت" }).click();
     await expect(invite(page)).toBeHidden();
     expect(await page.evaluate(() => (window as unknown as { prompted?: number }).prompted)).toBe(1);
@@ -71,6 +73,6 @@ test("on a computer: no invitation, and the menu gives the instructions", async 
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(invite(page)).toHaveCount(0);
   await page.getByRole("button", { name: /^حسابي/ }).click();
-  await page.getByRole("menuitem", { name: "أضف الدليل إلى هاتفي" }).click();
+  await page.getByRole("menuitem", { name: "أضف الدليل إلى جهازي" }).click();
   await expect(page.getByRole("dialog", { name: "أضف الدليل إلى جهازك" })).toBeVisible();
 });
