@@ -97,7 +97,7 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: { params: Promise<
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
-  const current = found.data as unknown as CurrentRow;
+  const current = found.data as CurrentRow;
 
   const ruleFailure = profileRuleFailure(parsed, current);
   if (ruleFailure) return fail(ruleFailure);

@@ -20,5 +20,8 @@ Then:
 2. Make it safe to run twice (`create or replace`, `if not exists`).
 3. Run it in the Supabase SQL Editor **before** deploying code that needs it,
    and say so in the PR.
+4. With the local stack up (`npx supabase db reset` applies it), run
+   `npm run db:types` and commit `lib/db/database.types.ts`. CI fails while
+   that file and the migrations disagree.
 
 `lib/migrations.test.ts` fails if two files share a number.

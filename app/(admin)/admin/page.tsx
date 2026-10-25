@@ -71,8 +71,10 @@ async function counts(service: SupabaseClient): Promise<Record<DoctorFilter, num
   return Object.fromEntries(DOCTOR_FILTERS.map((f, i) => [f.key, results[i].count ?? 0])) as Record<DoctorFilter, number>;
 }
 
+// Method syntax on purpose: the typed client's eq takes each column's own
+// value type, which only a method's (bivariant) parameters accept.
 function applyFilter<
-  T extends { eq: (c: string, v: unknown) => T; or: (f: string) => T; not: (c: string, op: string, v: unknown) => T },
+  T extends { eq(c: string, v: unknown): T; or(f: string): T; not(c: string, op: string, v: unknown): T },
 >(
   query: T,
   filter: DoctorFilter,
@@ -152,7 +154,7 @@ export default async function AdminDoctorsPage({
     redirect(adminDoctorsHref({ ...params, page: 1 }));
   }
 
-  const rows = (listed.data ?? []) as unknown as DoctorRowData[];
+  const rows = (listed.data ?? []) as DoctorRowData[];
   const total = listed.count ?? 0;
 
   const listHref = adminDoctorsHref({ filter: params.filter, q: params.q, page: params.page });

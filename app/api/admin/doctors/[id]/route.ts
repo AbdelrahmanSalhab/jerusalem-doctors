@@ -13,6 +13,7 @@ import { FEATURED_KINDS } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { allPhotoPaths, PHOTO_BUCKET } from "@/lib/photo";
+import type { TablesUpdate } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
 import { directoryChanged } from "@/lib/cachedReads";
@@ -51,7 +52,7 @@ const UPDATABLE = [
   "career_stage",
   "residency_start_year",
   "featured",
-] as const;
+] as const satisfies readonly (keyof TablesUpdate<"doctors">)[];
 
 export const PATCH = withJsonErrors(async (
   req: Request,
@@ -100,9 +101,11 @@ export const PATCH = withJsonErrors(async (
 
   // Built from the allow-list, never by spreading the body: approval_reason is
   // not a column and would fail the update.
-  const updates: Record<string, unknown> = {};
+  const updates: TablesUpdate<"doctors"> = {};
   for (const key of UPDATABLE) {
-    if (key in fields) updates[key] = fields[key];
+    // Every key is a doctors column (UPDATABLE's satisfies), so only the
+    // value's type is loosened here.
+    if (key in fields) (updates as Record<string, unknown>)[key] = fields[key];
   }
   // Re-featuring bumps featured_at, so the newest pick leads the section.
   if (fields.featured !== undefined) {

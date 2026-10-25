@@ -101,7 +101,8 @@ async function ourDoctors(supabase: Service): Promise<OurDoctor[]> {
   const serial = (region: string | null, n: string | null) => (region === "IL" && n && /^\d{1,9}$/.test(n) ? Number(n) : null);
   return (data ?? []).map((d) => ({
     id: d.id,
-    name: d.arabic_full_name,
+    // A generated column, so typed nullable; built from two required names.
+    name: d.arabic_full_name ?? "",
     licenses: [
       { slot: "primary" as const, number: serial(d.license_region, d.license_number), status: d.license_verification_status },
       {
@@ -157,12 +158,15 @@ async function dropUnlisted(supabase: Service, full: boolean, started: Date, mis
 
 /** Marks our doctors' licences the registry no longer lists, once each. */
 async function flagMissing(supabase: Service, doctors: OurDoctor[], missing: Set<number>): Promise<number> {
-  const column = { primary: "license_verification_status", secondary: "secondary_license_verification_status" };
   const flagged: { doctor: OurDoctor; license: number }[] = [];
   for (const d of doctors) {
     for (const l of d.licenses) {
       if (!missing.has(l.number) || l.status === "not_found") continue;
-      const { error } = await supabase.from("doctors").update({ [column[l.slot]]: "not_found" }).eq("id", d.id);
+      const flag =
+        l.slot === "primary"
+          ? { license_verification_status: "not_found" }
+          : { secondary_license_verification_status: "not_found" };
+      const { error } = await supabase.from("doctors").update(flag).eq("id", d.id);
       if (error) throw new Error(`doctors flag failed: ${error.message}`);
       await writeAudit(supabase, {
         action: "license_missing_from_registry",

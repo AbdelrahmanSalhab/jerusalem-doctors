@@ -14,7 +14,8 @@
     "dev-login:list": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts --list",
     "dev-login:add": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts",
     "e2e:stack": "supabase start && supabase seed buckets && docker compose -f e2e/docker-compose.yml -p jd-e2e up -d",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "db:types": "npx -y supabase@2.121.0 gen types typescript --local > lib/db/database.types.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^11.8.0",

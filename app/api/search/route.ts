@@ -79,14 +79,15 @@ export const GET = withJsonErrors(async (req: Request) => {
   const [rl, found] = await Promise.all([
     rateLimit("search", `doctor:${me.id}`),
     service.rpc("search_directory", {
-      p_term: term || null,
-      p_specialty_id: specialty_id ?? null,
+      // Left out means NULL: every optional argument defaults to it.
+      p_term: term || undefined,
+      p_specialty_id: specialty_id ?? undefined,
       p_institution_ids: term ? institutionsMatching(institutions, q) : [],
       // One extra row tells us whether more matched than we return.
       p_limit: SEARCH_PAGE_SIZE + 1,
-      p_workplace_institution: institution_id ?? null,
-      p_workplace_type: workplace_type ?? null,
-      p_stage: stage ?? null,
+      p_workplace_institution: institution_id ?? undefined,
+      p_workplace_type: workplace_type ?? undefined,
+      p_stage: stage ?? undefined,
       p_seeking_work: seeking_work === "1",
     }),
   ]);

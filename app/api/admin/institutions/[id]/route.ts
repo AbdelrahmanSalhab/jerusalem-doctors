@@ -9,6 +9,7 @@ import { writeAudit } from "@/lib/audit";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { institutionsChanged } from "@/lib/cachedReads";
 import { INSTITUTION_KINDS, relinkWorkplaces } from "@/lib/institutions";
+import type { TablesUpdate } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const Patch = z.union([
@@ -41,10 +42,9 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: Ctx) => {
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
 
   const body = parsed.data;
-  const update =
-    "add_alias" in body
-      ? { aliases: [...new Set([...(found.data.aliases as string[]), body.add_alias])] }
-      : Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
+  // A field left out of the body stays as it is (undefined is not sent).
+  const update: TablesUpdate<"institutions"> =
+    "add_alias" in body ? { aliases: [...new Set([...found.data.aliases, body.add_alias])] } : body;
   const r = await service.from("institutions").update(update).eq("id", id);
   if (r.error) {
     if (r.error.code === "23505") {
