@@ -63,6 +63,8 @@ export const RATE_LIMITS = {
   smsDaily: { limit: SMS_DAILY_CAP, window: "1 d" },
   devLogin: { limit: 5, window: "15 m" },
   devLoginIp: { limit: 10, window: "15 m" },
+  // Each attempt checks the current password: kept as slow as signing in.
+  passwordChange: { limit: 5, window: "15 m" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;
