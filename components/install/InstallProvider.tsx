@@ -59,7 +59,14 @@ function countAppOpened() {
   trackInstall("install_app_opened");
 }
 
-export function InstallProvider({ children }: { children: React.ReactNode }) {
+export function InstallProvider({
+  children,
+  signedIn,
+}: {
+  children: React.ReactNode;
+  /** An active doctor's session (the layout's INSTALL_OFFER_ATTR). */
+  signedIn: boolean;
+}) {
   const deferred = useRef<BeforeInstallPromptEvent | null>(null);
   const [state, setState] = useState({
     ready: false,
@@ -77,7 +84,6 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     // Browser-only facts, read after mount so the server render matches.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState((s) => ({ ...s, ready: true, standalone: isStandalone(), guide: installGuideFor(navigator.userAgent, touchMac) }));
-    countAppOpened();
 
     // The <head> script (INSTALL_CAPTURE_SCRIPT) keeps the event for our
     // own button rather than the browser's small bar, whenever it came.
@@ -110,6 +116,12 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
+
+  // Only once signed in, so a launch that starts at /login (iOS before 17.2,
+  // an expired session) is counted after the sign-in, not lost to it.
+  useEffect(() => {
+    if (signedIn) countAppOpened();
+  }, [signedIn]);
 
   const install = useCallback(async (source: "card" | "menu") => {
     trackInstall("install_click", source);

@@ -5,7 +5,8 @@
 
 import { devices, type Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
-import { BASE_URL } from "../env";
+import { ACCOUNTS, BASE_URL, PASSWORD } from "../env";
+import { flushRateLimits } from "../global-setup";
 import { stateFile } from "../helpers";
 import { serviceClient } from "../seed";
 
@@ -75,6 +76,27 @@ test.describe("on an iPhone", () => {
     await page.getByRole("button", { name: /^حسابي/ }).click();
     await expect(page.getByRole("menuitem", { name: /أضف الدليل/ })).toHaveCount(0);
     await expect.poll(() => installEvents(from)).toEqual(["install_app_opened ios-safari"]);
+  });
+
+  test.describe("signed out", () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+    test.beforeEach(flushRateLimits);
+
+    test("a launch that starts at the sign-in page is counted once signed in @phone", async ({ page }) => {
+      const from = await lastEventId();
+      await page.addInitScript(() => Object.defineProperty(navigator, "standalone", { value: true }));
+      await page.goto("/login/dev");
+      await page.getByLabel("البريد الإلكتروني").fill(ACCOUNTS.doctor);
+      await page.getByLabel("كلمة المرور").fill(PASSWORD);
+      await page.getByRole("button", { name: "تسجيل الدخول" }).click();
+      await expect(page).toHaveURL(/\/dashboard/);
+      await expect.poll(() => installEvents(from)).toEqual(["install_app_opened ios-safari"]);
+      // Still once a session.
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await page.waitForTimeout(300);
+      expect(await installEvents(from)).toEqual(["install_app_opened ios-safari"]);
+    });
   });
 
   test("«لاحقًا» closes it even where the browser refuses storage @phone", async ({ page }) => {
