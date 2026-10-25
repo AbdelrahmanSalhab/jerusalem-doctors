@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Generated from the database (npm run db:types).
+    "lib/db/database.types.ts",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",

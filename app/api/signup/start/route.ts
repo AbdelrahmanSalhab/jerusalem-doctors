@@ -31,6 +31,7 @@ import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/ot
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { verifyTurnstile } from "@/lib/turnstile";
 import { type WorkplaceType, WorkplaceInputSchema } from "@/lib/workplace";
@@ -444,7 +445,7 @@ async function startPendingSignup(
 
   const insert = await service
     .from("pending_signups")
-    .insert({ phone_e164: phoneE164, payload, expires_at: expiresAt })
+    .insert({ phone_e164: phoneE164, payload: payload as NonNullable<Json>, expires_at: expiresAt })
     .select("id")
     .single();
   if (insert.error) throw insert.error;

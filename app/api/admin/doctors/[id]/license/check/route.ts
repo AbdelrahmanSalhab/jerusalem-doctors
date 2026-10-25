@@ -50,7 +50,7 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
-  const doctor = found.data as unknown as AdminDoctorLicenseRow;
+  const doctor = found.data as AdminDoctorLicenseRow;
 
   const stored = storedSlot(doctor, body.slot);
   const region = body.region ?? (stored.region as "IL" | "PS" | null) ?? doctor.license_region;

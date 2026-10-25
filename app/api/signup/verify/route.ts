@@ -156,19 +156,16 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
 
   const userId = verify.data.user.id;
-  if ("existing_doctor_id" in pending.data.payload) {
-    const res = await signInExisting(
-      service,
-      pending.data.id,
-      pending.data.payload as ExistingAccountPayload,
-      userId,
-    );
+  // A jsonb column, typed only as JSON: /api/signup/start wrote one of these.
+  const stored = pending.data.payload as unknown as PendingPayload | ExistingAccountPayload;
+  if ("existing_doctor_id" in stored) {
+    const res = await signInExisting(service, pending.data.id, stored, userId);
     // verifyOtp already set the session cookies. A refused sign-in (inactive
     // or vanished account) must not leave that session behind.
     if (!res.ok) await ssr.auth.signOut();
     return res;
   }
-  const payload = pending.data.payload as PendingPayload;
+  const payload = stored;
 
   const isAutoApproved = payload.license_verification_status === "verified";
 

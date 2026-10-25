@@ -4,6 +4,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { normalizeArabic } from "@/lib/normalize/arabic";
+import type { TablesUpdate } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { specialtiesChanged } from "@/lib/cachedReads";
 
@@ -34,10 +35,10 @@ export const PATCH = withJsonErrors(async (
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
   }
 
-  const updates: Record<string, unknown> = { ...body };
-  if (body.name_ar !== undefined) {
-    updates.name_ar_normalized = normalizeArabic(body.name_ar);
-  }
+  const updates: TablesUpdate<"specialties"> = {
+    ...body,
+    ...(body.name_ar !== undefined && { name_ar_normalized: normalizeArabic(body.name_ar) }),
+  };
   if (Object.keys(updates).length === 0) {
     return jsonError(400, { error: "no_fields", code: "no_fields" });
   }

@@ -1,134 +1,31 @@
-// Hand-written shadow of supabase/migrations/0001_init.sql.
-//
-// Replace this file with the output of:
-//   npx supabase gen types typescript --linked > lib/db/types.ts
-// once the Supabase CLI is linked to the project. Until then, this file
-// keeps type imports in app code working.
+// Row types for app code, built on the generated database types
+// (lib/db/database.types.ts: `npm run db:types`, and CI fails when it is
+// stale). Text columns limited by a SQL check come out as plain `string`
+// there; the few the app relies on as unions are narrowed here. Narrowing a
+// name that is no longer a column fails the type check.
 
+import type { CareerStage } from "@/lib/careerStage";
+import type { Tables } from "@/lib/db/database.types";
 import type { WorkplaceType } from "@/lib/workplace";
 
-export interface Doctor {
-  id: string;
-  auth_user_id: string | null;
-  phone_e164: string;
-  phone_display: string | null;
-  arabic_first_name: string;
-  arabic_family_name: string;
-  arabic_full_name: string;
-  arabic_first_name_normalized: string;
-  arabic_family_name_normalized: string;
-  arabic_full_name_normalized: string;
-  hebrew_first_name: string | null;
-  hebrew_family_name: string | null;
-  hebrew_full_name: string | null;
-  license_number: string;
-  license_region: "IL" | "PS";
-  license_verified_at: string | null;
-  license_verification_status:
-    | "verified"
-    | "soft_match"
-    | "not_found"
-    | "name_mismatch_overridden"
-    | null;
-  secondary_license_region: "IL" | "PS" | null;
-  secondary_license_number: string | null;
-  secondary_license_verification_status:
-    | "verified"
-    | "soft_match"
-    | "not_found"
-    | "name_mismatch_overridden"
-    | null;
-  career_stage: "resident" | "specialist" | null;
-  /** Asked of residents only; null for everyone else. */
-  residency_start_year: number | null;
-  subspecialty: string | null;
-  subspecialty_normalized: string | null;
-  email: string | null;
-  bio: string | null;
-  consent_directory_use: boolean;
-  consent_timestamp: string;
-  is_phone_verified: boolean;
-  is_active: boolean;
-  is_visible: boolean;
-  is_admin_approved: boolean;
-  is_admin: boolean;
-  profile_picture_url: string | null;
-  /** Self-declared on /signup and /profile (0013). */
-  seeking_work: boolean;
-  /** Self-declared on /signup and /profile (0019). Independent of
-   *  seeking_work: a retired doctor may still want locum work. */
-  retired: boolean;
-  /** Set by an admin; drives the dashboard's featured sections. */
-  featured: "doctor" | "graduate" | null;
-  featured_at: string | null;
-  /** طب عام only, at most 5. */
-  certificates: string[];
-  certificates_normalized: string | null;
-  created_at: string;
-  updated_at: string;
-}
+/** A row with some columns' types narrowed; every key must be a column. */
+type Narrow<Row, N extends { [K in keyof N]: K extends keyof Row ? unknown : never }> = Omit<Row, keyof N> & N;
 
-export interface Specialty {
-  id: string;
-  name_ar: string;
-  /** Stable handle for rows the app has to single out, see 0009. */
-  code: string | null;
-  /** One level of nesting (0012): a subspecialty points at its parent. */
-  parent_id: string | null;
-  name_ar_normalized: string;
-  name_he: string | null;
-  name_en: string | null;
-  sort_order: number | null;
-  is_active: boolean;
-}
+type LicenseStatus = "verified" | "soft_match" | "not_found" | "name_mismatch_overridden";
 
-export interface DoctorSpecialty {
-  doctor_id: string;
-  specialty_id: string;
-}
+export type Doctor = Narrow<
+  // Computed columns: only there when a select names them, never in "*".
+  Omit<Tables<"doctors">, "clinic_missing_details" | "registry_specialty">,
+  {
+    license_region: "IL" | "PS";
+    license_verification_status: LicenseStatus | null;
+    secondary_license_region: "IL" | "PS" | null;
+    secondary_license_verification_status: LicenseStatus | null;
+    /** null is طب عام. */
+    career_stage: CareerStage | null;
+    /** Set by an admin; drives the dashboard's featured sections. */
+    featured: "doctor" | "graduate" | null;
+  }
+>;
 
-export interface AuditLog {
-  id: string;
-  actor_doctor_id: string | null;
-  action: string;
-  target_doctor_id: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-}
-
-export interface PendingSignup {
-  id: string;
-  phone_e164: string;
-  payload: Record<string, unknown>;
-  expires_at: string;
-  attempts: number;
-  created_at: string;
-}
-
-export interface DoctorWorkplace {
-  id: string;
-  doctor_id: string;
-  name: string;
-  name_normalized: string;
-  workplace_type: WorkplaceType;
-  /** Legacy free text, superseded by address/hours/phone (0012). */
-  details: string | null;
-  address: string | null;
-  hours: string | null;
-  phone: string | null;
-  is_primary: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MohPractitioner {
-  license_number: number;
-  hebrew_first_name: string;
-  hebrew_family_name: string;
-  hebrew_first_norm: string;
-  hebrew_family_norm: string;
-  specialty_name_he: string | null;
-  license_issued_yyyymmdd: number | null;
-  synced_at: string;
-}
+export type DoctorWorkplace = Narrow<Tables<"doctor_workplaces">, { workplace_type: WorkplaceType }>;

@@ -30,5 +30,8 @@ Then:
    The name is the file's, without `.sql`. `lib/migrations.test.ts` fails
    without it, and after each deploy the production smoke check lists any
    file production has not run.
+5. With the local stack up (`npx supabase db reset` applies it), run
+   `npm run db:types` and commit `lib/db/database.types.ts`. CI fails while
+   that file and the migrations disagree.
 
 `lib/migrations.test.ts` fails if two files share a number.

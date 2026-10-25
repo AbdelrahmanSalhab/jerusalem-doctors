@@ -115,7 +115,7 @@ export async function fetchDoctorDetail(
   const { data, error } = await service.from("doctors").select(DOCTOR_COLUMNS).eq("id", id).maybeSingle();
   if (error && error.code !== "PGRST116") throw new Error(`doctor read failed: ${error.message}`);
   if (!data) return null;
-  const doctor = data as unknown as DetailDoctor;
+  const doctor = data as DetailDoctor;
 
   const serials = [
     ...serialsOf(doctor.license_region, doctor.license_number),
@@ -191,9 +191,9 @@ export async function fetchDoctorDetail(
     doctor,
     specialties: specialtyNames(specialtyRows.data),
     specialtyIds: ((specialtyRows.data ?? []) as { specialty_id: string }[]).map((r) => r.specialty_id),
-    workplaces: (workplaceRows.data ?? []) as unknown as DetailWorkplace[],
+    workplaces: (workplaceRows.data ?? []) as DetailWorkplace[],
     licenses,
-    audit: (auditRows.data ?? []) as unknown as DoctorDetail["audit"],
+    audit: (auditRows.data ?? []) as DoctorDetail["audit"],
     lastSignInAt,
   };
 }

@@ -62,9 +62,9 @@ describe("GET /api/search", () => {
       p_institution_ids: [SHAAREI],
       // One past the page, to know whether more matched.
       p_limit: 51,
-      p_workplace_institution: null,
-      p_workplace_type: null,
-      p_stage: null,
+      p_workplace_institution: undefined,
+      p_workplace_type: undefined,
+      p_stage: undefined,
       p_seeking_work: false,
     });
   });
@@ -74,7 +74,7 @@ describe("GET /api/search", () => {
     expect(rpc).toHaveBeenCalledWith(
       "search_directory",
       expect.objectContaining({
-        p_term: null,
+        p_term: undefined,
         p_workplace_institution: SHAAREI,
         p_workplace_type: "hmo",
         p_stage: "general",
@@ -95,7 +95,7 @@ describe("GET /api/search", () => {
 
   it("lists everyone (filtered or not) when there is no text", async () => {
     await search({ specialty_id: SPECIALTY });
-    expect(rpc).toHaveBeenCalledWith("search_directory", expect.objectContaining({ p_term: null, p_institution_ids: [] }));
+    expect(rpc).toHaveBeenCalledWith("search_directory", expect.objectContaining({ p_term: undefined, p_institution_ids: [] }));
   });
 
   it("answers an all-punctuation query with nothing, without a query", async () => {

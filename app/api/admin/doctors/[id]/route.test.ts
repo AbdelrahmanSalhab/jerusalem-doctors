@@ -153,9 +153,12 @@ describe("PATCH /api/admin/doctors/[id]: the three switches", () => {
 
   it("keeps the three independent, touching only what was asked", async () => {
     await call({ is_active: false });
-    expect(updates[0]).toEqual({ is_active: false });
-    expect(updates[0]).not.toHaveProperty("is_visible");
-    expect(updates[0]).not.toHaveProperty("is_admin_approved");
+    // What reaches the database: the update goes as JSON, which leaves out
+    // the fields the body didn't name.
+    const sent = JSON.parse(JSON.stringify(updates[0]));
+    expect(sent).toEqual({ is_active: false });
+    expect(sent).not.toHaveProperty("is_visible");
+    expect(sent).not.toHaveProperty("is_admin_approved");
   });
 });
 

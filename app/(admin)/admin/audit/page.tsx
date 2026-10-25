@@ -38,10 +38,11 @@ export default async function AdminAuditPage({
   // join and the Jerusalem days are Postgres's own time zone arithmetic.
   const [{ data, error }, { data: institutions }] = await Promise.all([
     service.rpc("admin_audit_events", {
-      p_action: params.action || null,
-      p_term: toIlikeTerm(params.q) || null,
-      p_from: params.from || null,
-      p_to: params.to || null,
+      // Left out means NULL: every optional argument defaults to it.
+      p_action: params.action || undefined,
+      p_term: toIlikeTerm(params.q) || undefined,
+      p_from: params.from || undefined,
+      p_to: params.to || undefined,
       p_people_only: params.people,
       p_limit: PAGE_SIZE,
       p_offset: from,

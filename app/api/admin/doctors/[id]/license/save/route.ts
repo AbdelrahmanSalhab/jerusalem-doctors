@@ -16,7 +16,6 @@ import {
   checkLicense,
   findDuplicate,
   LICENSE_ROW_COLUMNS,
-  slotColumns,
   storedSlot,
   toColumnStatus,
   type AdminDoctorLicenseRow,
@@ -24,6 +23,7 @@ import {
 import { MohUnavailableError } from "@/lib/moh/match";
 import { isValidLicenseFormat, licenseFormatErrorMessage } from "@/lib/normalize/license";
 import { rateLimit } from "@/lib/ratelimit";
+import type { TablesUpdate } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const Body = z.object({
@@ -67,7 +67,7 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     return jsonError(500, { error: "update_failed", code: "update_failed" });
   }
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
-  const doctor = found.data as unknown as AdminDoctorLicenseRow;
+  const doctor = found.data as AdminDoctorLicenseRow;
 
   const stored = storedSlot(doctor, body.slot);
   const region = body.region ?? (stored.region as "IL" | "PS" | null) ?? doctor.license_region;
@@ -158,12 +158,14 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     return jsonOk({ ok: true, changed: false, status: nextStatus, checked_number: outcome.checkedNumber });
   }
 
-  const cols = slotColumns(body.slot);
-  const updates: Record<string, unknown> = {
-    [cols.number]: outcome.checkedNumber,
-    [cols.region]: region,
-    [cols.status]: nextStatus,
-  };
+  const updates: TablesUpdate<"doctors"> =
+    body.slot === "primary"
+      ? { license_number: outcome.checkedNumber, license_region: region, license_verification_status: nextStatus }
+      : {
+          secondary_license_number: outcome.checkedNumber,
+          secondary_license_region: region,
+          secondary_license_verification_status: nextStatus,
+        };
   // The Hebrew name is the doctor's, not the slot's: the other slot's stored
   // verdict was reached against the old spelling and is not re-run here, the
   // same way an admin's profile edit leaves it to be redone.
