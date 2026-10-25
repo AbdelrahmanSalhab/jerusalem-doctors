@@ -55,7 +55,7 @@ export async function SiteHeader() {
         </Link>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <ThemeToggle className="inline-flex items-center justify-center rounded-md px-2 py-1.5 text-sm text-muted hover:bg-foreground/5 hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11" />
+          <ThemeToggle className="inline-flex items-center justify-center rounded-md px-2 py-1.5 text-sm text-muted hover:bg-foreground/5 hover:text-foreground pointer-coarse:min-h-11" />
           {doctor ? (
             <AccountMenu
               photoUrl={doctor.profile_picture_url}
