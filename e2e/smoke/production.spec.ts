@@ -2,15 +2,14 @@
 // real users, or something in front of it (Vercel's firewall) is blocking
 // people or the services the site depends on.
 
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "../fixtures";
 import { repoMigrations } from "../../lib/migrationFiles";
 
-const EMAIL = process.env.SMOKE_EMAIL ?? "";
-const PASSWORD = process.env.SMOKE_PASSWORD ?? "";
 const RUN = process.env.CI_RUN_URL ?? "";
 
-test.skip(!EMAIL || !PASSWORD || !RUN, "SMOKE_EMAIL, SMOKE_PASSWORD and CI_RUN_URL are required");
+test.skip(!RUN, "CI_RUN_URL is required");
 
 test.beforeEach(async ({ context, baseURL }) => {
   // Same-origin only: a custom header on cross-origin fetches would trigger
@@ -49,6 +48,8 @@ test("the services the site depends on can reach it", async ({ request }) => {
 // form, and the session shared by the tests below.
 const STATE = join(__dirname, "..", ".results", "smoke-session.json");
 test.describe("signed in as an admin", () => {
+  // smoke.setup.ts signs in only inside GitHub Actions.
+  test.skip(!existsSync(STATE), "no session: signed in only in GitHub Actions");
   test.use({ storageState: STATE });
 
   test("searches, and opens the admin screens", async ({ page }) => {

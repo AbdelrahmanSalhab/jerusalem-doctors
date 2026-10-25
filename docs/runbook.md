@@ -390,6 +390,35 @@ needs a challenge step in `/api/login/password` and an `aal2` check in
 `requireDoctor`. Worth doing if these accounts stay enabled in production
 long term.
 
+## The production smoke check's sign-in (no password)
+
+`.github/workflows/smoke.yml` checks the live site after every deploy and every
+six hours, signed in as an admin. It signs in as a dedicated **CI account**,
+with a token GitHub issues to that workflow (OpenID Connect), checked by
+`POST /api/login/ci` (`lib/auth/githubOidc.ts`): GitHub's signature, this
+repository, `smoke.yml`, GitHub's own runners, fresh, and each token once.
+
+- **Nothing to leak.** No password or secret exists for it. The CI account
+  has no password and no phone, and its email is on the reserved `.invalid`
+  domain, so no other sign-in reaches it. A copied token is single-use and
+  lives for minutes.
+- **Signed out at the end** of every run (`e2e/smoke/smoke.teardown.ts`).
+- **The trust boundary** is write access to this repository: only a workflow
+  file named `smoke.yml` here can get a token that passes, which is the same
+  boundary a GitHub secret had. Pull requests from forks get no token.
+
+Setting it up, once per Supabase project:
+
+1. `npm run ci-login:add` (needs `.env.local` with the service key). It
+   creates the account, hidden from the directory, and prints the email.
+2. On Vercel (Production): `CI_LOGIN_EMAIL=ci@jerusalem-doctors.invalid`,
+   then redeploy.
+3. Delete the old `SMOKE_EMAIL` and `SMOKE_PASSWORD` secrets on GitHub, and
+   take that address off `DEV_LOGIN_EMAILS` if nobody signs in with it.
+
+The smoke check records no traces, screenshots or videos: they would record
+the session and admin pages, and the repository is public.
+
 ## Common one-liners
 
 ### Promote yourself to admin

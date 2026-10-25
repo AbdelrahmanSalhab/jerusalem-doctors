@@ -1,5 +1,5 @@
 // Read-only checks against production (.github/workflows/smoke.yml). Signs
-// in with a real admin account through /login/dev; every same-origin request
+// in as the CI account with GitHub's token (/api/login/ci); every same-origin request
 // carries x-ci-run so the activity log marks it as a test and its searches
 // stay out of the stats (lib/ciRun.ts). Changes nothing.
 
@@ -15,14 +15,20 @@ export default defineConfig({
   use: {
     baseURL: process.env.SMOKE_BASE_URL ?? "https://jerusalem-doctors.vercel.app",
     locale: "ar",
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
+    // No traces, screenshots or videos: they record what is typed (the smoke
+    // account's password), the session cookies, and admin pages with doctors'
+    // details, and this repository is public. The job log's error lines are
+    // what a failure leaves.
+    trace: "off",
+    screenshot: "off",
+    video: "off",
     ...devices["Desktop Chrome"],
   },
   // Sign in once (smoke.setup.ts), then run the checks with that session.
   projects: [
     // No retry: a refused sign-in retried is one more attempt against the limit.
-    { name: "setup", testMatch: /smoke\.setup\.ts/, retries: 0 },
+    { name: "setup", testMatch: /smoke\.setup\.ts/, retries: 0, teardown: "teardown" },
+    { name: "teardown", testMatch: /smoke\.teardown\.ts/, retries: 0 },
     { name: "smoke", testMatch: /production\.spec\.ts/, dependencies: ["setup"] },
   ],
 });

@@ -1,12 +1,13 @@
 name: Production smoke
 
 # Read-only checks against the live site: after every production deploy,
-# every six hours, and on demand. Signs in with an admin account through
-# /login/dev; its requests carry this run's URL (x-ci-run), so the activity
-# log shows the sign-in as "اختبار آلي (CI)" and its searches are not counted
-# in the stats. A failure here means the live site needs a look.
+# every six hours, and on demand. Signs in as the CI account with a token
+# GitHub issues to this workflow (id-token: write, /api/login/ci): there is
+# no password. Its requests carry this run's URL (x-ci-run), so the activity
+# log shows "اختبار آلي (CI)" and its searches are not counted in the stats.
+# A failure here means the live site needs a look.
 #
-# Secrets: SMOKE_EMAIL, SMOKE_PASSWORD (an address in Vercel's DEV_LOGIN_EMAILS).
+# Needs CI_LOGIN_EMAIL on Vercel (scripts/add-ci-account.ts). No secrets.
 
 on:
   deployment_status:
@@ -26,6 +27,10 @@ jobs:
       github.event_name != 'deployment_status' ||
       (github.event.deployment_status.state == 'success' &&
        github.event.deployment.environment == 'Production')
+    # id-token: GitHub's short-lived token for the sign-in (/api/login/ci).
+    permissions:
+      contents: read
+      id-token: write
     # Pinned to the current LTS on purpose: a moving label (ubuntu-latest)
     # can change the browser system libraries without a commit.
     runs-on: ubuntu-26.04
@@ -41,17 +46,17 @@ jobs:
       - name: Smoke checks
         run: npx playwright test -c playwright.smoke.config.ts
         env:
-          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
-          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
           CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Lighthouse (public pages)
         if: github.event_name != 'schedule'
         run: npx -y @lhci/cli@0.15.1 autorun
+      # Only the Lighthouse reports of the public pages. Never e2e/.results as a
+      # whole: it holds the signed-in session, and the repository is public.
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: smoke-results
-          path: e2e/.results
+          name: smoke-lighthouse
+          path: e2e/.results/lighthouse
           retention-days: 14
           # The folders start with a dot, which upload-artifact skips by default.
           include-hidden-files: true
