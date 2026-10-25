@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { directoryVisibility, STATE_SWITCHES, switchState, type VisibilityFlags } from "./doctorState";
+import { CI_LICENSE, directoryVisibility, staffKind, STATE_SWITCHES, switchState, type VisibilityFlags } from "./doctorState";
 
 const listed: VisibilityFlags = {
   is_admin_approved: true,
@@ -69,5 +69,16 @@ describe("directoryVisibility", () => {
     expect(v.blockers[0]).toBe("لم تُقبل عضويته بعد");
     expect(v.blockers[4]).toContain("لم يوافق");
     expect(v.sentence).toContain("السبب:");
+  });
+});
+
+describe("staffKind", () => {
+  const row = { is_admin: true, is_visible: false, license_number: "200002" };
+  it("tells staff and the CI account from doctors", () => {
+    expect(staffKind(row)).toBe("staff");
+    expect(staffKind({ ...row, license_number: CI_LICENSE })).toBe("ci");
+    expect(staffKind({ ...row, is_admin: false })).toBeNull();
+    // An admin who is also a listed doctor is a doctor in the list.
+    expect(staffKind({ ...row, is_visible: true })).toBeNull();
   });
 });

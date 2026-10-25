@@ -55,6 +55,7 @@ async function main() {
         arabic_first_name_normalized: "اختبار",
         arabic_family_name_normalized: "الي",
         arabic_full_name_normalized: "اختبار الي",
+        // CI_LICENSE in lib/admin/doctorState.ts: the admin list knows it by this.
         license_number: "CI",
         license_region: "IL",
         consent_directory_use: true,

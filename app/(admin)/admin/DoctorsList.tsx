@@ -29,6 +29,7 @@ export interface DoctorRowData {
   secondary_license_verification_status: string | null;
   career_stage: "resident" | "specialist" | null;
   residency_start_year: number | null;
+  is_admin: boolean;
   is_admin_approved: boolean;
   is_active: boolean;
   is_visible: boolean;
