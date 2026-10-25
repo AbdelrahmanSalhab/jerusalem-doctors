@@ -2,7 +2,7 @@
 // signature, for this repository's smoke workflow, fresh, is accepted.
 
 import { generateKeyPairSync, sign } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CI_AUDIENCE, GITHUB_ISSUER, REPOSITORY, verifySmokeToken } from "./githubOidc";
 
 const NOW = 1_800_000_000;
@@ -65,5 +65,34 @@ describe("verifySmokeToken", () => {
     for (const t of ["", "a.b", "a.b.c", "....", token(CLAIMS).replace(/\./, "")]) {
       expect(await check(t)).toBeNull();
     }
+  });
+});
+
+describe("githubKey", () => {
+  const keys = (...kids: string[]) => ({ keys: kids.map((kid) => ({ ...jwk, kid })) });
+
+  it("fetches GitHub's keys once, and again only for a key it has not seen", async () => {
+    vi.resetModules();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(keys("k1"))));
+    vi.stubGlobal("fetch", fetchMock);
+    const { githubKey } = await import("./githubOidc");
+
+    expect((await githubKey("k1"))?.kid).toBe("k1");
+    expect((await githubKey("k1"))?.kid).toBe("k1");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toBe(`${GITHUB_ISSUER}/.well-known/jwks`);
+
+    // A rotated key: fetched again, still unknown.
+    expect(await githubKey("k2")).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("fails loudly when GitHub does not answer", async () => {
+    vi.resetModules();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    const { githubKey } = await import("./githubOidc");
+    await expect(githubKey("k1")).rejects.toThrow("GitHub JWKS: 503");
+    vi.unstubAllGlobals();
   });
 });
