@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Field, RequiredMark, RetiredCheckbox, SeekingWorkCheckbox } from "@/components/FormField";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
-import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { StageRadios } from "@/components/StageRadios";
 import {
@@ -461,7 +460,6 @@ export function SignupForm({
         </a>
       </p>
 
-      <InputStyles />
     </form>
   );
 }

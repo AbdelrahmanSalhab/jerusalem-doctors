@@ -16,7 +16,6 @@ import { useState } from "react";
 import { PhotoUploader } from "@/app/profile/PhotoUploader";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
 import { Field, RetiredCheckbox, SeekingWorkCheckbox } from "@/components/FormField";
-import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { StageRadios } from "@/components/StageRadios";
 import { WorkplaceEditor } from "@/components/WorkplaceEditor";
@@ -229,7 +228,6 @@ export function DoctorProfileEditor({
 
   return (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-5">
-      <InputStyles />
 
       <PhotoUploader
         currentUrl={photoUrl}

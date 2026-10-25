@@ -14,7 +14,6 @@ import {
 } from "./ProfileSummaries";
 import { CertificatesEditor } from "@/components/CertificatesEditor";
 import { Field, RetiredCheckbox, SeekingWorkCheckbox } from "@/components/FormField";
-import { InputStyles } from "@/components/InputStyles";
 import { SpecialtyPicker } from "@/components/SpecialtyPicker";
 import { StageRadios } from "@/components/StageRadios";
 import { WorkplaceEditor } from "@/components/WorkplaceEditor";
@@ -403,7 +402,6 @@ export function ProfileForm({
 
       <DeleteAccountSection onError={setError} />
 
-      <InputStyles />
     </form>
   );
 }

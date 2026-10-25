@@ -176,9 +176,13 @@ export const TurnstileWidget = forwardRef<TurnstileHandle, Props>(
     }, [scriptReady, siteKey, action]);
 
     if (!siteKey) return null;
+    // Over the page, at the bottom of the screen, not in the form's flow:
+    // with "interaction-only" it appears only when Cloudflare wants a click,
+    // and in the flow it pushed everything under it down when it did (#168).
+    // The wrapper lets taps through; only the widget itself takes them.
     return (
-      <div className="flex justify-center py-1">
-        <div ref={containerRef} className="cf-turnstile" />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div ref={containerRef} className="cf-turnstile pointer-events-auto" />
       </div>
     );
   },
