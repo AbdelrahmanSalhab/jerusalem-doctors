@@ -47,11 +47,13 @@ jobs:
       - name: Lighthouse (public pages)
         if: github.event_name != 'schedule'
         run: npx -y @lhci/cli@0.15.1 autorun
+      # Only the Lighthouse reports of the public pages. Never e2e/.results as a
+      # whole: it holds the signed-in session, and the repository is public.
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: smoke-results
-          path: e2e/.results
+          name: smoke-lighthouse
+          path: e2e/.results/lighthouse
           retention-days: 14
           # The folders start with a dot, which upload-artifact skips by default.
           include-hidden-files: true
