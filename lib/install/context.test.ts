@@ -56,6 +56,8 @@ describe("installGuideFor", () => {
   it("falls back to the Android menu, or to a computer", () => {
     expect(installGuideFor(UA.androidChrome)).toBe("android");
     expect(installGuideFor(UA.desktopChrome)).toBe("other");
+    // Only the apps' own spelling: an "Offline/" token is not LINE.
+    expect(installGuideFor(`${UA.androidChrome} Offline/1.0`)).toBe("android");
   });
 });
 
@@ -98,6 +100,12 @@ describe("the invitation's timing", () => {
     }
     snoozeInvite(stores(local), now);
     expect(inviteAllowed(stores(local), now + 365 * DAY)).toBe(false);
+  });
+
+  it("counts from zero when the stored count is garbage", () => {
+    const local = new Map([[INVITE_KEYS.snoozes, "NaN"]]);
+    snoozeInvite(stores(local), NOW);
+    expect(local.get(INVITE_KEYS.snoozes)).toBe("1");
   });
 
   it("stays away for good after «أضفته بالفعل», on this browser only", () => {

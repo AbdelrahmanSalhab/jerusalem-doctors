@@ -9,16 +9,6 @@
 // can't install at all. Detection from the user agent is imperfect, so the
 // manual help stays reachable from the menu whatever this says.
 
-/** Runs in <head> before the page's JavaScript: Chrome fires its one-time
- *  install event as soon as the page is eligible, which on a repeat visit
- *  can be before React has loaded. Kept for InstallProvider, which also
- *  hears a later one through INSTALL_READY_EVENT. Chrome's own install bar
- *  is held back only where the site offers its own (a signed-in doctor:
- *  INSTALL_OFFER_ATTR on <html>), so visitors still get Chrome's. */
-export const INSTALL_READY_EVENT = "jd:install-ready";
-export const INSTALL_OFFER_ATTR = "data-install-offer";
-export const INSTALL_CAPTURE_SCRIPT = `window.addEventListener("beforeinstallprompt",function(e){if(document.documentElement.hasAttribute("${INSTALL_OFFER_ATTR}"))e.preventDefault();window.__jdInstall=e;window.dispatchEvent(new Event("${INSTALL_READY_EVENT}"));});`;
-
 export type InstallGuide =
   /** iPhone or iPad, Safari: Share (or the page menu) → Add to Home Screen. */
   | "ios-safari"
@@ -33,7 +23,8 @@ export type InstallGuide =
 
 // GSA/ is the Google app, LinkedInApp LinkedIn's; on Android any app's
 // browser says "; wv)".
-const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|TikTok|musical_ly|GSA\/|LinkedInApp|; wv\)/i;
+// Case-sensitive, as the apps write them, so "Offline/" is not LINE.
+const IN_APP = /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|\bLine\/|Snapchat|TikTok|musical_ly|\bGSA\/|LinkedInApp|; wv\)/;
 
 /** The instructions that fit a user agent. `touchMac` is a touch-screen
  *  "Mac", which is how an iPad presents itself to websites. */
@@ -89,6 +80,9 @@ const write = (s: InviteStores["local"], key: string, value: string) => {
   }
 };
 
+/** Phones and tablets, a keyboard or trackpad attached or not. */
+export const TOUCH_QUERY = "(any-pointer: coarse)";
+
 /** Whether the invitation may show now, on this browser. */
 export function inviteAllowed(stores: InviteStores, now = Date.now()): boolean {
   if (read(stores.local, INVITE_KEYS.added) === "1") return false;
@@ -104,8 +98,23 @@ export const markInviteShown = (stores: InviteStores) => write(stores.session, I
 /** «لاحقًا», closing it, or cancelling Chrome's install dialog. */
 export function snoozeInvite(stores: InviteStores, now = Date.now()) {
   write(stores.local, INVITE_KEYS.snoozedUntil, String(now + SNOOZE_DAYS * DAY_MS));
-  write(stores.local, INVITE_KEYS.snoozes, String(Number(read(stores.local, INVITE_KEYS.snoozes)) + 1));
+  write(stores.local, INVITE_KEYS.snoozes, String((Number(read(stores.local, INVITE_KEYS.snoozes)) || 0) + 1));
 }
 
 /** «أضفته بالفعل». */
 export const markAlreadyAdded = (stores: InviteStores) => write(stores.local, INVITE_KEYS.added, "1");
+
+// ---------------------------------------------------------------------------
+// Catching Chrome's install event
+// ---------------------------------------------------------------------------
+
+/** Runs in <head> before the page's JavaScript: Chrome fires its one-time
+ *  install event as soon as the page is eligible, which on a repeat visit
+ *  can be before React has loaded. Kept for InstallProvider, which also
+ *  hears a later one through INSTALL_READY_EVENT. Chrome's own install bar
+ *  is held back only where the site may still offer its own: a signed-in
+ *  doctor (INSTALL_OFFER_ATTR on <html>), on a touch screen, who hasn't
+ *  said «أضفته بالفعل» or put it off MAX_SNOOZES times. */
+export const INSTALL_READY_EVENT = "jd:install-ready";
+export const INSTALL_OFFER_ATTR = "data-install-offer";
+export const INSTALL_CAPTURE_SCRIPT = `window.addEventListener("beforeinstallprompt",function(e){var ours=document.documentElement.hasAttribute("${INSTALL_OFFER_ATTR}")&&matchMedia("${TOUCH_QUERY}").matches;try{ours=ours&&localStorage.getItem("${INVITE_KEYS.added}")!=="1"&&!(Number(localStorage.getItem("${INVITE_KEYS.snoozes}"))>=${MAX_SNOOZES})}catch(x){}if(ours)e.preventDefault();window.__jdInstall=e;window.dispatchEvent(new Event("${INSTALL_READY_EVENT}"));});`;

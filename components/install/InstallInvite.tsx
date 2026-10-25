@@ -9,7 +9,14 @@
 
 import { useEffect, useState } from "react";
 import { useInstall } from "@/components/install/InstallProvider";
-import { inviteAllowed, markAlreadyAdded, markInviteShown, snoozeInvite, type InviteStores } from "@/lib/install/context";
+import {
+  inviteAllowed,
+  markAlreadyAdded,
+  markInviteShown,
+  snoozeInvite,
+  TOUCH_QUERY,
+  type InviteStores,
+} from "@/lib/install/context";
 
 function browserStores(): InviteStores {
   const get = (name: "localStorage" | "sessionStorage") => {
@@ -24,7 +31,9 @@ function browserStores(): InviteStores {
 
 export function InstallInvite() {
   const install = useInstall();
-  const [show, setShow] = useState(false);
+  // Decided once per visit: closed stays closed even where the browser
+  // refuses storage and so can't remember it.
+  const [card, setCard] = useState<"undecided" | "shown" | "closed">("undecided");
 
   const offerable =
     Boolean(install?.ready) &&
@@ -33,31 +42,31 @@ export function InstallInvite() {
     (install?.canPrompt || install?.guide === "ios-safari" || install?.guide === "ios-other" || install?.guide === "in-app");
 
   useEffect(() => {
-    if (!offerable || show) return;
-    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    if (!offerable || card !== "undecided") return;
+    if (!window.matchMedia(TOUCH_QUERY).matches) return;
     const stores = browserStores();
     if (!inviteAllowed(stores)) return;
     markInviteShown(stores);
     // Browser-only facts (storage, pointer): read after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setShow(true);
-  }, [offerable, show]);
+    setCard("shown");
+  }, [offerable, card]);
 
-  if (!install || !show || install.standalone || install.installed) return null;
+  if (!install || card !== "shown" || install.standalone || install.installed) return null;
 
   const later = () => {
     snoozeInvite(browserStores());
-    setShow(false);
+    setCard("closed");
   };
   // After the native prompt the card has done its job; a cancel there
   // counts as «لاحقًا».
   const act = async () => {
-    if (install.canPrompt) setShow(false);
+    if (install.canPrompt) setCard("closed");
     if ((await install.install()) === "dismissed") snoozeInvite(browserStores());
   };
   const added = () => {
     markAlreadyAdded(browserStores());
-    setShow(false);
+    setCard("closed");
   };
 
   return (
