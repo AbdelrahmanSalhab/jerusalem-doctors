@@ -25,6 +25,7 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
   const router = useRouter();
   const install = useInstall();
 
@@ -61,6 +62,7 @@ export function AccountMenu({
   return (
     <div ref={ref} className="relative">
       <button
+        ref={toggle}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -106,6 +108,9 @@ export function AccountMenu({
               role="menuitem"
               type="button"
               onClick={() => {
+                // The dialog gives focus back to what had it, and this
+                // item is about to go: hand it to the account button.
+                toggle.current?.focus();
                 setOpen(false);
                 install.install();
               }}

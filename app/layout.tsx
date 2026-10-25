@@ -5,7 +5,8 @@ import { headers } from "next/headers";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { InstallProvider } from "@/components/install/InstallProvider";
-import { INSTALL_CAPTURE_SCRIPT } from "@/lib/install/context";
+import { getCurrentDoctor } from "@/lib/auth/session";
+import { INSTALL_CAPTURE_SCRIPT, INSTALL_OFFER_ATTR } from "@/lib/install/context";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -68,11 +69,15 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   // proxy.ts sets a fresh nonce per request; only scripts carrying it run.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  // Shared with the header's lookup (cache()): no extra request.
+  const doctor = await getCurrentDoctor().catch(() => null);
   return (
     <html
       lang="ar"
       dir="rtl"
       className={`${plexLatin.variable} ${plex.variable} h-full antialiased`}
+      // Signed in: the site offers installing itself (lib/install/context).
+      {...(doctor?.is_active ? { [INSTALL_OFFER_ATTR]: "" } : {})}
       // data-theme is set by the boot script before React hydrates.
       suppressHydrationWarning
     >

@@ -5,6 +5,7 @@ import {
   inviteAllowed,
   markAlreadyAdded,
   markInviteShown,
+  MAX_SNOOZES,
   SNOOZE_DAYS,
   snoozeInvite,
   type InviteStores,
@@ -25,6 +26,10 @@ const UA = {
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0",
   iphoneFacebook:
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/480.0]",
+  iphoneGoogleApp:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/380.0.0 Mobile/15E148 Safari/604.1",
+  iphoneLinkedIn:
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [LinkedInApp]/9.31",
   desktopChrome:
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
 };
@@ -44,6 +49,8 @@ describe("installGuideFor", () => {
     expect(installGuideFor(UA.androidWebView)).toBe("in-app");
     expect(installGuideFor(UA.iphoneInstagram)).toBe("in-app");
     expect(installGuideFor(UA.iphoneFacebook)).toBe("in-app");
+    expect(installGuideFor(UA.iphoneGoogleApp)).toBe("in-app");
+    expect(installGuideFor(UA.iphoneLinkedIn)).toBe("in-app");
   });
 
   it("falls back to the Android menu, or to a computer", () => {
@@ -79,6 +86,18 @@ describe("the invitation's timing", () => {
     snoozeInvite(stores(local), NOW);
     expect(inviteAllowed(stores(local), NOW + (SNOOZE_DAYS - 1) * DAY)).toBe(false);
     expect(inviteAllowed(stores(local), NOW + SNOOZE_DAYS * DAY + 1)).toBe(true);
+  });
+
+  it(`stops asking after ${MAX_SNOOZES} «لاحقًا»`, () => {
+    const local = new Map<string, string>();
+    let now = NOW;
+    for (let i = 1; i < MAX_SNOOZES; i++) {
+      snoozeInvite(stores(local), now);
+      now += (SNOOZE_DAYS + 1) * DAY;
+      expect(inviteAllowed(stores(local), now)).toBe(true);
+    }
+    snoozeInvite(stores(local), now);
+    expect(inviteAllowed(stores(local), now + 365 * DAY)).toBe(false);
   });
 
   it("stays away for good after «أضفته بالفعل», on this browser only", () => {

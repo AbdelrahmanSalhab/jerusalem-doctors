@@ -5,6 +5,7 @@
 
 import { devices } from "@playwright/test";
 import { expect, test } from "../fixtures";
+import { BASE_URL } from "../env";
 import { stateFile } from "../helpers";
 
 test.use({ storageState: stateFile("doctor") });
@@ -43,7 +44,7 @@ test.describe("on an iPhone", () => {
 test.describe("on Android, once Chrome offers to install", () => {
   test.use(ANDROID);
 
-  test("«تثبيت» opens the native prompt once, then the invitation goes", async ({ page }) => {
+  test("«تثبيت» opens the native prompt once; cancelling it counts as «لاحقًا»", async ({ page }) => {
     // Chrome fires the event once, as soon as the page is eligible: on a
     // repeat visit that can be before React has loaded. Sent once here, as
     // the page's body starts, so the <head> script has to have kept it.
@@ -57,7 +58,7 @@ test.describe("on Android, once Chrome offers to install", () => {
           w.prompted = (w.prompted ?? 0) + 1;
           return Promise.resolve();
         };
-        event.userChoice = Promise.resolve({ outcome: "accepted" });
+        event.userChoice = Promise.resolve({ outcome: "dismissed" });
         window.dispatchEvent(event);
       }).observe(document, { childList: true, subtree: true });
     });
@@ -65,6 +66,7 @@ test.describe("on Android, once Chrome offers to install", () => {
     await invite(page).getByRole("button", { name: "تثبيت" }).click();
     await expect(invite(page)).toBeHidden();
     expect(await page.evaluate(() => (window as unknown as { prompted?: number }).prompted)).toBe(1);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("install:snoozes"))).toBe("1");
   });
 });
 
@@ -75,4 +77,24 @@ test("on a computer: no invitation, and the menu gives the instructions", async 
   await page.getByRole("button", { name: /^حسابي/ }).click();
   await page.getByRole("menuitem", { name: "أضف الدليل إلى جهازي" }).click();
   await expect(page.getByRole("dialog", { name: "أضف الدليل إلى جهازك" })).toBeVisible();
+  // Closing it puts the keyboard back on the account button, not the page.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: /^حسابي/ })).toBeFocused();
+});
+
+test("Chrome's own install bar is held back only where the site offers its own", async ({ page, browser }) => {
+  const offer = (p: import("@playwright/test").Page) =>
+    p.evaluate(() => {
+      const event = new Event("beforeinstallprompt", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  await page.goto("/dashboard");
+  expect(await offer(page)).toBe(true);
+
+  // A visitor who isn't signed in keeps Chrome's.
+  const visitor = await browser.newPage({ baseURL: BASE_URL, storageState: { cookies: [], origins: [] } });
+  await visitor.goto("/login");
+  expect(await offer(visitor)).toBe(false);
+  await visitor.close();
 });

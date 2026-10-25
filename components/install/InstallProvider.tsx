@@ -29,9 +29,9 @@ interface InstallState {
   /** The native prompt is open: the button must not open it again. */
   prompting: boolean;
   guide: InstallGuide;
-  /** The native prompt where there is one, else the instructions. */
-  install: () => void;
-  openHelp: () => void;
+  /** The native prompt where there is one (its answer), else the
+   *  instructions (null). */
+  install: () => Promise<"accepted" | "dismissed" | null>;
 }
 
 const InstallContext = createContext<InstallState | null>(null);
@@ -95,30 +95,29 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const openHelp = useCallback(() => setHelpOpen(true), []);
-
   const install = useCallback(async () => {
     const event = deferred.current;
     if (!event) {
       setHelpOpen(true);
-      return;
+      return null;
     }
     // An event opens the prompt once; a second tap must not try again.
     deferred.current = null;
     setState((s) => ({ ...s, canPrompt: false, prompting: true }));
     try {
       await event.prompt();
-      await event.userChoice;
+      return (await event.userChoice).outcome;
     } catch {
       // The browser refused (it decides eligibility): offer the manual way.
       setHelpOpen(true);
+      return null;
     } finally {
       setState((s) => ({ ...s, prompting: false }));
     }
   }, []);
 
   return (
-    <InstallContext.Provider value={{ ...state, install, openHelp }}>
+    <InstallContext.Provider value={{ ...state, install }}>
       {children}
       <InstallHelpDialog open={helpOpen} guide={state.guide} onClose={() => setHelpOpen(false)} />
     </InstallContext.Provider>

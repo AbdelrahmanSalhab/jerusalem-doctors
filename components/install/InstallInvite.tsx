@@ -49,10 +49,11 @@ export function InstallInvite() {
     snoozeInvite(browserStores());
     setShow(false);
   };
-  // After the native prompt, whatever the answer, the card has done its job.
-  const act = () => {
+  // After the native prompt the card has done its job; a cancel there
+  // counts as «لاحقًا».
+  const act = async () => {
     if (install.canPrompt) setShow(false);
-    install.install();
+    if ((await install.install()) === "dismissed") snoozeInvite(browserStores());
   };
   const added = () => {
     markAlreadyAdded(browserStores());
