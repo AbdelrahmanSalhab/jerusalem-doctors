@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>دليل أطباء القدس</title>
+    <!-- Shown by public/sw.js when a page can't load offline. No script:
+         the link reloads the page that failed (an empty href is this URL).
+         Colours are app/globals.css's; the theme follows the system. -->
+    <style>
+      :root { --background: #f6f7f4; --surface: #ffffff; --foreground: #1b201d; --muted: #5b6660; --line: #dde2dc; --primary: #1b201d; --primary-fg: #ffffff; color-scheme: light; }
+      @media (prefers-color-scheme: dark) {
+        :root { --background: #0b0f0d; --surface: #212b27; --foreground: #e7ece9; --muted: #a4afa9; --line: #3a453f; --primary: #e7ece9; --primary-fg: #0b0f0d; color-scheme: dark; }
+      }
+      body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: var(--background); color: var(--foreground); font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif; }
+      main { max-width: 26rem; width: 100%; display: flex; flex-direction: column; gap: 16px; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-align: center; }
+      h1 { margin: 0; font-size: 1.35rem; }
+      p { margin: 0; color: var(--muted); line-height: 1.6; }
+      a { display: block; padding: 12px; border-radius: 8px; background: var(--primary); color: var(--primary-fg); font-weight: 600; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>لا يوجد اتصال بالإنترنت</h1>
+      <p>تعذّر فتح دليل أطباء القدس الآن. تأكّد من الاتصال بالشبكة، ثم حاول مجددًا.</p>
+      <a href="">حاول مجددًا</a>
+    </main>
+  </body>
+</html>
