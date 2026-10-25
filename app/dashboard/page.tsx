@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { DoctorWorkplace } from "@/lib/db/types";
 import { InstallInvite } from "@/components/install/InstallInvite";
 import { DashboardSearch } from "./DashboardSearch";
 import { ViewerProvider } from "@/components/ViewerContext";
@@ -70,7 +71,11 @@ export default async function DashboardPage({
     (name) => domainByName.get(name),
   );
   // Staff accounts (admin, hidden from the directory) have no card to improve.
-  const gaps = me.is_admin && !me.is_visible ? [] : profileGaps(me, myWorkplaces ?? []);
+  const gaps =
+    me.is_admin && !me.is_visible
+      ? []
+      : // workplace_type is text in SQL, limited by a check to WorkplaceType.
+        profileGaps(me, (myWorkplaces ?? []) as Pick<DoctorWorkplace, "name" | "workplace_type" | "address" | "phone">[]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">

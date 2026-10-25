@@ -23,6 +23,7 @@ import {
 } from "@/lib/admin/doctorsQuery";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
 import { fetchActiveSpecialties } from "@/lib/specialties/catalogue";
+import type { Tables } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -72,9 +73,11 @@ async function counts(service: SupabaseClient): Promise<Record<DoctorFilter, num
 }
 
 // Method syntax on purpose: the typed client's eq takes each column's own
-// value type, which only a method's (bivariant) parameters accept.
+// value type, which only a method's (bivariant) parameters accept. The
+// column stays checked: it must be a real doctors column.
+type DoctorColumn = keyof Tables<"doctors">;
 function applyFilter<
-  T extends { eq(c: string, v: unknown): T; or(f: string): T; not(c: string, op: string, v: unknown): T },
+  T extends { eq(c: DoctorColumn, v: unknown): T; or(f: string): T; not(c: DoctorColumn, op: string, v: unknown): T },
 >(
   query: T,
   filter: DoctorFilter,

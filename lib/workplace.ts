@@ -53,8 +53,7 @@ export function hasInvalidClinicPhone(w: { name: string; phone: string }): boole
  *  them at all (طب عام and specialists). */
 export function missingClinicFields(w: {
   name: string;
-  /** Only compared with "clinic": a stored row's text column fits as is. */
-  workplace_type: WorkplaceType | (string & {});
+  workplace_type: WorkplaceType;
   address: string;
   phone: string;
 }): ("address" | "phone")[] {

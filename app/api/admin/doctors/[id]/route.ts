@@ -44,16 +44,6 @@ const Body = z.object({
 });
 
 
-/** The columns this route may write; anything else in the body is ignored. */
-const UPDATABLE = [
-  "is_admin_approved",
-  "is_active",
-  "is_visible",
-  "career_stage",
-  "residency_start_year",
-  "featured",
-] as const satisfies readonly (keyof TablesUpdate<"doctors">)[];
-
 export const PATCH = withJsonErrors(async (
   req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -99,18 +89,20 @@ export const PATCH = withJsonErrors(async (
     return jsonError(400, { error: "approval_reason_required", code: "approval_reason_required" });
   }
 
-  // Built from the allow-list, never by spreading the body: approval_reason is
-  // not a column and would fail the update.
-  const updates: TablesUpdate<"doctors"> = {};
-  for (const key of UPDATABLE) {
-    // Every key is a doctors column (UPDATABLE's satisfies), so only the
-    // value's type is loosened here.
-    if (key in fields) (updates as Record<string, unknown>)[key] = fields[key];
-  }
-  // Re-featuring bumps featured_at, so the newest pick leads the section.
-  if (fields.featured !== undefined) {
-    updates.featured_at = fields.featured ? new Date().toISOString() : null;
-  }
+  // The columns this route may write, named one by one and checked against
+  // the table, never by spreading the body: approval_reason is not a column.
+  // A field the body left out is undefined, which is not sent; an explicit
+  // null is, and clears the column.
+  const updates: TablesUpdate<"doctors"> = {
+    is_admin_approved: fields.is_admin_approved,
+    is_active: fields.is_active,
+    is_visible: fields.is_visible,
+    career_stage: fields.career_stage,
+    residency_start_year: fields.residency_start_year,
+    featured: fields.featured,
+    // Re-featuring bumps featured_at, so the newest pick leads the section.
+    ...(fields.featured !== undefined && { featured_at: fields.featured ? new Date().toISOString() : null }),
+  };
 
   const r = await service.from("doctors").update(updates).eq("id", id);
   if (r.error) {

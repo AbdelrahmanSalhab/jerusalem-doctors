@@ -1,7 +1,7 @@
 // What a doctor's own profile still lacks, for the dashboard's "complete your
 // profile" note. Only things that make the card more useful to colleagues.
 
-import { missingClinicFields } from "@/lib/workplace";
+import { missingClinicFields, type WorkplaceType } from "@/lib/workplace";
 
 interface ReminderDoctor {
   career_stage: "resident" | "specialist" | null;
@@ -12,8 +12,7 @@ interface ReminderDoctor {
 
 interface ReminderWorkplace {
   name: string;
-  /** The stored column (text, checked in SQL). */
-  workplace_type: string;
+  workplace_type: WorkplaceType;
   address: string | null;
   phone: string | null;
 }
