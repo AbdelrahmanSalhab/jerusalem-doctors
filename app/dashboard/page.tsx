@@ -126,7 +126,7 @@ export default async function DashboardPage({
           </div>
           <Link
             href="/profile"
-            className="shrink-0 rounded-md bg-primary px-4 py-2 text-center text-primary-fg hover:opacity-90"
+            className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-primary-fg hover:opacity-90 pointer-coarse:min-h-11"
           >
             إكمال الملف
           </Link>

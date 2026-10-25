@@ -7,7 +7,7 @@
         "https://jerusalem-doctors.vercel.app/signup"
       ],
       "numberOfRuns": 2,
-      "settings": { "preset": "desktop", "chromeFlags": "--no-sandbox --headless=new" }
+      "settings": { "chromeFlags": "--no-sandbox --headless=new" }
     },
     "assert": {
       "assertions": {
