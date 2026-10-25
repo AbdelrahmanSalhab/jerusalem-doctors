@@ -49,6 +49,7 @@ const TITLE: Record<string, string> = {
   admin_license_rechecked: "إعادة فحص الترخيص",
   admin_license_corrected: "تصحيح رقم الترخيص",
   dev_password_login: "دخول فريق التطوير بكلمة مرور",
+  ci_login: "دخول الاختبار الآلي (CI)",
   password_changed: "تغيير كلمة المرور",
   institution_created: "إضافة مؤسسة",
   institution_updated: "تعديل مؤسسة",
@@ -176,6 +177,8 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
     case "admin_license_rechecked":
     case "admin_license_corrected":
       return licenseCheckDetail(m);
+    case "ci_login":
+      return "اختبار آلي (CI)";
     case "dev_password_login":
       return [m.ci_run ? "اختبار آلي (CI)" : "", m.email, m.is_admin ? "بصلاحيات إدارة" : ""].filter(Boolean).join(" · ");
     case "institution_created":

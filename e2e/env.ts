@@ -38,6 +38,9 @@ export const ACCOUNTS = {
 } as const;
 export type Role = keyof typeof ACCOUNTS;
 
+/** The account /api/login/ci signs in (scripts/add-ci-account.ts in production). */
+export const CI_LOGIN_EMAIL = "ci@e2e.invalid";
+
 /** Accounts a single test creates and removes (e.g. the deletion request). */
 export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test"];
 
@@ -56,6 +59,9 @@ export function appEnv(): Record<string, string> {
     TURNSTILE_SECRET_KEY,
     DEV_LOGIN: "1",
     DEV_LOGIN_EMAILS: [...Object.values(ACCOUNTS), ...THROWAWAY_ACCOUNTS].join(","),
+    // The smoke check's sign-in (app/api/login/ci), with the stub playing GitHub.
+    CI_LOGIN_EMAIL,
+    GITHUB_OIDC_JWKS_URL: `${STUB_URL}/github-oidc/jwks`,
     // The production provider, pointed at the stub: the mock sender refuses
     // to run in a production build, and this is the path real codes take.
     OTP_PROVIDER: "sms4free",
