@@ -29,6 +29,9 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
+    // The offline worker (public/sw.js) stays out of the way of page.route;
+    // e2e/ui/offline.spec.ts allows it.
+    serviceWorkers: "block",
   },
   projects: [
     { name: "db", testMatch: /db\/.*\.spec\.ts/, workers: 1 },

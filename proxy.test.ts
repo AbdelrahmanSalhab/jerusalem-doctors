@@ -15,6 +15,8 @@ describe("isPublic", () => {
     "/favicon.ico",
     "/robots.txt",
     "/manifest.webmanifest",
+    "/sw.js",
+    "/offline.html",
     // The team's password sign-in. Public here because nobody has a session
     // yet when they reach it; the route and page gate themselves on
     // DEV_LOGIN (see lib/auth/devLogin.ts).
