@@ -9,7 +9,7 @@
 import { Avatar } from "@/components/Avatar";
 import { ApprovalReasonPrompt } from "./ApprovalReasonPrompt";
 import type { DoctorRowData } from "./DoctorsList";
-import { directoryVisibility } from "@/lib/admin/doctorState";
+import { directoryVisibility, staffKind } from "@/lib/admin/doctorState";
 import { careerStageBadge } from "@/lib/careerStage";
 import { approvalNeedsReason, licenseDisplay, toneChip } from "@/lib/licenseStatus";
 import { useState } from "react";
@@ -50,6 +50,9 @@ export function DoctorListRow({
   const stage = row.career_stage ? careerStageBadge(row.career_stage, row.residency_start_year) : "طب عام";
   const visibility = directoryVisibility(row);
   const waiting = !row.is_admin_approved && row.is_active;
+  // Staff and the CI account carry placeholder doctor fields: say what they
+  // are instead of «د.», a stage and a licence nobody holds.
+  const staff = staffKind(row);
 
   // An exact registry match needs no explanation; anything else is a
   // judgement call, including a Palestinian licence, which is unverifiable by
@@ -75,29 +78,48 @@ export function DoctorListRow({
             aria-expanded={open}
             className="truncate text-start font-medium underline-offset-4 hover:underline"
           >
-            د. {name}
+            {staff ? name : `د. ${name}`}
           </button>
           <p className="truncate text-xs text-muted">
-            <span dir="ltr">{row.phone_e164}</span>
-            {stage && <> · {stage}</>}
-            {specialtyNames(row).length > 0 && <> · {specialtyNames(row).join("، ")}</>}
+            {staff === "ci" ? (
+              "يسجّل به فحص الإنتاج الآلي الدخول، بلا كلمة مرور"
+            ) : staff === "staff" ? (
+              <>
+                <span dir="ltr">{row.phone_e164}</span> · فريق الإدارة
+              </>
+            ) : (
+              <>
+                <span dir="ltr">{row.phone_e164}</span>
+                {stage && <> · {stage}</>}
+                {specialtyNames(row).length > 0 && <> · {specialtyNames(row).join("، ")}</>}
+              </>
+            )}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <span className="text-muted md:hidden">الترخيص:</span>
-        <span dir="ltr" className="tabular-nums">
-          {row.license_number}
-        </span>
-        <span className={toneChip(licence.tone)}>{licence.label}</span>
+        {staff ? (
+          <span className="text-muted">لا ينطبق</span>
+        ) : (
+          <>
+            <span dir="ltr" className="tabular-nums">
+              {row.license_number}
+            </span>
+            <span className={toneChip(licence.tone)}>{licence.label}</span>
+          </>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-muted md:hidden">الحالة:</span>
         {waiting && <span className={toneChip("warn")}>بانتظار القبول</span>}
         {!row.is_active && <span className={toneChip("danger")}>الحساب مغلق</span>}
-        {row.is_active && row.is_admin_approved && !row.is_visible && (
+        {staff === "ci" && <span className={toneChip("neutral")}>حساب آلي (CI)</span>}
+        {staff === "staff" && <span className={toneChip("neutral")}>حساب إدارة</span>}
+        {/* Staff are hidden by design, not by a decision to look into. */}
+        {!staff && row.is_active && row.is_admin_approved && !row.is_visible && (
           <span className={toneChip("warn")}>مخفي من الدليل</span>
         )}
         {visibility.listed && <span className={toneChip("success")}>في الدليل</span>}

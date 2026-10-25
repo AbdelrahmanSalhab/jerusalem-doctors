@@ -97,3 +97,18 @@ export function directoryVisibility(d: VisibilityFlags): DirectoryVisibility {
       : `لا يظهر في الدليل الآن. السبب: ${blockers.join("، ")}.`,
   };
 }
+
+/** The licence placeholder of the CI account (scripts/add-ci-account.ts), the
+ *  one the production smoke check signs in as (/api/login/ci). */
+export const CI_LICENSE = "CI";
+
+/**
+ * Not a doctor: a staff account (an admin hidden from the directory, the same
+ * rule admin_stats() and the registry sync use), and among them the CI
+ * account. null for a doctor. Their doctor fields are placeholders, so the
+ * admin list shows what they are instead.
+ */
+export function staffKind(row: { is_admin: boolean; is_visible: boolean; license_number: string }): "ci" | "staff" | null {
+  if (!row.is_admin || row.is_visible) return null;
+  return row.license_number === CI_LICENSE ? "ci" : "staff";
+}

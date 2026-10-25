@@ -42,6 +42,7 @@ const ROW_COLUMNS = `
   secondary_license_verification_status,
   career_stage,
   residency_start_year,
+  is_admin,
   is_admin_approved,
   is_active,
   is_visible,
