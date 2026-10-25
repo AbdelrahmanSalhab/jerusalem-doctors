@@ -67,6 +67,8 @@ export const RATE_LIMITS = {
   // (app/api/login/ci); GitHub's tokens live for minutes.
   ciLoginToken: { limit: 1, window: "15 m" },
   ciLoginIp: { limit: 10, window: "15 m" },
+  // Each attempt checks the current password: kept as slow as signing in.
+  passwordChange: { limit: 5, window: "15 m" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;

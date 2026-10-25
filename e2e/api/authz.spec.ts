@@ -29,6 +29,8 @@ const POLICY: Record<string, Policy> = {
   "GET /api/admin/migrations": "admin",
   // The smoke check's sign-in with a GitHub token (lib/auth/githubOidc.ts).
   "POST /api/login/ci": "credentials",
+  // Admins are the accounts with a password sign-in.
+  "POST /api/profile/password": "admin",
   "POST /api/admin/doctors/[id]/license/check": "admin",
   "POST /api/admin/doctors/[id]/license/save": "admin",
   "PATCH /api/admin/doctors/[id]": "admin",

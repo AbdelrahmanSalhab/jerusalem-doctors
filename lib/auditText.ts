@@ -50,6 +50,7 @@ const TITLE: Record<string, string> = {
   admin_license_corrected: "تصحيح رقم الترخيص",
   dev_password_login: "دخول فريق التطوير بكلمة مرور",
   ci_login: "دخول الاختبار الآلي (CI)",
+  password_changed: "تغيير كلمة المرور",
   institution_created: "إضافة مؤسسة",
   institution_updated: "تعديل مؤسسة",
   institution_deleted: "حذف مؤسسة",
