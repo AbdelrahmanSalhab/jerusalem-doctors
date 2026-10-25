@@ -78,13 +78,13 @@ export function InstallInvite() {
   return (
     <section
       aria-label="أضف الدليل إلى هاتفك"
-      className="relative flex flex-col gap-3 rounded-lg border border-info-line bg-info-bg p-4 pe-10 text-sm text-info"
+      className="relative flex flex-col gap-3 rounded-lg border border-info-line bg-info-bg p-4 pe-12 text-sm text-info"
     >
       <button
         type="button"
         onClick={later}
         aria-label="إغلاق"
-        className="absolute end-2 top-2 flex h-8 w-8 items-center justify-center rounded-full hover:bg-foreground/10"
+        className="absolute end-1 top-1 flex h-8 w-8 items-center justify-center rounded-full hover:bg-foreground/10 pointer-coarse:h-11 pointer-coarse:w-11"
       >
         ✕
       </button>
@@ -97,14 +97,14 @@ export function InstallInvite() {
           type="button"
           onClick={act}
           disabled={install.prompting}
-          className="rounded-md bg-primary px-4 py-2 font-semibold text-primary-fg hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 font-semibold text-primary-fg hover:opacity-90 disabled:opacity-50 pointer-coarse:min-h-11"
         >
           {install.canPrompt ? "تثبيت" : "طريقة الإضافة"}
         </button>
-        <button type="button" onClick={later} className="rounded-md border border-current/30 px-4 py-2 hover:bg-foreground/5">
+        <button type="button" onClick={later} className="rounded-md border border-current/30 px-4 py-2 hover:bg-foreground/5 pointer-coarse:min-h-11">
           لاحقًا
         </button>
-        <button type="button" onClick={added} className="px-2 py-2 underline">
+        <button type="button" onClick={added} className="px-2 py-2 underline pointer-coarse:min-h-11">
           أضفته بالفعل
         </button>
       </div>

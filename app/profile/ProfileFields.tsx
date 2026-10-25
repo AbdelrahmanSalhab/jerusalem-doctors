@@ -27,7 +27,7 @@ export function EditButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-md border border-foreground/20 px-3 py-1 text-sm hover:bg-foreground/5"
+      className="rounded-md border border-foreground/20 px-3 py-1 text-sm hover:bg-foreground/5 pointer-coarse:min-h-11"
     >
       تعديل
     </button>

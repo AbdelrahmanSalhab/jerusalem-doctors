@@ -30,7 +30,8 @@ export async function SiteHeader() {
   const doctor = current?.is_active ? current : null;
   const pending = doctor?.is_admin ? await countPending().catch(() => 0) : 0;
 
-  const button = "rounded-md border border-line px-2.5 py-1.5 text-sm hover:bg-foreground/5 sm:px-3";
+  const button =
+    "inline-flex items-center rounded-md border border-line px-2.5 py-1.5 text-sm hover:bg-foreground/5 sm:px-3 pointer-coarse:min-h-11";
   return (
     <header className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-2.5 sm:px-6">
@@ -54,7 +55,7 @@ export async function SiteHeader() {
         </Link>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <ThemeToggle className="rounded-md px-2 py-1.5 text-sm text-muted hover:bg-foreground/5 hover:text-foreground" />
+          <ThemeToggle className="inline-flex items-center justify-center rounded-md px-2 py-1.5 text-sm text-muted hover:bg-foreground/5 hover:text-foreground pointer-coarse:min-h-11" />
           {doctor ? (
             <AccountMenu
               photoUrl={doctor.profile_picture_url}
@@ -73,7 +74,7 @@ export async function SiteHeader() {
               </Link>
               <Link
                 href="/signup"
-                className="rounded-md bg-primary px-2.5 py-1.5 text-sm text-primary-fg hover:opacity-90 sm:px-3"
+                className="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-sm text-primary-fg hover:opacity-90 sm:px-3 pointer-coarse:min-h-11"
               >
                 إنشاء حساب
               </Link>

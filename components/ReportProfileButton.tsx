@@ -23,7 +23,7 @@ export function ReportProfileButton({ doctorId, name }: { doctorId: string; name
   }
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="self-start text-xs text-muted underline hover:text-foreground">
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center self-start text-xs text-muted underline hover:text-foreground pointer-coarse:min-h-11">
         أبلغ عن هذا الملف
       </button>
     );

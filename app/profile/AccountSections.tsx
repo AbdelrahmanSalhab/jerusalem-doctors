@@ -62,7 +62,7 @@ export function DeleteAccountSection({ onError }: { onError: (msg: string) => vo
       <button
         type="button"
         onClick={requestDelete}
-        className="rounded-md border border-danger-line px-4 py-2 text-danger hover:bg-danger-bg"
+        className="rounded-md border border-danger-line px-4 py-2 text-danger hover:bg-danger-bg pointer-coarse:min-h-11"
       >
         طلب حذف الحساب
       </button>

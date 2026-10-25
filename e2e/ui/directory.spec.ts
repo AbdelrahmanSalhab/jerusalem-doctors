@@ -17,7 +17,7 @@ test("the dashboard counts the listed doctors and shows the featured ones @phone
   await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
 });
 
-test("search finds by name and never shows hidden, pending or admin rows", async ({ page }) => {
+test("search finds by name and never shows hidden, pending or admin rows @phone", async ({ page }) => {
   await search(page, "ليلى");
   await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
   // A query every seeded name contains a letter of.
@@ -101,7 +101,7 @@ test("the filter chips narrow the list with no text, and clear @phone", async ({
   await expect(page.getByText(/في الدليل/)).toBeVisible();
 });
 
-test("saving a contact gives name and numbers, never the licence", async ({ page }) => {
+test("saving a contact gives name and numbers, never the licence @phone", async ({ page }) => {
   await search(page, "ليلى");
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -114,7 +114,7 @@ test("saving a contact gives name and numbers, never the licence", async ({ page
   expect(vcard).not.toContain("ترخيص");
 });
 
-test("WhatsApp opens with the viewer's introduction, and the press is counted", async ({ page }) => {
+test("WhatsApp opens with the viewer's introduction, and the press is counted @phone", async ({ page }) => {
   const db = serviceClient();
   const before = (await db.from("usage_events").select("*", { count: "exact", head: true })).count ?? 0;
   await search(page, "ليلى");
@@ -127,6 +127,20 @@ test("WhatsApp opens with the viewer's introduction, and the press is counted", 
   await expect
     .poll(async () => (await db.from("usage_events").select("*", { count: "exact", head: true })).count ?? 0)
     .toBeGreaterThan(before);
+});
+
+test("the call button dials the doctor's number, and the press is counted @phone", async ({ page }) => {
+  const db = serviceClient();
+  const calls = async () =>
+    (await db.from("usage_events").select("*", { count: "exact", head: true }).eq("kind", "contact_call")).count ?? 0;
+  const before = await calls();
+  await search(page, "ليلى");
+  const call = page.getByRole("link", { name: "اتصال" }).first();
+  await expect(call).toHaveAttribute("href", "tel:0521234502");
+  // Leave the dialer closed: the page's own handler still runs.
+  await call.evaluate((a) => a.addEventListener("click", (e) => e.preventDefault()));
+  await call.click();
+  await expect.poll(calls).toBe(before + 1);
 });
 
 test("no search response carries a licence number or another doctor's private fields", async ({ page }) => {
