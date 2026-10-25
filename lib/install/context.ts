@@ -21,6 +21,8 @@ export type InstallGuide =
   /** A computer, or anything else. */
   | "other";
 
+export const INSTALL_GUIDES = ["ios-safari", "ios-other", "android", "in-app", "other"] as const satisfies readonly InstallGuide[];
+
 // GSA/ is the Google app, LinkedInApp LinkedIn's; on Android any app's
 // browser says "; wv)".
 // Case-sensitive, as the apps write them, so "Offline/" is not LINE.
@@ -55,6 +57,8 @@ export const INVITE_KEYS = {
   added: "install:added",
   /** sessionStorage: the invitation already showed in this browser session. */
   shown: "install:shown",
+  /** sessionStorage: this session's launch of the installed app was counted. */
+  opened: "install:opened",
 } as const;
 
 /** The two storages, or null where the browser refuses them. */

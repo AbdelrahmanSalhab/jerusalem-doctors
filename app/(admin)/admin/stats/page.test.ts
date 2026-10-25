@@ -38,10 +38,17 @@ const METRICS = [
   { day: "2026-10-20", db_bytes: 13_631_488, counts: { searches: 41, sms_sent: 12, logins: 5, registry_requests: 2 } },
   { day: "2026-10-19", db_bytes: 13_000_000, counts: { searches: 30, sms_sent: 25, logins: 4 } },
 ];
+// install_funnel(30): a doctor on an iPhone who opened the installed app.
+const FUNNEL = [
+  { kind: "install_invite_shown", platform: "iphone", events: 3, doctors: 2 },
+  { kind: "install_invite_shown", platform: null, events: 3, doctors: 2 },
+  { kind: "install_app_opened", platform: "iphone", events: 4, doctors: 1 },
+  { kind: "install_app_opened", platform: null, events: 4, doctors: 1 },
+];
 vi.mock("@/lib/auth/session", () => ({ requireAdmin: vi.fn(async () => ({ id: "a1" })) }));
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
-    rpc: vi.fn(async () => ({ data: SAMPLE, error: null })),
+    rpc: vi.fn(async (name: string) => ({ data: name === "install_funnel" ? FUNNEL : SAMPLE, error: null })),
     // metrics_daily, newest first.
     from: () => {
       const chain: Record<string, unknown> = {
@@ -76,6 +83,9 @@ describe("/admin/stats", () => {
     expect(html).toContain("مع 22 زميلًا");
     expect(html).toContain("حساب مريب");
     expect(html).toContain("/admin/institutions");
+    // Install funnel: doctors per step, by platform and in all.
+    expect(html).toContain("الإضافة إلى الشاشة الرئيسية");
+    expect(html).toMatch(/فتحوه من الشاشة الرئيسية<\/th><td class="px-3 py-2">1<\/td>/);
   });
 });
 

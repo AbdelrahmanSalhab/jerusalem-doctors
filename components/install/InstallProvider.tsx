@@ -11,7 +11,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { InstallHelpDialog } from "@/components/install/InstallHelpDialog";
-import { INSTALL_READY_EVENT, installGuideFor, type InstallGuide } from "@/lib/install/context";
+import { INSTALL_READY_EVENT, INVITE_KEYS, installGuideFor, type InstallGuide } from "@/lib/install/context";
+import { trackInstall } from "@/lib/install/track";
 
 /** Chromium's install event (not in TypeScript's DOM types). */
 interface BeforeInstallPromptEvent extends Event {
@@ -30,8 +31,8 @@ interface InstallState {
   prompting: boolean;
   guide: InstallGuide;
   /** The native prompt where there is one (its answer), else the
-   *  instructions (null). */
-  install: () => Promise<"accepted" | "dismissed" | null>;
+   *  instructions (null). `source` says which button, for #150. */
+  install: (source: "card" | "menu") => Promise<"accepted" | "dismissed" | null>;
 }
 
 const InstallContext = createContext<InstallState | null>(null);
@@ -43,6 +44,19 @@ function isStandalone(): boolean {
     window.matchMedia("(display-mode: standalone)").matches ||
     (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
+}
+
+/** Opened from the home screen: counted once a browser session (#150), the
+ *  one install signal an iPhone gives. */
+function countAppOpened() {
+  if (!isStandalone()) return;
+  try {
+    if (sessionStorage.getItem(INVITE_KEYS.opened)) return;
+    sessionStorage.setItem(INVITE_KEYS.opened, "1");
+  } catch {
+    return;
+  }
+  trackInstall("install_app_opened");
 }
 
 export function InstallProvider({ children }: { children: React.ReactNode }) {
@@ -63,6 +77,7 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     // Browser-only facts, read after mount so the server render matches.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState((s) => ({ ...s, ready: true, standalone: isStandalone(), guide: installGuideFor(navigator.userAgent, touchMac) }));
+    countAppOpened();
 
     // The <head> script (INSTALL_CAPTURE_SCRIPT) keeps the event for our
     // own button rather than the browser's small bar, whenever it came.
@@ -75,6 +90,7 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     };
     take();
     const onInstalled = () => {
+      trackInstall("install_completed");
       deferred.current = null;
       setState((s) => ({ ...s, canPrompt: false, installed: true }));
       setHelpOpen(false);
@@ -95,7 +111,8 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const install = useCallback(async () => {
+  const install = useCallback(async (source: "card" | "menu") => {
+    trackInstall("install_click", source);
     const event = deferred.current;
     if (!event) {
       setHelpOpen(true);
@@ -106,7 +123,9 @@ export function InstallProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, canPrompt: false, prompting: true }));
     try {
       await event.prompt();
-      return (await event.userChoice).outcome;
+      const { outcome } = await event.userChoice;
+      if (outcome === "accepted") trackInstall("install_accepted");
+      return outcome;
     } catch {
       // The browser refused (it decides eligibility): offer the manual way.
       setHelpOpen(true);

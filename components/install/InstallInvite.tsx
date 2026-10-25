@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { useInstall } from "@/components/install/InstallProvider";
+import { trackInstall } from "@/lib/install/track";
 import {
   inviteAllowed,
   markAlreadyAdded,
@@ -47,6 +48,7 @@ export function InstallInvite() {
     const stores = browserStores();
     if (!inviteAllowed(stores)) return;
     markInviteShown(stores);
+    trackInstall("install_invite_shown");
     // Browser-only facts (storage, pointer): read after mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCard("shown");
@@ -56,13 +58,17 @@ export function InstallInvite() {
 
   const later = () => {
     snoozeInvite(browserStores());
+    trackInstall("install_invite_snoozed");
     setCard("closed");
   };
   // After the native prompt the card has done its job; a cancel there
   // counts as «لاحقًا».
   const act = async () => {
     if (install.canPrompt) setCard("closed");
-    if ((await install.install()) === "dismissed") snoozeInvite(browserStores());
+    if ((await install.install("card")) === "dismissed") {
+      snoozeInvite(browserStores());
+      trackInstall("install_invite_snoozed");
+    }
   };
   const added = () => {
     markAlreadyAdded(browserStores());

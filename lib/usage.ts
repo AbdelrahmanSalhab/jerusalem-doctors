@@ -21,7 +21,19 @@ export type UsageKind =
    *  metrics_daily, whatever flow asked for it. */
   | "sms_sent"
   /** A live data.gov.il request at signup, for a licence not in our copy. */
-  | "registry_lookup";
+  | "registry_lookup"
+  /** Adding the directory to the home screen, step by step (#150, lib/install). */
+  | InstallKind;
+
+export const INSTALL_KINDS = [
+  "install_invite_shown",
+  "install_invite_snoozed",
+  "install_click",
+  "install_accepted",
+  "install_completed",
+  "install_app_opened",
+] as const;
+export type InstallKind = (typeof INSTALL_KINDS)[number];
 
 export async function recordEvent(
   service: SupabaseClient,
