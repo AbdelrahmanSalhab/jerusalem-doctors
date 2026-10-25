@@ -1,6 +1,14 @@
-// Client-side Sentry init. Runs in the browser.
+// Runs in the browser before the app's own code: Sentry, and Zod's setting.
 import * as Sentry from "@sentry/nextjs";
+import { z } from "zod";
 import { browserBreadcrumb, PRIVATE_DATA_COLLECTION, scrubEvent, scrubSpan } from "@/lib/sentryScrub";
+
+// Zod 4 probes whether it may compile validators with Function(""). The
+// Content-Security-Policy refuses that by design (lib/security/csp.ts), and
+// the refusal is reported as a violation even though Zod falls back
+// quietly: Lighthouse marked /signup down for it (#168). jitless skips the
+// probe; the plain validators are what ran anyway.
+z.config({ jitless: true });
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 

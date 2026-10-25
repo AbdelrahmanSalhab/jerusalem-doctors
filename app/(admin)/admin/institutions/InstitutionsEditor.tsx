@@ -8,7 +8,6 @@ import { countOf, DOCTORS } from "@/lib/arabicCount";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { InputStyles } from "@/components/InputStyles";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import {
   type Institution,
@@ -123,7 +122,6 @@ export function InstitutionsEditor({
 
   return (
     <div className="flex flex-col gap-8">
-      <InputStyles />
       {notice && (
         <p
           role={notice.ok ? "status" : "alert"}

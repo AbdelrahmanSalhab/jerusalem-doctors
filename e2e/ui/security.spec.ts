@@ -1,6 +1,7 @@
 // The browser-side protections, checked in a real browser: what an attacker
 // who got HTML onto a page could and could not do.
 
+import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { stateFile } from "../helpers";
 
@@ -50,5 +51,45 @@ test.describe("signed out", () => {
   test("a look-alike of a public path still needs a session", async ({ page }) => {
     await page.goto("/loginx");
     await expect(page).toHaveURL(/\/login\?next=%2Floginx/);
+  });
+});
+
+/** Records the Content-Security-Policy violations a page causes. */
+async function watchCsp(page: Page) {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as { __csp?: string[] }).__csp = seen;
+    document.addEventListener("securitypolicyviolation", (e) => seen.push(`${e.effectiveDirective} ${e.blockedURI}`));
+  });
+}
+async function violations(page: Page): Promise<string[]> {
+  await page.waitForTimeout(500);
+  return page.evaluate(() => (window as { __csp?: string[] }).__csp ?? []);
+}
+
+// Zod's Function("") probe was refused on every page that validates in the
+// browser, and Lighthouse marked /signup down for it (#168).
+test.describe("the site's own code stays within its Content-Security-Policy", () => {
+  test("signed out: /, /login, /signup", async ({ browser }) => {
+    const page = await browser.newPage({ storageState: { cookies: [], origins: [] } });
+    await watchCsp(page);
+    for (const path of ["/", "/login", "/signup"]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      if (path === "/signup") await page.getByLabel("رقم الهاتف").fill("0521234567");
+      expect(await violations(page), path).toEqual([]);
+    }
+    await page.close();
+  });
+
+  test("signed in: the dashboard with a search, and the profile", async ({ page }) => {
+    await watchCsp(page);
+    await page.goto("/dashboard");
+    await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("ليلى");
+    await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+    expect(await violations(page), "/dashboard").toEqual([]);
+    await page.goto("/profile");
+    await expect(page.getByRole("heading", { name: "ملفي" })).toBeVisible();
+    expect(await violations(page), "/profile").toEqual([]);
   });
 });

@@ -41,26 +41,29 @@ export function LicenseSection({
       </Field>
 
       <Field label="جهة الترخيص" required>
+        {/* Two lines tall from the start, contents centred: the Palestinian
+            label fits one line in the fallback font and wraps in IBM Plex, and
+            growing when the font arrived moved the rest of the form down (#168). */}
         <div className="grid gap-2 sm:grid-cols-2">
-          <label className={OPTION_CARD}>
+          <label className={`${OPTION_CARD} min-h-[4.5rem]`}>
             <input
               type="radio"
               name="license_region"
-              className={OPTION_INPUT}
+              className={`${OPTION_INPUT} self-center`}
               checked={form.license_region === "IL"}
               onChange={() => setRegion("IL")}
             />
-            <span>ترخيص إسرائيلي (وزارة الصحة)</span>
+            <span className="self-center">ترخيص إسرائيلي (وزارة الصحة)</span>
           </label>
-          <label className={OPTION_CARD}>
+          <label className={`${OPTION_CARD} min-h-[4.5rem]`}>
             <input
               type="radio"
               name="license_region"
-              className={OPTION_INPUT}
+              className={`${OPTION_INPUT} self-center`}
               checked={form.license_region === "PS"}
               onChange={() => setRegion("PS")}
             />
-            <span>ترخيص فلسطيني (نقابة الأطباء / وزارة الصحة)</span>
+            <span className="self-center">ترخيص فلسطيني (نقابة الأطباء / وزارة الصحة)</span>
           </label>
         </div>
         {form.license_region === "PS" && (

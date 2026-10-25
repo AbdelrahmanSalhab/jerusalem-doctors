@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { Field } from "@/components/FormField";
-import { InputStyles } from "@/components/InputStyles";
 import { type TurnstileHandle, TurnstileWidget } from "@/components/TurnstileWidget";
 import { toAsciiDigits } from "@/lib/normalize/digits";
 
@@ -58,7 +57,6 @@ export function ReportForm({ license: initialLicense }: { license: string }) {
 
   return (
     <form onSubmit={submit} className="space-y-4 rounded-lg border border-line bg-surface p-5">
-      <InputStyles />
       <Field label="اسمك" htmlFor="name" required>
         <input id="name" required minLength={2} maxLength={100} className="input" value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
