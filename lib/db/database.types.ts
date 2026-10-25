@@ -23,7 +23,21 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "audit_logs": {
+            "applied_migrations": {
+                  Row: {
+                    "applied_at": string,"name": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "applied_at"?: string,"name": string
+                  }
+                  Update: {
+                    "applied_at"?: string,"name"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"audit_logs": {
                   Row: {
                     "action": string,"actor_doctor_id": string | null,"created_at": string,"id": string,"metadata": Json | null,"target_doctor_id": string | null
                   }

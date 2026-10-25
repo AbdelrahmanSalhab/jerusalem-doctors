@@ -4,6 +4,7 @@
 
 import { join } from "node:path";
 import { expect, test } from "../fixtures";
+import { repoMigrations } from "../../lib/migrationFiles";
 
 const EMAIL = process.env.SMOKE_EMAIL ?? "";
 const PASSWORD = process.env.SMOKE_PASSWORD ?? "";
@@ -69,6 +70,16 @@ test.describe("signed in as an admin", () => {
       expect(r?.status(), path).toBe(200);
     }
     await expect(page.getByText("اختبار آلي (CI)").first()).toBeVisible();
+  });
+
+  test("production has run every migration in this commit", async ({ page }) => {
+    // Each migration records itself in applied_migrations. One missing here
+    // was never run in the Supabase SQL Editor, and its feature is broken.
+    const res = await page.request.get("/api/admin/migrations");
+    expect(res.status(), "GET /api/admin/migrations (is 20261025103141_migration_ledger applied?)").toBe(200);
+    const applied = new Set<string>((await res.json()).applied);
+    const missing = repoMigrations().filter((m) => !applied.has(m));
+    expect(missing, "not run in production: paste each into the Supabase SQL Editor").toEqual([]);
   });
 
   test("the registry synced successfully in the last 36 hours", async ({ page }) => {

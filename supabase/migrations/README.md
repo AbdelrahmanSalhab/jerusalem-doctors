@@ -20,7 +20,17 @@ Then:
 2. Make it safe to run twice (`create or replace`, `if not exists`).
 3. Run it in the Supabase SQL Editor **before** deploying code that needs it,
    and say so in the PR.
-4. With the local stack up (`npx supabase db reset` applies it), run
+4. End it by recording itself, so production's record of what it ran
+   (`applied_migrations`) stays complete:
+
+   ```sql
+   insert into public.applied_migrations (name) values ('20261020114059_short_name_of_the_change') on conflict do nothing;
+   ```
+
+   The name is the file's, without `.sql`. `lib/migrations.test.ts` fails
+   without it, and after each deploy the production smoke check lists any
+   file production has not run.
+5. With the local stack up (`npx supabase db reset` applies it), run
    `npm run db:types` and commit `lib/db/database.types.ts`. CI fails while
    that file and the migrations disagree.
 
