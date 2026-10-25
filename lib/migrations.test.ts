@@ -5,8 +5,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { MIGRATIONS_DIR as DIR, repoMigrations } from "./migrationFiles";
 
-const DIR = path.join(__dirname, "../supabase/migrations");
 
 describe("supabase/migrations", () => {
   it("numbers every migration once", () => {
@@ -24,10 +24,7 @@ describe("supabase/migrations", () => {
   // applied_migrations: production's record of what it ran, which the smoke
   // check compares with these files.
   const LEDGER = "20261025103141_migration_ledger";
-  const names = readdirSync(DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .map((f) => f.replace(/\.sql$/, ""))
-    .sort();
+  const names = repoMigrations();
   const sql = (name: string) => readFileSync(path.join(DIR, `${name}.sql`), "utf8");
 
   it("records every migration from the ledger on, each under its own name", () => {

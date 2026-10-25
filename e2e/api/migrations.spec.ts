@@ -4,7 +4,7 @@
 
 import { expect, test } from "../fixtures";
 import { stateFile } from "../helpers";
-import { repoMigrations } from "../migrations";
+import { repoMigrations } from "../../lib/migrationFiles";
 
 test.use({ storageState: stateFile("admin") });
 
@@ -12,5 +12,6 @@ test("the database records every migration it ran, and only those", async ({ req
   const res = await request.get("/api/admin/migrations");
   expect(res.status()).toBe(200);
   const { applied } = await res.json();
-  expect(applied).toEqual(repoMigrations());
+  // Both sorted here: Postgres's collation and JS's order may differ.
+  expect([...applied].sort()).toEqual(repoMigrations());
 });

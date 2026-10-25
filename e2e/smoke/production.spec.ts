@@ -4,7 +4,7 @@
 
 import { join } from "node:path";
 import { expect, test } from "../fixtures";
-import { repoMigrations } from "../migrations";
+import { repoMigrations } from "../../lib/migrationFiles";
 
 const EMAIL = process.env.SMOKE_EMAIL ?? "";
 const PASSWORD = process.env.SMOKE_PASSWORD ?? "";

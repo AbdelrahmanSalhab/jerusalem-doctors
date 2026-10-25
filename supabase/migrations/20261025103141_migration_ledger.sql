@@ -17,9 +17,17 @@ create table if not exists public.applied_migrations (
   name        text primary key,
   applied_at  timestamptz not null default now()
 );
--- Service role only, like the rest of the admin data.
+-- Service role only, like the rest of the admin data, and said so with the
+-- always-false policy every server-only table has (20261021110400).
 alter table public.applied_migrations enable row level security;
 revoke all on public.applied_migrations from anon, authenticated;
+drop policy if exists "server only" on public.applied_migrations;
+create policy "server only"
+  on public.applied_migrations
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
 
 insert into public.applied_migrations (name) values
   ('0001_init'),
