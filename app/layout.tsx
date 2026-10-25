@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import { headers } from "next/headers";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { InstallProvider } from "@/components/install/InstallProvider";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -86,9 +87,13 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col font-sans overflow-x-hidden">
-        <SiteHeader />
-        <div className="flex-1">{children}</div>
-        <SiteFooter />
+        {/* Installing to the home screen: the account menu and the
+            dashboard share it, and it must outlive page changes. */}
+        <InstallProvider>
+          <SiteHeader />
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
+        </InstallProvider>
         <Analytics />
       </body>
     </html>

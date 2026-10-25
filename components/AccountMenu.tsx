@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { useInstall } from "@/components/install/InstallProvider";
 
 export function AccountMenu({
   photoUrl,
@@ -25,6 +26,7 @@ export function AccountMenu({
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const install = useInstall();
 
   useEffect(() => {
     if (!open) return;
@@ -97,6 +99,21 @@ export function AccountMenu({
                 <span className="ms-1.5 text-xs text-warn">({pending})</span>
               )}
             </Link>
+          )}
+          {/* Not inside the installed app, where it would offer itself. */}
+          {install?.ready && !install.standalone && (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                install.install();
+              }}
+              disabled={install.prompting}
+              className={item}
+            >
+              أضف الدليل إلى هاتفي
+            </button>
           )}
           <button role="menuitem" type="button" onClick={logout} disabled={busy} className={item}>
             {busy ? "..." : "تسجيل الخروج"}
