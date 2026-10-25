@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { useInstall } from "@/components/install/InstallProvider";
 
 export function AccountMenu({
   photoUrl,
@@ -24,7 +25,9 @@ export function AccountMenu({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+  const install = useInstall();
 
   useEffect(() => {
     if (!open) return;
@@ -59,6 +62,7 @@ export function AccountMenu({
   return (
     <div ref={ref} className="relative">
       <button
+        ref={toggle}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -97,6 +101,24 @@ export function AccountMenu({
                 <span className="ms-1.5 text-xs text-warn">({pending})</span>
               )}
             </Link>
+          )}
+          {/* Not inside the installed app, where it would offer itself. */}
+          {install?.ready && !install.standalone && !install.installed && (
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                // The dialog gives focus back to what had it, and this
+                // item is about to go: hand it to the account button.
+                toggle.current?.focus();
+                setOpen(false);
+                install.install();
+              }}
+              disabled={install.prompting}
+              className={item}
+            >
+              {install.guide === "other" ? "أضف الدليل إلى جهازي" : "أضف الدليل إلى هاتفي"}
+            </button>
           )}
           <button role="menuitem" type="button" onClick={logout} disabled={busy} className={item}>
             {busy ? "..." : "تسجيل الخروج"}

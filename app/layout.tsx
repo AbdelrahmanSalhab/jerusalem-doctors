@@ -4,6 +4,9 @@ import localFont from "next/font/local";
 import { headers } from "next/headers";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { InstallProvider } from "@/components/install/InstallProvider";
+import { getCurrentDoctor } from "@/lib/auth/session";
+import { INSTALL_CAPTURE_SCRIPT, INSTALL_OFFER_ATTR } from "@/lib/install/context";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -66,11 +69,15 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   // proxy.ts sets a fresh nonce per request; only scripts carrying it run.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  // Shared with the header's lookup (cache()): no extra request.
+  const doctor = await getCurrentDoctor().catch(() => null);
   return (
     <html
       lang="ar"
       dir="rtl"
       className={`${plexLatin.variable} ${plex.variable} h-full antialiased`}
+      // Signed in: the site offers installing itself (lib/install/context).
+      {...(doctor?.is_active ? { [INSTALL_OFFER_ATTR]: "" } : {})}
       // data-theme is set by the boot script before React hydrates.
       suppressHydrationWarning
     >
@@ -84,11 +91,21 @@ export default async function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
         />
+        {/* Chrome's install event can come before React loads. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_SCRIPT }}
+        />
       </head>
       <body className="min-h-full flex flex-col font-sans overflow-x-hidden">
-        <SiteHeader />
-        <div className="flex-1">{children}</div>
-        <SiteFooter />
+        {/* Installing to the home screen: the account menu and the
+            dashboard share it, and it must outlive page changes. */}
+        <InstallProvider>
+          <SiteHeader />
+          <div className="flex-1">{children}</div>
+          <SiteFooter />
+        </InstallProvider>
         <Analytics />
       </body>
     </html>

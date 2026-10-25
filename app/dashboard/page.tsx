@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InstallInvite } from "@/components/install/InstallInvite";
 import { DashboardSearch } from "./DashboardSearch";
 import { ViewerProvider } from "@/components/ViewerContext";
 import { cachedDirectoryOverview, cachedInstitutions, cachedSpecialties } from "@/lib/cachedReads";
@@ -102,6 +103,8 @@ export default async function DashboardPage({
           الإدارة من ترخيصك.
         </p>
       )}
+
+      <InstallInvite />
 
       {gaps.length > 0 && (
         <section
