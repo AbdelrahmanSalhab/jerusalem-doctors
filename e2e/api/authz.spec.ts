@@ -65,6 +65,7 @@ const POLICY: Record<string, Policy> = {
   "POST /api/signup/start": "public",
   "POST /api/signup/verify": "public",
   "POST /api/usage/contact": "doctor",
+  "POST /api/usage/install": "doctor",
 };
 
 /** Calls that would change the seeded accounts if they got through. */
