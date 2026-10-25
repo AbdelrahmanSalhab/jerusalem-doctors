@@ -10,6 +10,10 @@ import { stateFile } from "../helpers";
 
 const MIN = 44;
 
+// The sizes apply on touch screens only (pointer-coarse:); the desktop
+// project runs every UI test with a mouse, where the compact layout is right.
+test.skip(({ hasTouch }) => !hasTouch, "touch screens only");
+
 /** Visible controls shorter than MIN, as "28px «label»". */
 function tooSmall(page: Page): Promise<string[]> {
   return page.evaluate((min) => {
