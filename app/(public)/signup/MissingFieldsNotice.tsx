@@ -26,7 +26,7 @@ export function MissingFieldsNotice({ missing }: { missing: readonly MissingFiel
             <button
               type="button"
               onClick={() => focus(m.key)}
-              className="rounded-full border border-warn-line px-3 py-1 underline-offset-2 hover:underline"
+              className="rounded-full border border-warn-line px-3 py-1 underline-offset-2 hover:underline pointer-coarse:min-h-11"
             >
               {m.label}
             </button>

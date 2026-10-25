@@ -81,7 +81,7 @@ export function ContactButtons({ doctor, compact = false }: { doctor: ContactDoc
         <button
           type="button"
           onClick={() => saveContact(doctor)}
-          className={`text-sm text-muted underline-offset-2 hover:text-foreground hover:underline ${compact ? "px-1" : "self-center"}`}
+          className={`inline-flex items-center text-sm text-muted underline-offset-2 hover:text-foreground hover:underline pointer-coarse:min-h-11 ${compact ? "px-1" : "self-center"}`}
         >
           + إضافة لجهات الاتصال
         </button>

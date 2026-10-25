@@ -11,6 +11,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+// Touch screens get 44 px tall targets (pointer-coarse:), the size a finger
+// needs; with a mouse the pills stay compact.
 const PILL = "flex items-center rounded-full border text-sm whitespace-nowrap transition-colors";
 const PILL_OFF = "border-line bg-surface hover:border-foreground/40";
 const PILL_ON = "border-foreground bg-foreground text-background";
@@ -80,7 +82,7 @@ export function ChipMenu({
           aria-expanded={open}
           aria-controls={`${id}-list`}
           aria-label={selected ? `${label}: ${selected}` : label}
-          className="flex items-center gap-1.5 py-1.5 ps-3 pe-2"
+          className="flex items-center gap-1.5 py-1.5 ps-3 pe-2 pointer-coarse:min-h-11"
         >
           <span className="max-w-[12rem] truncate">{selected ?? label}</span>
           {!selected && (
@@ -94,7 +96,7 @@ export function ChipMenu({
             type="button"
             onClick={onClear}
             aria-label={`إزالة ${label}`}
-            className="py-1.5 pe-3 ps-1 opacity-80 hover:opacity-100"
+            className="flex items-center justify-center py-1.5 pe-3 ps-1 opacity-80 hover:opacity-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             ✕
           </button>
@@ -121,7 +123,7 @@ export function ToggleChip({ label, on, onChange }: { label: string; on: boolean
       type="button"
       aria-pressed={on}
       onClick={() => onChange(!on)}
-      className={`${PILL} ${on ? PILL_ON : PILL_OFF} gap-1.5 px-3 py-1.5`}
+      className={`${PILL} ${on ? PILL_ON : PILL_OFF} gap-1.5 px-3 py-1.5 pointer-coarse:min-h-11`}
     >
       {on && <span aria-hidden="true">✓</span>}
       {label}

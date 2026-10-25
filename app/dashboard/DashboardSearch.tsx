@@ -168,7 +168,7 @@ export function DashboardSearch({
                 <button
                   type="button"
                   onClick={() => setSpecialtyId(s.id)}
-                  className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-foreground/40"
+                  className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-foreground/40 pointer-coarse:min-h-11"
                 >
                   {s.name_ar}
                   {domainCounts[s.id] ? (
@@ -182,7 +182,7 @@ export function DashboardSearch({
                 <button
                   type="button"
                   onClick={() => setAllChips((v) => !v)}
-                  className="rounded-full border border-dashed border-line bg-surface px-3 py-1.5 text-sm text-muted hover:border-foreground/40 hover:text-foreground"
+                  className="rounded-full border border-dashed border-line bg-surface px-3 py-1.5 text-sm text-muted pointer-coarse:min-h-11 hover:border-foreground/40 hover:text-foreground"
                   aria-expanded={allChips}
                   aria-label={allChips ? "عرض تخصصات أقل" : "عرض كل التخصصات"}
                 >
@@ -300,7 +300,7 @@ function ResultsRegion({
             aria-checked={view === "cards"}
             onClick={() => setView("cards")}
             className={
-              "px-3 py-1.5 " +
+              "px-3 py-1.5 pointer-coarse:min-h-11 " +
               (view === "cards"
                 ? "bg-primary text-primary-fg"
                 : "hover:bg-foreground/5")
@@ -314,7 +314,7 @@ function ResultsRegion({
             aria-checked={view === "rows"}
             onClick={() => setView("rows")}
             className={
-              "px-3 py-1.5 border-r border-foreground/20 " +
+              "px-3 py-1.5 pointer-coarse:min-h-11 border-r border-foreground/20 " +
               (view === "rows"
                 ? "bg-primary text-primary-fg"
                 : "hover:bg-foreground/5")

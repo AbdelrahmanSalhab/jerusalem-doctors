@@ -69,7 +69,8 @@ export function AccountMenu({
         aria-expanded={open}
         // The badge's number is visible text, so the name has to include it.
         aria-label={isAdmin && pending > 0 ? `حسابي، ${pending} بانتظار القبول` : "حسابي"}
-        className="relative flex rounded-full ring-1 ring-line hover:ring-foreground/40"
+        // A 40 px photo: the padding makes the touch target 44 px.
+        className="relative flex rounded-full ring-1 ring-line hover:ring-foreground/40 pointer-coarse:p-0.5"
       >
         {/* Decorative: the button's name is its label, not the initial. */}
         <span aria-hidden="true" className="flex">

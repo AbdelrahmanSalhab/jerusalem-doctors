@@ -6,10 +6,15 @@ export function SiteFooter() {
     <footer className="mt-auto border-t border-line">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-4 text-sm text-muted">
         <nav className="flex flex-wrap gap-x-4 gap-y-1">
-          <a href="/privacy" className="hover:text-foreground hover:underline">
+          <a href="/privacy" className="inline-flex items-center hover:text-foreground hover:underline pointer-coarse:min-h-11">
             الخصوصية
           </a>
-          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center hover:text-foreground hover:underline pointer-coarse:min-h-11"
+          >
             مساعدة عبر واتساب
           </a>
         </nav>
