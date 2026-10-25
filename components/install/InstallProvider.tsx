@@ -84,6 +84,8 @@ export function InstallProvider({
     // Browser-only facts, read after mount so the server render matches.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState((s) => ({ ...s, ready: true, standalone: isStandalone(), guide: installGuideFor(navigator.userAgent, touchMac) }));
+    // The offline page instead of the browser's error (public/sw.js).
+    navigator.serviceWorker?.register("/sw.js").catch(() => {});
 
     // The <head> script (INSTALL_CAPTURE_SCRIPT) keeps the event for our
     // own button rather than the browser's small bar, whenever it came.

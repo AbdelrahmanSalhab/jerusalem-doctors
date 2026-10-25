@@ -28,6 +28,10 @@ const PUBLIC_EXACT = new Set([
   "/robots.txt",
   // The home-screen app manifest; phones fetch it before anyone logs in.
   "/manifest.webmanifest",
+  // The offline page and the worker that shows it (public/sw.js): fetched
+  // whether or not anyone is signed in, and must never be the login page.
+  "/sw.js",
+  "/offline.html",
 ]);
 
 const PUBLIC_TREES = ["/login/", "/api/", "/_next/"];
