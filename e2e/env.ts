@@ -39,7 +39,7 @@ export const ACCOUNTS = {
 export type Role = keyof typeof ACCOUNTS;
 
 /** Accounts a single test creates and removes (e.g. the deletion request). */
-export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test"];
+export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test"];
 
 /** Sentry's ingest, served by e2e/stubs.mjs. */
 export const SENTRY_STUB_DSN = `${STUB_URL.replace("://", "://e2e@")}/1`;

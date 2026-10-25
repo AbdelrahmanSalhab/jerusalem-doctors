@@ -49,6 +49,7 @@ const TITLE: Record<string, string> = {
   admin_license_rechecked: "إعادة فحص الترخيص",
   admin_license_corrected: "تصحيح رقم الترخيص",
   dev_password_login: "دخول فريق التطوير بكلمة مرور",
+  password_changed: "تغيير كلمة المرور",
   institution_created: "إضافة مؤسسة",
   institution_updated: "تعديل مؤسسة",
   institution_deleted: "حذف مؤسسة",

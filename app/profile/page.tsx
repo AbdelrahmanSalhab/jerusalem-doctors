@@ -1,3 +1,4 @@
+import { PasswordSection } from "./PasswordSection";
 import { ProfileForm } from "./ProfileForm";
 import { requireDoctor } from "@/lib/auth/session";
 import { cachedSpecialties } from "@/lib/cachedReads";
@@ -11,7 +12,7 @@ export default async function ProfilePage() {
   const me = await requireDoctor();
   const service = createSupabaseServiceClient();
 
-  const [specialties, { data: doctorSpecialties }, { data: workplaces }] =
+  const [specialties, { data: doctorSpecialties }, { data: workplaces }, loginEmail] =
     await Promise.all([
       cachedSpecialties(),
       service
@@ -24,6 +25,11 @@ export default async function ProfilePage() {
         .eq("doctor_id", me.id)
         .order("is_primary", { ascending: false })
         .order("sort_order", { ascending: true }),
+      // Admins sign in at /login/dev with an email and password; doctors
+      // have neither, so nobody else is asked.
+      me.is_admin && me.auth_user_id
+        ? service.auth.admin.getUserById(me.auth_user_id).then((r) => r.data.user?.email ?? null)
+        : null,
     ]);
 
   return (
@@ -53,6 +59,7 @@ export default async function ProfilePage() {
           >[]) ?? []
         }
       />
+      {loginEmail && <PasswordSection email={loginEmail} />}
     </main>
   );
 }
