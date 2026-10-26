@@ -19,7 +19,7 @@
     "db:types": "npx -y supabase@2.121.0 gen types typescript --local > lib/db/database.types.ts"
   },
   "dependencies": {
-    "@sentry/nextjs": "^11.8.0",
+    "@sentry/nextjs": "^11.9.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.105.3",
     "@upstash/ratelimit": "^2.0.8",
