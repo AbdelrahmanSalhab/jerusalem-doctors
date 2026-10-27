@@ -62,6 +62,8 @@ export function appEnv(): Record<string, string> {
     // The smoke check's sign-in (app/api/login/ci), with the stub playing GitHub.
     CI_LOGIN_EMAIL,
     GITHUB_OIDC_JWKS_URL: `${STUB_URL}/github-oidc/jwks`,
+    // SMS4FREE's delivery reports come back here; the stub plays SMS4FREE.
+    SMS_DELIVERY_BASE_URL: BASE_URL,
     // The production provider, pointed at the stub: the mock sender refuses
     // to run in a production build, and this is the path real codes take.
     OTP_PROVIDER: "sms4free",

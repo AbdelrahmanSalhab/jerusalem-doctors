@@ -5,6 +5,7 @@ import { cachedSpecialties } from "@/lib/cachedReads";
 import { licenseDisplay } from "@/lib/licenseStatus";
 import { formatPhoneDisplay } from "@/lib/normalize/phone";
 import { KEEP_DAYS, keepCutoff } from "@/lib/signup/unfinished";
+import { codeSummary, countBySignup, NO_CODES } from "@/lib/otp/summary";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
@@ -63,8 +64,22 @@ export default async function UnfinishedSignupsPage() {
       started: auditTime(r.created_at),
       reminded: r.reminded_at ? auditTime(r.reminded_at) : null,
       canResume: Boolean(p.resume_form),
+      codes: "",
     });
   }
+
+  // What happened at the code step, per signup: one query for the page.
+  const ids = rows.map((r) => r.id);
+  const events = ids.length
+    ? await service
+        .from("usage_events")
+        .select("kind, meta")
+        .in("kind", ["otp_refused", "otp_locked", "otp_resent", "sms_delivered", "sms_undelivered", "sms_voice"])
+        .filter("meta->>signup", "in", `(${ids.join(",")})`)
+    : { data: [], error: null };
+  if (events.error) throw events.error;
+  const byId = countBySignup(events.data ?? []);
+  const withCodes = rows.map((r) => ({ ...r, codes: codeSummary(byId.get(r.id) ?? NO_CODES) }));
 
   return (
     <main className="space-y-4">
@@ -73,7 +88,7 @@ export default async function UnfinishedSignupsPage() {
         أطباء ملؤوا نموذج التسجيل ولم يُدخلوا رمز التحقق. «تذكير» يفتح واتساب برسالة فيها رابط يعيد فتح النموذج
         كما تركوه. يُحذف كل تسجيل بعد {KEEP_DAYS} يومًا.
       </p>
-      <UnfinishedList rows={rows} />
+      <UnfinishedList rows={withCodes} />
     </main>
   );
 }

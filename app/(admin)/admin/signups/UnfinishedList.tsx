@@ -16,6 +16,8 @@ export interface UnfinishedRow {
   reminded: string | null;
   /** Saved with the form, so the reminder can reopen it (newer signups). */
   canResume: boolean;
+  /** What happened at the code step (lib/otp/summary.ts), "" if unknown. */
+  codes: string;
 }
 
 export function UnfinishedList({ rows }: { rows: UnfinishedRow[] }) {
@@ -84,6 +86,7 @@ export function UnfinishedList({ rows }: { rows: UnfinishedRow[] }) {
                 بدأ {r.started}
                 {r.reminded && <> · ذُكّر {r.reminded}</>}
               </p>
+              {r.codes && <p className="text-xs text-muted">رمز التحقق: {r.codes}</p>}
             </div>
             <div className="flex shrink-0 gap-2">
               {r.canResume && (

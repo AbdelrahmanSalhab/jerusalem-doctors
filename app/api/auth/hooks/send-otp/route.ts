@@ -140,11 +140,14 @@ export async function POST(req: Request) {
 
   try {
     const sender = getOtpSender();
+    const started = Date.now();
     await sender.send(e164, code);
+    // How long SMS4FREE took to accept it: tunes the 4 s timeout from data.
+    const ms = Date.now() - started;
     // Before answering: Supabase's retry comes seconds later and must see it.
     await markSent(once);
     // Counted after answering: Supabase waits on this hook.
-    after(() => recordEvent(createSupabaseServiceClient(), "sms_sent"));
+    after(() => recordEvent(createSupabaseServiceClient(), "sms_sent", { meta: { ms } }));
     return hookResponse(200);
   } catch (err) {
     // OtpProviderError messages carry Meta's error code and message, never

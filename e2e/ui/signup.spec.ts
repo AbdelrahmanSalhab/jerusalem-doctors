@@ -157,6 +157,8 @@ test("a new code cancels the old one, and the page says to use the newest @phone
   try {
     await toVerify(page, { phone, license: "599991", arabic: ["أحدث", "رمز"], hebrew: ["חדש", "קוד"] });
     await expect.poll(() => newestCode(phone)).toMatch(/^\d{6}$/);
+    const { data: pending } = await serviceClient().from("pending_signups").select("id").eq("phone_e164", phone).single();
+    const signupId = pending!.id as string;
     const first = (await newestCode(phone))!;
     await expect(page.getByText("الرمز صالح لمدة دقيقة واحدة فقط من إرساله.")).toBeVisible();
 
@@ -181,6 +183,19 @@ test("a new code cancels the old one, and the page says to use the newest @phone
     await expect(page.getByRole("alert").filter({ hasText: "انتهت صلاحيته" })).toHaveText(
       "الرمز غير صحيح أو انتهت صلاحيته. استخدم آخر رمز وصلك، أو اطلب رمزًا جديدًا.",
     );
+
+    // SMS4FREE's delivery reports were counted against this signup (the
+    // stub reports every text delivered).
+    await expect
+      .poll(async () => {
+        const { count } = await serviceClient()
+          .from("usage_events")
+          .select("id", { count: "exact", head: true })
+          .eq("kind", "sms_delivered")
+          .eq("meta->>signup", signupId);
+        return count ?? 0;
+      })
+      .toBeGreaterThanOrEqual(2);
 
     // The newest one works.
     await page.getByLabel("رمز التحقق").fill(second);

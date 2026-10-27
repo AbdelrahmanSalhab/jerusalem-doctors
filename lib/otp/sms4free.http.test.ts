@@ -47,6 +47,20 @@ describe("Sms4FreeOtpSender over HTTP", () => {
     });
   });
 
+  it("asks for a delivery report when reports are on", async () => {
+    reply = { body: "1", status: 200 };
+    process.env.SEND_SMS_HOOK_SECRET = "v1,whsec_test";
+    process.env.SMS_DELIVERY_BASE_URL = "https://jd.example";
+    try {
+      await send();
+    } finally {
+      delete process.env.SEND_SMS_HOOK_SECRET;
+      delete process.env.SMS_DELIVERY_BASE_URL;
+    }
+    expect(lastRequest?.returnUrl).toMatch(/^https:\/\/jd\.example\/api\/sms\/delivery\?k=[0-9a-f]{32}$/);
+    expect(lastRequest?.usermsgid).toMatch(/^\d{13}-[0-9a-f]{8}$/);
+  });
+
   it("accepts a bare numeric body", async () => {
     reply = { body: "1", status: 200 };
     await expect(send()).resolves.toMatchObject({ messageRef: "sms4free:accepted:1" });

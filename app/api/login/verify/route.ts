@@ -6,7 +6,8 @@ import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/resp
 import { linkAuthUser } from "@/lib/auth/link";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { rateLimit } from "@/lib/ratelimit";
-import { recordEvent } from "@/lib/usage";
+import { recordEvent, type UsageKind } from "@/lib/usage";
+import { after } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -14,6 +15,17 @@ const Body = z.object({
   phone: z.string().min(1),
   otp_code: z.string().regex(/^\d{4,8}$/),
 });
+
+/** Counts a refused or locked-out sign-in for /admin/stats, against the
+ *  doctor when the number is one (after the answer: no delay, and the same
+ *  timing for any number). */
+function countFailure(kind: Extract<UsageKind, "otp_refused" | "otp_locked">, phoneE164: string) {
+  after(async () => {
+    const service = createSupabaseServiceClient();
+    const doctor = await service.from("doctors").select("id").eq("phone_e164", phoneE164).maybeSingle();
+    await recordEvent(service, kind, { doctorId: doctor.data?.id, meta: { flow: "login" } });
+  });
+}
 
 export const POST = withJsonErrors(async (req: Request) => {
   const ip = ipFromHeaders(req);
@@ -46,6 +58,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     rateLimit("loginVerifyIp", `ip:${ip}`),
   ]);
   if (!rl.success || !rlIp.success) {
+    countFailure("otp_locked", phoneE164);
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
@@ -79,6 +92,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     type: "sms",
   });
   if (verify.error || !verify.data.user) {
+    countFailure("otp_refused", phoneE164);
     return jsonError(400, { error: "invalid_otp", code: "invalid_otp" });
   }
 

@@ -39,6 +39,9 @@ describe("POST /api/signup/resend", () => {
     expect(auth.signInWithOtp).toHaveBeenCalledWith({ phone: "+972501234567" });
     // The new code gets its own guesses.
     expect(db.argsOf("pending_signups", "update")).toEqual([[{ attempts: 0 }]]);
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "otp_resent", doctor_id: null, meta: { flow: "signup", signup: SESSION } }],
+    ]);
   });
 
   it("rejects a non-uuid session", async () => {
