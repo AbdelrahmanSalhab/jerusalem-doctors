@@ -2,6 +2,7 @@
 // doctor row materialised from the pending payload.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { runAfter } from "@/test/after";
 import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
 const rateLimit = vi.hoisted(() => vi.fn());
@@ -15,6 +16,11 @@ vi.mock("@/lib/supabase/server", async () => {
   const { auth } = await import("@/test/fakeSupabase");
   return { createSupabaseServerClient: async () => ({ auth }) };
 });
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (await import("@/test/after")).deferAfter,
+}));
+
 
 const SESSION = "11111111-1111-4111-8111-111111111111";
 const BODY = { signup_session_id: SESSION, otp_code: "123456" };
@@ -169,6 +175,10 @@ describe("POST /api/signup/verify", () => {
     expect(await res.json()).toMatchObject({ code: "too_many_attempts" });
     expect(db.argsOf("pending_signups", "delete")).toHaveLength(0);
     expect(auth.verifyOtp).not.toHaveBeenCalled();
+    await runAfter();
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "otp_locked", doctor_id: null, meta: { flow: "signup", signup: SESSION } }],
+    ]);
   });
 
   it("turns away a request that lost the race for the same attempt", async () => {
@@ -187,6 +197,10 @@ describe("POST /api/signup/verify", () => {
     expect(res.status).toBe(400);
     expect(db.argsOf("pending_signups", "update")).toEqual([[{ attempts: 3 }]]);
     expect(db.argsOf("doctors", "insert")).toHaveLength(0);
+    await runAfter();
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "otp_refused", doctor_id: null, meta: { flow: "signup", attempt: 3, signup: SESSION } }],
+    ]);
   });
 
   it("maps a duplicate insert to 409", async () => {

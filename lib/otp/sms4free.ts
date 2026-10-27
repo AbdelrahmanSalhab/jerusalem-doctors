@@ -1,4 +1,5 @@
 import { PhoneNotSmsDeliverableError, toSmsRecipient } from "@/lib/normalize/phone";
+import { deliveryUrl, newMessageId } from "./delivery";
 import { buildOtpMessage } from "./message";
 import {
   type OtpSendResult,
@@ -63,8 +64,12 @@ export function buildSendPayload(
   credentials: Sms4FreeCredentials,
   recipient: string,
   msg: string,
+  /** SMS4FREE's delivery report: where to send it, and our id for the text
+   *  (lib/otp/delivery.ts). Left out when reports are off. */
+  report?: { returnUrl: string; usermsgid: string },
 ) {
   return {
+    ...report,
     key: credentials.key,
     user: credentials.user,
     pass: credentials.pass,
@@ -173,10 +178,12 @@ export class Sms4FreeOtpSender implements OtpSender {
       throw err;
     }
 
+    const returnUrl = deliveryUrl();
     const payload = buildSendPayload(
       this.credentials,
       recipient,
       buildOtpMessage(code),
+      returnUrl ? { returnUrl, usermsgid: newMessageId() } : undefined,
     );
 
     let res: Response;

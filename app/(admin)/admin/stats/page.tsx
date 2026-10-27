@@ -6,6 +6,7 @@ import { fetchAvailableSms } from "@/lib/otp/sms4free";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { Attention, BarList, DailyBars, Section, Tile, TileGrid } from "./StatsParts";
 import { type FunnelRow, InstallSection } from "./InstallSection";
+import { OTP_LATE_AFTER, type OtpStats, OtpSection } from "./OtpSection";
 import { type MetricsDay, UsageSection } from "./UsageSection";
 
 export const dynamic = "force-dynamic";
@@ -26,12 +27,15 @@ export default async function AdminStatsPage() {
   // page without re-running the layout. requireAdmin is request-cached.
   await requireAdmin();
   const service = createSupabaseServiceClient();
-  const [s, sms, metrics, install] = await Promise.all([
+  const [s, sms, metrics, install, otp] = await Promise.all([
     fetchAdminStats(service),
     smsCredit(),
     service.from("metrics_daily").select("day, db_bytes, counts").order("day", { ascending: false }).limit(14),
     service.rpc("install_funnel", { p_days: 30 }),
+    service.rpc("otp_stats", { p_days: 7, p_valid_seconds: OTP_LATE_AFTER }),
   ]);
+  const codes = (otp.data ?? null) as OtpStats | null;
+  const stuckAtCode = codes ? codes.stuck_signups + codes.stuck_logins.length : 0;
   const d = s.doctors;
   const a = s.attention;
   const u = s.usage;
@@ -42,6 +46,7 @@ export default async function AdminStatsPage() {
   const c = s.contacts;
   const contactsTotal = c.whatsapp_7d + c.call_7d + c.save_7d;
   const attentionTotal =
+    stuckAtCode +
     s.heavy_contacters.length +
     a.pending + a.deletion_requests + a.clinics_missing_details + u.login_send_failed_24h +
     a.unmatched_workplaces +
@@ -72,6 +77,11 @@ export default async function AdminStatsPage() {
                 href="/admin?status=all"
               />
             ))}
+            <Attention
+              count={stuckAtCode}
+              text="طبيب أو تسجيل رُفض رمز تحققه ولم يدخل بعدها (آخر 7 أيام). التفاصيل في «رموز التحقق» أدناه."
+              href="/admin/signups"
+            />
             <Attention
               count={u.login_send_failed_24h}
               text="رمز دخول فشل إرساله في آخر 24 ساعة (راجع Sentry ورصيد SMS)."
@@ -157,6 +167,8 @@ export default async function AdminStatsPage() {
           <p className="text-sm text-muted">يبدأ العدّ من الآن؛ تظهر الأرقام مع أول ضغطة.</p>
         )}
       </Section>
+
+      <OtpSection stats={codes} />
 
       <InstallSection rows={(install.data ?? []) as FunnelRow[]} />
 

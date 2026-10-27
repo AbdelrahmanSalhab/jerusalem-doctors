@@ -45,10 +45,20 @@ const FUNNEL = [
   { kind: "install_app_opened", platform: "iphone", events: 4, doctors: 1 },
   { kind: "install_app_opened", platform: null, events: 4, doctors: 1 },
 ];
+// otp_stats(7): a late text, refused codes, and one doctor stuck at sign-in.
+const OTP = {
+  sent: 12, send_ms_p50: 900, send_ms_max: 2400, delivered: 10, undelivered: 1, voice: 1,
+  delay_p50: 6, delay_max: 95, late: 2, refused: 4, locked: 1, resent: 3, logins_ok: 5,
+  signups_started: 4, stuck_signups: 1,
+  stuck_logins: [{ id: "d1", name: "ليلى الخطيب", refused: 2, last_at: "2026-10-27T10:00:00Z" }],
+};
 vi.mock("@/lib/auth/session", () => ({ requireAdmin: vi.fn(async () => ({ id: "a1" })) }));
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
-    rpc: vi.fn(async (name: string) => ({ data: name === "install_funnel" ? FUNNEL : SAMPLE, error: null })),
+    rpc: vi.fn(async (name: string) => ({
+      data: name === "install_funnel" ? FUNNEL : name === "otp_stats" ? OTP : SAMPLE,
+      error: null,
+    })),
     // metrics_daily, newest first.
     from: () => {
       const chain: Record<string, unknown> = {
@@ -83,6 +93,11 @@ describe("/admin/stats", () => {
     expect(html).toContain("مع 22 زميلًا");
     expect(html).toContain("حساب مريب");
     expect(html).toContain("/admin/institutions");
+    // The code step: delivery, refusals, and who is stuck.
+    expect(html).toContain("رموز التحقق (آخر 7 أيام)");
+    expect(html).toContain("عادةً خلال 6 ث، أبطؤها 95 ث");
+    expect(html).toContain("د. ليلى الخطيب: رُفض رمزه مرتين، ولم يدخل بعدها");
+    expect(html).toContain("1 تسجيل رُفض رمزه ولم يكتمل");
     // Install funnel: doctors per step, by platform and in all.
     expect(html).toContain("الإضافة إلى الشاشة الرئيسية");
     expect(html).toMatch(/فتحوه من الشاشة الرئيسية<\/th><td class="px-3 py-2">1<\/td>/);
