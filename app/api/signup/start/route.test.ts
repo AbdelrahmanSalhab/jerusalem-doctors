@@ -117,6 +117,7 @@ const BASE = {
   email: "doc@example.com",
   workplaces: [{ name: "مستشفى المقاصد", workplace_type: "hospital", is_primary: true }],
   consent: true,
+  pledge: true,
 };
 
 async function start(body: Record<string, unknown>) {
@@ -149,6 +150,12 @@ describe("POST /api/signup/start: license resolution", () => {
       license_number: "23456",
       license_verification_status: "verified",
     });
+  });
+
+  it("refuses a signup that did not take the pledge on colleagues' numbers", async () => {
+    expect((await start({ pledge: false })).status).toBe(400);
+    expect((await start({ pledge: undefined })).status).toBe(400);
+    expect(pendingInserts).toEqual([]);
   });
 
   it("checks uniqueness against the resolved serial", async () => {

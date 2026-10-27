@@ -64,6 +64,7 @@ export const FIELD_LABELS: Record<string, string> = {
   workplaces: "أماكن العمل",
   certificates: "الشهادات",
   consent: "الموافقة على الشروط",
+  pledge: "الالتزام بعدم مشاركة أرقام الزملاء",
   phone_e164: "رقم الهاتف",
   phone_display: "صيغة عرض الهاتف",
   is_phone_verified: "توثيق الهاتف",

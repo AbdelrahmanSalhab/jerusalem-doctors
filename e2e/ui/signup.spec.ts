@@ -48,6 +48,7 @@ async function toVerify(page: Page, s: Signup) {
   await page.getByRole("checkbox", { name: /أبحث عن فرصة عمل/ }).check();
   await expect(page.getByRole("heading", { name: "مكان العمل (اختياري)" })).toBeVisible();
   await page.getByRole("checkbox", { name: /أوافق على ما ورد أعلاه/ }).check();
+  await page.getByRole("checkbox", { name: /ألتزم باستخدام أرقام الزملاء/ }).check();
   await page.getByRole("button", { name: "تسجيل وإرسال رمز التحقق برسالة نصية" }).click();
 
   await expect(page).toHaveURL(/\/verify\?mode=signup/, { timeout: 15_000 });
@@ -80,6 +81,28 @@ test("a doctor the registry knows signs up and is listed straight away @phone", 
   await expect(p.getByText("سمير خوري").first()).toBeVisible();
   await expect(p.getByText("يبحث عن فرصة عمل").first()).toBeVisible();
   await colleague.close();
+});
+
+test("signing up needs the pledge to keep colleagues' numbers among doctors", async ({ page }) => {
+  await page.goto("/signup");
+  await page.getByLabel("رقم الهاتف").fill("0521110009");
+  await page.getByLabel(/^رقم الترخيص/).fill("990009");
+  await page.getByLabel("البريد الإلكتروني").fill("990009@example.test");
+  await page.getByRole("button", { name: "التالي" }).click();
+  await page.getByLabel("الاسم بالعربية").fill("سامي");
+  await page.getByLabel("اسم العائلة بالعربية").fill("النجار");
+  await page.getByLabel(/^الاسم بالعبرية/).fill("סאמי");
+  await page.getByLabel(/^اسم العائلة بالعبرية/).fill("אלנג'אר");
+  await page.getByRole("button", { name: "التالي" }).click();
+  await page.getByRole("radio", { name: /طب عام/ }).check();
+  await page.getByRole("checkbox", { name: /أبحث عن فرصة عمل/ }).check();
+  await page.getByRole("checkbox", { name: /أوافق على ما ورد أعلاه/ }).check();
+
+  const send = page.getByRole("button", { name: "تسجيل وإرسال رمز التحقق برسالة نصية" });
+  await expect(page.getByText("الالتزام بعدم مشاركة أرقام الزملاء")).toBeVisible();
+  await expect(send).toBeDisabled();
+  await page.getByRole("checkbox", { name: /ألتزم باستخدام أرقام الزملاء/ }).check();
+  await expect(send).toBeEnabled();
 });
 
 test("a licence the registry does not have waits for an admin", async ({ page }) => {

@@ -1,13 +1,18 @@
 
 import { OPTION_CARD, OPTION_INPUT } from "@/components/FormField";
+import { PrivacyShieldIcon } from "@/components/PrivacyShieldIcon";
 import { Section } from "./SignupFields";
 
 export function ConsentSection({
   checked,
   onChange,
+  pledged,
+  onPledge,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
+  pledged: boolean;
+  onPledge: (v: boolean) => void;
 }) {
   return (
     <Section title="الموافقة" required>
@@ -32,6 +37,24 @@ export function ConsentSection({
         <span>
           أوافق على ما ورد أعلاه، وأؤكد أنني طبيب وأن المعلومات المدخلة
           صحيحة، وأوافق على استخدامها.
+        </span>
+      </label>
+
+      {/* Its own box, in the reminder's amber, so it reads as a commitment
+          of its own (#192). */}
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-warn-line border-s-4 border-s-warn-solid bg-warn-bg p-3 text-warn transition-colors hover:border-warn-solid has-[:checked]:border-warn-solid">
+        <input
+          id="pledge"
+          type="checkbox"
+          required
+          checked={pledged}
+          onChange={(e) => onPledge(e.target.checked)}
+          className={OPTION_INPUT}
+        />
+        <PrivacyShieldIcon className="mt-0.5 text-warn-solid" />
+        <span>
+          ألتزم باستخدام أرقام الزملاء للتواصل المهني فقط، وبعدم مشاركتها مع
+          المرضى أو مع أي شخص من خارج الطاقم الطبي.
         </span>
       </label>
     </Section>

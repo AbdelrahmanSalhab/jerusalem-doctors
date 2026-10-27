@@ -404,6 +404,8 @@ export function SignupForm({
       <ConsentSection
         checked={form.consent}
         onChange={(v) => update("consent", v)}
+        pledged={form.pledge}
+        onPledge={(v) => update("pledge", v)}
       />
 
       <TurnstileWidget

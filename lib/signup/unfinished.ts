@@ -49,6 +49,7 @@ export function toFormState(raw: unknown): FormState {
     : [];
   if (workplaces.length > 0) out.workplaces = workplaces;
   out.consent = false;
+  out.pledge = false;
   return out as FormState;
 }
 
