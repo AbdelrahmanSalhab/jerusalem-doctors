@@ -2,8 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PublicSearchBar } from "@/components/PublicSearchBar";
 import { getCurrentDoctor } from "@/lib/auth/session";
+import { indexable } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
+
+// Indexable (#171): the page that explains the directory.
+export const metadata = indexable("/");
 
 // What a doctor does, in order. The order is the point, so it's numbered.
 const STEPS = [

@@ -1,6 +1,5 @@
 // Runs in the browser before the app's own code: Sentry, and Zod's setting.
 import * as Sentry from "@sentry/nextjs";
-import { z } from "zod";
 import { browserBreadcrumb, PRIVATE_DATA_COLLECTION, scrubEvent, scrubSpan } from "@/lib/sentryScrub";
 
 // Zod 4 probes whether it may compile validators with Function(""). The
@@ -8,7 +7,12 @@ import { browserBreadcrumb, PRIVATE_DATA_COLLECTION, scrubEvent, scrubSpan } fro
 // the refusal is reported as a violation even though Zod falls back
 // quietly: Lighthouse marked /signup down for it (#168). jitless skips the
 // probe; the plain validators are what ran anyway.
-z.config({ jitless: true });
+// Set on Zod's global config object (zod/v4/core/core.js reads and keeps
+// globalThis.__zod_globalConfig) rather than through z.config: importing Zod
+// here put all of it on every page, 20 KB gzipped, even where nothing
+// validates (#175).
+const zodConfig = globalThis as { __zod_globalConfig?: Record<string, unknown> };
+zodConfig.__zod_globalConfig = Object.assign(zodConfig.__zod_globalConfig ?? {}, { jitless: true });
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
