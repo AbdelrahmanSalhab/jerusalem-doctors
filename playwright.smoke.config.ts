@@ -30,5 +30,7 @@ export default defineConfig({
     { name: "setup", testMatch: /smoke\.setup\.ts/, retries: 0, teardown: "teardown" },
     { name: "teardown", testMatch: /smoke\.teardown\.ts/, retries: 0 },
     { name: "smoke", testMatch: /production\.spec\.ts/, dependencies: ["setup"] },
+    // Warn-only, and not retried: a second run would only repeat the numbers.
+    { name: "lighthouse", testMatch: /lighthouse\.spec\.ts/, dependencies: ["setup"], retries: 0 },
   ],
 });

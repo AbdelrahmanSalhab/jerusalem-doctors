@@ -12,10 +12,10 @@ vi.mock("@/lib/supabase/service", async () => {
   return { createSupabaseServiceClient: () => db.client };
 });
 
-const beacon = (body: unknown) =>
+const beacon = (body: unknown, extra: Record<string, string> = {}) =>
   new Request("https://example.test/api/usage/install", {
     method: "POST",
-    headers: { "content-type": "text/plain;charset=UTF-8" },
+    headers: { "content-type": "text/plain;charset=UTF-8", ...extra },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 const post = async (body: unknown) => (await import("./route")).POST(beacon(body));
@@ -50,6 +50,13 @@ describe("POST /api/usage/install", () => {
   it("stops recording past the rate limit, still answering", async () => {
     rateLimit.mockResolvedValueOnce({ success: false });
     expect((await post({ kind: "install_click", guide: "android" })).status).toBe(204);
+    expect(db.argsOf("usage_events", "insert")).toEqual([]);
+  });
+
+  it("leaves a smoke run out of the stats", async () => {
+    const run = { "x-ci-run": "https://github.com/o/r/actions/runs/1" };
+    const res = await (await import("./route")).POST(beacon({ kind: "install_invite_shown", guide: "android" }, run));
+    expect(res.status).toBe(204);
     expect(db.argsOf("usage_events", "insert")).toEqual([]);
   });
 });
