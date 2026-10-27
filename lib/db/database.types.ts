@@ -328,6 +328,9 @@ isOneToOne: false
               "doctors": number,"events": number,"kind": string,"platform": string
             }[]
                            },
+"otp_stats":
+{ Args: { "p_days"?: number,"p_valid_seconds"?: number }; Returns: Json
+                           },
 "record_daily_metrics":
 { Args: { "p_day": string }; Returns: Json
                            },

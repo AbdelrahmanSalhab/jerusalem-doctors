@@ -16,6 +16,7 @@ import {
 } from "@/lib/client/verify_handoff";
 import { apiErrorMessage } from "@/lib/client/apiError";
 import { toAsciiDigits } from "@/lib/normalize/digits";
+import { OTP_VALID_SECONDS, validityText } from "@/lib/otp/expiry";
 import {
   TurnstileWidget,
   type TurnstileHandle,
@@ -53,9 +54,13 @@ export function VerifyForm() {
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [resendIn, setResendIn] = useState(60);
+  // A new code is offered as the current one runs out (lib/otp/expiry.ts).
+  const [resendIn, setResendIn] = useState(OTP_VALID_SECONDS);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Said after a resend: the earlier code stopped working, and it is the one
+  // a doctor is most likely to type when both texts arrive.
+  const [notice, setNotice] = useState<string | null>(null);
   // Login resends are Turnstile-gated (they spend the shared SMS budget);
   // signup resends are bound to the signup session instead.
   const turnstileRef = useRef<TurnstileHandle>(null);
@@ -79,6 +84,7 @@ export function VerifyForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setSubmitting(true);
 
     try {
@@ -96,15 +102,18 @@ export function VerifyForm() {
       const data = await res.json();
       if (!res.ok) {
         if (data?.code === "invalid_otp") {
-          setError("رمز التحقق غير صحيح. حاول مرة أخرى.");
+          // Supabase answers the same for a wrong code and an expired one.
+          setError("الرمز غير صحيح أو انتهت صلاحيته. استخدم آخر رمز وصلك، أو اطلب رمزًا جديدًا.");
         } else if (data?.code === "session_expired") {
           setError("انتهت صلاحية الجلسة. الرجاء البدء من جديد.");
         } else if (data?.code === "account_inactive") {
           setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "too_many_attempts") {
-          setError("عدد المحاولات تجاوز الحد. الرجاء البدء من جديد.");
+          // This code has had its guesses; the signup stays, a new code goes on.
+          setError("محاولات كثيرة بهذا الرمز. اطلب رمزًا جديدًا.");
+          setResendIn(0);
         } else if (data?.code === "rate_limited") {
-          setError("عدد كبير من المحاولات. حاول لاحقًا.");
+          setError("محاولات كثيرة. انتظر عشر دقائق، ثم اطلب رمزًا جديدًا.");
         } else {
           setError("حدث خطأ. الرجاء المحاولة لاحقًا.");
         }
@@ -131,6 +140,7 @@ export function VerifyForm() {
   const resend = async () => {
     if (resendIn > 0 || resending) return;
     setError(null);
+    setNotice(null);
     setResending(true);
 
     // Dedicated resend endpoints rather than re-posting to /*/start: those are
@@ -164,7 +174,9 @@ export function VerifyForm() {
         }
         return;
       }
-      setResendIn(60);
+      setResendIn(OTP_VALID_SECONDS);
+      setCode("");
+      setNotice("أرسلنا رمزًا جديدًا. استخدم آخر رمز وصلك فقط؛ الرمز السابق لم يعد يعمل.");
     } catch (err) {
       console.error(err);
       setError("حدث خطأ في الاتصال بالخادم.");
@@ -187,7 +199,19 @@ export function VerifyForm() {
         className="w-full rounded-md border border-foreground/20 px-4 py-3 text-center text-2xl tracking-[0.5em]"
         placeholder="------"
         required
+        aria-describedby="otp-validity"
       />
+      <p id="otp-validity" className="text-center text-sm text-muted">
+        {resendIn > 0
+          ? `الرمز صالح لمدة ${validityText()} فقط من إرساله.`
+          : "إن لم يصلك الرمز أو لم يعمل، اطلب رمزًا جديدًا."}
+      </p>
+
+      {notice && (
+        <p role="status" className="rounded border border-info-line bg-info-bg p-3 text-sm text-info">
+          {notice}
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="rounded border border-danger-line bg-danger-bg p-3 text-sm text-danger">

@@ -43,8 +43,22 @@ describe("Sms4FreeOtpSender over HTTP", () => {
       pass: "P",
       sender: "JDoctors",
       recipient: "0501234567",
-      msg: "رمز دخول دليل أطباء القدس: 012345. لا تشاركه.",
+      msg: "012345 هو رمز دخول دليل أطباء القدس. لا تشاركه.",
     });
+  });
+
+  it("asks for a delivery report when reports are on", async () => {
+    reply = { body: "1", status: 200 };
+    process.env.SEND_SMS_HOOK_SECRET = "v1,whsec_test";
+    process.env.SMS_DELIVERY_BASE_URL = "https://jd.example";
+    try {
+      await send();
+    } finally {
+      delete process.env.SEND_SMS_HOOK_SECRET;
+      delete process.env.SMS_DELIVERY_BASE_URL;
+    }
+    expect(lastRequest?.returnUrl).toMatch(/^https:\/\/jd\.example\/api\/sms\/delivery\?k=[0-9a-f]{32}$/);
+    expect(lastRequest?.usermsgid).toMatch(/^\d{13}-[0-9a-f]{8}$/);
   });
 
   it("accepts a bare numeric body", async () => {

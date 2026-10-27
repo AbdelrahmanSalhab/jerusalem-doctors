@@ -22,6 +22,14 @@ export type UsageKind =
   | "sms_sent"
   /** A live data.gov.il request at signup, for a licence not in our copy. */
   | "registry_lookup"
+  /** The code step (20261027113048_otp_events): a code refused, too many
+   *  tries, a signup's new code, and SMS4FREE's delivery reports. */
+  | "otp_refused"
+  | "otp_locked"
+  | "otp_resent"
+  | "sms_delivered"
+  | "sms_undelivered"
+  | "sms_voice"
   /** Adding the directory to the home screen, step by step (#150, lib/install). */
   | InstallKind;
 

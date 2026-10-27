@@ -5,7 +5,8 @@
 //                                   serving e2e/registry.json; supports
 //                                   `filters`, `q`, `limit`, `offset`
 //   POST /sms4free/send             SMS4FREE's send API (lib/otp/sms4free.ts);
-//                                   answers {status: 1} and keeps the message
+//                                   answers {status: 1} and keeps the message,
+//                                   and reports it delivered to returnUrl
 //   GET  /sms4free/messages?to=05…  what was "sent" to a number, newest last
 //   POST /api/<project>/envelope/   Sentry's ingest: the app's server and
 //                                   browser send here in e2e (SENTRY_DSN), so a
@@ -85,9 +86,19 @@ createServer((req, res) => {
     let body = "";
     req.on("data", (c) => (body += c));
     req.on("end", () => {
-      const { recipient, msg, sender } = JSON.parse(body);
+      const { recipient, msg, sender, returnUrl, usermsgid } = JSON.parse(body);
       sent.push({ to: recipient, msg, sender, at: Date.now() });
       json(res, { status: 1, message: "ok" });
+      // A delivery report, as SMS4FREE sends one when asked (returnUrl).
+      if (returnUrl) {
+        setTimeout(() => {
+          fetch(returnUrl, {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ to: recipient, status: "1", msgId: usermsgid ?? "" }),
+          }).catch(() => {});
+        }, 200);
+      }
     });
     return;
   }

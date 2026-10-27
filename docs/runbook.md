@@ -39,7 +39,8 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 
 **Fix:**
 1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
-   and that the OTP expiry matches what the UI's resend timer promises.
+   and that "SMS OTP Expiry" equals `OTP_VALID_SECONDS` in
+   `lib/otp/expiry.ts` (see **The code's lifetime** below).
 2. Supabase Dashboard → Authentication → Hooks → **Send SMS hook**: confirm it
    is enabled, type HTTPS, URL is
    `https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp`.
@@ -244,6 +245,38 @@ the floor (Dashboard → Authentication):
   (signup shows `otp_send_failed`; login stays silent and only Sentry sees
   it). Keep "token verifications" per IP low.
 - **Providers → Phone:** OTP length 6 or more, expiry 10 minutes or less.
+
+### The code's lifetime ("SMS OTP Expiry")
+
+Production is **60 seconds** (checked 27 Oct 2026), Supabase's default. That
+is short: a text that arrives late, or a doctor who looks a minute later,
+meets a dead code, and Supabase answers "wrong" and "expired" the same way.
+Doctors reported exactly that ("I got two codes and both were wrong").
+
+- **The verify page follows the setting.** `OTP_VALID_SECONDS` in
+  `lib/otp/expiry.ts` drives the "valid for…" line and when a new code is
+  offered. Change it together with the setting.
+- **A new code cancels the previous one.** The page says so after a resend
+  («استخدم آخر رمز وصلك فقط»).
+- **The dashboard locks the field while the Send SMS hook is on** ("SMS
+  provider settings are disabled while the SMS hook is enabled"). To raise it
+  to 600 (10 minutes, recommended): use the Management API's auth config,
+  `PATCH https://api.supabase.com/v1/projects/<ref>/config/auth` with a
+  personal access token and `{"sms_otp_exp": 600}`, then set
+  `OTP_VALID_SECONDS = 600` and deploy.
+- **How Supabase calls the hook** (supabase.com/docs/guides/auth/auth-hooks):
+  5 s for the whole call, retries included; it retries only a `429` or `503`
+  carrying a non-empty `retry-after`, up to three times two seconds apart. A
+  `500` is never retried. The hook answers a transient SMS4FREE failure with
+  `503` + `retry-after`, and a permanent one (credentials, balance) with
+  `400`. A call that runs out of time can still be retried, so
+  `lib/otp/sentOnce.ts` sends a given code to a given phone only once.
+- **The code's lifetime can be raised despite the locked field:** the
+  Management API's `sms_otp_exp` (seconds) on
+  `PATCH /v1/projects/<ref>/config/auth` (Supabase's published API schema).
+- **Twilio** shows as the SMS provider but is unused while the hook is on. If
+  the hook is ever switched off, Supabase falls back to it: clear its
+  credentials so that can't happen by accident.
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
 

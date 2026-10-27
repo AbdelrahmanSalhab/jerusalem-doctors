@@ -2,11 +2,17 @@
 // getCurrentDoctor find the doctor on later requests.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runAfter } from "@/test/after";
 import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
 const rateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (await import("@/test/after")).deferAfter,
+}));
+
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
   return { createSupabaseServiceClient: () => db.client };
@@ -74,6 +80,12 @@ describe("POST /api/login/verify", () => {
     const res = await call(GOOD);
     expect(res.status).toBe(429);
     expect(auth.verifyOtp).not.toHaveBeenCalled();
+    // Counted against the doctor the number belongs to.
+    db.queue("doctors", { data: { id: "doc-1" } });
+    await runAfter();
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "otp_locked", doctor_id: "doc-1", meta: { flow: "login" } }],
+    ]);
   });
 
   it.each([
@@ -84,6 +96,12 @@ describe("POST /api/login/verify", () => {
     const res = await call(GOOD);
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ code: "invalid_otp" });
+    // A number with no doctor still counts, against nobody.
+    db.queue("doctors", { data: null });
+    await runAfter();
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "otp_refused", doctor_id: null, meta: { flow: "login" } }],
+    ]);
   });
 
   it("answers 404 when no doctor has the phone", async () => {

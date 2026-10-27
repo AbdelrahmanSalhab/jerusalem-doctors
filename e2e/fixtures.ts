@@ -27,6 +27,8 @@ const EXPECTED: RegExp[] = [
   /^http 404 GET \/admin$/,
   /^console\.error Failed to load resource: .* status of 401 .*\[\/api\/login\/password\]$/,
   /^console\.error Failed to load resource: .* status of 404 .*\[\/admin\]$/,
+  // signup.spec.ts types an old, cancelled code on purpose.
+  /^(http 400 POST |console\.error Failed to load resource: .* status of 400 .*\[)\/api\/signup\/verify/,
   // password.spec.ts tries a wrong current password on purpose.
   /^(http 400 POST |console\.error Failed to load resource: .* status of 400 .*\[)\/api\/profile\/password/,
   // The photo test uploads a text file named .png on purpose.
