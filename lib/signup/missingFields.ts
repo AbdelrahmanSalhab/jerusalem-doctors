@@ -37,6 +37,7 @@ export interface SignupFields {
     phone: string;
   }[];
   consent: boolean;
+  pledge: boolean;
 }
 
 export interface MissingField {
@@ -104,5 +105,6 @@ export function getMissingFields(f: SignupFields): MissingField[] {
   }
 
   need(!f.consent, "consent", "الموافقة على استخدام المعلومات");
+  need(!f.pledge, "pledge", "الالتزام بعدم مشاركة أرقام الزملاء");
   return missing;
 }

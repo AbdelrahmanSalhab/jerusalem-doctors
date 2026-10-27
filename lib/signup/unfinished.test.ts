@@ -12,9 +12,10 @@ describe("toFormState", () => {
       specialty_ids: ["a", "b"],
       seeking_work: true,
       consent: true,
+      pledge: true,
       workplaces: [{ name: "المقاصد", workplace_type: "hospital", details: "", address: "", hours: "", phone: "", is_primary: true }],
     });
-    expect(form).toMatchObject({ phone: "0521234567", arabic_first_name: "سارة", stage: "specialist", specialty_ids: ["a", "b"], seeking_work: true, consent: false });
+    expect(form).toMatchObject({ phone: "0521234567", arabic_first_name: "سارة", stage: "specialist", specialty_ids: ["a", "b"], seeking_work: true, consent: false, pledge: false });
     expect(form.workplaces[0].name).toBe("المقاصد");
     // Saved before clinics had a fund.
     expect(form.workplaces[0].hmo).toBe("");

@@ -194,6 +194,14 @@ export function DashboardSearch({
         </div>
       )}
 
+      {/* Many doctors' work number is their personal one (#192). Always
+          shown, above whatever lists numbers, so nothing moves when results
+          arrive. */}
+      <p className="text-sm text-muted">
+        أرقام الزملاء مخصّصة للتواصل المهني بين الأطباء. نرجو عدم مشاركتها مع المرضى
+        أو مع أي شخص من خارج الطاقم الطبي، احترامًا لخصوصيتهم.
+      </p>
+
       <ResultsRegion
         state={!q.trim() && !specialtyId && !filtering ? { status: "idle" } : state}
         featured={featured}

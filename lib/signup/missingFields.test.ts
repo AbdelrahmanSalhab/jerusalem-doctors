@@ -22,6 +22,7 @@ const EMPTY: SignupFields = {
   retired: false,
   workplaces: [WP],
   consent: false,
+  pledge: false,
 };
 
 const COMPLETE: SignupFields = {
@@ -37,6 +38,7 @@ const COMPLETE: SignupFields = {
   email: "a@b.co",
   workplaces: [{ ...WP, name: "المقاصد" }],
   consent: true,
+  pledge: true,
 };
 
 const keys = (f: SignupFields) => getMissingFields(f).map((m) => m.key);
@@ -53,6 +55,7 @@ describe("getMissingFields", () => {
       "hebrew_family_name",
       "stage",
       "consent",
+      "pledge",
     ]);
   });
 

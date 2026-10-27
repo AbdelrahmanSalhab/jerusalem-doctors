@@ -33,6 +33,8 @@ export type FormState = {
   retired: boolean;
   workplaces: WorkplaceEntry[];
   consent: boolean;
+  /** Colleagues' numbers stay among doctors (#192). */
+  pledge: boolean;
 };
 
 export type UpdateField = <K extends keyof FormState>(k: K, v: FormState[K]) => void;
@@ -61,6 +63,7 @@ export const INITIAL: FormState = {
   retired: false,
   workplaces: [emptyWorkplace(true)],
   consent: false,
+  pledge: false,
 };
 
 // Strip disallowed chars from phone + license inputs so a paste of
@@ -151,6 +154,6 @@ export function buildStartBody(
     turnstile_token: turnstileToken,
     // Kept with the unfinished signup, so a reminder's link can reopen the
     // form as the doctor left it (lib/signup/unfinished.ts).
-    resume_form: { ...form, consent: false },
+    resume_form: { ...form, consent: false, pledge: false },
   };
 }

@@ -76,6 +76,7 @@ const Body = z
     seeking_work: z.boolean().optional(),
     retired: z.boolean().optional(),
     consent: z.literal(true),
+    pledge: z.literal(true),
     turnstile_token: z.string().optional(),
     // Soft-match override flow: client confirms registry name; we record it.
     override_name_mismatch: z.boolean().optional(),
