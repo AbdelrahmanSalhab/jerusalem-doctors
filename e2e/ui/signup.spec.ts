@@ -177,7 +177,8 @@ test("a new code cancels the old one, and the page says to use the newest @phone
     // The older text, typed: refused, and the page says what to do.
     await page.getByLabel("رمز التحقق").fill(first);
     await page.getByRole("button", { name: "تأكيد" }).click();
-    await expect(page.getByRole("alert")).toHaveText(
+    // By text: Next's route announcer is a role="alert" too.
+    await expect(page.getByRole("alert").filter({ hasText: "انتهت صلاحيته" })).toHaveText(
       "الرمز غير صحيح أو انتهت صلاحيته. استخدم آخر رمز وصلك، أو اطلب رمزًا جديدًا.",
     );
 
