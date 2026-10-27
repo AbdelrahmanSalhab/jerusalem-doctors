@@ -4,9 +4,12 @@ import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { cachedSpecialties } from "@/lib/cachedReads";
 import { SupportContact } from "@/components/SupportContact";
 import { readResumeForm } from "@/lib/signup/unfinished";
+import { indexable } from "@/lib/site";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = indexable("/signup", { title: "إنشاء حساب | دليل أطباء القدس" });
 
 export default async function SignupPage({
   searchParams,

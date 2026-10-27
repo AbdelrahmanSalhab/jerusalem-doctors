@@ -49,9 +49,9 @@ export async function SiteHeader() {
               className="h-9 w-9 object-contain sm:h-12 sm:w-12"
             />
           </span>
-          <span className="truncate text-base font-semibold leading-tight sm:text-lg">
-            {SITE_NAME_AR}
-          </span>
+          {/* Wraps onto two lines on a phone rather than being cut to «دليل
+              أطب...»: a signed-out visitor sees it before anything else (#179). */}
+          <span className="text-base font-semibold leading-tight text-balance max-[359px]:text-sm sm:text-lg">{SITE_NAME_AR}</span>
         </Link>
 
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -69,14 +69,17 @@ export async function SiteHeader() {
             <LogoutButton className={button} />
           ) : (
             <>
+              {/* Short labels on a phone leave the site's name room (#179). */}
               <Link href="/login" className={button}>
-                تسجيل الدخول
+                <span className="sm:hidden">دخول</span>
+                <span className="hidden sm:inline">تسجيل الدخول</span>
               </Link>
               <Link
                 href="/signup"
                 className="inline-flex items-center rounded-md bg-primary px-2.5 py-1.5 text-sm text-primary-fg hover:opacity-90 sm:px-3 pointer-coarse:min-h-11"
               >
-                إنشاء حساب
+                <span className="sm:hidden">حساب جديد</span>
+                <span className="hidden sm:inline">إنشاء حساب</span>
               </Link>
             </>
           )}
