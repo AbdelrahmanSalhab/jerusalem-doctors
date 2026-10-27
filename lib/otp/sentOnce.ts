@@ -1,14 +1,20 @@
 // One text per code, even when Supabase retries the Send SMS hook.
 //
 // Supabase gives the hook about five seconds, then retries it (up to three
-// times, two seconds apart) with the same `webhook-id`. A send that was slow
-// but went through would then go out again: the doctor gets the same code
-// twice, and we pay twice. The hook marks an id once its text is out, and a
-// retry of a marked id is answered without sending.
+// times, two seconds apart). A send that was slow but went through would then
+// go out again: the doctor gets the same code twice, and we pay twice. The
+// hook marks each (phone, code) once its text is out, and a call for a marked
+// pair is answered without sending. Keyed on the pair, not on the delivery's
+// id, because the same phone getting the same code twice is a duplicate
+// whatever id each call carries.
+//
+// The key is an HMAC with the hook's secret, so Redis never holds a code, nor
+// anything a six-digit code could be worked back out of.
 //
 // Upstash Redis in production (the rate limiter's), memory locally. Any Redis
 // failure lets the text go out: a duplicate is better than no code.
 
+import { createHmac } from "node:crypto";
 import { Redis } from "@upstash/redis";
 
 const TTL_SECONDS = 600;
@@ -21,26 +27,31 @@ function redis(): Redis | null {
   return url && token ? new Redis({ url, token }) : null;
 }
 
-/** Whether this hook delivery's text already went out. */
-export async function alreadySent(webhookId: string): Promise<boolean> {
+/** The pair's key; `secret` is SEND_SMS_HOOK_SECRET (unset only in dev). */
+export function sentKey(phoneE164: string, code: string, secret = ""): string {
+  return PREFIX + createHmac("sha256", secret).update(`${phoneE164}:${code}`).digest("hex");
+}
+
+/** Whether this code's text already went to this phone. */
+export async function alreadySent(key: string): Promise<boolean> {
   const r = redis();
-  if (!r) return (local.get(webhookId) ?? 0) > Date.now();
+  if (!r) return (local.get(key) ?? 0) > Date.now();
   try {
-    return (await r.exists(PREFIX + webhookId)) === 1;
+    return (await r.exists(key)) === 1;
   } catch {
     return false;
   }
 }
 
-/** Records that this hook delivery's text went out. */
-export async function markSent(webhookId: string): Promise<void> {
+/** Records that this code's text went to this phone. */
+export async function markSent(key: string): Promise<void> {
   const r = redis();
   if (!r) {
-    local.set(webhookId, Date.now() + TTL_SECONDS * 1000);
+    local.set(key, Date.now() + TTL_SECONDS * 1000);
     return;
   }
   try {
-    await r.set(PREFIX + webhookId, 1, { ex: TTL_SECONDS });
+    await r.set(key, 1, { ex: TTL_SECONDS });
   } catch {
     // A retry may then send again; nothing worse.
   }

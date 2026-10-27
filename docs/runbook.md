@@ -262,12 +262,21 @@ Doctors reported exactly that ("I got two codes and both were wrong").
   provider settings are disabled while the SMS hook is enabled"). To raise it
   to 600 (10 minutes, recommended): use the Management API's auth config,
   `PATCH https://api.supabase.com/v1/projects/<ref>/config/auth` with a
-  personal access token, setting the SMS OTP expiry field (check the API
-  reference for its exact name before sending), then set
+  personal access token and `{"sms_otp_exp": 600}`, then set
   `OTP_VALID_SECONDS = 600` and deploy.
-- One text per code: Supabase retries a slow hook with the same
-  `webhook-id`, and `lib/otp/sentOnce.ts` answers the retry without sending
-  the text again.
+- **How Supabase calls the hook** (supabase.com/docs/guides/auth/auth-hooks):
+  5 s for the whole call, retries included; it retries only a `429` or `503`
+  carrying a non-empty `retry-after`, up to three times two seconds apart. A
+  `500` is never retried. The hook answers a transient SMS4FREE failure with
+  `503` + `retry-after`, and a permanent one (credentials, balance) with
+  `400`. A call that runs out of time can still be retried, so
+  `lib/otp/sentOnce.ts` sends a given code to a given phone only once.
+- **The code's lifetime can be raised despite the locked field:** the
+  Management API's `sms_otp_exp` (seconds) on
+  `PATCH /v1/projects/<ref>/config/auth` (Supabase's published API schema).
+- **Twilio** shows as the SMS provider but is unused while the hook is on. If
+  the hook is ever switched off, Supabase falls back to it: clear its
+  credentials so that can't happen by accident.
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
 

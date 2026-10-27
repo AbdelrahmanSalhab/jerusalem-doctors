@@ -9,8 +9,9 @@ import {
 const DEFAULT_API_URL = "https://api.sms4free.co.il/ApiSMS/v2/SendSMS";
 const DEFAULT_BALANCE_URL = "https://api.sms4free.co.il/ApiSMS/AvailableSMS";
 
-// Supabase's Send SMS Hook gives us a 5s budget before it times out and
-// retries. Bail at 4s so we return a real status code instead of being cut off.
+// Supabase gives the whole Send SMS hook 5 s, retries included. Bail at 4 s
+// so we answer with a real status instead of being cut off. (SMS4FREE's own
+// sample waits 10 s; we can't.)
 const SEND_TIMEOUT_MS = 4_000;
 
 // The balance check runs from cron, not from the hook, so it is not competing
@@ -25,7 +26,8 @@ const SENDER_PATTERN = /^[A-Za-z0-9]{1,11}$/;
  * provider accepted; everything else is a failure.
  *
  * `permanent: true` means a Supabase retry cannot help, so the hook answers
- * 400 and Supabase drops it instead of burning its 3x/2s backoff. Every
+ * 400 and Supabase drops it; a transient one answers 503, which Supabase
+ * retries (up to 3 times, 2 s apart, within its 5 s budget). Every
  * negative code here is a configuration or account problem, not a hiccup.
  */
 export const SMS4FREE_STATUS: Record<

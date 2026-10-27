@@ -75,10 +75,13 @@ function hookRequest(body: unknown, sign = true, id = `webhook-id-${++nextId}`):
   });
 }
 
-const PAYLOAD = { user: { phone: "972501234567" }, sms: { otp: "123456" } };
+/** A new code each test: the hook sends a given code to a phone only once. */
+let codes = 100000;
+let PAYLOAD = { user: { phone: "972501234567" }, sms: { otp: "100000" } };
 
 describe("send-otp hook route", () => {
   beforeEach(() => {
+    PAYLOAD = { user: { phone: "972501234567" }, sms: { otp: String(++codes) } };
     vi.stubEnv("SEND_SMS_HOOK_SECRET", SECRET);
     send.mockReset();
     send.mockResolvedValue({ messageRef: "test:1" });
@@ -118,16 +121,18 @@ describe("send-otp hook route", () => {
 
     it("warns once as the day crosses half the budget, and still sends", async () => {
       const { POST } = await import("./route");
+      // Three different codes: the same one is sent to a phone only once.
+      const next = () => ({ ...PAYLOAD, sms: { otp: String(++codes) } });
       remaining = 101;
-      await POST(hookRequest(PAYLOAD));
+      await POST(hookRequest(next()));
       expect(captureMessage).not.toHaveBeenCalled();
       remaining = 100;
-      expect((await POST(hookRequest(PAYLOAD))).status).toBe(200);
+      expect((await POST(hookRequest(next()))).status).toBe(200);
       expect(captureMessage).toHaveBeenCalledWith("Half the daily SMS budget used", expect.objectContaining({ level: "warning" }));
       // Also in the admin's alerts list, for whoever does not read Sentry.
       expect(inserts).toContainEqual(["audit_logs", { action: "alert", metadata: { alert: "sms_half_budget", level: "warning", limit: 200 } }]);
       remaining = 99;
-      await POST(hookRequest(PAYLOAD));
+      await POST(hookRequest(next()));
       expect(captureMessage).toHaveBeenCalledTimes(1);
     });
 
@@ -146,21 +151,25 @@ describe("send-otp hook route", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
-    expect(send).toHaveBeenCalledWith("+972501234567", "123456");
+    expect(send).toHaveBeenCalledWith("+972501234567", PAYLOAD.sms.otp);
   });
 
-  it("answers Supabase's retry of a delivered text without sending it again", async () => {
+  it("sends a code to a phone once, whatever delivery id the retry carries", async () => {
     const { POST } = await import("./route");
-    expect((await POST(hookRequest(PAYLOAD, true, "slow-delivery"))).status).toBe(200);
-    expect((await POST(hookRequest(PAYLOAD, true, "slow-delivery"))).status).toBe(200);
+    expect((await POST(hookRequest(PAYLOAD, true, "first"))).status).toBe(200);
+    expect((await POST(hookRequest(PAYLOAD, true, "first"))).status).toBe(200);
+    expect((await POST(hookRequest(PAYLOAD, true, "a-new-id"))).status).toBe(200);
     expect(send).toHaveBeenCalledTimes(1);
+    // A new code to the same phone goes out.
+    await POST(hookRequest({ ...PAYLOAD, sms: { otp: "654321" } }));
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it("sends on the retry when the first try failed", async () => {
     const { POST } = await import("./route");
     send.mockRejectedValueOnce(new OtpProviderError("timeout", false));
-    expect((await POST(hookRequest(PAYLOAD, true, "failed-once"))).status).toBe(500);
-    expect((await POST(hookRequest(PAYLOAD, true, "failed-once"))).status).toBe(200);
+    expect((await POST(hookRequest(PAYLOAD))).status).toBe(503);
+    expect((await POST(hookRequest(PAYLOAD))).status).toBe(200);
     expect(send).toHaveBeenCalledTimes(2);
   });
 
@@ -201,12 +210,15 @@ describe("send-otp hook route", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
   });
 
-  it("answers 500 so Supabase retries a transient provider failure", async () => {
+  it("answers 503 with retry-after so Supabase retries a transient provider failure", async () => {
+    // Supabase retries only 429/503 carrying a non-empty retry-after; a 500
+    // is never retried (supabase.com/docs/guides/auth/auth-hooks).
     send.mockRejectedValue(new OtpProviderError("timeout", false));
     const { POST } = await import("./route");
     const res = await POST(hookRequest(PAYLOAD));
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBeTruthy();
     expect(res.headers.get("content-type")).toContain("application/json");
   });
 });
