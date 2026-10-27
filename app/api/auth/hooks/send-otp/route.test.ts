@@ -56,9 +56,10 @@ vi.mock("@/lib/otp", async () => {
 
 const SECRET = `v1,whsec_${Buffer.from("test-secret-bytes").toString("base64")}`;
 
-function hookRequest(body: unknown, sign = true): Request {
+/** Each call is a new delivery unless a test passes the same id again. */
+let nextId = 0;
+function hookRequest(body: unknown, sign = true, id = `webhook-id-${++nextId}`): Request {
   const raw = JSON.stringify(body);
-  const id = "webhook-id-1";
   const ts = Math.floor(Date.now() / 1000);
   return new Request("https://example.test/api/auth/hooks/send-otp", {
     method: "POST",
@@ -146,6 +147,21 @@ describe("send-otp hook route", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
     expect(send).toHaveBeenCalledWith("+972501234567", "123456");
+  });
+
+  it("answers Supabase's retry of a delivered text without sending it again", async () => {
+    const { POST } = await import("./route");
+    expect((await POST(hookRequest(PAYLOAD, true, "slow-delivery"))).status).toBe(200);
+    expect((await POST(hookRequest(PAYLOAD, true, "slow-delivery"))).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends on the retry when the first try failed", async () => {
+    const { POST } = await import("./route");
+    send.mockRejectedValueOnce(new OtpProviderError("timeout", false));
+    expect((await POST(hookRequest(PAYLOAD, true, "failed-once"))).status).toBe(500);
+    expect((await POST(hookRequest(PAYLOAD, true, "failed-once"))).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(2);
   });
 
   it("sends nothing while the kill switch is on, even for a signed call", async () => {

@@ -39,7 +39,8 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 
 **Fix:**
 1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
-   and that the OTP expiry matches what the UI's resend timer promises.
+   and that "SMS OTP Expiry" equals `OTP_VALID_SECONDS` in
+   `lib/otp/expiry.ts` (see **The code's lifetime** below).
 2. Supabase Dashboard → Authentication → Hooks → **Send SMS hook**: confirm it
    is enabled, type HTTPS, URL is
    `https://jerusalem-doctors.vercel.app/api/auth/hooks/send-otp`.
@@ -244,6 +245,29 @@ the floor (Dashboard → Authentication):
   (signup shows `otp_send_failed`; login stays silent and only Sentry sees
   it). Keep "token verifications" per IP low.
 - **Providers → Phone:** OTP length 6 or more, expiry 10 minutes or less.
+
+### The code's lifetime ("SMS OTP Expiry")
+
+Production is **60 seconds** (checked 27 Oct 2026), Supabase's default. That
+is short: a text that arrives late, or a doctor who looks a minute later,
+meets a dead code, and Supabase answers "wrong" and "expired" the same way.
+Doctors reported exactly that ("I got two codes and both were wrong").
+
+- **The verify page follows the setting.** `OTP_VALID_SECONDS` in
+  `lib/otp/expiry.ts` drives the "valid for…" line and when a new code is
+  offered. Change it together with the setting.
+- **A new code cancels the previous one.** The page says so after a resend
+  («استخدم آخر رمز وصلك فقط»).
+- **The dashboard locks the field while the Send SMS hook is on** ("SMS
+  provider settings are disabled while the SMS hook is enabled"). To raise it
+  to 600 (10 minutes, recommended): use the Management API's auth config,
+  `PATCH https://api.supabase.com/v1/projects/<ref>/config/auth` with a
+  personal access token, setting the SMS OTP expiry field (check the API
+  reference for its exact name before sending), then set
+  `OTP_VALID_SECONDS = 600` and deploy.
+- One text per code: Supabase retries a slow hook with the same
+  `webhook-id`, and `lib/otp/sentOnce.ts` answers the retry without sending
+  the text again.
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
 

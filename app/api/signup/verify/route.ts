@@ -15,6 +15,7 @@ import { writeAudit } from "@/lib/audit";
 import { directoryChanged } from "@/lib/cachedReads";
 import { raiseAlert } from "@/lib/alerts";
 
+/** Guesses per code. A new code (/api/signup/resend) starts the count again. */
 const MAX_ATTEMPTS = 5;
 
 const Body = z.object({
@@ -123,8 +124,11 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
 
+  // This code has had its guesses. The signup stays: the way on is a new code,
+  // not the whole form again (a late text, not a guesser, is the usual cause).
+  // Each new code is itself rate limited (signupResend), so guessing gains
+  // nothing.
   if (pending.data.attempts >= MAX_ATTEMPTS) {
-    await service.from("pending_signups").delete().eq("id", pending.data.id);
     return jsonError(429, {
       error: "too_many_attempts",
       code: "too_many_attempts",

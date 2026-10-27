@@ -162,12 +162,13 @@ describe("POST /api/signup/verify", () => {
     expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 
-  it("burns the session after too many attempts", async () => {
+  it("stops guessing after too many attempts, but keeps the signup for a new code", async () => {
     db.queue("pending_signups", pending({ attempts: 5 }), CLAIMED);
     const res = await call(BODY);
     expect(res.status).toBe(429);
     expect(await res.json()).toMatchObject({ code: "too_many_attempts" });
-    expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);
+    expect(db.argsOf("pending_signups", "delete")).toHaveLength(0);
+    expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 
   it("turns away a request that lost the race for the same attempt", async () => {

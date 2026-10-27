@@ -17,6 +17,7 @@ import { isKnownRecipient } from "@/lib/otp/recipients";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { raiseAlert } from "@/lib/alerts";
+import { alreadySent, markSent } from "@/lib/otp/sentOnce";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 import { recordEvent } from "@/lib/usage";
 
@@ -94,6 +95,14 @@ export async function POST(req: Request) {
     return hookResponse(400);
   }
 
+  // A retry of a delivery whose text already went out: answer, don't send it
+  // again (lib/otp/sentOnce.ts). Before the checks below, so it costs nothing.
+  const webhookId = req.headers.get("webhook-id");
+  if (webhookId && (await alreadySent(webhookId))) {
+    console.warn("[send-otp] retry of a delivered text, not sent again");
+    return hookResponse(200);
+  }
+
   // Only a registered doctor or a number mid-signup (lib/otp/recipients.ts).
   // 400: Supabase must not retry a number that will never qualify.
   const e164 = toE164(phone);
@@ -130,6 +139,8 @@ export async function POST(req: Request) {
   try {
     const sender = getOtpSender();
     await sender.send(e164, code);
+    // Before answering: Supabase's retry comes seconds later and must see it.
+    if (webhookId) await markSent(webhookId);
     // Counted after answering: Supabase waits on this hook.
     after(() => recordEvent(createSupabaseServiceClient(), "sms_sent"));
     return hookResponse(200);

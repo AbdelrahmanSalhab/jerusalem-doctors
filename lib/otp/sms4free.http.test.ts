@@ -43,7 +43,7 @@ describe("Sms4FreeOtpSender over HTTP", () => {
       pass: "P",
       sender: "JDoctors",
       recipient: "0501234567",
-      msg: "رمز دخول دليل أطباء القدس: 012345. لا تشاركه.",
+      msg: "012345 هو رمز دخول دليل أطباء القدس. لا تشاركه.",
     });
   });
 
