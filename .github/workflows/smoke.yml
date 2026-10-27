@@ -47,6 +47,9 @@ jobs:
         run: npx playwright test -c playwright.smoke.config.ts
         env:
           CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # Lighthouse on the signed-in dashboard (e2e/smoke/lighthouse.spec.ts),
+          # warn-only, scores to the job summary; not on the six-hourly runs.
+          SMOKE_LIGHTHOUSE: ${{ github.event_name != 'schedule' && '1' || '' }}
       - name: Lighthouse (public pages)
         if: github.event_name != 'schedule'
         run: npx -y @lhci/cli@0.15.1 autorun

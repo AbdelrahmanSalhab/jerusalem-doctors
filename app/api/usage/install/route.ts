@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
+import { ciRunOf } from "@/lib/ciRun";
 import { INSTALL_GUIDES } from "@/lib/install/context";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -27,7 +28,8 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (!parsed.success) return jsonError(400, { error: "invalid_body", code: "invalid_body" });
 
   const rl = await rateLimit("installEvent", `doctor:${me.id}`);
-  if (rl.success) {
+  // A smoke run (lib/ciRun.ts) is not a doctor deciding about the app.
+  if (rl.success && !ciRunOf(req)) {
     const { kind, guide, source } = parsed.data;
     await recordEvent(createSupabaseServiceClient(), kind, {
       doctorId: me.id,
