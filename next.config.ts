@@ -29,6 +29,13 @@ const nextConfig: NextConfig = {
   // Drop the `x-powered-by: Next.js` response header, minor fingerprint
   // reduction; closes pentest finding L1.
   poweredByHeader: false,
+  // Sentry's own size flags (what withSentryConfig's bundleSizeOptimizations
+  // sets under Turbopack): drop its tracing code and debug logging, both
+  // unused since every config has tracesSampleRate 0. Booleans, not strings:
+  // a string 'false' would be truthy.
+  compiler: {
+    define: { __SENTRY_TRACING__: false, __SENTRY_DEBUG__: false },
+  },
   images: {
     remotePatterns: [
       // Supabase Storage public URLs
