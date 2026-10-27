@@ -4,6 +4,7 @@
 
 import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
+import { STUB_URL } from "../env";
 import { flushRateLimits } from "../global-setup";
 import { createDoctor, serviceClient } from "../seed";
 
@@ -28,7 +29,8 @@ interface Signup {
   hebrew: [string, string];
 }
 
-async function signUp(page: Page, s: Signup) {
+/** Fills the three steps and lands on the code page. */
+async function toVerify(page: Page, s: Signup) {
   await page.goto("/signup");
   await page.getByLabel("رقم الهاتف").fill(s.phone.replace("+972", "0"));
   await page.getByLabel(/^رقم الترخيص/).fill(s.license);
@@ -49,6 +51,10 @@ async function signUp(page: Page, s: Signup) {
   await page.getByRole("button", { name: "تسجيل وإرسال رمز التحقق برسالة نصية" }).click();
 
   await expect(page).toHaveURL(/\/verify\?mode=signup/, { timeout: 15_000 });
+}
+
+async function signUp(page: Page, s: Signup) {
+  await toVerify(page, s);
   await page.getByLabel("رمز التحقق").fill("123456");
   await page.getByRole("button", { name: "تأكيد" }).click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
@@ -134,4 +140,58 @@ test("a resident can't also be retired: each greys the other out and says why @p
   await retired.check();
   await expect(resident).toBeDisabled();
   await expect(page.getByText("لا يجتمع مع «متقاعد». ألغِ «متقاعد» أولًا إن كنت مقيمًا.")).toBeVisible();
+});
+
+/** The code in the newest text the stub "sent" to a number (lib/otp/message.ts
+ *  puts it first). */
+async function newestCode(phone: string): Promise<string | undefined> {
+  const texts = (await (await fetch(`${STUB_URL}/sms4free/messages?to=${phone.replace("+972", "0")}`)).json()) as { msg: string }[];
+  return texts.at(-1)?.msg.match(/^(\d{6}) /)?.[1];
+}
+
+// Doctors reported "two codes, both wrong": a code lives a minute, and a new
+// one cancels the last, so the older text, often the first to arrive, fails.
+// An ordinary number, so real codes go through the hook to the stub.
+test("a new code cancels the old one, and the page says to use the newest @phone", async ({ page }) => {
+  const phone = "+972521110077";
+  try {
+    await toVerify(page, { phone, license: "599991", arabic: ["أحدث", "رمز"], hebrew: ["חדש", "קוד"] });
+    await expect.poll(() => newestCode(phone)).toMatch(/^\d{6}$/);
+    const first = (await newestCode(phone))!;
+    await expect(page.getByText("الرمز صالح لمدة دقيقة واحدة فقط من إرساله.")).toBeVisible();
+
+    // The minute runs out (a faked clock, on a reload that keeps the signup).
+    await page.clock.install();
+    await page.reload();
+    await page.clock.runFor("01:01");
+    await expect(page.getByText("إن لم يصلك الرمز أو لم يعمل، اطلب رمزًا جديدًا.")).toBeVisible();
+    // Supabase sends at most one text per number every 5 s (config.toml).
+    await page.waitForTimeout(5_000);
+    await page.getByRole("button", { name: "إعادة إرسال الرمز" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "أرسلنا رمزًا جديدًا" })).toHaveText(
+      "أرسلنا رمزًا جديدًا. استخدم آخر رمز وصلك فقط؛ الرمز السابق لم يعد يعمل.",
+    );
+    await expect.poll(() => newestCode(phone)).not.toBe(first);
+    const second = (await newestCode(phone))!;
+
+    // The older text, typed: refused, and the page says what to do.
+    await page.getByLabel("رمز التحقق").fill(first);
+    await page.getByRole("button", { name: "تأكيد" }).click();
+    // By text: Next's route announcer is a role="alert" too.
+    await expect(page.getByRole("alert").filter({ hasText: "انتهت صلاحيته" })).toHaveText(
+      "الرمز غير صحيح أو انتهت صلاحيته. استخدم آخر رمز وصلك، أو اطلب رمزًا جديدًا.",
+    );
+
+    // The newest one works.
+    await page.getByLabel("رمز التحقق").fill(second);
+    await page.getByRole("button", { name: "تأكيد" }).click();
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
+  } finally {
+    const db = serviceClient();
+    const { data } = await db.from("doctors").select("id, auth_user_id").eq("phone_e164", phone);
+    for (const d of data ?? []) {
+      await db.from("doctors").delete().eq("id", d.id);
+      if (d.auth_user_id) await db.auth.admin.deleteUser(d.auth_user_id);
+    }
+  }
 });

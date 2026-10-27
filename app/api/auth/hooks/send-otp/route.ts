@@ -17,6 +17,7 @@ import { isKnownRecipient } from "@/lib/otp/recipients";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { raiseAlert } from "@/lib/alerts";
+import { alreadySent, markSent, sentKey } from "@/lib/otp/sentOnce";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 import { recordEvent } from "@/lib/usage";
 
@@ -38,8 +39,8 @@ interface SendSmsHookPayload {
  * a generic error on /login and /signup and never gets a code, even though the
  * SMS itself went out fine. The body content is irrelevant; the header is not.
  */
-function hookResponse(status: number): Response {
-  return Response.json({}, { status });
+function hookResponse(status: number, headers?: HeadersInit): Response {
+  return Response.json({}, { status, headers });
 }
 
 /** Supabase stores phones without a leading +; the Meta sender wants E.164. */
@@ -94,9 +95,19 @@ export async function POST(req: Request) {
     return hookResponse(400);
   }
 
+  const e164 = toE164(phone);
+
+  // This code already went to this phone (a retry after a slow send): answer,
+  // don't send it again (lib/otp/sentOnce.ts). Before the checks below, so a
+  // duplicate costs nothing.
+  const once = sentKey(e164, code, secret);
+  if (await alreadySent(once)) {
+    console.warn("[send-otp] this code already went to this phone, not sent again");
+    return hookResponse(200);
+  }
+
   // Only a registered doctor or a number mid-signup (lib/otp/recipients.ts).
   // 400: Supabase must not retry a number that will never qualify.
-  const e164 = toE164(phone);
   let known: boolean;
   try {
     known = await isKnownRecipient(createSupabaseServiceClient(), e164);
@@ -130,6 +141,8 @@ export async function POST(req: Request) {
   try {
     const sender = getOtpSender();
     await sender.send(e164, code);
+    // Before answering: Supabase's retry comes seconds later and must see it.
+    await markSent(once);
     // Counted after answering: Supabase waits on this hook.
     after(() => recordEvent(createSupabaseServiceClient(), "sms_sent"));
     return hookResponse(200);
@@ -141,8 +154,11 @@ export async function POST(req: Request) {
     console.error("[send-otp] delivery failed:", (err as Error)?.message);
     Sentry.captureException(err);
     const permanent = err instanceof OtpProviderError && err.permanent;
-    // 400 tells Supabase not to bother retrying a config error three times;
-    // 500 lets its 3x/2s backoff do useful work on a transient failure.
-    return hookResponse(permanent ? 400 : 500);
+    // Supabase retries a hook only on 429 or 503 with a non-empty
+    // retry-after, up to three times two seconds apart, all within its 5 s
+    // budget (supabase.com/docs/guides/auth/auth-hooks). A 500 is never
+    // retried, so a transient failure answers 503: the retry then gets the
+    // doctor a code. A permanent one (config, balance) answers 400.
+    return permanent ? hookResponse(400) : hookResponse(503, { "retry-after": "2" });
   }
 }

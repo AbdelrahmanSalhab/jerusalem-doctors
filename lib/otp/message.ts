@@ -13,7 +13,10 @@ export const MAX_SEGMENT_CHARS = 70;
 /**
  * Build the Arabic OTP body. The code is interpolated as-is, it arrives from
  * Supabase as a string and may carry a meaningful leading zero.
+ *
+ * The code comes first: phones offer "use this code" more reliably when it
+ * leads, and a doctor glancing at the notification sees it at once.
  */
 export function buildOtpMessage(code: string): string {
-  return `رمز دخول دليل أطباء القدس: ${code}. لا تشاركه.`;
+  return `${code} هو رمز دخول دليل أطباء القدس. لا تشاركه.`;
 }

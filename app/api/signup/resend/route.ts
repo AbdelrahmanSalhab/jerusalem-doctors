@@ -72,5 +72,8 @@ export async function POST(req: Request) {
     return jsonError(502, { error: "otp_send_failed", code: "otp_send_failed" });
   }
 
+  // A new code gets its own guesses (MAX_ATTEMPTS in /api/signup/verify).
+  const reset = await service.from("pending_signups").update({ attempts: 0 }).eq("id", pending.data.id);
+  if (reset.error) throw reset.error;
   return jsonOk({ ok: true });
 }

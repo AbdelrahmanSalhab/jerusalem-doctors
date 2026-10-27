@@ -37,6 +37,8 @@ describe("POST /api/signup/resend", () => {
     const res = await call({ signup_session_id: SESSION });
     expect(await res.json()).toEqual({ ok: true });
     expect(auth.signInWithOtp).toHaveBeenCalledWith({ phone: "+972501234567" });
+    // The new code gets its own guesses.
+    expect(db.argsOf("pending_signups", "update")).toEqual([[{ attempts: 0 }]]);
   });
 
   it("rejects a non-uuid session", async () => {
