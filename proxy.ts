@@ -36,8 +36,19 @@ const PUBLIC_EXACT = new Set([
 
 const PUBLIC_TREES = ["/login/", "/api/", "/_next/"];
 
+/** Paths that look like files (/llms.txt, /sitemap.xml, /x.json) and
+ *  /.well-known/: answered with the file or "not found", never the login
+ *  page, which crawlers and agents would otherwise read as the file (#172).
+ *  No page has a dot in its path, and every file here is public. */
+const FILE_LIKE = /\.[a-z0-9]+$/i;
+
 export function isPublic(pathname: string): boolean {
-  return PUBLIC_EXACT.has(pathname) || PUBLIC_TREES.some((p) => pathname.startsWith(p));
+  return (
+    PUBLIC_EXACT.has(pathname) ||
+    PUBLIC_TREES.some((p) => pathname.startsWith(p)) ||
+    FILE_LIKE.test(pathname) ||
+    pathname.startsWith("/.well-known/")
+  );
 }
 
 export async function proxy(req: NextRequest) {

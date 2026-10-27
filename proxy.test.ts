@@ -22,6 +22,13 @@ describe("isPublic", () => {
     // DEV_LOGIN (see lib/auth/devLogin.ts).
     "/login/dev",
     "/api/login/password",
+    // Files, existing or not: their content or "not found", never the login
+    // page, which crawlers and agents read as the file (#172).
+    "/llms.txt",
+    "/sitemap.xml",
+    "/robots.txt",
+    "/.well-known/ai-catalog.json",
+    "/nonexistent.php",
   ])("%s is public", (p) => expect(isPublic(p)).toBe(true));
 
   it.each([
@@ -36,6 +43,9 @@ describe("isPublic", () => {
     "/privacy2",
     "/healthz",
     "/favicon-admin",
+    // A dot only counts as the file's extension, at the end.
+    "/admin.v2/doctors",
+    "/.well-knownx",
   ])(
     "%s needs a session",
     (p) => expect(isPublic(p)).toBe(false),
