@@ -2,16 +2,20 @@ import { describe, expect, it } from "vitest";
 import {
   chooseGroupGeneral,
   groupSpecialties,
+  groupForPicker,
   isGroupActive,
+  isGroupOpen,
   MAX_SUBSPECIALTIES,
   toggleChild,
   toggleGroup,
+  toggleStandalone,
 } from "./specialtyTree";
 
-const s = (id: string, parent_id: string | null = null) => ({
+const s = (id: string, parent_id: string | null = null, code: string | null = null) => ({
   id,
   name_ar: id,
   parent_id,
+  code,
 });
 
 // Input order is sort_order, as every loader queries it.
@@ -19,7 +23,7 @@ const LIST = [
   s("general"),
   s("internal"),
   s("peds"),
-  s("cardio", "internal"),
+  s("cardio", "internal", "cardiology"),
   s("nephro", "internal"),
   s("rheum", "internal"),
 ];
@@ -76,5 +80,60 @@ describe("selecting inside a group", () => {
       "peds",
       "internal",
     ]);
+  });
+});
+
+describe("standalone subspecialties (القلب, أمراض الدم, طب الشيخوخة)", () => {
+  const picker = groupForPicker(LIST);
+  const cardio = picker.find((g) => g.parent.id === "cardio")!;
+
+  it("lists them at the top level too, in sort order, and under their parent", () => {
+    expect(picker.map((g) => g.parent.id)).toEqual(["general", "internal", "peds", "cardio"]);
+    expect(cardio.children).toEqual([]);
+    expect(picker.find((g) => g.parent.id === "internal")!.children.map((c) => c.id)).toEqual([
+      "cardio",
+      "nephro",
+      "rheum",
+    ]);
+  });
+
+  it("leaves the search filter's grouping alone: nested once", () => {
+    expect(groups.map((g) => g.parent.id)).toEqual(["general", "internal", "peds"]);
+  });
+
+  it("promotes one whose parent is missing once, not twice", () => {
+    const g = groupForPicker([s("cardio", "internal", "cardiology"), s("peds")]);
+    expect(g.map((x) => x.parent.id)).toEqual(["cardio", "peds"]);
+  });
+
+  it("a cardiologist alone is not an internist", () => {
+    expect(isGroupActive(["cardio"], internal)).toBe(false);
+    expect(isGroupActive(["nephro"], internal)).toBe(true);
+    expect(isGroupActive(["internal"], internal)).toBe(true);
+  });
+
+  it("ticks and unticks at the top level like a plain checkbox", () => {
+    expect(toggleStandalone(["peds"], internal, "cardio", false)).toEqual(["peds", "cardio"]);
+    expect(toggleStandalone(["peds", "cardio"], internal, "cardio", false)).toEqual(["peds"]);
+  });
+
+  it("opening الباطنية over a picked one keeps it, as the answer", () => {
+    expect(toggleGroup(["cardio"], internal, false)).toEqual(["cardio"]);
+    expect(isGroupOpen(["cardio"], internal, true)).toBe(true);
+    expect(isGroupOpen(["cardio"], internal, false)).toBe(false);
+  });
+
+  it("while الباطنية is open, the top-level box is the same as the one inside", () => {
+    expect(toggleStandalone(["internal"], internal, "cardio", true)).toEqual(["cardio"]);
+    expect(toggleStandalone(["cardio"], internal, "cardio", true)).toEqual(["internal"]);
+    expect(toggleStandalone(["cardio", "nephro"], internal, "rheum", true)).toEqual(["cardio", "nephro"]);
+  });
+
+  it("closing الباطنية drops what was picked in it", () => {
+    expect(toggleGroup(["cardio", "nephro"], internal, true)).toEqual([]);
+  });
+
+  it("never stores the general option twice", () => {
+    expect(toggleChild(["internal", "cardio"], internal, "cardio")).toEqual(["internal"]);
   });
 });
