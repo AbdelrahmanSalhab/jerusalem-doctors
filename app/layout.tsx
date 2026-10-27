@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { InstallProvider } from "@/components/install/InstallProvider";
 import { getCurrentDoctor } from "@/lib/auth/session";
 import { INSTALL_CAPTURE_SCRIPT, INSTALL_OFFER_ATTR } from "@/lib/install/context";
+import { SITE_URL } from "@/lib/site";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -47,9 +48,20 @@ const plex = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "دليل أطباء القدس",
   description: "دليل مهني مغلق للأطباء المسجلين في القدس",
+  // Not indexed unless a page says so (lib/site.ts: /, /signup, /privacy).
   robots: { index: false, follow: false },
+  // A shared link (WhatsApp, Telegram) shows the name, the line and the logo.
+  openGraph: {
+    type: "website",
+    locale: "ar",
+    siteName: "دليل أطباء القدس",
+    title: "دليل أطباء القدس",
+    description: "دليل مهني مغلق للأطباء المسجلين في القدس",
+    images: [{ url: "/icon-512.png", width: 512, height: 512 }],
+  },
   // iPhone "Add to Home Screen": the icon's name, and a full-screen launch.
   // "default" keeps the status bar above the page; "black-translucent" would
   // draw the clock over the header.
