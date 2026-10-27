@@ -1,0 +1,14 @@
+// How long a code works once Supabase issues it: "SMS OTP Expiry" under
+// Authentication → Sign In / Providers → Phone. Production is 60 seconds, and
+// the dashboard locks that field while the Send SMS hook is on (docs/runbook.md
+// says how to change it anyway). The verify page tells the doctor this and
+// offers a new code when it runs out, so change both together.
+export const OTP_VALID_SECONDS = 60;
+
+/** "دقيقة واحدة", "دقيقتين", "10 دقائق": for the verify page's sentences. */
+export function validityText(seconds: number = OTP_VALID_SECONDS): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes === 1) return "دقيقة واحدة";
+  if (minutes === 2) return "دقيقتين";
+  return minutes <= 10 ? `${minutes} دقائق` : `${minutes} دقيقة`;
+}

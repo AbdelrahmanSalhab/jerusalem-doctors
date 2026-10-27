@@ -6,6 +6,10 @@ describe("buildOtpMessage", () => {
     expect(buildOtpMessage("123456")).toContain("123456");
   });
 
+  it("starts with the code, so phones offer it", () => {
+    expect(buildOtpMessage("482913").startsWith("482913 ")).toBe(true);
+  });
+
   it("preserves a leading zero in the code", () => {
     expect(buildOtpMessage("012345")).toContain("012345");
   });
