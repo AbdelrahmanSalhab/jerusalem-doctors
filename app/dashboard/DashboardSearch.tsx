@@ -4,6 +4,7 @@ import { countOf, DOCTORS } from "@/lib/arabicCount";
 import { useEffect, useRef, useState } from "react";
 import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
+import { PrivacyShieldIcon } from "@/components/PrivacyShieldIcon";
 import { type FilterInstitution, SearchFilterChips } from "@/components/SearchFilterChips";
 import { activeFilterCount, NO_FILTERS, setFilterParams, type SearchFilters } from "@/lib/searchFilters";
 import { SEARCH_PAGE_SIZE, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
@@ -197,9 +198,13 @@ export function DashboardSearch({
       {/* Many doctors' work number is their personal one (#192). Always
           shown, above whatever lists numbers, so nothing moves when results
           arrive. */}
-      <p className="text-sm text-muted">
-        أرقام الزملاء مخصّصة للتواصل المهني بين الأطباء. نرجو عدم مشاركتها مع المرضى
-        أو مع أي شخص من خارج الطاقم الطبي، احترامًا لخصوصيتهم.
+      <p className="flex items-start gap-2.5 rounded-lg border border-warn-line border-s-4 border-s-warn-solid bg-warn-bg p-3 text-sm leading-relaxed text-warn">
+        <PrivacyShieldIcon className="text-warn-solid" />
+        <span>
+          <strong className="font-semibold">للأطباء فقط:</strong> أرقام الزملاء مخصّصة للتواصل
+          المهني بين الأطباء. نرجو عدم مشاركتها مع المرضى أو مع أي شخص من خارج الطاقم
+          الطبي، احترامًا لخصوصيتهم.
+        </span>
       </p>
 
       <ResultsRegion
