@@ -3,18 +3,24 @@
 // Specialty checkboxes for /signup and /profile. A specialty with children
 // (الباطنية) opens an inline question when ticked: "باطنية عامة" (the parent
 // itself) or up to MAX_SUBSPECIALTIES subspecialties. Only what is picked
-// there is stored, so the card shows الكلى, not الباطنية. Selection rules
-// live in lib/specialtyTree.ts.
+// there is stored, so the card shows الكلى, not الباطنية. القلب, أمراض الدم
+// and طب الشيخوخة are listed there and also at the top level, for doctors
+// who trained in them directly. Selection rules live in
+// lib/specialtyTree.ts.
 
+import { useState } from "react";
 import {
   chooseGroupGeneral,
-  groupSpecialties,
-  isGroupActive,
+  groupForPicker,
+  hasSelection,
+  isGroupOpen,
+  isStandalone,
   MAX_SUBSPECIALTIES,
   type SpecialtyGroup,
   type SpecialtyNode,
   toggleChild,
   toggleGroup,
+  toggleStandalone,
 } from "@/lib/specialtyTree";
 
 export const MAX_SPECIALTIES = 5;
@@ -33,7 +39,23 @@ export function SpecialtyPicker({
   selected: readonly string[];
   onChange: (next: string[]) => void;
 }) {
-  const groups = groupSpecialties(specialties);
+  const groups = groupForPicker(specialties);
+  /** Groups whose question the doctor opened: it stays open while a
+   *  standalone subspecialty inside it is picked (lib/specialtyTree.ts). */
+  const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
+  const isOpen = (g: SpecialtyGroup) =>
+    g.children.length > 0 && isGroupOpen(selected, g, opened.has(g.parent.id));
+  const parentOf = new Map(groups.flatMap((g) => g.children.map((c) => [c.id, g] as const)));
+  const commit = (next: string[], keep?: string, close?: string) => {
+    setOpened((prev) => {
+      const out = new Set(prev);
+      for (const g of groups) if (isOpen(g)) out.add(g.parent.id);
+      if (keep) out.add(keep);
+      if (close) out.delete(close);
+      return out;
+    });
+    onChange(next);
+  };
   /** A change that would break the cap, or that the rules refused, is
    *  offered disabled rather than silently ignored. */
   const blocked = (next: string[]) =>
@@ -48,27 +70,31 @@ export function SpecialtyPicker({
     >
       <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
         {groups.map((g) => {
-          const active = isGroupActive(selected, g);
-          const next = toggleGroup(selected, g);
+          const parentGroup = isStandalone(g.parent) ? parentOf.get(g.parent.id) : undefined;
+          const open = isOpen(g);
+          const checked = g.children.length > 0 ? open : selected.includes(g.parent.id);
+          const next = parentGroup
+            ? toggleStandalone(selected, parentGroup, g.parent.id, opened.has(parentGroup.parent.id))
+            : toggleGroup(selected, g, opened.has(g.parent.id));
+          // Opening a group over a standalone pick leaves the selection as is.
+          const opensOverPick = g.children.length > 0 && hasSelection(selected, g);
+          const disabled = !checked && !opensOverPick && blocked(next);
           return (
-            <div
-              key={g.parent.id}
-              className={g.children.length > 0 && active ? "sm:col-span-2" : undefined}
-            >
+            <div key={g.parent.id} className={open ? "sm:col-span-2" : undefined}>
               <label className="flex items-center gap-2 rounded p-1 hover:bg-foreground/5">
                 <input
                   type="checkbox"
-                  checked={active}
-                  disabled={!active && blocked(next)}
-                  onChange={() => onChange(next)}
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => commit(next, open || g.children.length === 0 ? undefined : g.parent.id, open ? g.parent.id : undefined)}
                 />
                 <span>{g.parent.name_ar}</span>
               </label>
-              {active && g.children.length > 0 && (
+              {open && (
                 <SubspecialtyQuestion
                   group={g}
                   selected={selected}
-                  onChange={onChange}
+                  onChange={commit}
                   blocked={blocked}
                 />
               )}

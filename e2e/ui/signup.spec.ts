@@ -149,6 +149,36 @@ test("a specialist sees their services after their specialty", async ({ page }) 
   expect(services).toBeGreaterThan(specialty);
 });
 
+test("a cardiologist who is not an internist finds القلب, أمراض الدم and طب الشيخوخة at the top @phone", async ({ page }) => {
+  await toLastStep(page);
+  await page.getByRole("radio", { name: /طبيب أخصائي/ }).check();
+  const picker = page.locator("#specialty_ids");
+  const internal = picker.getByRole("checkbox", { name: "الباطنية", exact: true });
+  const cardiology = picker.getByRole("checkbox", { name: "القلب", exact: true });
+  for (const name of ["القلب", "أمراض الدم", "طب الشيخوخة"]) {
+    await expect(picker.getByRole("checkbox", { name, exact: true })).toBeVisible();
+  }
+
+  // Ticked at the top: the doctor is a cardiologist, not an internist.
+  await cardiology.check();
+  await expect(internal).not.toBeChecked();
+  await expect(page.getByText("ما تخصصك الفرعي في الباطنية؟")).toBeHidden();
+
+  // Opening الباطنية keeps القلب as the answer, ticked inside it as well.
+  await internal.check();
+  const inside = page.getByRole("group", { name: /ما تخصصك الفرعي في الباطنية/ });
+  await expect(inside.getByRole("checkbox", { name: "القلب", exact: true })).toBeChecked();
+  await expect(inside.getByRole("checkbox", { name: /الباطنية العامة/ })).not.toBeChecked();
+
+  // Picking another one inside doesn't close the question.
+  await inside.getByRole("checkbox", { name: "أمراض الكلى", exact: true }).check();
+  await expect(inside).toBeVisible();
+
+  // Unticking الباطنية drops what was picked in it, القلب included.
+  await internal.uncheck();
+  await expect(cardiology).not.toBeChecked();
+});
+
 test("a resident can't also be retired: each greys the other out and says why @phone", async ({ page }) => {
   await toLastStep(page);
   const resident = page.getByRole("radio", { name: /طبيب مقيم/ });
