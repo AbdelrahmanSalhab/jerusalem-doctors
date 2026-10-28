@@ -33,6 +33,36 @@ test("search finds by name and never shows hidden, pending or admin rows @phone"
   }
 });
 
+test("the search is in the address bar, so a reload and back from another page keep it (#177) @phone", async ({ page }) => {
+  await page.goto("/dashboard?existing=1");
+  const box = page.getByPlaceholder("ابحث عن طبيب أو تخصص");
+  await box.fill("ليلى");
+  await expect(page).toHaveURL(/q=%D9%84%D9%8A%D9%84%D9%89|q=ليلى/);
+  // What was already in the address stays.
+  expect(page.url()).toContain("existing=1");
+  await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+
+  await page.reload();
+  await expect(box).toHaveValue("ليلى");
+  await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+
+  // Leave for another page and come back with the back button.
+  await page.goto("/profile");
+  await page.goBack();
+  await expect(box).toHaveValue("ليلى");
+  await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+
+  // Clearing the box clears the address.
+  await box.fill("");
+  await expect(page).not.toHaveURL(/q=/);
+});
+
+test("a mangled search link opens the plain dashboard @phone", async ({ page }) => {
+  await page.goto("/dashboard?specialty_id=nope&stage=boss&workplace_type=zoo");
+  await expect(page.getByText(`${LISTED.length} أطباء`)).toBeVisible();
+  await expect(page.getByText("حدث خطأ")).toHaveCount(0);
+});
+
 test("a specialty search includes its subspecialties", async ({ page }) => {
   // سامر is a cardiologist; القلب sits under الباطنية.
   await search(page, "الباطنية");

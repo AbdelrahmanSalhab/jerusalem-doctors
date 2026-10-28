@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { DoctorWorkplace } from "@/lib/db/types";
 import { InstallInvite } from "@/components/install/InstallInvite";
 import { DashboardSearch } from "./DashboardSearch";
+import { searchFromParams } from "@/lib/searchFilters";
 import { ViewerProvider } from "@/components/ViewerContext";
 import { cachedDirectoryOverview, cachedInstitutions, cachedSpecialties } from "@/lib/cachedReads";
 import { rankRecent } from "@/lib/directory";
@@ -18,7 +19,12 @@ export default async function DashboardPage({
 }) {
   // Signup with a phone that already has an account signs its owner in
   // (signup/verify); /verify sends them here with ?existing=1 to say so.
-  const existing = (await searchParams).existing === "1";
+  const sp = await searchParams;
+  const existing = sp.existing === "1";
+  // The search the URL carries (#177), so back from a card lands on the results.
+  const initialSearch = searchFromParams(
+    new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : []))),
+  );
   // Started before the auth check so the two don't run back to back; nothing
   // is rendered unless requireDoctor() passes. What every doctor sees the
   // same (specialties, featured doctors, counts) comes from the cache
@@ -136,6 +142,7 @@ export default async function DashboardPage({
       <ViewerProvider viewer={viewer}>
         <DashboardSearch
           specialties={specialties ?? []}
+          initial={initialSearch}
           featured={featured}
           listed={counts.listed}
           domainCounts={counts.byDomain}

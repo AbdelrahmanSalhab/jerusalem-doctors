@@ -6,7 +6,7 @@ import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
 import { PrivacyShieldIcon } from "@/components/PrivacyShieldIcon";
 import { type FilterInstitution, SearchFilterChips } from "@/components/SearchFilterChips";
-import { activeFilterCount, NO_FILTERS, setFilterParams, type SearchFilters } from "@/lib/searchFilters";
+import { activeFilterCount, searchParamsOf, type DashboardSearchState } from "@/lib/searchFilters";
 import { SEARCH_PAGE_SIZE, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
 
 type Specialty = { id: string; name_ar: string; parent_id: string | null };
@@ -33,8 +33,11 @@ const CARD_COLUMNS = "columns-1 gap-4 md:columns-2";
 const CARD_COLUMN_ITEM =
   "mb-4 break-inside-avoid [-webkit-column-break-inside:avoid]";
 
+const URL_KEYS = ["q", "specialty_id", "institution_id", "workplace_type", "stage", "seeking_work"];
+
 export function DashboardSearch({
   specialties,
+  initial,
   featured,
   listed,
   domainCounts,
@@ -42,6 +45,8 @@ export function DashboardSearch({
   institutions,
 }: {
   specialties: Specialty[];
+  /** The search the URL carried when the page loaded. */
+  initial: DashboardSearchState;
   /** «جديد هذا الأسبوع», already ranked for this viewer. */
   recent: SearchHit[];
   /** Hospitals and funds with listed doctors, for the filter panel. */
@@ -53,11 +58,16 @@ export function DashboardSearch({
    *  dropping the empty ones. */
   domainCounts: Record<string, number>;
 }) {
-  const [q, setQ] = useState("");
-  const [specialtyId, setSpecialtyId] = useState<string>("");
-  const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
+  const [q, setQ] = useState(initial.q);
+  const [specialtyId, setSpecialtyId] = useState(initial.specialtyId);
+  const [filters, setFilters] = useState(initial.filters);
   const filtering = activeFilterCount(filters) > 0;
-  const [state, setState] = useState<SearchState>({ status: "idle" });
+  // A search carried by the URL shows "searching" at once, not the idle page.
+  const [state, setState] = useState<SearchState>(
+    initial.q || initial.specialtyId || activeFilterCount(initial.filters) > 0
+      ? { status: "loading" }
+      : { status: "idle" },
+  );
   const [view, setView] = useState<ViewMode>("cards");
   const [allChips, setAllChips] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -75,6 +85,22 @@ export function DashboardSearch({
     localStorage.setItem(VIEW_STORAGE_KEY, next);
   };
 
+  // Keep the search in the address bar (#177). replaceState, not a push: the
+  // back button should leave the dashboard, not step through keystrokes. Other
+  // parameters (?existing=1) are left alone.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const url = new URL(window.location.href);
+      URL_KEYS.forEach((k) => url.searchParams.delete(k));
+      searchParamsOf({ q, specialtyId, filters }).forEach((v, k) => url.searchParams.set(k, v));
+      const next = url.pathname + url.search + url.hash;
+      if (next !== window.location.pathname + window.location.search + window.location.hash) {
+        window.history.replaceState(null, "", next);
+      }
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [q, specialtyId, filters]);
+
   useEffect(() => {
     const trimmed = q.trim();
     // Nothing typed or chosen renders as idle (see `shown` below), no fetch.
@@ -87,10 +113,7 @@ export function DashboardSearch({
     const timer = setTimeout(async () => {
       setState({ status: "loading" });
       try {
-        const params = new URLSearchParams();
-        if (trimmed) params.set("q", trimmed);
-        if (specialtyId) params.set("specialty_id", specialtyId);
-        setFilterParams(params, filters);
+        const params = searchParamsOf({ q, specialtyId, filters });
         const res = await fetch(`/api/search?${params}`, {
           signal: ctrl.signal,
           headers: { Accept: "application/json" },
