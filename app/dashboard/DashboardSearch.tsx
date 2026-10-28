@@ -33,6 +33,10 @@ const CARD_COLUMNS = "columns-1 gap-4 md:columns-2";
 const CARD_COLUMN_ITEM =
   "mb-4 break-inside-avoid [-webkit-column-break-inside:avoid]";
 
+/** Written to this history entry (not the URL, not storage): it belongs to
+ *  one visit of the page and survives reload and back, never a fresh visit. */
+const SCROLL_KEY = "searchScroll";
+const SCROLL_SAVE_MS = 400;
 const URL_KEYS = ["q", "specialty_id", "institution_id", "workplace_type", "stage", "seeking_work"];
 
 export function DashboardSearch({
@@ -71,6 +75,10 @@ export function DashboardSearch({
   const [view, setView] = useState<ViewMode>("cards");
   const [allChips, setAllChips] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Where the doctor had scrolled to on this entry, until the results it
+  // belongs to are on screen (#177). Read after mount: the server has no history.
+  const scrollBack = useRef<number | null>(null);
+  const openedWith = useRef(searchParamsOf(initial).toString());
 
   // Restore the user's preferred view on first paint.
   useEffect(() => {
@@ -85,6 +93,41 @@ export function DashboardSearch({
     localStorage.setItem(VIEW_STORAGE_KEY, next);
   };
 
+  // The browser cannot restore the scroll itself: the results arrive after the
+  // page has loaded, when there is nothing yet to scroll to. Remember it per
+  // history entry, put it back once the results are in, and never after the
+  // doctor starts a different search.
+  useEffect(() => {
+    const saved: unknown = window.history.state?.[SCROLL_KEY];
+    if (typeof saved === "number" && saved > 0) scrollBack.current = saved;
+    let timer: ReturnType<typeof setTimeout>;
+    const save = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (window.history.state?.[SCROLL_KEY] === window.scrollY) return;
+        window.history.replaceState({ ...window.history.state, [SCROLL_KEY]: window.scrollY }, "");
+      }, SCROLL_SAVE_MS);
+    };
+    window.addEventListener("scroll", save, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", save);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state.status !== "ready" || scrollBack.current === null) return;
+    // Only the search the page opened with: a new one starts at the top.
+    if (searchParamsOf({ q, specialtyId, filters }).toString() !== openedWith.current) {
+      scrollBack.current = null;
+      return;
+    }
+    window.scrollTo(0, scrollBack.current);
+    scrollBack.current = null;
+    // Only a new result: `state` is all that should re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
   // Keep the search in the address bar (#177). replaceState, not a push: the
   // back button should leave the dashboard, not step through keystrokes. Other
   // parameters (?existing=1) are left alone.
@@ -95,7 +138,7 @@ export function DashboardSearch({
       searchParamsOf({ q, specialtyId, filters }).forEach((v, k) => url.searchParams.set(k, v));
       const next = url.pathname + url.search + url.hash;
       if (next !== window.location.pathname + window.location.search + window.location.hash) {
-        window.history.replaceState(null, "", next);
+        window.history.replaceState(window.history.state, "", next);
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(timer);

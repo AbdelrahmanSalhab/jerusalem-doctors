@@ -57,6 +57,27 @@ test("the search is in the address bar, so a reload and back from another page k
   await expect(page).not.toHaveURL(/q=/);
 });
 
+test("back from another page returns to where the results were scrolled to (#177) @phone", async ({ page }) => {
+  await page.goto("/dashboard");
+  await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("ا");
+  // The count line: the results are in (the featured doctors show before that).
+  await expect(page.getByText(/^\d+ نتيجة$/)).toBeVisible();
+  const reachable = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  expect(reachable, "the results are taller than the screen").toBeGreaterThan(300);
+  await page.evaluate(() => scrollTo(0, 300));
+  // Saved a moment after the scrolling stops.
+  await expect.poll(() => page.evaluate(() => history.state?.searchScroll)).toBe(300);
+
+  await page.goto("/profile");
+  await page.goBack();
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(300);
+
+  // A different search starts at the top.
+  await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("ليلى");
+  await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+  expect(await page.evaluate(() => scrollY)).toBeLessThanOrEqual(300);
+});
+
 test("a mangled search link opens the plain dashboard @phone", async ({ page }) => {
   await page.goto("/dashboard?specialty_id=nope&stage=boss&workplace_type=zoo");
   await expect(page.getByText(`${LISTED.length} أطباء`)).toBeVisible();
