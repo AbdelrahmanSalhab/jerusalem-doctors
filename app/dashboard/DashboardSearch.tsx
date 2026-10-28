@@ -6,7 +6,7 @@ import { DoctorCard } from "@/components/DoctorCard";
 import { DoctorRow } from "@/components/DoctorRow";
 import { PrivacyShieldIcon } from "@/components/PrivacyShieldIcon";
 import { type FilterInstitution, SearchFilterChips } from "@/components/SearchFilterChips";
-import { activeFilterCount, NO_FILTERS, setFilterParams, type SearchFilters } from "@/lib/searchFilters";
+import { activeFilterCount, searchParamsOf, type DashboardSearchState } from "@/lib/searchFilters";
 import { SEARCH_PAGE_SIZE, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
 
 type Specialty = { id: string; name_ar: string; parent_id: string | null };
@@ -33,8 +33,15 @@ const CARD_COLUMNS = "columns-1 gap-4 md:columns-2";
 const CARD_COLUMN_ITEM =
   "mb-4 break-inside-avoid [-webkit-column-break-inside:avoid]";
 
+/** Written to this history entry (not the URL, not storage): it belongs to
+ *  one visit of the page and survives reload and back, never a fresh visit. */
+const SCROLL_KEY = "searchScroll";
+const SCROLL_SAVE_MS = 400;
+const URL_KEYS = ["q", "specialty_id", "institution_id", "workplace_type", "stage", "seeking_work"];
+
 export function DashboardSearch({
   specialties,
+  initial,
   featured,
   listed,
   domainCounts,
@@ -42,6 +49,8 @@ export function DashboardSearch({
   institutions,
 }: {
   specialties: Specialty[];
+  /** The search the URL carried when the page loaded. */
+  initial: DashboardSearchState;
   /** «جديد هذا الأسبوع», already ranked for this viewer. */
   recent: SearchHit[];
   /** Hospitals and funds with listed doctors, for the filter panel. */
@@ -53,14 +62,23 @@ export function DashboardSearch({
    *  dropping the empty ones. */
   domainCounts: Record<string, number>;
 }) {
-  const [q, setQ] = useState("");
-  const [specialtyId, setSpecialtyId] = useState<string>("");
-  const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
+  const [q, setQ] = useState(initial.q);
+  const [specialtyId, setSpecialtyId] = useState(initial.specialtyId);
+  const [filters, setFilters] = useState(initial.filters);
   const filtering = activeFilterCount(filters) > 0;
-  const [state, setState] = useState<SearchState>({ status: "idle" });
+  // A search carried by the URL shows "searching" at once, not the idle page.
+  const [state, setState] = useState<SearchState>(
+    initial.q || initial.specialtyId || activeFilterCount(initial.filters) > 0
+      ? { status: "loading" }
+      : { status: "idle" },
+  );
   const [view, setView] = useState<ViewMode>("cards");
   const [allChips, setAllChips] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Where the doctor had scrolled to on this entry, until the results it
+  // belongs to are on screen (#177). Read after mount: the server has no history.
+  const scrollBack = useRef<number | null>(null);
+  const openedWith = useRef(searchParamsOf(initial).toString());
 
   // Restore the user's preferred view on first paint.
   useEffect(() => {
@@ -75,6 +93,57 @@ export function DashboardSearch({
     localStorage.setItem(VIEW_STORAGE_KEY, next);
   };
 
+  // The browser cannot restore the scroll itself: the results arrive after the
+  // page has loaded, when there is nothing yet to scroll to. Remember it per
+  // history entry, put it back once the results are in, and never after the
+  // doctor starts a different search.
+  useEffect(() => {
+    const saved: unknown = window.history.state?.[SCROLL_KEY];
+    if (typeof saved === "number" && saved > 0) scrollBack.current = saved;
+    let timer: ReturnType<typeof setTimeout>;
+    const save = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (window.history.state?.[SCROLL_KEY] === window.scrollY) return;
+        window.history.replaceState({ ...window.history.state, [SCROLL_KEY]: window.scrollY }, "");
+      }, SCROLL_SAVE_MS);
+    };
+    window.addEventListener("scroll", save, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", save);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (state.status !== "ready" || scrollBack.current === null) return;
+    // Only the search the page opened with: a new one starts at the top.
+    if (searchParamsOf({ q, specialtyId, filters }).toString() !== openedWith.current) {
+      scrollBack.current = null;
+      return;
+    }
+    window.scrollTo(0, scrollBack.current);
+    scrollBack.current = null;
+    // Only a new result: `state` is all that should re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  // Keep the search in the address bar (#177). replaceState, not a push: the
+  // back button should leave the dashboard, not step through keystrokes. Other
+  // parameters (?existing=1) are left alone.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const url = new URL(window.location.href);
+      URL_KEYS.forEach((k) => url.searchParams.delete(k));
+      searchParamsOf({ q, specialtyId, filters }).forEach((v, k) => url.searchParams.set(k, v));
+      const next = url.pathname + url.search + url.hash;
+      if (next !== window.location.pathname + window.location.search + window.location.hash) {
+        window.history.replaceState(window.history.state, "", next);
+      }
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [q, specialtyId, filters]);
+
   useEffect(() => {
     const trimmed = q.trim();
     // Nothing typed or chosen renders as idle (see `shown` below), no fetch.
@@ -87,10 +156,7 @@ export function DashboardSearch({
     const timer = setTimeout(async () => {
       setState({ status: "loading" });
       try {
-        const params = new URLSearchParams();
-        if (trimmed) params.set("q", trimmed);
-        if (specialtyId) params.set("specialty_id", specialtyId);
-        setFilterParams(params, filters);
+        const params = searchParamsOf({ q, specialtyId, filters });
         const res = await fetch(`/api/search?${params}`, {
           signal: ctrl.signal,
           headers: { Accept: "application/json" },
