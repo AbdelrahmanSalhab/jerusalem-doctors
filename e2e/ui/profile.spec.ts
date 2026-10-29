@@ -52,3 +52,14 @@ test("a specialist lists a clinic that belongs to a health fund, and a search fo
   const card = page.getByRole("article").filter({ hasText: "سامر ناصر" });
   await expect(card.getByText("تابعة لـكلاليت")).toBeVisible();
 });
+
+test("the profile reminder can be closed and stays closed after a reload @phone", async ({ page }) => {
+  await page.goto("/dashboard");
+  const reminder = page.getByRole("region", { name: "أكمل ملفك" });
+  await expect(reminder).toBeVisible();
+  await reminder.getByRole("button", { name: "إغلاق" }).click();
+  await expect(reminder).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText(/^\d+ نتيجة$|ابحث عن طبيب/).first()).toBeVisible();
+  await expect(reminder).toHaveCount(0);
+});

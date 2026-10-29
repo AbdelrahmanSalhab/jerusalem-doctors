@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { DoctorWorkplace } from "@/lib/db/types";
+import { ProfileReminder } from "@/components/ProfileReminder";
 import { InstallInvite } from "@/components/install/InstallInvite";
 import { DashboardSearch } from "./DashboardSearch";
 import { searchFromParams } from "@/lib/searchFilters";
@@ -117,27 +118,7 @@ export default async function DashboardPage({
 
       <InstallInvite />
 
-      {gaps.length > 0 && (
-        <section
-          aria-label="أكمل ملفك"
-          className="flex flex-col gap-2 rounded-md border border-info-line bg-info-bg p-4 text-sm text-info sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div>
-            <p className="font-semibold">أكمل ملفك ليسهل على الزملاء الوصول إليك</p>
-            <ul className="mt-1 list-disc ps-5">
-              {gaps.map((g) => (
-                <li key={g}>{g}</li>
-              ))}
-            </ul>
-          </div>
-          <Link
-            href="/profile"
-            className="inline-flex shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-primary-fg hover:opacity-90 pointer-coarse:min-h-11"
-          >
-            إكمال الملف
-          </Link>
-        </section>
-      )}
+      {gaps.length > 0 && <ProfileReminder gaps={gaps} />}
 
       <ViewerProvider viewer={viewer}>
         <DashboardSearch
