@@ -1,4 +1,5 @@
-// The starting institutions list (migration 0016 inserts exactly these).
+// The institutions list: migration 0016 inserted these, and 20261030142000
+// added Sheba and took its spelling off Assaf Harofeh.
 // Spellings come from what doctors actually typed. Admins maintain the list
 // from /admin/institutions afterwards; this file is not read at runtime.
 
@@ -48,6 +49,8 @@ export const INSTITUTIONS_SEED: {
     aliases: ["وولفسون", "ولفسون", "مستشفى وولفسون"] },
   { name_ar: "أساف هروفيه (شمير)", name_he: "שמיר אסף הרופא", kind: "hospital",
     aliases: ["اساف هروفا", "اساف هروفيه", "شمير", "אסף הרופא", "مستشفى أساف هروفيه (شمير)"] },
+  { name_ar: "شيبا تل هشومير", name_he: "שיבא תל השומר", kind: "hospital",
+    aliases: ["تل هشومير شيبا", "شيبا", "تل هشومير", "שיבא", "תל השומר", "مستشفى شيبا"] },
   { name_ar: "كلاليت", name_he: "כללית", kind: "hmo", aliases: [] },
   { name_ar: "مكابي", name_he: "מכבי", kind: "hmo", aliases: [] },
   { name_ar: "مئوحيدت", name_he: "מאוחדת", kind: "hmo",

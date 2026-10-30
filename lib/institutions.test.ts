@@ -192,3 +192,22 @@ describe("withHmoIds", () => {
     expect(db.calls).toHaveLength(0);
   });
 });
+
+describe("Sheba and Assaf Harofeh are different hospitals", () => {
+  it.each([
+    ["تل هشومير شيبا", "شيبا تل هشومير"],
+    ["شيبا تل هشومير", "شيبا تل هشومير"],
+    ["مستشفى شيبا", "شيبا تل هشومير"],
+    ["שיבא", "شيبا تل هشومير"],
+    ["مستشفى اساف هروفا", "أساف هروفيه (شمير)"],
+  ])("%s -> %s", (name, expected) => {
+    expect(m(name, "hospital")).toBe(expected);
+  });
+
+  it("keeps the two hospitals' spellings apart", () => {
+    const assaf = INSTITUTIONS_SEED.find((i) => i.name_ar === "أساف هروفيه (شمير)")!;
+    const sheba = INSTITUTIONS_SEED.find((i) => i.name_ar === "شيبا تل هشومير")!;
+    const shared = assaf.aliases.filter((a) => sheba.aliases.includes(a));
+    expect(shared).toEqual([]);
+  });
+});
