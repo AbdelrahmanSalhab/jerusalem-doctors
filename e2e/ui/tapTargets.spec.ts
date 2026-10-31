@@ -56,6 +56,14 @@ test.describe("signed in @phone", () => {
 test.describe("signed out @phone", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test("/verify", async ({ page }) => {
+    await page.goto("/login");
+    await page.evaluate(() => sessionStorage.setItem("verify:phone", "+972501234567"));
+    await page.goto("/verify?mode=login");
+    await expect(page.getByLabel("رمز التحقق")).toBeVisible();
+    expect(await tooSmall(page), "/verify").toEqual([]);
+  });
+
   for (const path of ["/", "/login", "/signup"]) {
     test(`${path}`, async ({ page }) => {
       await page.goto(path);
