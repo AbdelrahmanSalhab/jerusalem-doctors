@@ -1,7 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/test/fakeSupabase";
-import { failureReason, recordSendFailure } from "./failure";
+import { failureReason, recordSendFailure, recordStopped } from "./failure";
+import * as sentOnce from "./sentOnce";
+import { vi } from "vitest";
+
+vi.mock("@/lib/supabase/service", async () => {
+  const { db } = await import("@/test/fakeSupabase");
+  return { createSupabaseServiceClient: () => db.client };
+});
 import { OtpProviderError } from "./provider";
 
 describe("failureReason", () => {
@@ -45,5 +52,18 @@ describe("recordSendFailure", () => {
     db.queue("pending_signups", { data: null });
     await recordSendFailure(service, "unknown", { phoneE164: "+972501234567" });
     expect(db.argsOf("usage_events", "insert")).toEqual([[{ kind: "sms_failed", doctor_id: null, meta: { reason: "unknown" } }]]);
+  });
+});
+
+describe("recordStopped", () => {
+  beforeEach(() => db.reset());
+
+  it("counts a stopped request once a minute per reason, so a flood is not a flood of writes", async () => {
+    vi.spyOn(sentOnce, "claimOnce").mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await recordStopped("our_rate_limit");
+    await recordStopped("our_rate_limit");
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "sms_failed", doctor_id: null, meta: { reason: "our_rate_limit" } }],
+    ]);
   });
 });

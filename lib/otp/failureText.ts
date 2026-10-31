@@ -13,6 +13,8 @@ const SMS4FREE_STATUS_TEXT: Record<string, string> = {
 
 export function failureText(reason: string): string {
   if (reason === "daily_cap") return "تجاوز الحد اليومي للرسائل (SMS_DAILY_CAP)";
+  if (reason === "our_rate_limit") return "أوقفها حدّنا قبل الإرسال (٥ طلبات في الساعة لكل رقم، أو كثرة الطلبات من عنوان واحد)";
+  if (reason === "turnstile_failed") return "فشل التحقق من المتصفح (Turnstile) قبل الإرسال";
   if (reason === "sms4free_timeout") return "انتهت مهلة SMS4FREE (ربما أُرسلت الرسالة)";
   if (reason === "sms4free_unreadable") return "ردّ SMS4FREE غير مفهوم";
   if (reason === "number_not_deliverable") return "رقم لا تصله الرسائل";
