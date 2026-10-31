@@ -268,6 +268,20 @@ Doctors reported exactly that ("I got two codes and both were wrong").
 - **The verify page follows the setting.** `OTP_VALID_SECONDS` in
   `lib/otp/expiry.ts` drives the "valid for…" line and when a new code is
   offered. Change it together with the setting.
+- **The resend wait is its own number.** `RESEND_AFTER_SECONDS` (60, Supabase's
+  floor between two sends to a number) in the same file, so a longer lifetime
+  does not make a doctor wait that long to ask again. `OTP_LENGTH` (6) must
+  match "SMS OTP Length".
+- **The sixth digit submits** the code, a refused one is cleared, and Android
+  Chrome reads the text itself when it ends with the domain line (below).
+- **Domain-bound text (off by default).** `SMS_DOMAIN_LINE=1` in Vercel makes the
+  text `123456 رمز دليل أطباء القدس` + a last line `@<host> #123456`, which
+  iOS 14+ and Android Chrome use to offer or read the code only on our site
+  (`SMS_ORIGIN_HOST` overrides the host; default is Vercel's production
+  address). Same one segment, but a line that looks like an address can be held
+  back by a carrier, so turn it on, send yourself a code on each carrier's phone
+  and look at `/admin/stats` (delivered, failed) before leaving it on. Off again:
+  unset it, no deploy of code needed beyond Vercel's redeploy.
 - **A new code cancels the previous one.** The page says so after a resend
   («استخدم آخر رمز وصلك فقط»).
 - **The dashboard locks the field while the Send SMS hook is on** ("SMS

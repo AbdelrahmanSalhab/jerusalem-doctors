@@ -17,6 +17,22 @@ export const MAX_SEGMENT_CHARS = 70;
  * The code comes first: phones offer "use this code" more reliably when it
  * leads, and a doctor glancing at the notification sees it at once.
  */
-export function buildOtpMessage(code: string): string {
+export function buildOtpMessage(code: string, originHost?: string): string {
+  // A domain-bound code (iOS 14+ AutoFill, Android Chrome's WebOTP): the last
+  // line is "@host #code", so the browser offers the code only on this site
+  // and a phishing page can't have it filled in. It must be the last line and
+  // the host alone. Shorter wording keeps it in one segment (message.test.ts).
+  if (originHost) return `${code} رمز دليل أطباء القدس\n@${originHost} #${code}`;
   return `${code} هو رمز دخول دليل أطباء القدس. لا تشاركه.`;
+}
+
+/**
+ * The host for the domain-bound line, or undefined while it is off. Opt-in
+ * (SMS_DOMAIN_LINE=1): a text carrying something that looks like an address
+ * can be held back by carriers, so it is switched on once a real phone has
+ * received it. Production's address comes from Vercel.
+ */
+export function originHostFromEnv(env: Record<string, string | undefined> = process.env): string | undefined {
+  if (env.SMS_DOMAIN_LINE !== "1") return undefined;
+  return env.SMS_ORIGIN_HOST ?? env.VERCEL_PROJECT_PRODUCTION_URL;
 }
