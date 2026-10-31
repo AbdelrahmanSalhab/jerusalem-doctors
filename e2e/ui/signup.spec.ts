@@ -214,6 +214,9 @@ async function newestCode(phone: string): Promise<string | undefined> {
 // An ordinary number, so real codes go through the hook to the stub.
 test("a new code cancels the old one, and the page says to use the newest @phone", async ({ page }) => {
   const phone = "+972521110077";
+  // A signup this test left behind (a failed first try) would make the single
+  // pending row below ambiguous on the retry.
+  await serviceClient().from("pending_signups").delete().eq("phone_e164", phone);
   try {
     await toVerify(page, { phone, license: "599991", arabic: ["أحدث", "رمز"], hebrew: ["חדש", "קוד"] });
     await expect.poll(() => newestCode(phone)).toMatch(/^\d{6}$/);
@@ -225,6 +228,14 @@ test("a new code cancels the old one, and the page says to use the newest @phone
     // The minute runs out (a faked clock, on a reload that keeps the signup).
     await page.clock.install();
     await page.reload();
+    // The page's own countdown has to be running before the clock jumps, or
+    // the jump passes before the timer exists and the wait never ends (seen on
+    // a slow CI run). The server render already says 60, so tick a second at a
+    // time until the page itself has counted one down.
+    await expect(async () => {
+      await page.clock.runFor(1000);
+      await expect(page.getByRole("button", { name: /إعادة إرسال الرمز خلال (?!60 )/ })).toBeVisible({ timeout: 500 });
+    }).toPass({ timeout: 15_000 });
     await page.clock.runFor("01:01");
     await expect(page.getByText("إن لم يصلك الرمز أو لم يعمل، اطلب رمزًا جديدًا.")).toBeVisible();
     // Supabase sends at most one text per number every 5 s (config.toml).
@@ -264,6 +275,7 @@ test("a new code cancels the old one, and the page says to use the newest @phone
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
   } finally {
     const db = serviceClient();
+    await db.from("pending_signups").delete().eq("phone_e164", phone);
     const { data } = await db.from("doctors").select("id, auth_user_id").eq("phone_e164", phone);
     for (const d of data ?? []) {
       await db.from("doctors").delete().eq("id", d.id);
