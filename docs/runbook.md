@@ -260,8 +260,9 @@ the floor (Dashboard → Authentication):
 
 ### The code's lifetime ("SMS OTP Expiry")
 
-Production is **60 seconds** (checked 27 Oct 2026), Supabase's default. That
-is short: a text that arrives late, or a doctor who looks a minute later,
+Production was **60 seconds** (checked 27 Oct 2026), Supabase's
+default, and is now **600** (set through the Management API; read it back with
+a `GET` on the same URL to check). 60 was short: a text that arrives late, or a doctor who looks a minute later,
 meets a dead code, and Supabase answers "wrong" and "expired" the same way.
 Doctors reported exactly that ("I got two codes and both were wrong").
 

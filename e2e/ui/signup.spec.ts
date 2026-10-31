@@ -220,7 +220,7 @@ test("a new code cancels the old one, and the page says to use the newest @phone
     const { data: pending } = await serviceClient().from("pending_signups").select("id").eq("phone_e164", phone).single();
     const signupId = pending!.id as string;
     const first = (await newestCode(phone))!;
-    await expect(page.getByText("الرمز صالح لمدة دقيقة واحدة فقط من إرساله.")).toBeVisible();
+    await expect(page.getByText("الرمز صالح لمدة 10 دقائق فقط من إرساله.")).toBeVisible();
 
     // The minute runs out (a faked clock, on a reload that keeps the signup).
     await page.clock.install();
