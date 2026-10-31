@@ -54,15 +54,22 @@ async function toVerify(page: Page, s: Signup) {
   await expect(page).toHaveURL(/\/verify\?mode=signup/, { timeout: 15_000 });
 }
 
-async function signUp(page: Page, s: Signup) {
+async function signUp(page: Page, s: Signup, { wrongFirst = false } = {}) {
   await toVerify(page, s);
+  if (wrongFirst) {
+    // The sixth digit sends it, a wrong code is refused, cleared, and the cursor is back.
+    await page.getByLabel("رمز التحقق").fill("000000");
+    await expect(page.getByRole("alert").filter({ hasText: "انتهت صلاحيته" })).toBeVisible();
+    await expect(page.getByLabel("رمز التحقق")).toHaveValue("");
+    await expect(page.getByLabel("رمز التحقق")).toBeFocused();
+  }
+  // The sixth digit sends it: no button to press.
   await page.getByLabel("رمز التحقق").fill("123456");
-  await page.getByRole("button", { name: "تأكيد" }).click();
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
 }
 
 test("a doctor the registry knows signs up and is listed straight away @phone", async ({ page, browser }) => {
-  await signUp(page, { phone: PHONES.matched, license: "510020", arabic: ["سمير", "خوري"], hebrew: ["סמיר", "חורי"] });
+  await signUp(page, { phone: PHONES.matched, license: "510020", arabic: ["سمير", "خوري"], hebrew: ["סמיר", "חורי"] }, { wrongFirst: true });
   await expect(page.getByRole("heading", { name: "مرحبًا د. سمير" })).toBeVisible();
   await expect(page.getByText("حسابك قيد المراجعة")).toHaveCount(0);
 
@@ -231,11 +238,13 @@ test("a new code cancels the old one, and the page says to use the newest @phone
 
     // The older text, typed: refused, and the page says what to do.
     await page.getByLabel("رمز التحقق").fill(first);
-    await page.getByRole("button", { name: "تأكيد" }).click();
     // By text: Next's route announcer is a role="alert" too.
     await expect(page.getByRole("alert").filter({ hasText: "انتهت صلاحيته" })).toHaveText(
       "الرمز غير صحيح أو انتهت صلاحيته. استخدم آخر رمز وصلك، أو اطلب رمزًا جديدًا.",
     );
+    // The refused code is cleared and the cursor is back in the field.
+    await expect(page.getByLabel("رمز التحقق")).toHaveValue("");
+    await expect(page.getByLabel("رمز التحقق")).toBeFocused();
 
     // SMS4FREE's delivery reports were counted against this signup (the
     // stub reports every text delivered).
@@ -252,7 +261,6 @@ test("a new code cancels the old one, and the page says to use the newest @phone
 
     // The newest one works.
     await page.getByLabel("رمز التحقق").fill(second);
-    await page.getByRole("button", { name: "تأكيد" }).click();
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
   } finally {
     const db = serviceClient();

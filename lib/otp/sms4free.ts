@@ -1,6 +1,6 @@
 import { PhoneNotSmsDeliverableError, toSmsRecipient } from "@/lib/normalize/phone";
 import { deliveryUrl, newMessageId } from "./delivery";
-import { buildOtpMessage } from "./message";
+import { buildOtpMessage, originHostFromEnv } from "./message";
 import {
   type OtpSendResult,
   type OtpSender,
@@ -187,7 +187,7 @@ export class Sms4FreeOtpSender implements OtpSender {
     const payload = buildSendPayload(
       this.credentials,
       recipient,
-      buildOtpMessage(code),
+      buildOtpMessage(code, originHostFromEnv()),
       returnUrl ? { returnUrl, usermsgid: newMessageId() } : undefined,
     );
 

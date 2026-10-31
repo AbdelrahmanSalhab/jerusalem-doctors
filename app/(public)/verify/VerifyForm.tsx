@@ -15,7 +15,7 @@ import {
 import { apiErrorMessage } from "@/lib/client/apiError";
 import { SupportContact } from "@/components/SupportContact";
 import { toAsciiDigits } from "@/lib/normalize/digits";
-import { OTP_VALID_SECONDS, validityText } from "@/lib/otp/expiry";
+import { OTP_LENGTH, RESEND_AFTER_SECONDS, validityText } from "@/lib/otp/expiry";
 import {
   TurnstileWidget,
   type TurnstileHandle,
@@ -53,8 +53,8 @@ export function VerifyForm() {
 
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  // A new code is offered as the current one runs out (lib/otp/expiry.ts).
-  const [resendIn, setResendIn] = useState(OTP_VALID_SECONDS);
+  // A new code is offered a minute after the last send (lib/otp/expiry.ts).
+  const [resendIn, setResendIn] = useState(RESEND_AFTER_SECONDS);
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Said after a resend: the earlier code stopped working, and it is the one
@@ -63,12 +63,47 @@ export function VerifyForm() {
   // Login resends are Turnstile-gated (they spend the shared SMS budget);
   // signup resends are bound to the signup session instead.
   const turnstileRef = useRef<TurnstileHandle>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Bumped on every send: each text gets its own wait for the phone to read it.
+  const [sends, setSends] = useState(1);
+
+  // Android Chrome can read the text itself when it ends "@host #code"
+  // (lib/otp/message.ts). Anywhere else this does nothing and the doctor
+  // types, or iOS offers the code on the keyboard.
+  useEffect(() => {
+    if (!("OTPCredential" in window)) return;
+    const abort = new AbortController();
+    navigator.credentials
+      .get({ otp: { transport: ["sms"] }, signal: abort.signal } as CredentialRequestOptions)
+      .then((c) => {
+        const read = toAsciiDigits((c as { code?: string } | null)?.code ?? "").replace(/\D/g, "");
+        if (read) setCode(read.slice(0, OTP_LENGTH));
+      })
+      .catch(() => {});
+    return () => abort.abort();
+  }, [sends]);
+
+  // The last digit sends it: nothing left to tap in a minute that counts.
+  // Once per code: a refused one is cleared below, so it can't loop.
+  useEffect(() => {
+    if (code.length === OTP_LENGTH && !submitting) formRef.current?.requestSubmit();
+    // submitting is left out on purpose: it flips back to false after a refusal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
     const t = setInterval(() => setResendIn((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(t);
   }, [resendIn]);
+
+  // A refused code is cleared and the cursor put back, so the next one is typed
+  // (or autofilled) into an empty field.
+  const clearCode = () => {
+    setCode("");
+    inputRef.current?.focus();
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +128,7 @@ export function VerifyForm() {
         if (data?.code === "invalid_otp") {
           // Supabase answers the same for a wrong code and an expired one.
           setError("الرمز غير صحيح أو انتهت صلاحيته. استخدم آخر رمز وصلك، أو اطلب رمزًا جديدًا.");
+          clearCode();
         } else if (data?.code === "session_expired") {
           setError("انتهت صلاحية الجلسة. الرجاء البدء من جديد.");
         } else if (data?.code === "account_inactive") {
@@ -100,6 +136,7 @@ export function VerifyForm() {
         } else if (data?.code === "too_many_attempts") {
           // This code has had its guesses; the signup stays, a new code goes on.
           setError("محاولات كثيرة بهذا الرمز. اطلب رمزًا جديدًا.");
+          clearCode();
           setResendIn(0);
         } else if (data?.code === "rate_limited") {
           setError("محاولات كثيرة. انتظر عشر دقائق، ثم اطلب رمزًا جديدًا.");
@@ -163,7 +200,8 @@ export function VerifyForm() {
         }
         return;
       }
-      setResendIn(OTP_VALID_SECONDS);
+      setResendIn(RESEND_AFTER_SECONDS);
+      setSends((n) => n + 1);
       setCode("");
       setNotice("أرسلنا رمزًا جديدًا. استخدم آخر رمز وصلك فقط؛ الرمز السابق لم يعد يعمل.");
     } catch (err) {
@@ -175,14 +213,16 @@ export function VerifyForm() {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form ref={formRef} onSubmit={submit} className="space-y-4">
       <input
+        ref={inputRef}
         type="text"
         dir="ltr"
         inputMode="numeric"
         autoComplete="one-time-code"
         aria-label="رمز التحقق"
-        maxLength={8}
+        maxLength={OTP_LENGTH}
+        pattern={`\\d{${OTP_LENGTH}}`}
         value={code}
         onChange={(e) => setCode(toAsciiDigits(e.target.value).replace(/\D/g, ""))}
         className="w-full rounded-md border border-foreground/20 px-4 py-3 text-center text-2xl tracking-[0.5em]"
@@ -210,7 +250,7 @@ export function VerifyForm() {
 
       <button
         type="submit"
-        disabled={submitting || code.length < 4}
+        disabled={submitting || code.length !== OTP_LENGTH}
         className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
       >
         {submitting ? "جارٍ التحقق..." : "تأكيد"}
