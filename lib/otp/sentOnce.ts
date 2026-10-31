@@ -56,3 +56,23 @@ export async function markSent(key: string): Promise<void> {
     // A retry may then send again; nothing worse.
   }
 }
+
+/**
+ * True the first time a key is claimed within `ttlSeconds`, false after. For
+ * counting something once when its sender may report it again (SMS4FREE's
+ * delivery reports). A Redis failure counts it: a double is better than a gap.
+ */
+export async function claimOnce(key: string, ttlSeconds: number): Promise<boolean> {
+  const r = redis();
+  if (!r) {
+    const now = Date.now();
+    if ((local.get(key) ?? 0) > now) return false;
+    local.set(key, now + ttlSeconds * 1000);
+    return true;
+  }
+  try {
+    return (await r.set(key, 1, { nx: true, ex: ttlSeconds })) === "OK";
+  } catch {
+    return true;
+  }
+}

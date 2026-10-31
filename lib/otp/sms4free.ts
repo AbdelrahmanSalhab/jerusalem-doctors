@@ -146,6 +146,8 @@ export class Sms4FreeOtpSender implements OtpSender {
       throw new OtpProviderError(
         "Sms4FreeOtpSender missing env: SMS4FREE_KEY / SMS4FREE_USER / SMS4FREE_PASS / SMS4FREE_SENDER",
         true,
+        undefined,
+        "provider_config",
       );
     }
     // Catch a Hebrew or Arabic sender name at boot rather than as a -2 on the
@@ -154,6 +156,8 @@ export class Sms4FreeOtpSender implements OtpSender {
       throw new OtpProviderError(
         "SMS4FREE_SENDER must be 1-11 Latin letters or digits",
         true,
+        undefined,
+        "provider_config",
       );
     }
     this.credentials = { key, user, pass, sender };
@@ -173,6 +177,7 @@ export class Sms4FreeOtpSender implements OtpSender {
           `SMS4FREE cannot deliver to this number (${err.reason})`,
           true,
           err,
+          "number_not_deliverable",
         );
       }
       throw err;
@@ -202,6 +207,7 @@ export class Sms4FreeOtpSender implements OtpSender {
         "SMS4FREE send failed: network error or timeout",
         false,
         err,
+        "sms4free_timeout",
       );
     }
 
@@ -211,6 +217,8 @@ export class Sms4FreeOtpSender implements OtpSender {
       throw new OtpProviderError(
         `SMS4FREE send failed: HTTP ${res.status}`,
         res.status >= 400 && res.status < 500,
+        undefined,
+        `sms4free_http_${res.status}`,
       );
     }
 
@@ -222,6 +230,8 @@ export class Sms4FreeOtpSender implements OtpSender {
       throw new OtpProviderError(
         "SMS4FREE send failed: unparseable response body",
         false,
+        undefined,
+        "sms4free_unreadable",
       );
     }
 
@@ -240,6 +250,8 @@ export class Sms4FreeOtpSender implements OtpSender {
       // An undocumented status is not known to be permanent; let Supabase's
       // bounded retry have a chance rather than failing the doctor outright.
       known?.permanent ?? false,
+      undefined,
+      `sms4free_status_${parsed.status}`,
     );
   }
 }

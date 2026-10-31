@@ -61,4 +61,24 @@ describe("POST /api/sms/delivery", () => {
     expect((await post(report({ to: "0501234567", status: "3" }))).status).toBe(200);
     expect(db.argsOf("usage_events", "insert")).toEqual([]);
   });
+
+  it("counts a text once when SMS4FREE reports it again", async () => {
+    const msgId = newMessageId(Date.now() - 5_000);
+    for (let i = 0; i < 3; i++) {
+      db.queue("doctors", { data: { id: "doc-1" } });
+      db.queue("pending_signups", { data: null });
+      expect((await post(report({ to: "0501234567", status: "1", msgId }))).status).toBe(200);
+    }
+    expect(db.argsOf("usage_events", "insert")).toHaveLength(1);
+  });
+
+  it("counts a different status of the same text separately", async () => {
+    const msgId = newMessageId(Date.now() - 5_000);
+    for (const status of ["5", "1"]) {
+      db.queue("doctors", { data: { id: "doc-1" } });
+      db.queue("pending_signups", { data: null });
+      await post(report({ to: "0501234567", status, msgId }));
+    }
+    expect(db.argsOf("usage_events", "insert")).toHaveLength(2);
+  });
 });

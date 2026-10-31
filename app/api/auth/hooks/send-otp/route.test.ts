@@ -28,7 +28,7 @@ vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from(table: string) {
       const chain: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "gt", "limit"]) chain[m] = () => chain;
+      for (const m of ["select", "eq", "gt", "limit", "order"]) chain[m] = () => chain;
       chain.insert = async (row: unknown) => {
         inserts.push([table, row]);
         return { error: null };
@@ -142,6 +142,8 @@ describe("send-otp hook route", () => {
       expect((await POST(hookRequest(PAYLOAD))).status).toBe(400);
       expect(send).not.toHaveBeenCalled();
       expect(inserts).toContainEqual(["audit_logs", { action: "alert", metadata: { alert: "sms_cap_reached", level: "error", limit: 200 } }]);
+      await runAfter();
+      expect(inserts).toContainEqual(["usage_events", { kind: "sms_failed", doctor_id: "x", meta: { reason: "daily_cap" } }]);
     });
   });
 
@@ -202,10 +204,13 @@ describe("send-otp hook route", () => {
   });
 
   it("answers 400 without retry on a permanent provider failure", async () => {
-    send.mockRejectedValue(new OtpProviderError("bad sender", true));
+    send.mockRejectedValue(new OtpProviderError("bad sender", true, undefined, "sms4free_status_-4"));
     const { POST } = await import("./route");
     const res = await POST(hookRequest(PAYLOAD));
 
+    // Counted for the doctor, with the provider's reason and no number.
+    await runAfter();
+    expect(inserts).toContainEqual(["usage_events", { kind: "sms_failed", doctor_id: "x", meta: { reason: "sms4free_status_-4" } }]);
     expect(res.status).toBe(400);
     expect(res.headers.get("content-type")).toContain("application/json");
   });

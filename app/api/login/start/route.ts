@@ -11,6 +11,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
+import { failureReason } from "@/lib/otp/failure";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
@@ -114,7 +115,10 @@ export const POST = withJsonErrors(async (req: Request) => {
       console.error("[login/start] signInWithOtp failed", otpErr);
       Sentry.captureException(otpErr, { tags: { route: "login/start" } });
     }
-    await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", { doctorId });
+    await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
+      doctorId,
+      ...(otpErr && { meta: { reason: failureReason(otpErr) } }),
+    });
   });
 
   return jsonOk({ ok: true, phone_e164: phoneE164 });

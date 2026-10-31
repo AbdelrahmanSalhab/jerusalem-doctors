@@ -17,6 +17,7 @@ import { isKnownRecipient } from "@/lib/otp/recipients";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { raiseAlert } from "@/lib/alerts";
+import { failureReason, recordSendFailure } from "@/lib/otp/failure";
 import { alreadySent, markSent, sentKey } from "@/lib/otp/sentOnce";
 import { verifySendSmsHook } from "@/lib/otp/webhook";
 import { recordEvent } from "@/lib/usage";
@@ -135,6 +136,7 @@ export async function POST(req: Request) {
   if (!budget.success) {
     console.error("[send-otp] daily SMS cap reached; no codes until it resets");
     await raiseAlert(createSupabaseServiceClient(), "sms_cap_reached", { extra: { limit: budget.limit } });
+    after(() => recordSendFailure(createSupabaseServiceClient(), "daily_cap", { phoneE164: e164 }));
     return hookResponse(400);
   }
 
@@ -156,6 +158,7 @@ export async function POST(req: Request) {
     // delivery failure is the worst possible failure mode here.
     console.error("[send-otp] delivery failed:", (err as Error)?.message);
     Sentry.captureException(err);
+    after(() => recordSendFailure(createSupabaseServiceClient(), failureReason(err), { phoneE164: e164 }));
     const permanent = err instanceof OtpProviderError && err.permanent;
     // Supabase retries a hook only on 429 or 503 with a non-empty
     // retry-after, up to three times two seconds apart, all within its 5 s

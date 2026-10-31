@@ -88,7 +88,7 @@ export function LoginForm() {
               "الدخول متاح حاليًا للأرقام الإسرائيلية (+972) فقط.",
           );
         } else if (data?.code === "rate_limited") {
-          setError("عدد كبير من المحاولات. حاول لاحقًا.");
+          setError("طلبت رمزًا مرات كثيرة. حاول بعد ساعة، أو راسلنا عبر واتساب ونساعدك.");
         } else if (data?.code === "turnstile_failed") {
           setError("لم يكتمل التحقق من المتصفح. الرجاء المحاولة مرة أخرى.");
         } else if (data?.code === "phone_auth_disabled") {

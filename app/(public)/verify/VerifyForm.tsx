@@ -6,8 +6,6 @@ import { useEffect, useRef, useState } from "react";
 
 type Mode = "signup" | "login";
 
-const NO_CODE_HINT_DELAY_MS = 30_000;
-
 import {
   SS_PHONE,
   SS_SESSION,
@@ -15,6 +13,7 @@ import {
   getHandoff,
 } from "@/lib/client/verify_handoff";
 import { apiErrorMessage } from "@/lib/client/apiError";
+import { SupportContact } from "@/components/SupportContact";
 import { toAsciiDigits } from "@/lib/normalize/digits";
 import { OTP_VALID_SECONDS, validityText } from "@/lib/otp/expiry";
 import {
@@ -64,16 +63,6 @@ export function VerifyForm() {
   // Login resends are Turnstile-gated (they spend the shared SMS budget);
   // signup resends are bound to the signup session instead.
   const turnstileRef = useRef<TurnstileHandle>(null);
-
-  // Login answers "code sent" even for an unregistered number (no account
-  // enumeration), so a doctor who never signed up waits for nothing. After a
-  // while, say plainly what the two likely causes are.
-  const [waitedLong, setWaitedLong] = useState(false);
-  useEffect(() => {
-    if (mode !== "login") return;
-    const t = setTimeout(() => setWaitedLong(true), NO_CODE_HINT_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [mode]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -244,47 +233,45 @@ export function VerifyForm() {
         <TurnstileWidget ref={turnstileRef} onToken={noop} action="login_resend" />
       )}
 
-      {mode === "login" && !waitedLong && (
-        <p className="text-center text-sm text-foreground/70">
-          لم يصلك الرمز؟ تأكد من رقم الهاتف، أو{" "}
-          <Link href="/signup" className="underline">
-            أنشئ حسابًا جديدًا
-          </Link>{" "}
-          إن لم تكن مسجّلًا.
-        </p>
-      )}
-
-      {mode === "login" && waitedLong && (
-        <div
-          role="status"
-          className="space-y-3 rounded-md border border-warn-line bg-warn-bg p-4 text-sm text-warn"
-        >
-          <p className="font-medium">لم يصلك الرمز بعد؟</p>
-          <p>
-            نرسل الرمز فقط إلى رقم مسجّل لدينا. أُرسل الطلب إلى{" "}
-            <span dir="ltr" className="font-medium">
-              {phone}
-            </span>
-            .
-          </p>
-          <ul className="list-disc space-y-1 ps-5">
-            <li>
-              إن كان الرقم خاطئًا،{" "}
-              <Link href="/login" className="underline">
-                عُد وصحّحه
-              </Link>
-              .
-            </li>
-            <li>إن لم تُنشئ حسابًا بعد، سجّل أولًا ثم ادخل.</li>
-          </ul>
-          <Link
-            href="/signup"
-            className="block w-full rounded-md bg-primary px-6 py-2 text-center text-primary-fg"
-          >
-            إنشاء حساب جديد
-          </Link>
-        </div>
-      )}
+      <NoCodeHelp mode={mode} phone={phone} />
     </form>
+  );
+}
+
+/**
+ * Shown from the start, to everyone: login answers "code sent" for any number
+ * (no account enumeration), so the page can't say whether a text is coming.
+ * It says what usually goes wrong, true for any visitor, and how to reach us.
+ */
+function NoCodeHelp({ mode, phone }: { mode: Mode; phone: string }) {
+  return (
+    <div className="space-y-2 rounded-md border border-info-line bg-info-bg p-4 text-sm text-info">
+      <p className="font-medium">لم يصلك الرمز؟</p>
+      <ul className="list-disc space-y-1 ps-5">
+        <li>
+          قد يتأخر نحو نصف دقيقة. الرقم الذي أدخلته:{" "}
+          <span dir="ltr" className="font-medium">
+            {phone}
+          </span>
+          {" "}
+          <Link href={mode === "login" ? "/login" : "/signup"} className="underline">
+            (رقم خاطئ؟ صحّحه)
+          </Link>
+          .
+        </li>
+        <li>استخدم الرقم نفسه الذي سجّلت به في الدليل.</li>
+        {mode === "login" && (
+          <li>
+            إن لم تسجّل بعد،{" "}
+            <Link href="/signup" className="underline">
+              أنشئ حسابًا
+            </Link>{" "}
+            أولًا.
+          </li>
+        )}
+        <li>إن بقي الأمر كذلك، اطلب رمزًا جديدًا بعد انتهاء العدّ التنازلي.</li>
+      </ul>
+      <SupportContact />
+    </div>
   );
 }

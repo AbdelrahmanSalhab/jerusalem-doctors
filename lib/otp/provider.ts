@@ -23,6 +23,8 @@ export class OtpProviderError extends Error {
     /** True when the failure is a config/permanent error, not worth retrying. */
     public readonly permanent: boolean = false,
     public readonly cause?: unknown,
+    /** A short, number-free label for /admin/stats: why the send failed. */
+    public readonly reason: string = "provider_error",
   ) {
     super(message);
     this.name = "OtpProviderError";

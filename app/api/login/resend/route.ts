@@ -13,6 +13,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
+import { failureReason } from "@/lib/otp/failure";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
@@ -102,7 +103,7 @@ export async function POST(req: Request) {
     }
     await recordEvent(service, otpErr ? "login_send_failed" : "login_code_sent", {
       doctorId,
-      meta: { resend: true },
+      meta: { resend: true, ...(otpErr && { reason: failureReason(otpErr) }) },
     });
   });
 

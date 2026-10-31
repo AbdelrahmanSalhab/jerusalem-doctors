@@ -9,11 +9,12 @@ describe("the code step per signup", () => {
       { kind: "otp_refused", meta: { flow: "signup", signup: "a", attempt: 2 } },
       { kind: "otp_resent", meta: { flow: "signup", signup: "a" } },
       { kind: "sms_undelivered", meta: { signup: "b" } },
+      { kind: "sms_failed", meta: { signup: "b", reason: "daily_cap" } },
       { kind: "search", meta: { signup: "a" } },
       { kind: "otp_refused", meta: null },
     ]);
     expect(counts.get("a")).toEqual({ ...NO_CODES, delivered: 1, refused: 2, resent: 1 });
-    expect(counts.get("b")).toEqual({ ...NO_CODES, undelivered: 1 });
+    expect(counts.get("b")).toEqual({ ...NO_CODES, undelivered: 1, failed: 1 });
   });
 
   it("says it in one line, and nothing when nothing is known", () => {

@@ -9,9 +9,10 @@ export interface CodeCounts {
   delivered: number;
   undelivered: number;
   voice: number;
+  failed: number;
 }
 
-export const NO_CODES: CodeCounts = { refused: 0, locked: 0, resent: 0, delivered: 0, undelivered: 0, voice: 0 };
+export const NO_CODES: CodeCounts = { refused: 0, locked: 0, resent: 0, delivered: 0, undelivered: 0, voice: 0, failed: 0 };
 
 const KIND_TO_FIELD: Record<string, keyof CodeCounts> = {
   otp_refused: "refused",
@@ -20,6 +21,7 @@ const KIND_TO_FIELD: Record<string, keyof CodeCounts> = {
   sms_delivered: "delivered",
   sms_undelivered: "undelivered",
   sms_voice: "voice",
+  sms_failed: "failed",
 };
 
 /** Counts per signup id from usage events carrying meta.signup. */
@@ -40,6 +42,7 @@ export function codeSummary(c: CodeCounts): string {
   return [
     c.delivered && `وصلت الرسالة: ${c.delivered}`,
     c.undelivered && `لم تصل: ${c.undelivered}`,
+    c.failed && `فشل الإرسال: ${c.failed}`,
     c.voice && `مكالمة صوتية (رقم كوشير): ${c.voice}`,
     c.refused && `رمز مرفوض: ${c.refused}`,
     c.resent && `رمز جديد: ${c.resent}`,

@@ -30,6 +30,9 @@ export type UsageKind =
   | "sms_delivered"
   | "sms_undelivered"
   | "sms_voice"
+  /** A code that could not be sent (20261031100000_sms_failed): meta.reason
+   *  says why; the doctor or signup it was for is kept, never the number. */
+  | "sms_failed"
   /** Adding the directory to the home screen, step by step (#150, lib/install). */
   | InstallKind;
 

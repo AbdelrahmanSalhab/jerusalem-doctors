@@ -50,6 +50,9 @@ const OTP = {
   sent: 12, send_ms_p50: 900, send_ms_max: 2400, delivered: 10, undelivered: 1, voice: 1,
   delay_p50: 6, delay_max: 95, late: 2, refused: 4, locked: 1, resent: 3, logins_ok: 5,
   signups_started: 4, stuck_signups: 1,
+  failed: 3,
+  failed_by_reason: [{ reason: "sms4free_status_-4", n: 2 }, { reason: "daily_cap", n: 1 }],
+  recent_failures: [{ at: "2026-10-30T11:00:00Z", reason: "sms4free_status_-4", name: "سامر خوري", signup: null }],
   stuck_logins: [{ id: "d1", name: "ليلى الخطيب", refused: 2, last_at: "2026-10-27T10:00:00Z" }],
 };
 vi.mock("@/lib/auth/session", () => ({ requireAdmin: vi.fn(async () => ({ id: "a1" })) }));
@@ -97,6 +100,8 @@ describe("/admin/stats", () => {
     expect(html).toContain("رموز التحقق (آخر 7 أيام)");
     expect(html).toContain("عادةً خلال 6 ث، أبطؤها 95 ث");
     expect(html).toContain("د. ليلى الخطيب: رُفض رمزه مرتين، ولم يدخل بعدها");
+    expect(html).toContain("نفد رصيد الرسائل: اشحنه: 2");
+    expect(html).toContain("د. سامر خوري");
     expect(html).toContain("1 تسجيل رُفض رمزه ولم يكتمل");
     // Install funnel: doctors per step, by platform and in all.
     expect(html).toContain("الإضافة إلى الشاشة الرئيسية");
