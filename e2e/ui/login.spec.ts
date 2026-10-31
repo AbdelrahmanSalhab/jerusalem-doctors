@@ -40,14 +40,18 @@ test("the admin area does not exist for a doctor", async ({ browser }) => {
   await ctx.close();
 });
 
-test("the code page helps from the first second, and says nothing about whether the number has an account @phone", async ({ page }) => {
+test("the code page names the number as an \"if\", offers help at once, and says nothing about the account @phone", async ({ page }) => {
   await page.goto("/login");
   await page.evaluate(() => sessionStorage.setItem("verify:phone", "+972501234567"));
   await page.goto("/verify?mode=login");
-  const help = page.locator("div").filter({ has: page.getByText("لم يصلك الرمز؟", { exact: true }) }).last();
-  await expect(help).toBeVisible();
-  await expect(help).toContainText("+972501234567");
+  // "If a code reaches you at...": the same words for every number.
+  await expect(page.getByText(/إن وصلك رمز على/)).toContainText("+972501234567");
+  await expect(page.getByRole("link", { name: "تغيير الرقم" })).toBeVisible();
+  await expect(page.getByLabel("رمز التحقق")).toBeFocused();
+  // The help is one line until it is opened (or a text is overdue).
+  const help = page.locator("details").filter({ hasText: "لم يصلك الرمز؟" });
+  await expect(help).not.toHaveAttribute("open", "");
+  await help.getByText("لم يصلك الرمز؟").click();
   await expect(help).toContainText("استخدم الرقم نفسه الذي سجّلت به");
-  // The same words for every number: nothing says "not registered".
   await expect(page.getByText("نرسل الرمز فقط إلى رقم مسجّل لدينا")).toHaveCount(0);
 });

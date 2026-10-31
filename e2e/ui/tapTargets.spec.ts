@@ -53,8 +53,30 @@ test.describe("signed in @phone", () => {
   });
 });
 
+test.describe("admin @phone", () => {
+  test.use({ storageState: stateFile("admin") });
+
+  // The panel's own pages are denser (tables for a desktop); its tab bar is
+  // what every admin page starts with.
+  test("the admin tab bar", async ({ page }) => {
+    await page.goto("/admin/stats");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const heights = await page.locator('nav[aria-label] a').evaluateAll((as) => as.map((a) => a.getBoundingClientRect().height));
+    expect(heights.length).toBeGreaterThan(3);
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(MIN);
+  });
+});
+
 test.describe("signed out @phone", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("/verify", async ({ page }) => {
+    await page.goto("/login");
+    await page.evaluate(() => sessionStorage.setItem("verify:phone", "+972501234567"));
+    await page.goto("/verify?mode=login");
+    await expect(page.getByLabel("رمز التحقق")).toBeVisible();
+    expect(await tooSmall(page), "/verify").toEqual([]);
+  });
 
   for (const path of ["/", "/login", "/signup"]) {
     test(`${path}`, async ({ page }) => {
