@@ -71,8 +71,12 @@ describe("POST /api/signup/resend", () => {
 
   it("reports a failed send as 502", async () => {
     db.queue("pending_signups", { data: { id: SESSION, phone_e164: "+972501234567", expires_at: future() } });
-    auth.signInWithOtp.mockResolvedValue({ error: { message: "down" } });
+    auth.signInWithOtp.mockResolvedValue({ error: { code: "over_sms_send_rate_limit", message: "down" } });
     expect((await call({ signup_session_id: SESSION })).status).toBe(502);
+    // Counted against the signup, with Supabase's reason.
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "sms_failed", doctor_id: null, meta: { reason: "supabase_over_sms_send_rate_limit", signup: SESSION } }],
+    ]);
   });
 
   it("short-circuits under the dev shim", async () => {

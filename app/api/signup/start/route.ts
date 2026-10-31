@@ -27,6 +27,7 @@ import {
   licenseFormatErrorMessage,
 } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
+import { failureReason, recordSendFailure } from "@/lib/otp/failure";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
@@ -463,6 +464,8 @@ async function startPendingSignup(
     // Roll back the pending row so we don't leak an unusable session id.
     await service.from("pending_signups").delete().eq("id", insert.data.id);
     console.error("[signup/start] signInWithOtp failed", otpErr);
+    // The row above is gone, so this one is counted without a signup.
+    await recordSendFailure(service, failureReason(otpErr));
     return jsonError(502, {
       error: "otp_send_failed",
       code: "otp_send_failed",

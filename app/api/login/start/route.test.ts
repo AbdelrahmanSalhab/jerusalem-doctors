@@ -200,4 +200,14 @@ describe("usage events", () => {
     await call({ phone: "0501234567", turnstile_token: "t" });
     expect(kinds()).toEqual(["login_code_sent", "login_send_failed"]);
   });
+
+  it("says why a send failed, keeping no number", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    auth.signInWithOtp.mockResolvedValue({ error: { code: "over_sms_send_rate_limit", message: "for +972501234567" } });
+    db.queue("doctors", { data: { id: "d1", is_active: true, is_phone_verified: true } });
+    await call({ phone: "0501234567", turnstile_token: "t" });
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "login_send_failed", doctor_id: "d1", meta: { reason: "supabase_over_sms_send_rate_limit" } }],
+    ]);
+  });
 });

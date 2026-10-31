@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk } from "@/lib/api/respond";
+import { failureReason, recordSendFailure } from "@/lib/otp/failure";
 import { rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
   });
   if (otpErr) {
     console.error("[signup/resend] signInWithOtp failed", otpErr);
+    await recordSendFailure(service, failureReason(otpErr), { signupId: pending.data.id });
     return jsonError(502, { error: "otp_send_failed", code: "otp_send_failed" });
   }
 

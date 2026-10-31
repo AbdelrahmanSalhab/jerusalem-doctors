@@ -74,7 +74,7 @@ export default async function UnfinishedSignupsPage() {
     ? await service
         .from("usage_events")
         .select("kind, meta")
-        .in("kind", ["otp_refused", "otp_locked", "otp_resent", "sms_delivered", "sms_undelivered", "sms_voice"])
+        .in("kind", ["otp_refused", "otp_locked", "otp_resent", "sms_delivered", "sms_undelivered", "sms_voice", "sms_failed"])
         .filter("meta->>signup", "in", `(${ids.join(",")})`)
     : { data: [], error: null };
   if (events.error) throw events.error;

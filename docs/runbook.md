@@ -37,6 +37,18 @@ signInWithOtp  →  Supabase hook dispatch  →  our hook route  →  SMS4FREE
 | No `[send-otp]` line in Vercel logs at all | Supabase never reached us, wrong hook URL, or the hook is disabled |
 | Hook route returns 401 | Signature mismatch, `SEND_SMS_HOOK_SECRET` in Vercel does not match the secret in Supabase |
 
+**Who failed, and why.** `/admin/stats` → "رموز التحقق" counts every code that
+could not be sent (`sms_failed`, and `login_send_failed` for sign-ins), by
+reason and with the latest cases: the doctor's name, or "تسجيل جديد" for a
+signup (`/admin/signups` shows the count per signup too). Never the number.
+Reasons: `daily_cap`, `sms4free_status_N` (the table below), `sms4free_timeout`,
+`sms4free_http_N`, `supabase_<code>` (Supabase refused before our hook ran:
+`over_sms_send_rate_limit` is its per-hour limit or one text per number per
+60 seconds). A failure can appear twice, once from our hook and once from
+Supabase. A login with a number that has no account is not a failure: it is
+counted separately ("حاولوا الدخول بلا حساب"), and the doctor sees the same
+code screen as anyone.
+
 **Fix:**
 1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
    and that "SMS OTP Expiry" equals `OTP_VALID_SECONDS` in

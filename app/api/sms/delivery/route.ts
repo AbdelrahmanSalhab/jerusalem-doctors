@@ -4,8 +4,13 @@
 
 import { DELIVERY_STATUS, deliveryDelaySeconds, validDeliveryKey } from "@/lib/otp/delivery";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
+import { textOwner } from "@/lib/otp/owner";
+import { claimOnce } from "@/lib/otp/sentOnce";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { recordEvent } from "@/lib/usage";
+
+/** Reports come minutes to hours after the send; a day covers any retry. */
+const REPORT_TTL_SECONDS = 86_400;
 
 const empty = (status: number) => Response.json({}, { status });
 
@@ -24,27 +29,19 @@ export async function POST(req: Request) {
   } catch (e) {
     if (!(e instanceof InvalidPhoneError)) throw e;
   }
-  const delay = deliveryDelaySeconds(String(form.get("msgId") ?? ""));
+  // SMS4FREE may report a text more than once: count each (message, status) once.
+  const msgId = String(form.get("msgId") ?? "");
+  if (msgId && !(await claimOnce(`sms-report:${msgId}:${kind}`, REPORT_TTL_SECONDS))) return empty(200);
+  const delay = deliveryDelaySeconds(msgId);
 
   const service = createSupabaseServiceClient();
   // Whose text: a doctor's (sign-in), else the newest signup on the number.
-  const [doctor, signup] = phone
-    ? await Promise.all([
-        service.from("doctors").select("id").eq("phone_e164", phone).maybeSingle(),
-        service
-          .from("pending_signups")
-          .select("id")
-          .eq("phone_e164", phone)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ])
-    : [null, null];
+  const owner = phone ? await textOwner(service, phone) : {};
   await recordEvent(service, kind, {
-    doctorId: doctor?.data?.id,
+    doctorId: owner.doctorId,
     meta: {
       ...(delay !== null && { delay_s: delay }),
-      ...(!doctor?.data && signup?.data && { signup: signup.data.id }),
+      ...(owner.signupId && { signup: owner.signupId }),
     },
   });
   return empty(200);

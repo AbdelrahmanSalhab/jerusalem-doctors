@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { Section, Tile, TileGrid } from "@/components/AdminParts";
+import { failureText } from "@/lib/otp/failureText";
 import { OTP_VALID_SECONDS, validityText } from "@/lib/otp/expiry";
 
 export interface OtpStats {
@@ -22,6 +23,9 @@ export interface OtpStats {
   resent: number;
   logins_ok: number;
   signups_started: number;
+  failed: number;
+  failed_by_reason: { reason: string; n: number }[];
+  recent_failures: { at: string; reason: string; name: string | null; signup: string | null }[];
   stuck_signups: number;
   stuck_logins: { id: string; name: string; refused: number; last_at: string }[];
 }
@@ -33,6 +37,8 @@ const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n * 100) / of)}%
 
 export function OtpSection({ stats }: { stats: OtpStats | null }) {
   if (!stats) return null;
+  // Before 20261031100000 runs the database does not send these.
+  const failed = stats.failed ?? 0;
   const reports = stats.delivered + stats.undelivered + stats.voice;
   return (
     <Section
@@ -50,10 +56,36 @@ export function OtpSection({ stats }: { stats: OtpStats | null }) {
         />
         <Tile label="لم تصل" value={stats.undelivered} tone={stats.undelivered > 0 ? "warn" : "plain"} />
         <Tile label="مكالمة صوتية (كوشير)" value={stats.voice} />
+        <Tile label="فشل الإرسال" value={failed} tone={failed > 0 ? "warn" : "plain"} sub={failed > 0 ? "الأسباب أدناه" : undefined} />
         <Tile label="رموز مرفوضة" value={stats.refused} tone={stats.refused > 0 ? "warn" : "plain"} />
         <Tile label="طلبات رمز جديد" value={stats.resent} />
         <Tile label="تجاوز المحاولات" value={stats.locked} tone={stats.locked > 0 ? "warn" : "plain"} />
       </TileGrid>
+      {failed > 0 && (
+        <div className="space-y-2 rounded-lg border border-warn-line bg-warn-bg p-3 text-sm text-warn">
+          <p className="font-medium">رموز لم تُرسل</p>
+          <ul className="list-disc space-y-0.5 ps-5">
+            {stats.failed_by_reason.map((r) => (
+              <li key={r.reason}>
+                {failureText(r.reason)}: {r.n}
+              </li>
+            ))}
+          </ul>
+          <p className="font-medium">آخر الحالات</p>
+          <ul className="list-disc space-y-0.5 ps-5">
+            {stats.recent_failures.map((f, i) => (
+              <li key={i}>
+                <span dir="ltr">{new Date(f.at).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" })}</span>
+                {" · "}
+                {f.name ? `د. ${f.name}` : f.signup ? "تسجيل جديد" : "رقم غير معروف"}
+                {" · "}
+                {failureText(f.reason)}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs">قد يظهر عطل واحد مرتين: مرة من مزوّد الرسائل ومرة من Supabase.</p>
+        </div>
+      )}
       {(stats.stuck_signups > 0 || stats.stuck_logins.length > 0) && (
         <div className="space-y-2 rounded-lg border border-warn-line bg-warn-bg p-3 text-sm text-warn">
           <p className="font-medium">عالقون عند رمز التحقق</p>

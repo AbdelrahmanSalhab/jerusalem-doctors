@@ -39,3 +39,15 @@ test("the admin area does not exist for a doctor", async ({ browser }) => {
   expect(res?.status()).toBe(404);
   await ctx.close();
 });
+
+test("the code page helps from the first second, and says nothing about whether the number has an account @phone", async ({ page }) => {
+  await page.goto("/login");
+  await page.evaluate(() => sessionStorage.setItem("verify:phone", "+972501234567"));
+  await page.goto("/verify?mode=login");
+  const help = page.locator("div").filter({ has: page.getByText("لم يصلك الرمز؟", { exact: true }) }).last();
+  await expect(help).toBeVisible();
+  await expect(help).toContainText("+972501234567");
+  await expect(help).toContainText("استخدم الرقم نفسه الذي سجّلت به");
+  // The same words for every number: nothing says "not registered".
+  await expect(page.getByText("نرسل الرمز فقط إلى رقم مسجّل لدينا")).toHaveCount(0);
+});
