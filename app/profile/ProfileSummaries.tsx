@@ -17,9 +17,11 @@ export function FixedInfoSection({ doctor }: { doctor: Doctor }) {
     <Section title="معلومات ثابتة">
       <p className="text-sm text-foreground/65">
         هذه المعلومات لا يمكن تعديلها ذاتيًا. للحاجة إلى تعديل، تواصل مع
-        المطوّر من زر الأسفل.
+        المطوّر من الزر أدناه.
       </p>
-      <Locked label="رقم الهاتف">{doctor.phone_e164}</Locked>
+      <Locked label="رقم الهاتف">
+        <bdi dir="ltr">{doctor.phone_e164}</bdi>
+      </Locked>
       <Locked label="رقم الترخيص">
         {doctor.license_number}{" "}
         <span className="text-muted">
