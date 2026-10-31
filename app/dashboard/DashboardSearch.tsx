@@ -267,9 +267,8 @@ export function DashboardSearch({
       <p className="flex items-start gap-2.5 rounded-lg border border-warn-line border-s-4 border-s-warn-solid bg-warn-bg p-3 text-sm leading-relaxed text-warn">
         <PrivacyShieldIcon className="text-warn-solid" />
         <span>
-          <strong className="font-semibold">للأطباء فقط:</strong> أرقام الزملاء مخصّصة للتواصل
-          المهني بين الأطباء. نرجو عدم مشاركتها مع المرضى أو مع أي شخص من خارج الطاقم
-          الطبي، احترامًا لخصوصيتهم.
+          <strong className="font-semibold">للأطباء فقط:</strong> أرقام الزملاء للتواصل المهني بين
+          الأطباء، ولا تُشارك مع المرضى أو من خارج الطاقم الطبي.
         </span>
       </p>
 
