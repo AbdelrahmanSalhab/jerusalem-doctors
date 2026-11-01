@@ -141,10 +141,10 @@ export function VerifyForm() {
         } else if (data?.code === "account_inactive") {
           setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "too_many_attempts") {
-          // This code has had its guesses; the signup stays, a new code goes on.
-          setError("محاولات كثيرة بهذا الرمز. اطلب رمزًا جديدًا.");
+          // The signup has had its guesses, whatever codes were sent: a new
+          // code does not give new ones.
+          setError("محاولات كثيرة. انتظر عشر دقائق، ثم ابدأ التسجيل من جديد.");
           clearCode();
-          setResendIn(0);
         } else if (data?.code === "rate_limited") {
           setError("محاولات كثيرة. انتظر عشر دقائق، ثم اطلب رمزًا جديدًا.");
         } else {
