@@ -10,7 +10,9 @@ export const ADMIN_PAGE_SIZE = 25;
 /** `tile`: shown as a count box above the list rather than a pill.
  *  `attention`: a non-zero count is work waiting for an admin. */
 export const DOCTOR_FILTERS = [
-  { key: "all", label: "كل الأطباء", tile: true },
+  // Not "all doctors": the list also holds the admins who are not doctors,
+  // which /admin/stats leaves out of its total.
+  { key: "all", label: "كل الحسابات", tile: true },
   { key: "pending", label: "بانتظار القبول", tile: true, attention: true },
   { key: "license", label: "ترخيص يحتاج مراجعة", tile: true, attention: true },
   { key: "stage", label: "مقيم والسجل يقول أخصائي", attention: true },
