@@ -1,9 +1,10 @@
 // How long a code works once Supabase issues it: "SMS OTP Expiry" under
-// Authentication → Sign In / Providers → Phone. Production is 60 seconds, and
-// the dashboard locks that field while the Send SMS hook is on (docs/runbook.md
-// says how to change it anyway). The verify page tells the doctor this and
-// offers a new code when it runs out, so change both together.
-export const OTP_VALID_SECONDS = 60;
+// Authentication → Sign In / Providers → Phone. Production is 10 minutes, the most NIST SP
+// 800-63B-4 allows for a code sent out of band; the dashboard locks that field
+// while the Send SMS hook is on, so it was set through the Management API
+// (docs/runbook.md). The verify page tells the doctor this, so change both
+// together.
+export const OTP_VALID_SECONDS = 600;
 
 /** "SMS OTP Length" in the same place: digits in a code. */
 export const OTP_LENGTH = 6;

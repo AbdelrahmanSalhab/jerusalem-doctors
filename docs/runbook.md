@@ -267,8 +267,9 @@ the floor (Dashboard → Authentication):
 
 ### The code's lifetime ("SMS OTP Expiry")
 
-Production is **60 seconds** (checked 27 Oct 2026), Supabase's default. That
-is short: a text that arrives late, or a doctor who looks a minute later,
+Production was **60 seconds** (checked 27 Oct 2026), Supabase's
+default, and is now **600** (set through the Management API; read it back with
+a `GET` on the same URL to check). 60 was short: a text that arrives late, or a doctor who looks a minute later,
 meets a dead code, and Supabase answers "wrong" and "expired" the same way.
 Doctors reported exactly that ("I got two codes and both were wrong").
 
@@ -292,11 +293,14 @@ Doctors reported exactly that ("I got two codes and both were wrong").
 - **A new code cancels the previous one.** The page says so after a resend
   («استخدم آخر رمز وصلك فقط»).
 - **The dashboard locks the field while the Send SMS hook is on** ("SMS
-  provider settings are disabled while the SMS hook is enabled"). To raise it
-  to 600 (10 minutes, recommended): use the Management API's auth config,
-  `PATCH https://api.supabase.com/v1/projects/<ref>/config/auth` with a
-  personal access token and `{"sms_otp_exp": 600}`, then set
-  `OTP_VALID_SECONDS = 600` and deploy.
+  provider settings are disabled while the SMS hook is enabled"). Both values
+  were changed through the Management API's auth config,
+  `PATCH https://api.supabase.com/v1/projects/<ref>/config/auth`, with the
+  project Owner's personal access token: `{"sms_otp_exp": 600,
+  "rate_limit_sms_sent": 100}` (read back on 1 Nov 2026: 600 and 100; SMS per
+  hour was 30). Our own limits sit inside them: a code gets 5 guesses per 10
+  minutes per phone at login (`loginVerify`) and 5 per code at signup, and the
+  site sends at most 200 texts a day.
 - **How Supabase calls the hook** (supabase.com/docs/guides/auth/auth-hooks):
   5 s for the whole call, retries included; it retries only a `429` or `503`
   carrying a non-empty `retry-after`, up to three times two seconds apart. A

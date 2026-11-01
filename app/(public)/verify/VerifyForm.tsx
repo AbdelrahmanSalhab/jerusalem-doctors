@@ -141,10 +141,10 @@ export function VerifyForm() {
         } else if (data?.code === "account_inactive") {
           setError("الحساب غير مفعّل. تواصل مع الإدارة.");
         } else if (data?.code === "too_many_attempts") {
-          // This code has had its guesses; the signup stays, a new code goes on.
-          setError("محاولات كثيرة بهذا الرمز. اطلب رمزًا جديدًا.");
+          // The signup has had its guesses, whatever codes were sent: a new
+          // code does not give new ones.
+          setError("محاولات كثيرة. انتظر عشر دقائق، ثم ابدأ التسجيل من جديد.");
           clearCode();
-          setResendIn(0);
         } else if (data?.code === "rate_limited") {
           setError("محاولات كثيرة. انتظر عشر دقائق، ثم اطلب رمزًا جديدًا.");
         } else {
@@ -298,6 +298,9 @@ export function VerifyForm() {
   );
 }
 
+// No number in it: the page never says whether the number has an account.
+const NO_CODE_MESSAGE = "السلام عليكم، لم يصلني رمز التحقق على دليل أطباء القدس.";
+
 /**
  * One line until a text is overdue, then open, for everyone: login answers
  * "code sent" for any number (no account enumeration), so the page can't say
@@ -330,7 +333,7 @@ function NoCodeHelp({ mode, open, onToggle }: { mode: Mode; open: boolean; onTog
           )}
           <li>إن بقي الأمر كذلك، اطلب رمزًا جديدًا بعد انتهاء العدّ التنازلي.</li>
         </ul>
-        <SupportContact />
+        <SupportContact message={NO_CODE_MESSAGE} />
       </div>
     </details>
   );
