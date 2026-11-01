@@ -298,6 +298,9 @@ export function VerifyForm() {
   );
 }
 
+// No number in it: the page never says whether the number has an account.
+const NO_CODE_MESSAGE = "السلام عليكم، لم يصلني رمز التحقق على دليل أطباء القدس.";
+
 /**
  * One line until a text is overdue, then open, for everyone: login answers
  * "code sent" for any number (no account enumeration), so the page can't say
@@ -330,7 +333,7 @@ function NoCodeHelp({ mode, open, onToggle }: { mode: Mode; open: boolean; onTog
           )}
           <li>إن بقي الأمر كذلك، اطلب رمزًا جديدًا بعد انتهاء العدّ التنازلي.</li>
         </ul>
-        <SupportContact />
+        <SupportContact message={NO_CODE_MESSAGE} />
       </div>
     </details>
   );
