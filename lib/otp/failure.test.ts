@@ -34,7 +34,7 @@ describe("recordSendFailure", () => {
     db.queue("pending_signups", { data: null });
     await recordSendFailure(service, "daily_cap", { phoneE164: "+972501234567" });
     expect(db.argsOf("usage_events", "insert")).toEqual([
-      [{ kind: "sms_failed", doctor_id: "doc-1", meta: { reason: "daily_cap" } }],
+      [{ kind: "sms_failed", doctor_id: "doc-1", meta: { reason: "daily_cap", prefix: "050" } }],
     ]);
   });
 
@@ -43,7 +43,7 @@ describe("recordSendFailure", () => {
     db.queue("pending_signups", { data: { id: "signup-1" } });
     await recordSendFailure(service, "sms4free_timeout", { phoneE164: "+972501234567" });
     expect(db.argsOf("usage_events", "insert")).toEqual([
-      [{ kind: "sms_failed", doctor_id: null, meta: { reason: "sms4free_timeout", signup: "signup-1" } }],
+      [{ kind: "sms_failed", doctor_id: null, meta: { reason: "sms4free_timeout", prefix: "050", signup: "signup-1" } }],
     ]);
   });
 
@@ -51,7 +51,7 @@ describe("recordSendFailure", () => {
     db.queue("doctors", { data: null });
     db.queue("pending_signups", { data: null });
     await recordSendFailure(service, "unknown", { phoneE164: "+972501234567" });
-    expect(db.argsOf("usage_events", "insert")).toEqual([[{ kind: "sms_failed", doctor_id: null, meta: { reason: "unknown" } }]]);
+    expect(db.argsOf("usage_events", "insert")).toEqual([[{ kind: "sms_failed", doctor_id: null, meta: { reason: "unknown", prefix: "050" } }]]);
   });
 });
 
