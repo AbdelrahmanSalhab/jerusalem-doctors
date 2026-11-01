@@ -37,7 +37,7 @@ describe("POST /api/sms/delivery", () => {
     const msgId = newMessageId(Date.now() - 12_000);
     expect((await post(report({ to: "0501234567", status: "1", msgId }))).status).toBe(200);
     expect(db.argsOf("usage_events", "insert")).toEqual([
-      [{ kind: "sms_delivered", doctor_id: "doc-1", meta: { delay_s: 12 } }],
+      [{ kind: "sms_delivered", doctor_id: "doc-1", meta: { prefix: "050", delay_s: 12 } }],
     ]);
   });
 
@@ -46,7 +46,7 @@ describe("POST /api/sms/delivery", () => {
     db.queue("pending_signups", { data: { id: "signup-1" } });
     await post(report({ to: "0501234567", status: "5", msgId: "theirs" }));
     expect(db.argsOf("usage_events", "insert")).toEqual([
-      [{ kind: "sms_undelivered", doctor_id: null, meta: { signup: "signup-1" } }],
+      [{ kind: "sms_undelivered", doctor_id: null, meta: { prefix: "050", signup: "signup-1" } }],
     ]);
   });
 
@@ -54,7 +54,7 @@ describe("POST /api/sms/delivery", () => {
     db.queue("doctors", { data: { id: "doc-2" } });
     db.queue("pending_signups", { data: null });
     await post(report({ to: "0501234567", status: "6" }));
-    expect(db.argsOf("usage_events", "insert")).toEqual([[{ kind: "sms_voice", doctor_id: "doc-2", meta: {} }]]);
+    expect(db.argsOf("usage_events", "insert")).toEqual([[{ kind: "sms_voice", doctor_id: "doc-2", meta: { prefix: "050" } }]]);
   });
 
   it("answers but ignores a status it doesn't count", async () => {

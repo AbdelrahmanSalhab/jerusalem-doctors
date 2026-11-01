@@ -5,6 +5,7 @@
 import { DELIVERY_STATUS, deliveryDelaySeconds, validDeliveryKey } from "@/lib/otp/delivery";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
 import { textOwner } from "@/lib/otp/owner";
+import { numberPrefix } from "@/lib/otp/prefix";
 import { claimOnce } from "@/lib/otp/sentOnce";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { recordEvent } from "@/lib/usage";
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
   await recordEvent(service, kind, {
     doctorId: owner.doctorId,
     meta: {
+      ...(phone && { prefix: numberPrefix(phone) }),
       ...(delay !== null && { delay_s: delay }),
       ...(owner.signupId && { signup: owner.signupId }),
     },

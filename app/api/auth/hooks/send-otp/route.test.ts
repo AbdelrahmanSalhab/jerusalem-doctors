@@ -100,7 +100,7 @@ describe("send-otp hook route", () => {
       expect(send).toHaveBeenCalled();
       // Counted once sent, after the answer (metrics_daily's SMS count).
       await runAfter();
-      expect(inserts).toContainEqual(["usage_events", expect.objectContaining({ kind: "sms_sent" })]);
+      expect(inserts).toContainEqual(["usage_events", expect.objectContaining({ kind: "sms_sent", meta: expect.objectContaining({ prefix: "050" }) })]);
     });
 
     it("refuses a number with no account and no signup, even on a signed call", async () => {
@@ -143,7 +143,7 @@ describe("send-otp hook route", () => {
       expect(send).not.toHaveBeenCalled();
       expect(inserts).toContainEqual(["audit_logs", { action: "alert", metadata: { alert: "sms_cap_reached", level: "error", limit: 200 } }]);
       await runAfter();
-      expect(inserts).toContainEqual(["usage_events", { kind: "sms_failed", doctor_id: "x", meta: { reason: "daily_cap" } }]);
+      expect(inserts).toContainEqual(["usage_events", { kind: "sms_failed", doctor_id: "x", meta: { reason: "daily_cap", prefix: "050" } }]);
     });
   });
 
@@ -210,7 +210,7 @@ describe("send-otp hook route", () => {
 
     // Counted for the doctor, with the provider's reason and no number.
     await runAfter();
-    expect(inserts).toContainEqual(["usage_events", { kind: "sms_failed", doctor_id: "x", meta: { reason: "sms4free_status_-4" } }]);
+    expect(inserts).toContainEqual(["usage_events", { kind: "sms_failed", doctor_id: "x", meta: { reason: "sms4free_status_-4", prefix: "050" } }]);
     expect(res.status).toBe(400);
     expect(res.headers.get("content-type")).toContain("application/json");
   });

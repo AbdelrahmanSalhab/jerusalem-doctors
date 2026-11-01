@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OtpProviderError } from "./provider";
 import { textOwner } from "./owner";
+import { numberPrefix } from "./prefix";
 import { claimOnce } from "./sentOnce";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { recordEvent } from "@/lib/usage";
@@ -30,7 +31,7 @@ export async function recordSendFailure(
     const signup = who.signupId ?? (doctorId ? undefined : owner.signupId);
     await recordEvent(service, "sms_failed", {
       doctorId,
-      meta: { reason, ...(signup && { signup }) },
+      meta: { reason, ...(who.phoneE164 && { prefix: numberPrefix(who.phoneE164) }), ...(signup && { signup }) },
     });
   } catch (err) {
     console.error("[otp] failure not recorded", err);
