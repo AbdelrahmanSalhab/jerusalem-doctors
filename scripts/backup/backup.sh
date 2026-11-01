@@ -8,12 +8,13 @@
 #   BACKUP_DATABASE_URL  Supabase "Session pooler" connection string (IPv4; the
 #                        direct host is IPv6-only on the free plan)
 #   BACKUP_AGE_PUBLIC_KEY  age recipient (age1...): only the public half is here
-#   R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET
+#   S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY: any
+#                        S3-compatible private bucket (Backblaze B2 today)
 # Optional: BACKUP_KEEP (how many to keep, default 30).
 set -euo pipefail
 umask 077
 
-: "${BACKUP_DATABASE_URL:?}" "${BACKUP_AGE_PUBLIC_KEY:?}" "${R2_ACCOUNT_ID:?}" "${R2_ACCESS_KEY_ID:?}" "${R2_SECRET_ACCESS_KEY:?}" "${R2_BUCKET:?}"
+: "${BACKUP_DATABASE_URL:?}" "${BACKUP_AGE_PUBLIC_KEY:?}" "${S3_ENDPOINT:?}" "${S3_REGION:?}" "${S3_BUCKET:?}" "${S3_ACCESS_KEY_ID:?}" "${S3_SECRET_ACCESS_KEY:?}"
 KEEP="${BACKUP_KEEP:-30}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -39,16 +40,16 @@ grep -q 'TABLE DATA public doctors' "$WORK/list.txt" || fail "no doctors data in
 age -r "$BACKUP_AGE_PUBLIC_KEY" -o "$OUT" "$DUMP" 2>>"$ERR" || fail "age exit $?"
 rm -f "$DUMP"
 
-export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION=auto
-# AWS CLI 2.23+ sends checksums R2 rejects unless they are only used when required.
+export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID" AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY" AWS_DEFAULT_REGION="$S3_REGION"
+# AWS CLI 2.23+ sends checksums some S3-compatible stores reject (R2 does); only when required.
 export AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
-S3=(aws s3 --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com")
-"${S3[@]}" cp "$OUT" "s3://$R2_BUCKET/daily/$(basename "$OUT")" --only-show-errors 2>>"$ERR" || fail "upload exit $?"
+S3=(aws s3 --endpoint-url "$S3_ENDPOINT")
+"${S3[@]}" cp "$OUT" "s3://$S3_BUCKET/daily/$(basename "$OUT")" --only-show-errors 2>>"$ERR" || fail "upload exit $?"
 
 # Keep the newest $KEEP; the names sort by date.
-mapfile -t all < <("${S3[@]}" ls "s3://$R2_BUCKET/daily/" 2>>"$ERR" | awk '{print $4}' | grep -E '^jd-.*\.dump\.age$' | sort)
+mapfile -t all < <("${S3[@]}" ls "s3://$S3_BUCKET/daily/" 2>>"$ERR" | awk '{print $4}' | grep -E '^jd-.*\.dump\.age$' | sort)
 extra=$(( ${#all[@]} - KEEP ))
 if [ "$extra" -gt 0 ]; then
-  for f in "${all[@]:0:extra}"; do "${S3[@]}" rm "s3://$R2_BUCKET/daily/$f" --only-show-errors 2>>"$ERR" || fail "prune exit $?"; done
+  for f in "${all[@]:0:extra}"; do "${S3[@]}" rm "s3://$S3_BUCKET/daily/$f" --only-show-errors 2>>"$ERR" || fail "prune exit $?"; done
 fi
 echo "backup ok: $(basename "$OUT"), $(stat -c %s "$OUT") bytes, ${#all[@]} kept before pruning"
