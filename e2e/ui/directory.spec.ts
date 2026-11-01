@@ -16,7 +16,7 @@ test("the dashboard counts the listed doctors and shows the featured ones @phone
   await expect(page.getByText(`${LISTED.length} أطباء`)).toBeVisible();
   await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
   // Above the numbers: they are for doctors, not patients (#192).
-  await expect(page.getByText(/أرقام الزملاء مخصّصة للتواصل المهني بين الأطباء/)).toBeVisible();
+  await expect(page.getByText(/أرقام الزملاء للتواصل المهني بين الأطباء/)).toBeVisible();
 });
 
 test("search finds by name and never shows hidden, pending or admin rows @phone", async ({ page }) => {

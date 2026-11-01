@@ -22,6 +22,7 @@ import {
 } from "@/components/TurnstileWidget";
 
 const TURNSTILE_WAIT_MS = 15_000;
+const HELP_OPENS_AFTER_MS = 25_000;
 const noop = () => {};
 
 export function VerifyForm() {
@@ -67,6 +68,12 @@ export function VerifyForm() {
   const inputRef = useRef<HTMLInputElement>(null);
   // Bumped on every send: each text gets its own wait for the phone to read it.
   const [sends, setSends] = useState(1);
+  // The help opens by itself once a text is overdue; until then it is one line.
+  const [helpOpen, setHelpOpen] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setHelpOpen(true), HELP_OPENS_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [sends]);
 
   // Android Chrome can read the text itself when it ends "@host #code"
   // (lib/otp/message.ts). Anywhere else this does nothing and the doctor
@@ -214,7 +221,20 @@ export function VerifyForm() {
 
   return (
     <form ref={formRef} onSubmit={submit} className="space-y-4">
+      {mode === "signup" && <p className="text-sm font-medium text-muted">الخطوة الأخيرة</p>}
+      {/* Says "if", not "we sent": login answers the same for any number. */}
+      <p className="text-sm">
+        إن وصلك رمز على{" "}
+        <bdi dir="ltr" className="font-medium">
+          {phone}
+        </bdi>{" "}
+        فأدخله هنا.{" "}
+        <Link href={mode === "login" ? "/login" : "/signup"} className="underline">
+          تغيير الرقم
+        </Link>
+      </p>
       <input
+        autoFocus
         ref={inputRef}
         type="text"
         dir="ltr"
@@ -251,7 +271,7 @@ export function VerifyForm() {
       <button
         type="submit"
         disabled={submitting || code.length !== OTP_LENGTH}
-        className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50"
+        className="w-full rounded-md border border-foreground px-6 py-3 hover:bg-foreground/5 disabled:opacity-50 pointer-coarse:min-h-11"
       >
         {submitting ? "جارٍ التحقق..." : "تأكيد"}
       </button>
@@ -260,7 +280,7 @@ export function VerifyForm() {
         type="button"
         onClick={resend}
         disabled={resendIn > 0 || resending}
-        className="w-full rounded-md border border-foreground px-6 py-2 text-sm disabled:opacity-50"
+        className="mx-auto block px-2 text-sm underline disabled:text-muted disabled:no-underline pointer-coarse:min-h-11"
       >
         {resending
           ? "جارٍ الإرسال..."
@@ -273,45 +293,45 @@ export function VerifyForm() {
         <TurnstileWidget ref={turnstileRef} onToken={noop} action="login_resend" />
       )}
 
-      <NoCodeHelp mode={mode} phone={phone} />
+      <NoCodeHelp mode={mode} open={helpOpen} onToggle={setHelpOpen} />
     </form>
   );
 }
 
 /**
- * Shown from the start, to everyone: login answers "code sent" for any number
- * (no account enumeration), so the page can't say whether a text is coming.
- * It says what usually goes wrong, true for any visitor, and how to reach us.
+ * One line until a text is overdue, then open, for everyone: login answers
+ * "code sent" for any number (no account enumeration), so the page can't say
+ * whether a text is coming. It says what usually goes wrong, true for any
+ * visitor, and how to reach us. The number it refers to is at the top.
  */
-function NoCodeHelp({ mode, phone }: { mode: Mode; phone: string }) {
+function NoCodeHelp({ mode, open, onToggle }: { mode: Mode; open: boolean; onToggle: (open: boolean) => void }) {
   return (
-    <div className="space-y-2 rounded-md border border-info-line bg-info-bg p-4 text-sm text-info">
-      <p className="font-medium">لم يصلك الرمز؟</p>
-      <ul className="list-disc space-y-1 ps-5">
-        <li>
-          قد يتأخر نحو نصف دقيقة. الرقم الذي أدخلته:{" "}
-          <span dir="ltr" className="font-medium">
-            {phone}
-          </span>
-          {" "}
-          <Link href={mode === "login" ? "/login" : "/signup"} className="underline">
-            (رقم خاطئ؟ صحّحه)
-          </Link>
-          .
-        </li>
-        <li>استخدم الرقم نفسه الذي سجّلت به في الدليل.</li>
-        {mode === "login" && (
-          <li>
-            إن لم تسجّل بعد،{" "}
-            <Link href="/signup" className="underline">
-              أنشئ حسابًا
-            </Link>{" "}
-            أولًا.
-          </li>
-        )}
-        <li>إن بقي الأمر كذلك، اطلب رمزًا جديدًا بعد انتهاء العدّ التنازلي.</li>
-      </ul>
-      <SupportContact />
-    </div>
+    <details
+      open={open}
+      onToggle={(e) => onToggle(e.currentTarget.open)}
+      className="rounded-md border border-info-line bg-info-bg text-sm text-info"
+    >
+      <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-medium pointer-coarse:min-h-11">
+        لم يصلك الرمز؟
+        <span aria-hidden="true">▾</span>
+      </summary>
+      <div className="space-y-2 px-4 pb-4">
+        <ul className="list-disc space-y-1 ps-5">
+          <li>قد يتأخر نحو نصف دقيقة.</li>
+          <li>استخدم الرقم نفسه الذي سجّلت به في الدليل، أو صحّحه من «تغيير الرقم».</li>
+          {mode === "login" && (
+            <li>
+              إن لم تسجّل بعد،{" "}
+              <Link href="/signup" className="underline">
+                أنشئ حسابًا
+              </Link>{" "}
+              أولًا.
+            </li>
+          )}
+          <li>إن بقي الأمر كذلك، اطلب رمزًا جديدًا بعد انتهاء العدّ التنازلي.</li>
+        </ul>
+        <SupportContact />
+      </div>
+    </details>
   );
 }
