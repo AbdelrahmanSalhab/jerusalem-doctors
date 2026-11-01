@@ -13,6 +13,7 @@ import * as Sentry from "@sentry/nextjs";
 import { after } from "next/server";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { getOtpSender, OtpProviderError } from "@/lib/otp";
+import { numberPrefix } from "@/lib/otp/prefix";
 import { isKnownRecipient } from "@/lib/otp/recipients";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
     // Before answering: Supabase's retry comes seconds later and must see it.
     await markSent(once);
     // Counted after answering: Supabase waits on this hook.
-    after(() => recordEvent(createSupabaseServiceClient(), "sms_sent", { meta: { ms } }));
+    after(() => recordEvent(createSupabaseServiceClient(), "sms_sent", { meta: { ms, prefix: numberPrefix(e164) } }));
     return hookResponse(200);
   } catch (err) {
     // OtpProviderError messages carry Meta's error code and message, never

@@ -49,6 +49,13 @@ Supabase. A login with a number that has no account is not a failure: it is
 counted separately ("حاولوا الدخول بلا حساب"), and the doctor sees the same
 code screen as anyone.
 
+Since 1 Nov 2026 each sent, failed and delivery-report row from the hook and
+the delivery webhook carries `meta.prefix`: the first three digits of the
+number (`052`, `059`, `other`), never the number. Numbers move between
+networks, so it is a hint to the carrier. Nothing shows it yet; read it with
+`select meta->>'prefix', kind, count(*) from usage_events where meta ? 'prefix'
+group by 1, 2`. Grouping it in `/admin/stats` needs a change to `otp_stats`.
+
 **Fix:**
 1. Supabase Dashboard → Authentication → Providers → Phone: confirm it is ON,
    and that "SMS OTP Expiry" equals `OTP_VALID_SECONDS` in
