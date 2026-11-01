@@ -123,14 +123,17 @@ describe("/admin doctors list", () => {
     // The list query must not narrow by approval. The filter counts do use eq,
     // so only the id-filtering of the list itself is checked here.
     expect(eqArgs()).not.toContainEqual(["id", expect.anything()]);
-    expect(html).toContain("كل الأطباء");
+    expect(html).toContain("كل الحسابات");
+    // The admins who are not doctors are named, so the total can differ from /admin/stats.
+    expect(html).toContain("منها 60 من الإدارة وليسوا أطباء");
   });
 
   it("counts every filter with the filter's own conditions", async () => {
     await render();
     const heads = calls.filter((c) => c.table === "doctors" && c.method === "select" && JSON.stringify(c.args).includes('"head":true'));
-    expect(heads).toHaveLength(8);
-    expect(eqArgs()).toEqual(expect.arrayContaining([["clinic_missing_details", true], ["career_stage", "resident"]]));
+    // The eight filters, and the admins who are not doctors.
+    expect(heads).toHaveLength(9);
+    expect(eqArgs()).toEqual(expect.arrayContaining([["clinic_missing_details", true], ["career_stage", "resident"], ["is_admin", true]]));
   });
 
   it("counts what is in the filter, in Arabic", async () => {

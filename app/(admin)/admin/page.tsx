@@ -73,6 +73,17 @@ async function counts(service: SupabaseClient): Promise<Record<DoctorFilter, num
   return Object.fromEntries(DOCTOR_FILTERS.map((f, i) => [f.key, results[i].count ?? 0])) as Record<DoctorFilter, number>;
 }
 
+/** Admins who are not doctors (hidden on purpose): in "all", but not in
+ *  admin_stats()'s total, so the two pages differ by this many. */
+async function staffCount(service: SupabaseClient): Promise<number> {
+  const { count } = await service
+    .from("doctors")
+    .select("id", { count: "exact", head: true })
+    .eq("is_admin", true)
+    .eq("is_visible", false);
+  return count ?? 0;
+}
+
 // Method syntax on purpose: the typed client's eq takes each column's own
 // value type, which only a method's (bivariant) parameters accept. The
 // column stays checked: it must be a real doctors column.
@@ -144,9 +155,10 @@ export default async function AdminDoctorsPage({
     }
   }
 
-  const [listed, filterCounts, detail, specialties] = await Promise.all([
+  const [listed, filterCounts, staff, detail, specialties] = await Promise.all([
     query,
     counts(service),
+    staffCount(service),
     params.doctorId ? fetchDoctorDetail(service, params.doctorId) : Promise.resolve(null),
     // Only the panel's editor needs the catalogue.
     params.doctorId && params.editing ? fetchActiveSpecialties(service) : Promise.resolve([]),
@@ -179,6 +191,7 @@ export default async function AdminDoctorsPage({
             key={f.key}
             label={f.label}
             value={filterCounts[f.key]}
+            sub={f.key === "all" && staff > 0 ? `منها ${staff} من الإدارة وليسوا أطباء` : undefined}
             href={adminDoctorsHref({ filter: f.key, q: "", page: 1 })}
             tone={"attention" in f && filterCounts[f.key] > 0 ? "warn" : "plain"}
             current={f.key === params.filter}
