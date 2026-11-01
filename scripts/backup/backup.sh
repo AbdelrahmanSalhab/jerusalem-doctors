@@ -9,7 +9,8 @@
 #                        direct host is IPv6-only on the free plan)
 #   BACKUP_AGE_PUBLIC_KEY  age recipient (age1...): only the public half is here
 #   S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY: any
-#                        S3-compatible private bucket (Backblaze B2 today)
+#                        S3-compatible private bucket (Cloudflare R2 today,
+#                        region "auto")
 # Optional: BACKUP_KEEP (how many to keep, default 30).
 set -euo pipefail
 umask 077

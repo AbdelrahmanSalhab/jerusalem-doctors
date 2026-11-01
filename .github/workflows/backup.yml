@@ -1,7 +1,7 @@
 name: Nightly backup
 
-# An encrypted dump of the public schema, uploaded to private storage (Backblaze
-# B2, S3-compatible) every night. The repository is public: the dump is never an artifact, the
+# An encrypted dump of the public schema, uploaded to private storage (Cloudflare
+# R2, S3-compatible) every night. The repository is public: the dump is never an artifact, the
 # log shows no data, and the secrets live in the `backup` environment, which is
 # limited to the main branch (Settings > Environments). Setup and the restore
 # drill are in docs/runbook.md ("Backups"). A red run means last night has no

@@ -332,9 +332,9 @@ Supabase's free plan keeps no backups and has no point-in-time recovery
 `scripts/backup/backup.sh` every night at 01:41 UTC: `pg_dump` of the `public`
 schema (custom format, without the registry mirror, which the nightly sync
 refills), checked with `pg_restore --list`, encrypted with `age`, uploaded to a
-private Backblaze B2 bucket (S3-compatible, free 10 GB), the newest 30 kept. The
-database is about 30 MB, so that is far more than enough. The bucket has a
-lifecycle rule (delete a hidden version after 1 day) so pruning frees space.
+private Cloudflare R2 bucket `jd-backups` (S3-compatible, free 10 GB, no egress
+fees), the newest 30 kept. The database is about 30 MB, so that is far more than
+enough. The bucket also expires `daily/` objects after 60 days, as a backstop.
 
 **The repository is public, so:** the dump is never a workflow artifact, the log
 prints no host, row or connection string (failures say only which step failed),
@@ -345,9 +345,12 @@ private key is held offline by two people. Sign-ins relink to a doctor by phone
 (`linkAuthUser`), photos live in storage and are not in this dump.
 
 **One-time setup (a repository admin):**
-1. B2: a private bucket and an application key limited to it (list, read, write,
-   delete files). Created 1 Nov 2026 with the `b2` CLI; the key is held by Khaled
-   and must reach the GitHub environment without going through chat.
+1. R2: a private bucket (`wrangler r2 bucket create jd-backups`) and an Account
+   API token of the R2 type, **Object Read & Write**, limited to that bucket
+   only (a token with zone permissions can change DNS; do not use one). Endpoint
+   `https://<account id>.r2.cloudflarestorage.com`, region `auto`. Created
+   1 Nov 2026; the key is held by Khaled and must reach the GitHub environment
+   without going through chat.
 2. `age-keygen -o jd-backup.key` on a trusted machine. Keep the file offline in
    two places (two people). Put the line starting `age1...` in the secret below.
 3. GitHub, Settings, Environments, new environment `backup`: deployment branches
@@ -365,7 +368,7 @@ jd.dump`, and compare `select count(*) from doctors` with production. Expect one
 error: the foreign key from `doctors.auth_user_id` to `auth.users`, because a new
 project has no auth users; the data is complete, and a doctor is linked again by
 phone at the next sign-in (`linkAuthUser`). Tested 1 Nov 2026 with the real
-script, the real bucket and a throwaway key against the local database (8 of 8
+script, the real R2 bucket and a throwaway key against the local database (8 of 8
 doctors back). Delete the scratch project and the decrypted file.
 
 **If a night fails:** GitHub emails the people watching the repository. Scheduled
