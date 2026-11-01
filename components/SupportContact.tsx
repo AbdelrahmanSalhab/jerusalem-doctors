@@ -5,14 +5,15 @@
 
 const SUPPORT_NUMBER = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_NUMBER;
 
-export function SupportContact() {
+/** `message` is the text WhatsApp opens with; none opens an empty chat. */
+export function SupportContact({ message }: { message?: string } = {}) {
   if (!SUPPORT_NUMBER) return null;
 
   return (
     <p className="mt-4 text-center text-sm text-foreground/65">
       بحاجة لمساعدة؟{" "}
       <a
-        href={`https://wa.me/${SUPPORT_NUMBER}`}
+        href={`https://wa.me/${SUPPORT_NUMBER}${message ? `?text=${encodeURIComponent(message)}` : ""}`}
         target="_blank"
         rel="noopener noreferrer"
         className="font-medium text-[#25d366] hover:underline"
