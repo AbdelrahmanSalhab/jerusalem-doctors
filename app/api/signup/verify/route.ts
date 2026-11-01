@@ -126,10 +126,9 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(410, { error: "session_expired", code: "session_expired" });
   }
 
-  // This code has had its guesses. The signup stays: the way on is a new code,
-  // not the whole form again (a late text, not a guesser, is the usual cause).
-  // Each new code is itself rate limited (signupResend), so guessing gains
-  // nothing.
+  // The signup has had its guesses, across every code sent to it: a resend
+  // does not reset the count. The signup stays, unfinished, for an admin's
+  // reminder.
   if (pending.data.attempts >= MAX_ATTEMPTS) {
     const signup = pending.data.id;
     after(() => recordEvent(service, "otp_locked", { meta: { flow: "signup", signup } }));
