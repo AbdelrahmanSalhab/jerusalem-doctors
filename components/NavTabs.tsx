@@ -29,7 +29,7 @@ export function NavTabs({ tabs, label }: { tabs: NavTab[]; label: string }) {
           href={t.href}
           aria-current={active(t) ? "page" : undefined}
           className={
-            "shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors " +
+            "shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors pointer-coarse:py-3 " +
             (active(t)
               ? "border-foreground font-semibold text-foreground"
               : "border-transparent text-muted hover:text-foreground")

@@ -13,4 +13,8 @@ describe("failureText", () => {
     expect(failureText("sms4free_status_-9")).toContain("-9");
     expect(failureText("unknown")).toBe("سبب غير مسجّل");
   });
+  it("names the two ways our own checks stop a request", () => {
+    expect(failureText("our_rate_limit")).toContain("حدّنا");
+    expect(failureText("turnstile_failed")).toContain("Turnstile");
+  });
 });

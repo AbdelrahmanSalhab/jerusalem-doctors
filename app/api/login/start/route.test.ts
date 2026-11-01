@@ -73,11 +73,15 @@ describe("POST /api/login/start", () => {
     expect(await res.json()).toMatchObject({ code: "invalid_body" });
   });
 
-  it("rejects a failed Turnstile check before touching the DB", async () => {
+  it("rejects a failed Turnstile check before looking anything up, and counts it", async () => {
     verifyTurnstile.mockResolvedValue({ ok: false });
     const res = await call({ phone: "0501234567" });
     expect(res.status).toBe(403);
-    expect(db.calls).toHaveLength(0);
+    // No doctor or phone is read; the only write is the count, with no number.
+    expect(db.calls.map((c) => c.table)).toEqual(["usage_events"]);
+    expect(db.argsOf("usage_events", "insert")).toEqual([
+      [{ kind: "sms_failed", doctor_id: null, meta: { reason: "turnstile_failed" } }],
+    ]);
   });
 
   it("rejects an invalid phone", async () => {

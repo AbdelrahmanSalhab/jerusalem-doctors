@@ -11,7 +11,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
-import { failureReason } from "@/lib/otp/failure";
+import { failureReason, recordStopped } from "@/lib/otp/failure";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
@@ -39,6 +39,7 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   const ts = await verifyTurnstile(parsed.turnstile_token, ip);
   if (!ts.ok) {
+    await recordStopped("turnstile_failed");
     return jsonError(403, {
       error: "turnstile_failed",
       code: "turnstile_failed",
@@ -69,6 +70,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     rateLimit("loginStartIp", `ip:${ip}`),
   ]);
   if (!rl.success || !rlIp.success) {
+    await recordStopped("our_rate_limit");
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 

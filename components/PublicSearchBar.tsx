@@ -27,14 +27,14 @@ export function PublicSearchBar() {
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") open(e);
           }}
-          placeholder="ابحث عن طبيب بالاسم أو التخصص أو مكان العمل"
+          placeholder="ابحث عن طبيب أو تخصص أو مكان عمل"
           aria-label="بحث"
           aria-haspopup="dialog"
           className="min-w-0 flex-1 cursor-pointer rounded-md border border-line bg-surface px-4 py-3 text-base"
         />
         <button
           type="submit"
-          className="rounded-md bg-primary px-6 py-3 font-semibold text-primary-fg hover:opacity-90"
+          className="rounded-md border border-line bg-surface px-6 py-3 hover:bg-foreground/5"
         >
           بحث
         </button>

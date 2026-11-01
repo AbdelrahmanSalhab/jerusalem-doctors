@@ -27,7 +27,7 @@ import {
   licenseFormatErrorMessage,
 } from "@/lib/normalize/license";
 import { InvalidPhoneError, normalizePhone } from "@/lib/normalize/phone";
-import { failureReason, recordSendFailure } from "@/lib/otp/failure";
+import { failureReason, recordSendFailure, recordStopped } from "@/lib/otp/failure";
 import { rejectUndeliverablePhone, rejectWhilePhoneAuthDisabled } from "@/lib/otp/phone_gate";
 import { rateLimit } from "@/lib/ratelimit";
 import { recordEvent } from "@/lib/usage";
@@ -119,6 +119,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   // Per-IP gate first; per-phone limit after we normalize.
   const rlIp = await rateLimit("signupStartIp", `ip:${ip}`);
   if (!rlIp.success) {
+    await recordStopped("our_rate_limit");
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
@@ -135,6 +136,7 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   const ts = await verifyTurnstile(parsed.turnstile_token, ip);
   if (!ts.ok) {
+    await recordStopped("turnstile_failed");
     return jsonError(403, { error: "turnstile_failed", code: "turnstile_failed" });
   }
 
@@ -157,6 +159,7 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   const rlPhone = await rateLimit("signupStart", `phone:${phoneE164}`);
   if (!rlPhone.success) {
+    await recordStopped("our_rate_limit");
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
