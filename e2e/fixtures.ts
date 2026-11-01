@@ -55,6 +55,8 @@ const EXPECTED: RegExp[] = [
   /^(http 404 GET |console\.error Failed to load resource: .* status of 404 .*\[)\/nope\.png/,
   // Next aborts in-flight prefetches when a test navigates on.
   /^requestfailed GET \S+[?&]_rsc=\S+ net::ERR_ABORTED/,
+  // The same abort as WebKit (the phone project) reports it: a page error, not a failed request.
+  /^pageerror Fetch API cannot load .*[?&]_rsc=\S+ due to access control checks/,
 ];
 
 export const isExpected = (i: Issue) => EXPECTED.some((re) => re.test(`${i.kind} ${i.text}`));
