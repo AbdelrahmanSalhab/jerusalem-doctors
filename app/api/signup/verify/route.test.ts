@@ -168,7 +168,7 @@ describe("POST /api/signup/verify", () => {
     expect(auth.verifyOtp).not.toHaveBeenCalled();
   });
 
-  it("stops guessing after too many attempts, but keeps the signup for a new code", async () => {
+  it("stops guessing after too many attempts, whatever codes were sent, and keeps the signup", async () => {
     db.queue("pending_signups", pending({ attempts: 5 }), CLAIMED);
     const res = await call(BODY);
     expect(res.status).toBe(429);
