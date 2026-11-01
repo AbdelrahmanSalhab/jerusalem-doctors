@@ -303,7 +303,10 @@ Doctors reported exactly that ("I got two codes and both were wrong").
   doctor every 5 s, which our per-number limit never saw), the unused Twilio
   account SID and message service SID cleared (the auth token field still
   reads back 64 characters; revoke it in Twilio if it matters), and the old
-  `sms_test_otp` mapping (May, expired) emptied. Our own limits sit inside them: a code gets 5 guesses per 10
+  `sms_test_otp` mapping (May, expired) emptied. The database now refuses
+  connections without SSL (`PUT /v1/projects/<ref>/ssl-enforcement`, 1 Nov; the app
+  uses the REST API and is not affected; a direct `psql` needs `sslmode=require`).
+  Our own limits sit inside them: a code gets 5 guesses per 10
   minutes per phone at login (`loginVerify`) and 5 per code at signup, and the
   site sends at most 200 texts a day.
 - **How Supabase calls the hook** (supabase.com/docs/guides/auth/auth-hooks):
@@ -321,6 +324,47 @@ Doctors reported exactly that ("I got two codes and both were wrong").
   credentials so that can't happen by accident.
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
+
+### Backups (the free plan has none)
+
+Supabase's free plan keeps no backups and has no point-in-time recovery
+(checked 1 Nov 2026: 0 backups). `.github/workflows/backup.yml` runs
+`scripts/backup/backup.sh` every night at 01:41 UTC: `pg_dump` of the `public`
+schema (custom format, without the registry mirror, which the nightly sync
+refills), checked with `pg_restore --list`, encrypted with `age`, uploaded to a
+private Cloudflare R2 bucket, the newest 30 kept. The database is about 30 MB,
+so R2's free 10 GB is far more than enough.
+
+**The repository is public, so:** the dump is never a workflow artifact, the log
+prints no host, row or connection string (failures say only which step failed),
+the plaintext exists only on the runner's temporary disk, and the secrets sit in
+a GitHub **environment** called `backup`, limited to the `main` branch, so a
+pull request cannot read them. Only the age *public* key is on GitHub; the
+private key is held offline by two people. Sign-ins relink to a doctor by phone
+(`linkAuthUser`), photos live in storage and are not in this dump.
+
+**One-time setup (a repository admin):**
+1. R2: create a private bucket and an API token that can read and write only it.
+2. `age-keygen -o jd-backup.key` on a trusted machine. Keep the file offline in
+   two places (two people). Put the line starting `age1...` in the secret below.
+3. GitHub, Settings, Environments, new environment `backup`: deployment branches
+   limited to `main`, then these secrets: `BACKUP_DATABASE_URL` (Supabase,
+   Connect, **Session pooler**, the URI with the password filled in; the direct
+   host is IPv6-only on the free plan and the runner is IPv4), `BACKUP_AGE_PUBLIC_KEY`,
+   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
+4. Actions, Nightly backup, Run workflow once: it ends with `backup ok`.
+
+**Restore drill (once now, then after any change to the workflow):** download the
+newest `daily/jd-*.dump.age` from the bucket, `age -d -i jd-backup.key -o jd.dump
+jd-....dump.age`, create a scratch Supabase project (or a local `supabase start`),
+apply `supabase/migrations`, then `pg_restore --no-owner --data-only
+--disable-triggers -d "<scratch url>" jd.dump`; compare `select count(*) from
+doctors` with production. Delete the scratch project and the decrypted file.
+
+**If a night fails:** GitHub emails the people watching the repository. Scheduled
+workflows stop after 60 days without repository activity, so a long quiet spell
+needs a manual run. Not covered: auth settings (kept in this runbook), storage
+objects (photos), the registry mirror.
 
 ### Usage against the free plans
 
