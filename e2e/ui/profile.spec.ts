@@ -22,6 +22,10 @@ test("a doctor edits their bio and it stays saved @phone", async ({ page }) => {
   await bio.fill("أخصائي قلب، أستقبل التحويلات من الزملاء.");
   await page.getByRole("button", { name: "حفظ التعديلات" }).click();
   await expect(page.getByText("تم حفظ التعديلات.")).toBeVisible();
+  // The save refreshes the page's data in the background; reloading under it
+  // aborts that fetch, which WebKit reports as «Load failed» (a console error
+  // that failed this test twice on main, then passed on a rerun).
+  await page.waitForLoadState("networkidle");
   await page.reload();
   await expect(page.getByText("أخصائي قلب، أستقبل التحويلات من الزملاء.")).toBeVisible();
 });
