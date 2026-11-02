@@ -113,11 +113,16 @@ describe("sendTestPush", () => {
   it("sends at once to this admin's own devices, unthrottled, and counts the ones that got it", async () => {
     sendNotification.mockResolvedValueOnce({}).mockRejectedValueOnce(Object.assign(new Error("gone"), { statusCode: 410 }));
     const { service, eqs, deleted } = client({ data: [ROW("1"), ROW("2")] });
-    expect(await sendTestPush(service, "admin-1")).toBe(1);
+    expect(await sendTestPush(service, "admin-1")).toEqual({ devices: 2, sent: 1 });
     expect(eqs).toEqual([["doctor_id", "admin-1"]]);
     expect(deleted).toEqual([["2"]]);
     expect(claimOnce).not.toHaveBeenCalled();
     expect(JSON.parse(sendNotification.mock.calls[0][1])).toMatchObject({ tag: "test", url: "/admin" });
+  });
+
+  it("reports no devices at all, rather than success", async () => {
+    expect(await sendTestPush(client({ data: [] }).service, "admin-1")).toEqual({ devices: 0, sent: 0 });
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   it("throws when the devices cannot be read, so the route can say so", async () => {

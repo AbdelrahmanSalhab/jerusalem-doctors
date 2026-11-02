@@ -101,8 +101,9 @@ export async function sendPushToAdmins(service: SupabaseClient, message: PushMes
 
 /** The switch's «جرّب»: one notification to this admin's own devices, at
  *  once and unthrottled, so they can see it works. null when the keys are not
- *  set; otherwise how many devices it reached. */
-export async function sendTestPush(service: SupabaseClient, doctorId: string): Promise<number | null> {
+ *  set; otherwise how many devices there were and how many the push service
+ *  accepted it for (the others are gone, and are deleted). */
+export async function sendTestPush(service: SupabaseClient, doctorId: string): Promise<{ devices: number; sent: number } | null> {
   const keys = vapid();
   if (!keys) return null;
   const { data, error } = await service
@@ -110,5 +111,7 @@ export async function sendTestPush(service: SupabaseClient, doctorId: string): P
     .select("id, endpoint, p256dh, auth")
     .eq("doctor_id", doctorId);
   if (error) throw error;
-  return deliver(service, keys, data ?? [], { title: "الإشعارات تعمل على هذا الجهاز", url: "/admin", tag: "test" });
+  const rows = data ?? [];
+  const sent = await deliver(service, keys, rows, { title: "الإشعارات تعمل على هذا الجهاز", url: "/admin", tag: "test" });
+  return { devices: rows.length, sent };
 }
