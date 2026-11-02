@@ -53,6 +53,9 @@ export const RATE_LIMITS = {
   // opens and fixes one profile after another. It only brakes a runaway loop.
   adminProfileSave: { limit: 60, window: "1 h" },
   adminPhotoUpload: { limit: 30, window: "1 h" },
+  // Turning notifications on or off for a device, and the test button.
+  adminPush: { limit: 20, window: "1 h" },
+  adminPushTest: { limit: 10, window: "1 h" },
   // Password sign-in for devs and QA. Tight: a leaked password on one of
   // these accounts is the whole risk, so guessing stays slow.
   // Every SMS the site sends, all numbers together: the per-phone and per-IP

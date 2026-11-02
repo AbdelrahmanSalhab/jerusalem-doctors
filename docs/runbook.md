@@ -347,6 +347,41 @@ badge counts warnings and urgent alerts from the last 24 hours. The rate
 limiter's timeout alert reaches the log at most once an hour (Sentry once a
 minute), so a slow Redis cannot flood it.
 
+### Notifications on admins' phones
+
+The alerts above that need someone to act also reach each admin's phone or
+browser, as a notification: a doctor waiting for approval, a profile report,
+licences gone from the registry, the daily SMS cap or a low SMS balance, and
+the database nearing its limit (`PUSH_TO` in `lib/alerts.ts`; the rest stay in
+the activity log). Web Push, sent by `lib/push.ts` after the response.
+
+- **What it says:** the alert's Arabic title and a link to the admin page.
+  Never a name, a number or a licence: it passes through Apple's and Google's
+  push services.
+- **How often:** one notification per alert in five minutes, and a newer one
+  replaces the older. The admin list always shows every one.
+- **Setup, once:** the `push_subscriptions` migration
+  (`20261102130000_push_subscriptions.sql`), then three Vercel variables, for
+  Production only, and a redeploy (the public key is built in):
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (Sensitive) and
+  `VAPID_SUBJECT` (`https://jerusalem-doctors.vercel.app`). A new pair:
+  `npx web-push generate-vapid-keys`. Changing the pair signs every device out
+  of notifications; admins turn them on again. Without the keys the switch is
+  not shown and nothing is sent.
+- **Each admin, on each device:** open the admin panel and press «تفعيل
+  الإشعارات», then «جرّب» to see one arrive. On an **iPhone** (iOS 16.4 or
+  later) the app must first be added to the Home Screen and opened from there;
+  in Safari's tab the switch says so. If the browser's notifications for the
+  site are blocked, the switch says that too: allow them in the browser's
+  settings and reload.
+- **Who gets them:** admins only, active ones. A demoted or closed account
+  stops at once; a device the push service reports gone (the app removed) is
+  deleted on the next send. «إيقاف» removes the device.
+- **Not arriving:** check the switch says «مفعّلة», press «جرّب» (a 503 means
+  the keys are not set in Vercel), and that the phone's own notification
+  settings for the app are on. Delivery is the push service's: a phone that is
+  off gets it, if at all, for an hour (`TTL` in `lib/push.ts`).
+
 ### Sentry alert rules worth having
 
 Sentry groups identical messages into one issue, and a default "new issue"
