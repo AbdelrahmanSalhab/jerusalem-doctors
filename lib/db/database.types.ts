@@ -263,6 +263,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"push_subscriptions": {
+                  Row: {
+                    "auth": string,"created_at": string,"doctor_id": string,"endpoint": string,"id": string,"p256dh": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "auth": string,"created_at"?: string,"doctor_id": string,"endpoint": string,"id"?: string,"p256dh": string
+                  }
+                  Update: {
+                    "auth"?: string,"created_at"?: string,"doctor_id"?: string,"endpoint"?: string,"id"?: string,"p256dh"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "push_subscriptions_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
+      referencedRelation: "doctors"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"specialties": {
                   Row: {
                     "code": string | null,"id": string,"is_active": boolean,"name_ar": string,"name_ar_normalized": string,"name_en": string | null,"name_he": string | null,"parent_id": string | null,"sort_order": number | null
