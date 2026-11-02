@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { raiseAlert } from "@/lib/alerts";
 import { requireDoctor } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -27,13 +28,14 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
 
-  const r = await createSupabaseServiceClient()
-    .from("number_requests")
-    .insert({ requester_id: me.id, query: parsed.data.q });
+  const service = createSupabaseServiceClient();
+  const r = await service.from("number_requests").insert({ requester_id: me.id, query: parsed.data.q });
   if (r.error) {
     console.error("[number-requests] insert failed", r.error);
     return jsonError(500, { error: "insert_failed", code: "insert_failed" });
   }
 
+  // Someone is waiting for a reply. No name or query: those stay on /admin/requests.
+  await raiseAlert(service, "number_requested");
   return jsonOk({ ok: true });
 });
