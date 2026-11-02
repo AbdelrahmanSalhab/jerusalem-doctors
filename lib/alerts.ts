@@ -39,6 +39,18 @@ export const ALERTS = {
     level: "warning",
     todo: "اشحن رصيد SMS4FREE قبل أن ينفد، وإلا توقفت رموز الدخول.",
   },
+  number_requested: {
+    sentry: "Doctor asked the admins for a number",
+    ar: "طبيب يطلب رقم زميل",
+    level: "info",
+    todo: "افتح «طلبات الأرقام»، أرسل الرقم للطبيب عبر واتساب، ثم اضغط «تم».",
+  },
+  deletion_requested: {
+    sentry: "Account deletion requested",
+    ar: "طلب حذف حساب",
+    level: "warning",
+    todo: "أُغلق الحساب وأُخفي فورًا. افتح «حساب مغلق / طلب حذف»، وتأكد أن الطلب من صاحبه، ثم اضغط «حذف نهائي» كما تعد صفحة الخصوصية.",
+  },
   unknown_workplaces: {
     sentry: "Workplace names not in the institutions list",
     ar: "أماكن عمل غير موجودة في قائمة المستشفيات",
@@ -76,7 +88,8 @@ export type AlertCode = keyof typeof ALERTS;
 /** The alerts that also reach an admin's phone (lib/push.ts), and the page
  *  the notification opens. The rest are for the activity log: the SMS half
  *  budget is information, the rate limiter's timeout is noise, and the
- *  unknown workplaces can wait for the next visit. */
+ *  unknown workplaces can wait for the next visit. A number request is only
+ *  information for the log too, but someone is waiting on a reply. */
 const PUSH_TO: Partial<Record<AlertCode, string>> = {
   doctor_waiting: "/admin?status=pending",
   profile_reported: "/admin/reports",
@@ -84,6 +97,8 @@ const PUSH_TO: Partial<Record<AlertCode, string>> = {
   sms_cap_reached: "/admin/stats",
   sms_balance_low: "/admin/stats",
   db_size_high: "/admin/stats",
+  number_requested: "/admin/requests",
+  deletion_requested: "/admin?status=suspended",
 };
 
 export function isAlertCode(v: unknown): v is AlertCode {

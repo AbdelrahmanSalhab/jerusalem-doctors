@@ -49,10 +49,17 @@ describe("raiseAlert and the admins' phones", () => {
     expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, expect.objectContaining({ url: "/admin/stats", tag: "sms_cap_reached" }));
   });
 
-  it("pushes exactly the six that call for action, none of the noisy ones", async () => {
+  it("pushes exactly the eight that call for action, none of the noisy ones", async () => {
     for (const code of Object.keys(ALERTS) as (keyof typeof ALERTS)[]) await raiseAlert(service, code);
     const pushed = sendPushToAdmins.mock.calls.map((c) => (c as unknown as [unknown, { tag: string }])[1].tag).sort();
-    expect(pushed).toEqual(["db_size_high", "doctor_waiting", "licenses_missing", "profile_reported", "sms_balance_low", "sms_cap_reached"]);
+    expect(pushed).toEqual(["db_size_high", "deletion_requested", "doctor_waiting", "licenses_missing", "number_requested", "profile_reported", "sms_balance_low", "sms_cap_reached"]);
+  });
+
+  it("sends the two new ones to the page that deals with them", async () => {
+    await raiseAlert(service, "number_requested");
+    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, { title: ALERTS.number_requested.ar, url: "/admin/requests", tag: "number_requested" });
+    await raiseAlert(service, "deletion_requested");
+    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, { title: ALERTS.deletion_requested.ar, url: "/admin?status=suspended", tag: "deletion_requested" });
   });
 
   it("never carries details: the push has the title and link only", async () => {

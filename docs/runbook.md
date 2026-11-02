@@ -351,9 +351,10 @@ minute), so a slow Redis cannot flood it.
 
 The alerts above that need someone to act also reach each admin's phone or
 browser, as a notification: a doctor waiting for approval, a profile report,
-licences gone from the registry, the daily SMS cap or a low SMS balance, and
-the database nearing its limit (`PUSH_TO` in `lib/alerts.ts`; the rest stay in
-the activity log). Web Push, sent by `lib/push.ts` after the response.
+licences gone from the registry, the daily SMS cap or a low SMS balance, the
+database nearing its limit, a doctor asking for a colleague's number, and an
+account-deletion request (`PUSH_TO` in `lib/alerts.ts`; the rest stay in the
+activity log). Web Push, sent by `lib/push.ts` after the response.
 
 - **What it says:** the alert's Arabic title and a link to the admin page.
   Never a name, a number or a licence: it passes through Apple's and Google's
@@ -390,6 +391,9 @@ in an issue is more than 0 in 1 minute") for:
 
 - `New doctor waiting for approval`: a doctor needs approval (the admin nav
   badge shows the count too).
+- `Doctor asked the admins for a number` and `Account deletion requested`:
+  someone is waiting on a reply ("طلبات الأرقام"), or an account is closed and
+  waits for "حذف نهائي" (see "A doctor asked to delete their account").
 - `signInWithOtp failed` tagged `route:login/start` or `route:login/resend`:
   login codes are not being sent.
 - `SMS4FREE balance low`: from the daily balance cron. The remaining balance

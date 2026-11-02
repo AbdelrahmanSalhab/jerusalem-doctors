@@ -3,11 +3,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db, jsonRequest } from "@/test/fakeSupabase";
 
-const { requireDoctor, rateLimit } = vi.hoisted(() => ({
+const { requireDoctor, rateLimit, raiseAlert } = vi.hoisted(() => ({
   requireDoctor: vi.fn(),
   rateLimit: vi.fn(async () => ({ success: true })),
+  raiseAlert: vi.fn(async () => {}),
 }));
 
+vi.mock("@/lib/alerts", () => ({ raiseAlert }));
 vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 vi.mock("@/lib/supabase/service", async () => {
@@ -35,6 +37,12 @@ describe("POST /api/number-requests", () => {
     expect(rateLimit).toHaveBeenCalledWith("numberRequest", "doctor:d1");
   });
 
+  it("tells the admins someone is waiting, with no name or search text", async () => {
+    await call({ q: "أحمد خليل" });
+    expect(raiseAlert).toHaveBeenCalledTimes(1);
+    expect(raiseAlert).toHaveBeenCalledWith(db.client, "number_requested");
+  });
+
   it("answers 401 without a session", async () => {
     requireDoctor.mockRejectedValue(new Error("NEXT_REDIRECT"));
     expect((await call({ q: "x" })).status).toBe(401);
@@ -55,5 +63,16 @@ describe("POST /api/number-requests", () => {
   it("answers 500 when the insert fails", async () => {
     db.queue("number_requests", { error: { message: "x" } });
     expect((await call({ q: "x" })).status).toBe(500);
+  });
+
+  it("tells nobody when nothing was saved", async () => {
+    requireDoctor.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    await call({ q: "x" });
+    await call({ q: "   " });
+    rateLimit.mockResolvedValueOnce({ success: false });
+    await call({ q: "x" });
+    db.queue("number_requests", { error: { message: "x" } });
+    await call({ q: "x" });
+    expect(raiseAlert).not.toHaveBeenCalled();
   });
 });

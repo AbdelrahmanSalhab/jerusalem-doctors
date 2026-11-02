@@ -4,6 +4,7 @@
 // final state via /admin (also soft-only, no hard delete in MVP).
 
 import { ipFromHeaders, jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
+import { raiseAlert } from "@/lib/alerts";
 import { requireDoctor } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -36,6 +37,8 @@ export const POST = withJsonErrors(async (req: Request) => {
     target_doctor_id: me.id,
     metadata: { ip },
   });
+  // An admin has to finish it, as the privacy page promises.
+  await raiseAlert(service, "deletion_requested");
 
   // The account is suspended now; end the session with it.
   const ssr = await createSupabaseServerClient();
