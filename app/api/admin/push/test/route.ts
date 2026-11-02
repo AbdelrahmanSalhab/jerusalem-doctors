@@ -13,7 +13,7 @@ export const POST = withJsonErrors(async () => {
   const rl = await rateLimit("adminPushTest", `admin:${admin.id}`);
   if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
 
-  const sent = await sendTestPush(createSupabaseServiceClient(), admin.id);
-  if (sent === null) return jsonError(503, { error: "push_not_configured", code: "push_not_configured" });
-  return jsonOk({ ok: true, sent });
+  const result = await sendTestPush(createSupabaseServiceClient(), admin.id);
+  if (result === null) return jsonError(503, { error: "push_not_configured", code: "push_not_configured" });
+  return jsonOk({ ok: true, ...result });
 });

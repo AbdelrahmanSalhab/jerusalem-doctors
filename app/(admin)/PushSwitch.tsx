@@ -12,6 +12,13 @@ export type PushState = "off" | "on" | "denied" | "unsupported" | "unsupported-i
 
 const BUTTON = "shrink-0 rounded-md border border-line bg-surface px-3 py-1.5 text-sm hover:bg-foreground/5 disabled:opacity-50";
 
+/** «إيقاف» is not a sibling of «جرّب»: a quiet text button at the far end, so a
+ *  tap meant to test does not turn it off. */
+const QUIET = "ms-auto shrink-0 rounded-md px-2 py-1.5 text-sm text-foreground/70 underline hover:bg-foreground/5 disabled:opacity-50";
+
+/** How long a result stays in place of the explanation. */
+const MESSAGE_SECONDS = 10;
+
 const TEXT: Record<PushState, string> = {
   off: "إشعارات الإدارة: تصلك على هذا الجهاز عند وجود طبيب بانتظار القبول أو بلاغ أو عطل عاجل.",
   on: "الإشعارات مفعّلة على هذا الجهاز.",
@@ -49,13 +56,23 @@ export function PushSwitchView({
           <button type="button" onClick={onTest} disabled={busy} className={BUTTON}>
             جرّب
           </button>
-          <button type="button" onClick={onDisable} disabled={busy} className={BUTTON}>
+          <button type="button" onClick={onDisable} disabled={busy} className={QUIET}>
             إيقاف
           </button>
         </>
       )}
     </div>
   );
+}
+
+/** What «جرّب» tells the admin: how many of their devices the push service
+ *  took it for. «Sent» is not «shown»: a phone that is off or has this app's
+ *  notifications switched off still counts, so the hint says where to look. */
+export function testResultText(sent: number, devices: number): string {
+  if (devices === 0) return "لا جهاز مسجّل لحسابك. شغّل الإشعارات من جديد.";
+  const reached = `وصل الإشعار التجريبي إلى ${sent} من ${devices} من أجهزتك المسجّلة.`;
+  if (sent === 0) return `${reached} أُزيلت الأجهزة التي لم تعد تستقبل؛ شغّل الإشعارات من جديد.`;
+  return `${reached} إن لم يظهر على جهاز فتحقق من إعدادات الإشعارات فيه.`;
 }
 
 /** The base64url public key as the bytes pushManager.subscribe wants. */
@@ -88,6 +105,13 @@ export function PushSwitch({ publicKey }: { publicKey: string }) {
     void read().then(setState).catch(() => setState("unsupported"));
   }, [publicKey, read]);
 
+  // A result stays a few seconds, then the status comes back.
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => setMessage(null), MESSAGE_SECONDS * 1000);
+    return () => clearTimeout(timer);
+  }, [message]);
+
   // Off until the keys are set (the runbook says how), and until mounted.
   if (!publicKey || state === null) return null;
 
@@ -96,8 +120,10 @@ export function PushSwitch({ publicKey }: { publicKey: string }) {
     setMessage(null);
     try {
       setMessage(await task());
-    } catch {
-      setMessage("تعذّر ذلك الآن. حاول مرة أخرى.");
+    } catch (err) {
+      // The error's name (NotAllowedError, AbortError...) is what tells a
+      // blocked permission from a browser with no push service (Brave).
+      setMessage(`تعذّر ذلك الآن (${err instanceof Error ? err.name : "؟"}). حاول مرة أخرى.`);
     }
     setState(await read().catch(() => "unsupported" as const));
     setBusy(false);
@@ -133,8 +159,8 @@ export function PushSwitch({ publicKey }: { publicKey: string }) {
     run(async () => {
       const res = await send("POST", "/api/admin/push/test");
       if (!res.ok) return "تعذّر إرسال إشعار تجريبي.";
-      const { sent } = (await res.json()) as { sent: number };
-      return sent > 0 ? "أُرسل إشعار تجريبي. إن لم يظهر خلال لحظات فتحقق من إعدادات الإشعارات في الجهاز." : "لا جهاز مسجّل لحسابك.";
+      const { sent, devices } = (await res.json()) as { sent: number; devices: number };
+      return testResultText(sent, devices);
     });
 
   return <PushSwitchView state={state} busy={busy} message={message} onEnable={enable} onDisable={disable} onTest={test} />;

@@ -2,7 +2,7 @@
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PushSwitchView, type PushState } from "./PushSwitch";
+import { PushSwitchView, testResultText, type PushState } from "./PushSwitch";
 
 const html = (state: PushState, over: Partial<Parameters<typeof PushSwitchView>[0]> = {}) =>
   renderToStaticMarkup(PushSwitchView({ state, busy: false, message: null, onEnable: () => {}, onDisable: () => {}, onTest: () => {}, ...over }));
@@ -39,5 +39,32 @@ describe("PushSwitchView", () => {
 
   it("is a labelled region, so a screen reader can find it", () => {
     expect(html("off")).toContain('aria-label="إشعارات الإدارة"');
+  });
+});
+
+describe("testResultText", () => {
+  it("counts the devices it reached out of the ones registered, and says where to look if one stays silent", () => {
+    expect(testResultText(2, 2)).toContain("2 من 2");
+    expect(testResultText(2, 2)).toContain("فتحقق من إعدادات الإشعارات");
+  });
+
+  it("says a device that stopped receiving was removed, and asks to turn it on again", () => {
+    const out = testResultText(1, 2);
+    expect(out).toContain("1 من 2");
+    const none = testResultText(0, 1);
+    expect(none).toContain("أُزيلت");
+    expect(none).not.toContain("فتحقق");
+  });
+
+  it("says when no device is registered at all, which is how a missing desktop shows up", () => {
+    expect(testResultText(0, 0)).toContain("لا جهاز مسجّل");
+  });
+});
+
+describe("the stop button", () => {
+  it("sits apart from the test button, at the far end, so one tap does not mean the other", () => {
+    const out = html("on");
+    expect(out.indexOf("جرّب")).toBeLessThan(out.indexOf("إيقاف"));
+    expect(out).toMatch(/ms-auto[^"]*"[^>]*>إيقاف/);
   });
 });

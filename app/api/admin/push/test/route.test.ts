@@ -17,13 +17,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   gate.allowed = true;
   requireAdminOrNull.mockResolvedValue({ id: "admin-1" });
-  sendTestPush.mockResolvedValue(2);
+  sendTestPush.mockResolvedValue({ devices: 3, sent: 2 });
 });
 
 describe("POST /api/admin/push/test", () => {
-  it("tests the admin's own devices and says how many it reached", async () => {
+  it("tests the admin's own devices and says how many there were and how many it reached", async () => {
     const res = await call();
-    expect(await res.json()).toEqual({ ok: true, sent: 2 });
+    expect(await res.json()).toEqual({ ok: true, devices: 3, sent: 2 });
     expect(sendTestPush).toHaveBeenCalledWith({ marker: "service" }, "admin-1");
   });
 
