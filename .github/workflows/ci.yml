@@ -52,14 +52,17 @@ jobs:
           - name: e2e
             slug: main
             projects: --project=db --project=api --project=desktop
+            browsers: chromium
             first: true
           - name: e2e (phone)
             slug: phone
             projects: --project=phone --no-deps
+            browsers: webkit
             first: false
           - name: e2e (sweep)
             slug: sweep
             projects: --project=sweep --no-deps
+            browsers: chromium
             first: false
     steps:
       - uses: actions/checkout@v7
@@ -86,9 +89,12 @@ jobs:
       # and in the background while npm, the browsers and the build run.
       - name: Start Supabase in the background (every migration from zero)
         run: |
-          (if [ -f "$RUNNER_TEMP/images.tar" ]; then docker load -q -i "$RUNNER_TEMP/images.tar"; fi \
-            && supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor \
-            && supabase seed buckets; echo $? > "$RUNNER_TEMP/supabase.exit") > "$RUNNER_TEMP/supabase.log" 2>&1 &
+          # Each phase's seconds go to supabase.phases (printed below), to see
+          # which part of the start is the long one.
+          (t=$(date +%s); mark() { echo "- $1: $(( $(date +%s) - t )) s" >> "$RUNNER_TEMP/supabase.phases"; t=$(date +%s); }
+            if [ -f "$RUNNER_TEMP/images.tar" ]; then docker load -q -i "$RUNNER_TEMP/images.tar"; fi && mark "docker load" \
+            && supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor && mark "supabase start" \
+            && supabase seed buckets && mark "seed buckets"; echo $? > "$RUNNER_TEMP/supabase.exit") > "$RUNNER_TEMP/supabase.log" 2>&1 &
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -104,8 +110,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.os.outputs.image }}-${{ hashFiles('package-lock.json') }}
-      # --with-deps installs WebKit's libraries with apt every run (the image
+          key: playwright-${{ runner.os }}-${{ steps.os.outputs.image }}-${{ matrix.browsers }}-${{ hashFiles('package-lock.json') }}
+      # One browser per job (the matrix says which): the iPhone tests use WebKit,
+      # the others Chromium. --with-deps installs WebKit's libraries with apt every run (the image
       # lacks some). The runner's default mirror, azure.archive.ubuntu.com,
       # sometimes trickles at ~60 kB/s, which no apt timeout catches, and the
       # install took 7 to 20 minutes (actions/runner-images#14823). The
@@ -115,7 +122,7 @@ jobs:
           sudo find /etc/apt \( -name sources.list -o -name '*.sources' -o -name apt-mirrors.txt \) \
             -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} +
           grep -rhoE "https?://[a-z.]*archive\.ubuntu\.com" /etc/apt/ | sort | uniq -c || true
-          (npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
+          (npx playwright install --with-deps ${{ matrix.browsers }}; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
       - name: Build the app against the test stack
         run: |
           # e2e/env.ts is the one list of the test stack's settings.
@@ -153,6 +160,7 @@ jobs:
             grep -h "^Fetched" "$RUNNER_TEMP/$job.log" || true
             tail -3 "$RUNNER_TEMP/$job.log"
           done
+          { echo "### Supabase start (${{ matrix.name }})"; cat "$RUNNER_TEMP/supabase.phases"; } | tee -a "$GITHUB_STEP_SUMMARY"
       # The app's database types must match the schema the migrations build.
       # A difference means a migration landed without `npm run db:types`.
       - name: Database types match the migrations
