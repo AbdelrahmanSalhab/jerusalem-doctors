@@ -31,3 +31,11 @@ describe("GET /api/admin/migrations", () => {
     expect(db.argsOf("applied_migrations", "select")).toEqual([]);
   });
 });
+
+describe("GET /api/admin/migrations: a failed read", () => {
+  it("fails rather than reporting an empty list", async () => {
+    db.queue("applied_migrations", { error: { message: "boom" } });
+    const res = await (await import("./route")).GET(new Request("http://x/api/admin/migrations"));
+    expect(res.status).toBe(500);
+  });
+});

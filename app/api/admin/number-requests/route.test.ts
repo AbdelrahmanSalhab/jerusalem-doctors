@@ -55,3 +55,13 @@ describe("PATCH /api/admin/number-requests/[id]", () => {
     expect(db.calls).toHaveLength(0);
   });
 });
+
+describe("PATCH /api/admin/number-requests/[id]: a failed update", () => {
+  it("answers 500 and logs it, rather than saying the request is gone", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    requireAdminOrNull.mockResolvedValue({ id: "admin-1" });
+    db.reset();
+    db.queue("number_requests", { error: { message: "boom" } });
+    expect((await call()).status).toBe(500);
+  });
+});

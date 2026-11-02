@@ -69,3 +69,37 @@ describe("DELETE /api/admin/pending-signups/[id]", () => {
     expect((await discard()).status).toBe(401);
   });
 });
+
+describe("pending signups: edges", () => {
+  it("404s a malformed id on both verbs, without asking the database", async () => {
+    const r = await route();
+    expect((await r.POST(jsonRequest("/x", {}), ctx("abc"))).status).toBe(404);
+    expect((await r.DELETE(jsonRequest("/x", {}), ctx("abc"))).status).toBe(404);
+    expect(db.calls).toHaveLength(0);
+  });
+
+  it("refuses a non-admin on delete", async () => {
+    requireAdminOrNull.mockResolvedValue(null);
+    expect((await (await route()).DELETE(jsonRequest("/x", {}), ctx())).status).toBe(401);
+  });
+
+  it("fails on a database error, and 404s a signup that is already gone", async () => {
+    const r = await route();
+    db.queue("pending_signups", { error: { message: "boom" } });
+    expect((await r.POST(jsonRequest("/x", {}), ctx())).status).toBe(500);
+    db.queue("pending_signups", { error: { message: "boom" } });
+    expect((await r.DELETE(jsonRequest("/x", {}), ctx())).status).toBe(500);
+    db.queue("pending_signups", { data: null });
+    expect((await r.DELETE(jsonRequest("/x", {}), ctx())).status).toBe(404);
+  });
+
+  it("greets and logs a signup that has no first name yet", async () => {
+    const r = await route();
+    db.queue("pending_signups", { data: { phone_e164: "+972521234567", payload: { resume_form: {} } } });
+    expect((await r.POST(jsonRequest("/x", {}), ctx())).status).toBe(200);
+    expect(db.argsOf("audit_logs", "insert")[0][0]).toMatchObject({ metadata: { name: null } });
+    db.queue("pending_signups", { data: { payload: {} } });
+    expect((await r.DELETE(jsonRequest("/x", {}), ctx())).status).toBe(200);
+    expect(db.argsOf("audit_logs", "insert")[1][0]).toMatchObject({ metadata: { name: null } });
+  });
+});
