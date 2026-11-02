@@ -236,6 +236,22 @@ After this, the doctor's next login attempt with the new number works.
 
 By design, these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
 
+### «ترخيص يحتاج مراجعة» on /admin
+
+The tile (and the list behind it, `?status=license`) counts doctors whose
+primary licence is not «موثّق» **and** that no admin has reviewed
+(`doctors.license_reviewed_at`). Before, it counted every licence the registry
+had not confirmed, so a Palestinian licence (no registry to check it against)
+or an Israeli one the registry does not list stayed in it for good, however
+carefully an admin had looked.
+
+A licence is marked reviewed when an admin accepts the doctor with a reason,
+saves the primary licence after a change, or presses «تمت المراجعة» in the
+licence section (an optional note goes to the activity log). The nightly
+registry sync clears the mark when it flags a licence as gone, so that doctor
+comes back to the queue. A save that changes nothing writes nothing: use
+«تمت المراجعة» for that.
+
 ### A doctor asked to delete their account
 
 "طلب حذف الحساب" on /profile hides and suspends the account at once; the

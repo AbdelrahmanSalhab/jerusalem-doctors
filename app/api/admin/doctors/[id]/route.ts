@@ -102,6 +102,9 @@ export const PATCH = withJsonErrors(async (
     featured: fields.featured,
     // Re-featuring bumps featured_at, so the newest pick leads the section.
     ...(fields.featured !== undefined && { featured_at: fields.featured ? new Date().toISOString() : null }),
+    // Accepting a doctor the registry does not confirm, with a reason, is the
+    // review the licence queue waits for.
+    ...(fields.is_admin_approved === true && approval_reason && { license_reviewed_at: new Date().toISOString() }),
   };
 
   const r = await service.from("doctors").update(updates).eq("id", id);

@@ -48,3 +48,31 @@ test("the panel opens from the activity log", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin\?doctor=/);
   await expect(page.getByText("التحقق من الترخيص")).toBeVisible();
 });
+
+test("a licence the registry does not list leaves «ترخيص يحتاج مراجعة» once an admin reviewed it", async ({ page }) => {
+  const doctor = await createDoctor({ first: "مراجع", family: "الترخيص", licenseStatus: "not_found" });
+  try {
+    await page.goto("/admin?status=license&q=مراجع");
+    await expect(page.getByText("مراجع الترخيص").first()).toBeVisible();
+
+    await page.goto(`/admin?status=license&doctor=${doctor.id}`);
+    await page.getByLabel("ملاحظة (اختياري)").fill("تحققت من الشهادة");
+    await page.getByRole("button", { name: "تمت المراجعة" }).click();
+    await expect(page.getByText(/روجع هذا الترخيص في/)).toBeVisible();
+
+    // Out of the queue, though the registry still does not list it.
+    await page.goto("/admin?status=license&q=مراجع");
+    await expect(page.getByText("مراجع الترخيص")).toHaveCount(0);
+    const db = serviceClient();
+    expect((await db.from("doctors").select("license_verification_status, license_reviewed_at").eq("id", doctor.id).single()).data).toMatchObject({
+      license_verification_status: "not_found",
+      license_reviewed_at: expect.any(String),
+    });
+    expect((await db.from("audit_logs").select("metadata").eq("target_doctor_id", doctor.id).eq("action", "admin_license_reviewed").single()).data?.metadata).toEqual({
+      license_status: "not_found",
+      note: "تحققت من الشهادة",
+    });
+  } finally {
+    await doctor.remove();
+  }
+});

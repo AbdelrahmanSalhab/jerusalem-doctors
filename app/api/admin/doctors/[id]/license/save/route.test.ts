@@ -356,3 +356,21 @@ describe("POST .../license/save: the other branches", () => {
     expect((await res.json()).code).toBe("invalid_license");
   });
 });
+
+describe("POST .../license/save: the review mark", () => {
+  it("marks the primary licence as looked at by an admin when a save changes it", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", expected_status: "verified" });
+    expect(updates[0]).toHaveProperty("license_reviewed_at");
+  });
+
+  it("writes nothing when the save changes nothing: «تمت المراجعة» is for that", async () => {
+    await call({ slot: "primary", license_number: "999999" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("does not touch it when the secondary slot is saved: the queue counts the primary", async () => {
+    await call({ slot: "secondary", license_number: "12345", region: "PS" });
+    expect(updates[0]).not.toHaveProperty("license_reviewed_at");
+  });
+});

@@ -48,6 +48,7 @@ const TITLE: Record<string, string> = {
   admin_doctor_deleted: "حذف نهائي لحساب",
   admin_license_rechecked: "إعادة فحص الترخيص",
   admin_license_corrected: "تصحيح رقم الترخيص",
+  admin_license_reviewed: "مراجعة الترخيص",
   dev_password_login: "دخول فريق التطوير بكلمة مرور",
   ci_login: "دخول الاختبار الآلي (CI)",
   password_changed: "تغيير كلمة المرور",
@@ -177,6 +178,10 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
     case "admin_license_rechecked":
     case "admin_license_corrected":
       return licenseCheckDetail(m);
+    case "admin_license_reviewed":
+      return [isLicenseStatus(m.license_status) ? licenseStatusSentence(m.license_status) : "", m.note ? `الملاحظة: ${quote(m.note)}` : ""]
+        .filter(Boolean)
+        .join(" · ");
     case "ci_login":
       return "اختبار آلي (CI)";
     case "dev_password_login":

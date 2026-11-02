@@ -103,6 +103,21 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
     expect(updates[0]).toEqual({ is_admin_approved: true });
   });
 
+  it("counts accepting a doctor with a reason as the licence review, and nothing else does", async () => {
+    licenseStatus = "not_found";
+    await call({ is_admin_approved: true, approval_reason: "تحققت من الشهادة" });
+    expect(updates[0]).toHaveProperty("license_reviewed_at");
+    // A verified doctor needs no reason, and so no review mark.
+    updates.length = 0;
+    licenseStatus = "verified";
+    await call({ is_admin_approved: true });
+    expect(updates[0]).not.toHaveProperty("license_reviewed_at");
+    // Withdrawing acceptance, or any other switch, does not review a licence.
+    updates.length = 0;
+    await call({ is_visible: false });
+    expect(updates[0]).not.toHaveProperty("license_reviewed_at");
+  });
+
   it("refuses an unexplained acceptance when the licence is not confirmed", async () => {
     for (const status of ["soft_match", "not_found", "name_mismatch_overridden", null]) {
       licenseStatus = status;
@@ -130,7 +145,8 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
   it("never writes the reason as a column", async () => {
     licenseStatus = "soft_match";
     await call({ is_admin_approved: true, approval_reason: "تحققت هاتفيًا" });
-    expect(updates[0]).toEqual({ is_admin_approved: true });
+    expect(updates[0]).toEqual({ is_admin_approved: true, license_reviewed_at: expect.any(String) });
+    expect(updates[0]).not.toHaveProperty("approval_reason");
   });
 
   it("rejects a reason too short to mean anything", async () => {

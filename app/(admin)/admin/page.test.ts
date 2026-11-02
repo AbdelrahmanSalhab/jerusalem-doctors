@@ -164,7 +164,7 @@ describe("/admin doctors list", () => {
     await render({ status: "license" });
     const ors = calls.filter((c) => c.table === "doctors" && c.method === "or").map((c) => String(c.args[0]));
     expect(ors).toContain(
-      "and(or(license_verification_status.is.null,license_verification_status.neq.verified),or(is_admin.eq.false,is_visible.eq.true))",
+      "and(or(license_verification_status.is.null,license_verification_status.neq.verified),license_reviewed_at.is.null,or(is_admin.eq.false,is_visible.eq.true))",
     );
   });
 

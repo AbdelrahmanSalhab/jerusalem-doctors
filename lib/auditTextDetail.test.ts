@@ -22,6 +22,8 @@ describe("auditDetail", () => {
     expect(detail("unfinished_signup_deleted", {})).toBe("");
     expect(detail("admin_doctor_deleted")).toContain("حُذفت بياناته");
     expect(detail("ci_login")).toContain("CI");
+    expect(detail("admin_license_reviewed", { license_status: "not_found", note: "تحققت من الشهادة" })).toBe("الترخيص غير موجود في السجل · الملاحظة: «تحققت من الشهادة»");
+    expect(detail("admin_license_reviewed", {})).toBe("");
     expect(detail("admin_doctor_photo_changed", { removed: true })).toContain("حُذفت");
     expect(detail("admin_doctor_photo_changed", {})).toContain("رُفعت");
     expect(detail("moh_sync_failed", { error: "boom" })).toBe("boom");

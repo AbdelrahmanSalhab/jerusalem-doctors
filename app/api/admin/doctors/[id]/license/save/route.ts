@@ -178,6 +178,8 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
   if (body.slot === "primary") {
     updates.license_verified_at =
       nextStatus === "verified" || nextStatus === "soft_match" ? new Date().toISOString() : null;
+    // An admin has just looked at it, whatever the answer was.
+    updates.license_reviewed_at = new Date().toISOString();
   }
 
   const r = await service.from("doctors").update(updates).eq("id", id);
