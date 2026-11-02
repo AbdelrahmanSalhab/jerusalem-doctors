@@ -52,14 +52,17 @@ jobs:
           - name: e2e
             slug: main
             projects: --project=db --project=api --project=desktop
+            browsers: chromium
             first: true
           - name: e2e (phone)
             slug: phone
             projects: --project=phone --no-deps
+            browsers: webkit
             first: false
           - name: e2e (sweep)
             slug: sweep
             projects: --project=sweep --no-deps
+            browsers: chromium
             first: false
     steps:
       - uses: actions/checkout@v7
@@ -107,8 +110,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.os.outputs.image }}-${{ hashFiles('package-lock.json') }}
-      # --with-deps installs WebKit's libraries with apt every run (the image
+          key: playwright-${{ runner.os }}-${{ steps.os.outputs.image }}-${{ matrix.browsers }}-${{ hashFiles('package-lock.json') }}
+      # One browser per job (the matrix says which): the iPhone tests use WebKit,
+      # the others Chromium. --with-deps installs WebKit's libraries with apt every run (the image
       # lacks some). The runner's default mirror, azure.archive.ubuntu.com,
       # sometimes trickles at ~60 kB/s, which no apt timeout catches, and the
       # install took 7 to 20 minutes (actions/runner-images#14823). The
@@ -118,7 +122,7 @@ jobs:
           sudo find /etc/apt \( -name sources.list -o -name '*.sources' -o -name apt-mirrors.txt \) \
             -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} +
           grep -rhoE "https?://[a-z.]*archive\.ubuntu\.com" /etc/apt/ | sort | uniq -c || true
-          (npx playwright install --with-deps chromium webkit; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
+          (npx playwright install --with-deps ${{ matrix.browsers }}; echo $? > "$RUNNER_TEMP/browsers.exit") > "$RUNNER_TEMP/browsers.log" 2>&1 &
       - name: Build the app against the test stack
         run: |
           # e2e/env.ts is the one list of the test stack's settings.
