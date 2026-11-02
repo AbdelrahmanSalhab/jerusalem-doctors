@@ -403,7 +403,7 @@ export const POST = withJsonErrors(async (req: Request) => {
 
       subspecialty: parsed.subspecialty?.trim() || null,
       subspecialty_normalized: subspecialtyNorm,
-      email: parsed.email?.trim() || null,
+      email: parsed.email.trim(),
       bio: parsed.bio?.trim() || null,
       career_stage: parsed.career_stage ?? null,
       residency_start_year: parsed.residency_start_year ?? null,

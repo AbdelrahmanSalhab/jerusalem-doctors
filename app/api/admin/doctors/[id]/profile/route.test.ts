@@ -20,6 +20,10 @@ let doctor: Record<string, unknown> | null;
 let phoneHeldBy: { arabic_first_name: string; arabic_family_name: string } | null = null;
 let rpcError: { code?: string; message: string } | null = null;
 let authError: { status?: number; message: string } | null = null;
+/** Errors for successive login updates; empty means no error. */
+let authQueue: ({ status?: number; message: string } | null)[] = [];
+let readError: { code: string } | null = null;
+const gate = vi.hoisted(() => ({ allowed: true }));
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({
@@ -27,17 +31,17 @@ const { requireAdminOrNull } = vi.hoisted(() => ({
   })),
 }));
 vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
-vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
+vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: gate.allowed })) }));
 // The relink is best-effort after the save and reads tables this fake does
 // not model; it swallows its own errors, so stub it out of the way.
-vi.mock("@/lib/institutions", () => ({ relinkDoctor: vi.fn(async () => {}) }));
+vi.mock("@/lib/institutions", () => ({ relinkDoctor: vi.fn(async () => {}), withHmoIds: async (_s: unknown, rows: unknown[]) => rows }));
 
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from: (table: string) => ({
       select: () => ({
         eq: () => ({
-          maybeSingle: async () => ({ data: doctor, error: null }),
+          maybeSingle: async () => ({ data: doctor, error: readError }),
           neq: () => ({ maybeSingle: async () => ({ data: phoneHeldBy, error: null }) }),
         }),
       }),
@@ -55,7 +59,7 @@ vi.mock("@/lib/supabase/service", () => ({
       admin: {
         updateUserById: async (id: string, attrs: Record<string, unknown>) => {
           authCalls.push({ id, attrs });
-          return { error: authError };
+          return { error: authQueue.length > 0 ? authQueue.shift()! : authError };
         },
       },
     },
@@ -97,6 +101,9 @@ beforeEach(() => {
   phoneHeldBy = null;
   rpcError = null;
   authError = null;
+  authQueue = [];
+  readError = null;
+  gate.allowed = true;
 });
 
 describe("PATCH /api/admin/doctors/[id]/profile: who may call it", () => {
@@ -275,5 +282,87 @@ describe("PATCH /api/admin/doctors/[id]/profile: the trail", () => {
     });
     expect(JSON.stringify(m)).not.toContain("سيرة طويلة");
     expect(JSON.stringify(m)).not.toContain("972503334444");
+  });
+});
+
+describe("PATCH /api/admin/doctors/[id]/profile: refusals and failures", () => {
+  const NEW = "0503334444";
+  const NEW_E164 = "+972503334444";
+  it("stops a flood of saves", async () => {
+    gate.allowed = false;
+    expect((await call({ bio: "x" })).status).toBe(429);
+  });
+
+  it("names the field when the body is wrong, and refuses a body that is not JSON", async () => {
+    const bad = await call({ email: "not an email" });
+    expect(bad.status).toBe(400);
+    expect(Object.keys((await bad.json()).fields)).toContain("email");
+    const { PATCH } = await import("./route");
+    const raw = await PATCH(new Request("https://example.test/x", { method: "PATCH", body: "nope" }), { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000000d1" }) });
+    expect(raw.status).toBe(400);
+  });
+
+  it("answers 500 when the doctor cannot be read", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    readError = { code: "XX000" };
+    expect((await call({ bio: "x" })).status).toBe(500);
+  });
+
+  it("saves a valid workplace set, and a specialty set, and says how many in the trail", async () => {
+    const res = await call({
+      workplaces: [{ name: "هداسا", workplace_type: "hospital", is_primary: true }],
+      specialty_ids: ["11111111-1111-4111-8111-111111111111"],
+    });
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({ metadata: { workplaces: 1, specialties: 1 } });
+  });
+
+  it("reports an auth failure that is not a taken number as 502, and writes nothing", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    authError = { status: 500, message: "gotrue down" };
+    const res = await call({ phone: NEW });
+    expect(res.status).toBe(502);
+    expect((await res.json()).code).toBe("auth_update_failed");
+    expect(saves).toHaveLength(0);
+  });
+
+  it("keeps going, and tells Sentry, when even the rollback of the login fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    rpcError = { message: "boom" };
+    authQueue = [null, { message: "rollback failed" }];
+    expect((await call({ phone: NEW })).status).toBe(500);
+    expect(authCalls).toHaveLength(2);
+  });
+
+  it("does not touch the login on a failed save when the phone did not move", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    rpcError = { message: "boom" };
+    expect((await call({ bio: "x" })).status).toBe(500);
+    expect(authCalls).toHaveLength(0);
+  });
+
+  it("accepts the Hebrew names being cleared or changed one at a time", async () => {
+    await call({ hebrew_first_name: null });
+    expect(saves[0].p_updates.hebrew_first_name).toBeNull();
+    await call({ hebrew_family_name: "כהן" });
+    expect(saves[1].p_updates).toHaveProperty("hebrew_family_name");
+    expect(audits[1]).toMatchObject({ metadata: { hebrew_name_changed: true } });
+    await call({ hebrew_first_name: BASE.hebrew_first_name });
+    expect(audits[2].metadata).not.toHaveProperty("hebrew_name_changed");
+  });
+
+  it("keeps the doctor's phone display when the same number is retyped the same way", async () => {
+    await call({ phone: BASE.phone_display });
+    expect(saves[0].p_updates).not.toHaveProperty("phone_display");
+  });
+
+  it("formats a number typed as E.164 for the cards", async () => {
+    await call({ phone: NEW_E164 });
+    expect(saves[0].p_updates.phone_display).not.toBe(NEW_E164);
+  });
+
+  it("notes in the trail that a confirmed number cannot receive codes", async () => {
+    await call({ phone: "+14155550123", confirm_phone_risk: true });
+    expect(audits[0]).toMatchObject({ metadata: { phone_not_sms_deliverable: true } });
   });
 });

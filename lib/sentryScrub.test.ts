@@ -176,3 +176,44 @@ describe("browser breadcrumbs", () => {
     expect(browserBreadcrumb({ category: "navigation", data: { to: "/search?q=0521234567" } })).toEqual({ category: "navigation", data: { to: "/search?q=[phone]" } });
   });
 });
+
+describe("edges of the scrubbers", () => {
+  it("scrubs an Error with no stack, and a span with no attributes or no name", () => {
+    const err = new Error("call 0501234567");
+    err.stack = undefined;
+    expect(JSON.stringify(scrubPii(err))).not.toContain("0501234567");
+    expect(scrubSpan({ name: "GET /x?q=سارة" }).name).toBe("GET /x");
+    expect(scrubSpan({ attributes: { "http.url": "https://x/y?q=1", other: 5 } }).attributes).toEqual({ "http.url": "https://x/y", other: 5 });
+  });
+
+  it("keeps a captured object's event whole when it has no code, and when it has no exception values", () => {
+    const base = { extra: { __serialized__: { message: "row for سارة" } } } as never;
+    expect(JSON.stringify(scrubEvent(base))).not.toContain("سارة");
+    const withValues = scrubEvent({
+      extra: { __serialized__: { message: "x" } },
+      exception: { values: [{ type: "Error", value: "x", mechanism: { type: "generic", synthetic: true } }, { type: "Error", value: "kept" }] },
+    } as never);
+    expect(JSON.stringify(withValues)).toContain("captured object (code none)");
+    expect(JSON.stringify(withValues)).toContain("kept");
+  });
+
+  it("scrubs an event whose extra is not an object", () => {
+    expect(scrubEvent({ message: "0501234567", extra: { __serialized__: "text" } } as never)).toBeTruthy();
+  });
+
+  it("fails closed even when a span field throws as it is read", () => {
+    const span = {
+      get name(): string {
+        throw new Error("unreadable");
+      },
+      id: "abc",
+      get secret(): string {
+        throw new Error("unreadable");
+      },
+      nested: { a: 1 },
+    };
+    const out = scrubSpan(span as never) as Record<string, unknown>;
+    expect(out).toMatchObject({ id: "abc", name: "[unscrubbable span]", attributes: {} });
+    expect(out).not.toHaveProperty("nested");
+  });
+});

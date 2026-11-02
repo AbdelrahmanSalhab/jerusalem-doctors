@@ -11,6 +11,9 @@ const updates: Record<string, unknown>[] = [];
 const audits: Record<string, unknown>[] = [];
 
 let doctorExists = true;
+let readError: { code: string } | null = null;
+let removeError: unknown = null;
+const gate = vi.hoisted(() => ({ allowed: true }));
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({
@@ -18,7 +21,7 @@ const { requireAdminOrNull } = vi.hoisted(() => ({
   })),
 }));
 vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
-vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
+vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: gate.allowed })) }));
 
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
@@ -30,14 +33,14 @@ vi.mock("@/lib/supabase/service", () => ({
         },
         remove: async (paths: string[]) => {
           removeSpy(paths);
-          return { error: null };
+          return { error: removeError };
         },
         getPublicUrl: (path: string) => ({ data: { publicUrl: `https://cdn.test/${path}` } }),
       }),
     },
     from: (table: string) => ({
       select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: doctorExists ? { id: "00000000-0000-4000-8000-0000000000d1" } : null, error: null }) }),
+        eq: () => ({ maybeSingle: async () => ({ data: doctorExists ? { id: "00000000-0000-4000-8000-0000000000d1" } : null, error: readError }) }),
       }),
       update(values: Record<string, unknown>) {
         updates.push(values);
@@ -67,6 +70,9 @@ beforeEach(() => {
   audits.length = 0;
   requireAdminOrNull.mockClear();
   doctorExists = true;
+  readError = null;
+  removeError = null;
+  gate.allowed = true;
 });
 
 describe("POST /api/admin/doctors/[id]/photo", () => {
@@ -124,5 +130,40 @@ describe("DELETE /api/admin/doctors/[id]/photo", () => {
     const { DELETE } = await import("./route");
     expect((await DELETE(new Request("https://example.test/x", { method: "DELETE" }), ctx)).status).toBe(401);
     expect(removeSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("admin photo: refusals and failures", () => {
+  it("stops a flood of uploads, a malformed id and a request with no file", async () => {
+    const { POST } = await import("./route");
+    gate.allowed = false;
+    expect((await POST(post(), ctx)).status).toBe(429);
+    gate.allowed = true;
+    expect((await POST(post(), { params: Promise.resolve({ id: "abc" }) })).status).toBe(404);
+    const empty = new Request("https://example.test/x", { method: "POST", body: new FormData() });
+    expect((await POST(empty, ctx)).status).toBe(400);
+    expect((await POST(new Request("https://example.test/x", { method: "POST", body: "nope" }), ctx)).status).toBe(400);
+  });
+
+  it("fails when the doctor lookup fails", async () => {
+    const { POST } = await import("./route");
+    readError = { code: "XX000" };
+    expect((await POST(post(), ctx)).status).toBe(500);
+  });
+
+  it("removes a photo for an admin, 404s a bad id or unknown doctor, and reports a storage failure", async () => {
+    const { DELETE } = await import("./route");
+    const req = new Request("https://example.test/x", { method: "DELETE" });
+    expect((await DELETE(req, ctx)).status).toBe(200);
+    expect(audits.at(-1)).toMatchObject({ metadata: { removed: true } });
+    requireAdminOrNull.mockResolvedValueOnce(null);
+    expect((await DELETE(req, ctx)).status).toBe(401);
+    expect((await DELETE(req, { params: Promise.resolve({ id: "abc" }) })).status).toBe(404);
+    doctorExists = false;
+    expect((await DELETE(req, ctx)).status).toBe(404);
+    doctorExists = true;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    removeError = { message: "storage down" };
+    expect((await DELETE(req, ctx)).status).toBe(500);
   });
 });

@@ -101,9 +101,8 @@ function cleanSpecialty(s: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+// Both strings are non-empty: nameMatchRule is the only caller and checks.
 function levenshtein(a: string, b: string): number {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
   let prev = new Array<number>(b.length + 1);
   let curr = new Array<number>(b.length + 1);
   for (let j = 0; j <= b.length; j++) prev[j] = j;
@@ -119,7 +118,7 @@ function levenshtein(a: string, b: string): number {
     }
     [prev, curr] = [curr, prev];
   }
-  return prev[b.length] ?? 0;
+  return prev[b.length] as number;
 }
 
 /** The live fallback runs while a doctor waits on the form. */
