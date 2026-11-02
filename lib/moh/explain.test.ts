@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { explainLicense, type ExplainInput } from "./explain";
+import { explainDate, explainLicense, type ExplainInput } from "./explain";
 import type { MirrorPractitioner } from "./mirror";
 
 const ROW: MirrorPractitioner = {
@@ -197,5 +197,45 @@ describe("explainLicense", () => {
   it("survives a missing sync date without printing an empty gap", () => {
     const e = explainLicense(input({ status: "not_found", registryRow: null, mirrorSyncedAt: null }));
     expect(e.reasons[0]).toContain("غير معروف");
+  });
+});
+
+describe("explainLicense: the edges", () => {
+  it("says a date is unknown when it is missing or unreadable", () => {
+    expect(explainDate(null)).toBe("غير معروف");
+    expect(explainDate("not a date")).toBe("غير معروف");
+    expect(explainDate("2026-10-19T03:00:00Z")).toBe("19/10/2026");
+  });
+
+  it("explains a soft match for a doctor with no Hebrew name stored, and without a fresh comparison", () => {
+    const e = explainLicense(input({ status: "soft_match", hebrewFirstName: null, hebrewFamilyName: null }));
+    expect(e.code).toBe("soft_match_rules");
+    expect(e.reasons.join(" ")).not.toContain("الاسم العبري المسجَّل لدينا");
+  });
+
+  it("explains a soft match that was just re-checked, using the fresh comparison", () => {
+    const e = explainLicense(input({ status: "soft_match", match: { first: "exact", family: "edit1" } }));
+    expect(e.derivedNow).toBe(false);
+  });
+
+  it("explains an overridden mismatch without our own Hebrew name, and when the registry row is not in the copy", () => {
+    const noName = explainLicense(input({ status: "name_mismatch_overridden", hebrewFirstName: null, hebrewFamilyName: null }));
+    expect(noName.code).toBe("mismatch_overridden");
+    expect(noName.reasons.join(" ")).not.toContain("الاسم العبري المسجَّل لدينا");
+  });
+
+  it("explains a not-found for a doctor with no Hebrew name, with or without a registry row", () => {
+    const withRow = explainLicense(input({ status: "not_found", hebrewFirstName: null, hebrewFamilyName: null }));
+    expect(withRow.code).toBe("not_found_no_hebrew_name");
+    expect(withRow.reasons).toHaveLength(2);
+    const noRow = explainLicense(input({ status: "not_found", hebrewFirstName: null, hebrewFamilyName: null, registryRow: null }));
+    expect(noRow.reasons).toHaveLength(1);
+  });
+
+  it("adds no ambiguity note for a Palestinian licence or an empty number", () => {
+    const ps = explainLicense(input({ region: "PS", status: "soft_match", licenseNumber: "123456" }));
+    expect(ps.reasons.join(" ")).not.toContain("ملاحظة");
+    const empty = explainLicense(input({ status: "soft_match", licenseNumber: "" }));
+    expect(empty).toBeTruthy();
   });
 });

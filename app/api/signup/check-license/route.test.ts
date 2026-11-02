@@ -1,18 +1,19 @@
 // POST /api/signup/check-license resolves the typed number against the
 // registry, including the `1` prefix typed without its hyphen.
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const REGISTRY: Record<number, { first: string; family: string }> = {
   23456: { first: "דניאל", family: "דריפוס" },
 };
 
+const gate = vi.hoisted(() => ({ allowed: true, human: true, registryError: false }));
 vi.mock("@/lib/ratelimit", () => ({
-  rateLimit: vi.fn(async () => ({ success: true })),
+  rateLimit: vi.fn(async () => ({ success: gate.allowed })),
 }));
 
 vi.mock("@/lib/turnstile", () => ({
-  verifyTurnstile: vi.fn(async () => ({ ok: true })),
+  verifyTurnstile: vi.fn(async () => ({ ok: gate.human })),
 }));
 
 vi.mock("@/lib/moh/client", () => ({
@@ -29,6 +30,7 @@ vi.mock("@/lib/supabase/service", () => ({
       select: () => ({
         eq: (_col: string, license: number) => ({
           maybeSingle: async () => {
+            if (gate.registryError) return { data: null, error: { code: "XX000", message: "down" } };
             const hit = REGISTRY[license];
             return {
               data: hit && {
@@ -90,5 +92,37 @@ describe("POST /api/signup/check-license", () => {
     const r = await check("2-45678");
     expect(r.status).toBe(400);
     expect(r.body).toMatchObject({ code: "invalid_license" });
+  });
+});
+
+describe("POST /api/signup/check-license: refusals and failures", () => {
+  beforeEach(() => {
+    gate.allowed = true;
+    gate.human = true;
+    gate.registryError = false;
+  });
+
+  it("stops a flood from one address, and a failed human check", async () => {
+    gate.allowed = false;
+    expect((await check("123456")).status).toBe(429);
+    gate.allowed = true;
+    gate.human = false;
+    const r = await check("123456");
+    expect(r.status).toBe(403);
+    expect(r.body.code).toBe("turnstile_failed");
+  });
+
+  it("refuses a body that is not JSON or lacks the names", async () => {
+    const { POST } = await import("./route");
+    const res = await POST(new Request("https://example.test/x", { method: "POST", body: "nope" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("says the registry is unavailable rather than guessing, when the lookup fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    gate.registryError = true;
+    const r = await check("123456");
+    expect(r.status).toBe(503);
+    expect(r.body.code).toBe("moh_unavailable");
   });
 });
