@@ -61,12 +61,13 @@ describe("cardServices", () => {
 });
 
 describe("directoryQuery", () => {
-  it("asks only for listed, approved doctors who consented", () => {
+  it("reads the listed_doctors view and adds no conditions of its own: who is listed is written once, in the database", () => {
+    const tables: string[] = [];
     const calls: [string, unknown[]][] = [];
-    directoryQuery(client(chain({}, calls)));
-    expect(calls.filter(([m]) => m === "eq").map(([, a]) => a)).toEqual(
-      expect.arrayContaining([["is_active", true], ["is_admin_approved", true], ["consent_directory_use", true]]),
-    );
+    const c = chain({}, calls);
+    directoryQuery({ from: (t: string) => (tables.push(t), c) } as unknown as SupabaseClient);
+    expect(tables).toEqual(["listed_doctors"]);
+    expect(calls.map(([m]) => m)).toEqual(["select"]);
   });
 });
 
