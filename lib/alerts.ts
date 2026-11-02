@@ -8,7 +8,9 @@
 
 import * as Sentry from "@sentry/nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { after } from "next/server";
 import { writeAudit } from "@/lib/audit";
+import { sendPushToAdmins } from "@/lib/push";
 
 type Level = "info" | "warning" | "error";
 
@@ -71,6 +73,19 @@ export const ALERTS = {
 
 export type AlertCode = keyof typeof ALERTS;
 
+/** The alerts that also reach an admin's phone (lib/push.ts), and the page
+ *  the notification opens. The rest are for the activity log: the SMS half
+ *  budget is information, the rate limiter's timeout is noise, and the
+ *  unknown workplaces can wait for the next visit. */
+const PUSH_TO: Partial<Record<AlertCode, string>> = {
+  doctor_waiting: "/admin?status=pending",
+  profile_reported: "/admin/reports",
+  licenses_missing: "/admin?status=license",
+  sms_cap_reached: "/admin/stats",
+  sms_balance_low: "/admin/stats",
+  db_size_high: "/admin/stats",
+};
+
 export function isAlertCode(v: unknown): v is AlertCode {
   return typeof v === "string" && v in ALERTS;
 }
@@ -92,4 +107,16 @@ export async function raiseAlert(
   const level = details.level ?? defaultLevel;
   Sentry.captureMessage(sentry, { level, extra: details.extra, tags: details.tags });
   await writeAudit(service, { action: "alert", metadata: { alert: code, level, ...details.extra, ...details.logOnly } });
+
+  const url = PUSH_TO[code];
+  if (url) {
+    const push = () => sendPushToAdmins(service, { title: ALERTS[code].ar, url, tag: code });
+    // After the response, so a signup does not wait for Apple's push service;
+    // outside a request (after() throws there) it simply starts.
+    try {
+      after(push);
+    } catch {
+      void push();
+    }
+  }
 }
