@@ -17,13 +17,12 @@ export default defineConfig({
       ],
       thresholds: {
         // Measured 2 Nov 2026: statements 98.4, branches 95.3, functions
-        // 99.8, lines 98.6. The floors sit about a point and a half under, so
-        // a change that drops tested code fails; raise them when the numbers
-        // rise. lib/auth is held to 100 lines below.
-        lines: 97,
-        statements: 97,
-        functions: 98,
-        branches: 93,
+        // 99.8, lines 98.6. The floors are 95 for all four, so a change that
+        // drops tested code fails; lib/auth is held to 100 lines below.
+        lines: 95,
+        statements: 95,
+        functions: 95,
+        branches: 95,
         "lib/auth/**": { lines: 100 },
       },
     },

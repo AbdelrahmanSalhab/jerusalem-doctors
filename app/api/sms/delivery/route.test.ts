@@ -81,4 +81,21 @@ describe("POST /api/sms/delivery", () => {
     }
     expect(db.argsOf("usage_events", "insert")).toHaveLength(2);
   });
+
+  it("answers 200 and counts nothing for a status we do not count, or a body that is not a form", async () => {
+    expect((await post(report({ to: "0501234567", status: "99" }))).status).toBe(200);
+    const raw = new Request(`https://example.test/api/sms/delivery?k=${deliveryKey(SECRET)}`, { method: "POST", body: "plain text" });
+    expect((await post(raw)).status).toBe(200);
+    expect(db.argsOf("usage_events", "insert")).toEqual([]);
+  });
+
+  it("still counts a report whose number cannot be read, without a prefix or an owner", async () => {
+    expect((await post(report({ to: "abc", status: "1" }))).status).toBe(200);
+    expect(db.argsOf("usage_events", "insert")).toEqual([[{ kind: "sms_delivered", doctor_id: null, meta: {} }]]);
+  });
+
+  it("counts a report that has no number field at all", async () => {
+    expect((await post(report({ status: "1" }))).status).toBe(200);
+    expect(db.argsOf("usage_events", "insert")).toHaveLength(1);
+  });
 });

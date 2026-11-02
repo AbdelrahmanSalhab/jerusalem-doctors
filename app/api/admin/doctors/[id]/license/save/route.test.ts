@@ -317,3 +317,42 @@ describe("POST .../license/save: refusals and failures", () => {
     expect((await call({ ...body, adopt_registry_name: true })).status).toBe(409);
   });
 });
+
+describe("POST .../license/save: the other branches", () => {
+  it("writes the secondary slot's own columns, with no verified-at", async () => {
+    const res = await call({ slot: "secondary", license_number: "12345", region: "PS" });
+    expect(res.status).toBe(200);
+    expect(updates[0]).toMatchObject({ secondary_license_number: "12345", secondary_license_region: "PS", secondary_license_verification_status: "not_found" });
+    expect(updates[0]).not.toHaveProperty("license_verified_at");
+  });
+
+  it("says nothing changed when number and verdict are already what the registry gives", async () => {
+    doctor = { ...DOCTOR, license_number: "189371", license_verification_status: "verified" };
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371" });
+    expect(await res.json()).toMatchObject({ ok: true, changed: false });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("refuses when the registry's answer moved since the admin looked", async () => {
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "not_found" });
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("result_changed");
+  });
+
+  it("names a duplicate licence without a holder's name when it cannot find who", async () => {
+    mirrorRows = [MIRROR];
+    updateError = { code: "23505" };
+    duplicateRow = null;
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "verified" });
+    expect(res.status).toBe(409);
+    expect(JSON.stringify(await res.json())).not.toContain("(د.");
+  });
+
+  it("refuses a licence number with the wrong format for its region", async () => {
+    const res = await call({ slot: "primary", license_number: "abc", region: "IL" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("invalid_license");
+  });
+});
