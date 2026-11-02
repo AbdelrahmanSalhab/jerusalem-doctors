@@ -96,7 +96,22 @@ jobs:
         run: |
           # e2e/env.ts is the one list of the test stack's settings.
           node --experimental-strip-types -e 'import("./e2e/env.ts").then((m) => { for (const [k, v] of Object.entries(m.appEnv())) console.log(`${k}=${v}`) })' >> "$GITHUB_ENV"
+      # Next's own build cache: a build with it takes a third of the time.
+      # Restored by every run; only main saves it, once a day (as the Docker
+      # images above), so branches do not fill the repository's cache quota.
+      - name: Restore Next's build cache
+        id: next-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .next/cache
+          key: next-cache-${{ hashFiles('package-lock.json') }}-${{ steps.images.outputs.day }}
+          restore-keys: next-cache-${{ hashFiles('package-lock.json') }}-
       - run: npm run build
+      - uses: actions/cache/save@v6
+        if: github.event_name == 'push' && steps.next-cache.outputs.cache-hit != 'true'
+        with:
+          path: .next/cache
+          key: next-cache-${{ hashFiles('package-lock.json') }}-${{ steps.images.outputs.day }}
       - name: Start Redis for rate limits
         run: docker compose -f e2e/docker-compose.yml -p jd-e2e up -d --wait
       # Ten minutes at most: a stalled install (apt under --with-deps) once
@@ -132,6 +147,10 @@ jobs:
       - run: npx playwright test
         env:
           E2E_PREBUILT: "1"
+      # Where the minutes went: per project, and the slowest tests.
+      - name: Timing summary
+        if: always()
+        run: node scripts/e2e-timing.mjs >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

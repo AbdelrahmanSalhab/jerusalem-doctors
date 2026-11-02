@@ -22,7 +22,10 @@ export default defineConfig({
   forbidOnly: CI,
   timeout: 30_000,
   expect: { timeout: 7_000 },
-  reporter: CI ? [["github"], ["html", { open: "never", outputFolder: "e2e/.report" }]] : [["list"]],
+  // The JSON report feeds scripts/e2e-timing.mjs (the job summary's timing table).
+  reporter: CI
+    ? [["github"], ["html", { open: "never", outputFolder: "e2e/.report" }], ["json", { outputFile: "e2e/.results/report.json" }]]
+    : [["list"]],
   use: {
     baseURL: BASE_URL,
     locale: "ar",
