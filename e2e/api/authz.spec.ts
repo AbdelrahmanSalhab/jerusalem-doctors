@@ -39,6 +39,7 @@ const POLICY: Record<string, Policy> = {
   "POST /api/profile/password": "admin",
   "POST /api/admin/doctors/[id]/license/check": "admin",
   "POST /api/admin/doctors/[id]/license/save": "admin",
+  "POST /api/admin/doctors/[id]/license/reviewed": "admin",
   "PATCH /api/admin/doctors/[id]": "admin",
   "POST /api/admin/doctors/[id]/photo": "admin",
   "DELETE /api/admin/doctors/[id]/photo": "admin",

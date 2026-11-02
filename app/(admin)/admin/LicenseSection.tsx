@@ -5,6 +5,7 @@
 // meant for this particular doctor, which made the queue a guessing game.
 
 import { LicenseCheckPanel } from "./LicenseCheckPanel";
+import { LicenseReviewed } from "./LicenseReviewed";
 import type { LicenseSlotDetail } from "@/lib/admin/doctorDetail";
 import { licenseDisplay, toneChip } from "@/lib/licenseStatus";
 
@@ -50,6 +51,9 @@ export function LicenseSection({ doctorId, slot }: { doctorId: string; slot: Lic
           <p className="text-xs text-muted">محسوبة الآن من نسخة السجل الحالية، لا من نتيجة وقت التسجيل.</p>
         )}
       </div>
+
+      {/* The primary licence is the one the queue counts. */}
+      {slot.slot === "primary" && slot.status !== "verified" && <LicenseReviewed doctorId={doctorId} reviewedAt={slot.reviewedAt} />}
 
       <LicenseCheckPanel doctorId={doctorId} slot={slot.slot} region={slot.region} storedNumber={slot.number} />
     </div>

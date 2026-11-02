@@ -57,7 +57,11 @@ const ROW_COLUMNS = `
 `;
 
 /** "needs a look": anything short of an exact registry match, nulls included. */
-const LICENCE_NEEDS_REVIEW = "license_verification_status.is.null,license_verification_status.neq.verified";
+const LICENCE_NOT_VERIFIED = "license_verification_status.is.null,license_verification_status.neq.verified";
+/** ... that no admin has looked at since (doctors.license_reviewed_at): a
+ *  Palestinian licence, or one the registry does not list, would otherwise
+ *  stay in the queue for good after an admin accepted it. */
+const NOT_REVIEWED = "license_reviewed_at.is.null";
 
 /** Not a non-doctor admin: those rows are hidden on purpose and carry no real
  *  licence, so they would inflate "hidden" and "licence" (admin_stats() leaves
@@ -107,7 +111,7 @@ function applyFilter<
       return query.eq("is_visible", false).eq("is_active", true).eq("is_admin", false);
     case "license":
       // Both groups inside one or=, so they combine with AND.
-      return query.or(`and(or(${LICENCE_NEEDS_REVIEW}),or(${REAL_DOCTOR}))`);
+      return query.or(`and(or(${LICENCE_NOT_VERIFIED}),${NOT_REVIEWED},or(${REAL_DOCTOR}))`);
     case "stage":
       // Marked طبيب مقيم, but the registry lists a specialty, which it only
       // does once the board certificate is granted (registry_specialty()).

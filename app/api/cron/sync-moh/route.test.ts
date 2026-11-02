@@ -71,7 +71,7 @@ describe("GET /api/cron/sync-moh", () => {
     const body = await (await call()).json();
     // d1's primary and d3's secondary are new; d2 was already flagged.
     expect(body).toMatchObject({ missing: 3, flagged: 2 });
-    expect(db.argsOf("doctors", "update")).toEqual([[{ license_verification_status: "not_found" }], [{ secondary_license_verification_status: "not_found" }]]);
+    expect(db.argsOf("doctors", "update")).toEqual([[{ license_verification_status: "not_found", license_reviewed_at: null }], [{ secondary_license_verification_status: "not_found" }]]);
     expect(db.argsOf("moh_practitioners", "in")).toEqual([["license_number", [100, 200, 301]]]);
     expect(raiseAlert).toHaveBeenCalledWith(expect.anything(), "licenses_missing", expect.objectContaining({ extra: expect.objectContaining({ flagged: 2 }) }));
   });
