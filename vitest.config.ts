@@ -16,13 +16,14 @@ export default defineConfig({
         "lib/db/types.ts",
       ],
       thresholds: {
-        // Measured 2 Nov 2026: lines 90.7, statements 88.2, functions 90.4,
-        // branches 81.1. The floors sit about two points under, so a change
-        // that drops tested code fails; raise them when the numbers rise.
-        lines: 88,
-        statements: 86,
-        functions: 88,
-        branches: 79,
+        // Measured 2 Nov 2026: statements 98.4, branches 95.3, functions
+        // 99.8, lines 98.6. The floors sit about a point and a half under, so
+        // a change that drops tested code fails; raise them when the numbers
+        // rise. lib/auth is held to 100 lines below.
+        lines: 97,
+        statements: 97,
+        functions: 98,
+        branches: 93,
         "lib/auth/**": { lines: 100 },
       },
     },

@@ -45,6 +45,13 @@ describe("Sms4FreeOtpSender.send", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.sms4free.co.il/ApiSMS/v2/SendSMS");
   });
 
+  it("ignores an empty API address setting", async () => {
+    vi.stubEnv("SMS4FREE_API_URL", "");
+    reply("1");
+    await new Sms4FreeOtpSender().send("+972501234567", "123456");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.sms4free.co.il/ApiSMS/v2/SendSMS");
+  });
+
   it("uses an API address from the environment", async () => {
     vi.stubEnv("SMS4FREE_API_URL", "https://sms.example/send");
     reply("1");

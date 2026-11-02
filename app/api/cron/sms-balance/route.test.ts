@@ -54,4 +54,14 @@ describe("GET /api/cron/sms-balance", () => {
     vi.stubEnv("OTP_PROVIDER", "twilio");
     expect(await (await call()).json()).toMatchObject({ skipped: true });
   });
+
+  it("falls back to the default threshold when the setting is empty or not a number", async () => {
+    fetchAvailableSms.mockResolvedValue(10);
+    for (const bad of ["", "  ", "abc", "-5"]) {
+      vi.stubEnv("SMS4FREE_LOW_BALANCE_THRESHOLD", bad);
+      expect(await (await call()).json()).toMatchObject({ threshold: 50, low: true });
+    }
+    vi.stubEnv("SMS4FREE_LOW_BALANCE_THRESHOLD", "5");
+    expect(await (await call()).json()).toMatchObject({ threshold: 5, low: false });
+  });
 });
