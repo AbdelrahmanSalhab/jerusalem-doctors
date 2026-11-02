@@ -10,7 +10,7 @@ const claimOnce = vi.hoisted(() => vi.fn());
 vi.mock("web-push", () => ({ default: { sendNotification } }));
 vi.mock("@/lib/otp/sentOnce", () => ({ claimOnce }));
 
-import { PUSH_THROTTLE_SECONDS, pushConfigured, sendPushToAdmins } from "./push";
+import { PUSH_THROTTLE_SECONDS, pushConfigured, sendPushToAdmins, sendTestPush } from "./push";
 
 const MESSAGE = { title: "طبيب جديد بانتظار القبول", url: "/admin?status=pending", tag: "doctor_waiting" };
 const ROW = (id: string) => ({ id, endpoint: `https://push.example/${id}`, p256dh: `p-${id}`, auth: `a-${id}`, doctor: { is_admin: true, is_active: true } });
@@ -99,5 +99,28 @@ describe("sendPushToAdmins", () => {
   it("never throws, whatever goes wrong", async () => {
     claimOnce.mockRejectedValueOnce(new Error("redis down"));
     await expect(sendPushToAdmins(client({ data: [ROW("1")] }).service, MESSAGE)).resolves.toBeUndefined();
+  });
+});
+
+describe("sendTestPush", () => {
+  it("is null when the keys are not set, and reads nothing", async () => {
+    vi.stubEnv("VAPID_SUBJECT", "");
+    const { service, eqs } = client({ data: [ROW("1")] });
+    expect(await sendTestPush(service, "admin-1")).toBeNull();
+    expect(eqs).toEqual([]);
+  });
+
+  it("sends at once to this admin's own devices, unthrottled, and counts the ones that got it", async () => {
+    sendNotification.mockResolvedValueOnce({}).mockRejectedValueOnce(Object.assign(new Error("gone"), { statusCode: 410 }));
+    const { service, eqs, deleted } = client({ data: [ROW("1"), ROW("2")] });
+    expect(await sendTestPush(service, "admin-1")).toBe(1);
+    expect(eqs).toEqual([["doctor_id", "admin-1"]]);
+    expect(deleted).toEqual([["2"]]);
+    expect(claimOnce).not.toHaveBeenCalled();
+    expect(JSON.parse(sendNotification.mock.calls[0][1])).toMatchObject({ tag: "test", url: "/admin" });
+  });
+
+  it("throws when the devices cannot be read, so the route can say so", async () => {
+    await expect(sendTestPush(client({ data: null, error: new Error("down") }).service, "admin-1")).rejects.toThrow("down");
   });
 });

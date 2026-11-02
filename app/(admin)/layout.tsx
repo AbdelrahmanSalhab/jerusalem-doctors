@@ -1,3 +1,4 @@
+import { PushSwitch } from "@/app/(admin)/PushSwitch";
 import { NavTabs } from "@/components/NavTabs";
 import { ALERT_NOUN, countOf } from "@/lib/arabicCount";
 import { requireAdmin } from "@/lib/auth/session";
@@ -48,6 +49,8 @@ export default async function AdminLayout({
           ]}
         />
       </div>
+      {/* Empty until the VAPID keys are set (docs/runbook.md). */}
+      <PushSwitch publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""} />
       {children}
     </div>
   );

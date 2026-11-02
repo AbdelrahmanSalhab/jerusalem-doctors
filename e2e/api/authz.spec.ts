@@ -27,6 +27,10 @@ type Policy =
 
 const POLICY: Record<string, Policy> = {
   "GET /api/admin/migrations": "admin",
+  // The admin panel's notification switch (lib/push.ts).
+  "POST /api/admin/push": "admin",
+  "DELETE /api/admin/push": "admin",
+  "POST /api/admin/push/test": "admin",
   // The smoke check's sign-in with a GitHub token (lib/auth/githubOidc.ts).
   "POST /api/login/ci": "credentials",
   // SMS4FREE's delivery reports, with the key in the URL (lib/otp/delivery.ts).

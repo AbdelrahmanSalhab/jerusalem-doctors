@@ -37,6 +37,46 @@ function vapid() {
 /** Whether pushes can be sent at all (the keys are set). */
 export const pushConfigured = () => vapid() !== null;
 
+interface Subscription {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+/** Sends `message` to each subscription; returns how many the push service
+ *  accepted. A subscription it says is gone (404, 410: the browser
+ *  unsubscribed, or the app was removed) is deleted. */
+async function deliver(
+  service: SupabaseClient,
+  keys: NonNullable<ReturnType<typeof vapid>>,
+  rows: Subscription[],
+  message: PushMessage,
+): Promise<number> {
+  const body = JSON.stringify(message);
+  const gone: string[] = [];
+  let accepted = 0;
+  await Promise.all(
+    rows.map(async (row) => {
+      try {
+        await webpush.sendNotification({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } }, body, {
+          vapidDetails: keys,
+          TTL: TTL_SECONDS,
+          timeout: SEND_TIMEOUT_MS,
+        });
+        accepted += 1;
+      } catch (err) {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 404 || status === 410) gone.push(row.id);
+        // Not the endpoint: it identifies a phone.
+        else console.error("[push] send failed", status ?? (err as Error).message);
+      }
+    }),
+  );
+  if (gone.length > 0) await service.from("push_subscriptions").delete().in("id", gone);
+  return accepted;
+}
+
 export async function sendPushToAdmins(service: SupabaseClient, message: PushMessage): Promise<void> {
   try {
     const keys = vapid();
@@ -53,29 +93,22 @@ export async function sendPushToAdmins(service: SupabaseClient, message: PushMes
       console.error("[push] subscriptions not read", error.code ?? error.message);
       return;
     }
-    if (!data?.length) return;
-
-    const body = JSON.stringify(message);
-    const gone: string[] = [];
-    await Promise.all(
-      data.map(async (row) => {
-        try {
-          await webpush.sendNotification({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } }, body, {
-            vapidDetails: keys,
-            TTL: TTL_SECONDS,
-            timeout: SEND_TIMEOUT_MS,
-          });
-        } catch (err) {
-          const status = (err as { statusCode?: number }).statusCode;
-          // 404 and 410: the browser unsubscribed or the app was removed.
-          if (status === 404 || status === 410) gone.push(row.id);
-          // Not the endpoint: it identifies a phone.
-          else console.error("[push] send failed", status ?? (err as Error).message);
-        }
-      }),
-    );
-    if (gone.length > 0) await service.from("push_subscriptions").delete().in("id", gone);
+    if (data?.length) await deliver(service, keys, data, message);
   } catch (err) {
     console.error("[push] failed", (err as Error).message);
   }
+}
+
+/** The switch's «جرّب»: one notification to this admin's own devices, at
+ *  once and unthrottled, so they can see it works. null when the keys are not
+ *  set; otherwise how many devices it reached. */
+export async function sendTestPush(service: SupabaseClient, doctorId: string): Promise<number | null> {
+  const keys = vapid();
+  if (!keys) return null;
+  const { data, error } = await service
+    .from("push_subscriptions")
+    .select("id, endpoint, p256dh, auth")
+    .eq("doctor_id", doctorId);
+  if (error) throw error;
+  return deliver(service, keys, data ?? [], { title: "الإشعارات تعمل على هذا الجهاز", url: "/admin", tag: "test" });
 }

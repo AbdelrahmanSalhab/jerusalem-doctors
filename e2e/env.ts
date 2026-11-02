@@ -74,6 +74,12 @@ export function appEnv(): Record<string, string> {
     SMS4FREE_SENDER: "JDoctors",
     SEND_SMS_HOOK_SECRET: "v1,whsec_ZTJlLXRlc3QtaG9vay1zZWNyZXQtZm9yLWNp",
     CRON_SECRET,
+    // Admin notifications (lib/push.ts): a key pair made for these tests only,
+    // so the switch shows in the admin pages and the push routes answer.
+    // Nothing is ever sent: no test device subscribes.
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: "BIW_AUJsT77tRi0df7Vwi6_5FdvnFpd_972qjzvknAinH-vXdyVBsfOGMUjp_bw8nAoUApjl7maK-uBr86k0Oyg",
+    VAPID_PRIVATE_KEY: "rYjLluoCImTnEUMldqObF_P9telB_6aS9zKgkbNldL8",
+    VAPID_SUBJECT: "https://jerusalem-doctors.invalid",
     // Tests change doctors straight in the database (lib/cachedReads.ts).
     DIRECTORY_CACHE_SECONDS: "0",
     MOH_API_BASE: `${STUB_URL}/api/3`,
