@@ -82,7 +82,7 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
             <span aria-hidden="true">📍</span>
             <span className="font-medium text-foreground">{primaryWp.name}</span>
             {workplaceInfoLine(primaryWp) && (
-              <span className="text-foreground/60">({workplaceInfoLine(primaryWp)})</span>
+              <span className="text-foreground/70">({workplaceInfoLine(primaryWp)})</span>
             )}
             {otherWps.length > 0 && (
               <span className="text-foreground/65">
