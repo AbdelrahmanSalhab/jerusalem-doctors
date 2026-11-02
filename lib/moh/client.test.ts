@@ -47,3 +47,57 @@ describe("findAll", () => {
     expect(offsets).toEqual(["0", "2", "4"]);
   });
 });
+
+describe("failures", () => {
+  const bad = () => new Response(JSON.stringify({ success: false }), { status: 200 });
+
+  it("rejects a CKAN answer that says it failed, for a licence lookup and a sweep", async () => {
+    const fetchImpl = vi.fn(async () => bad());
+    await expect(new MohClient({ fetchImpl }).findByLicenses([1])).rejects.toThrow("success=false");
+    await expect(new MohClient({ fetchImpl }).findAll(10, 0)).rejects.toThrow("success=false");
+  });
+
+  it("retries a server error with a growing pause, then reports it", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn(async () => new Response("oops", { status: 500 }));
+      const done = new MohClient({ fetchImpl, retries: 2 }).findByLicenses([1]);
+      const check = expect(done).rejects.toThrow("MoH HTTP 500");
+      await vi.advanceTimersByTimeAsync(200 + 400);
+      await check;
+      expect(fetchImpl).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("succeeds on a retry after a network failure, and counts each request", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = vi.fn().mockRejectedValueOnce(new Error("reset")).mockResolvedValueOnce(ok([]));
+      const client = new MohClient({ fetchImpl, retries: 1 });
+      const done = client.findByLicenses([1]);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(await done).toEqual([]);
+      expect(client.requests).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("gives a plain error when what was thrown is not one", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw "plain string";
+    });
+    await expect(new MohClient({ fetchImpl, retries: 0 }).findByLicenses([1])).rejects.toThrow("failed after retries");
+  });
+
+  it("aborts a request that takes longer than its timeout", async () => {
+    const fetchImpl = vi.fn((_: string, init: RequestInit) => new Promise((_, reject) => init.signal!.addEventListener("abort", () => reject(new Error("aborted")))));
+    await expect(new MohClient({ fetchImpl: fetchImpl as never, retries: 0, timeoutMs: 5 }).findByLicenses([1])).rejects.toThrow("aborted");
+  });
+
+  it("uses the global fetch when none is given", () => {
+    expect(new MohClient()).toBeInstanceOf(MohClient);
+  });
+});

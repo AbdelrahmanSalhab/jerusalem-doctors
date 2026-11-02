@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyStageCascade,
   CAREER_STAGES,
   isResidentAndRetired,
   careerStageBadge,
@@ -230,5 +231,52 @@ describe("isResidentAndRetired", () => {
     expect(isResidentAndRetired("specialist", true)).toBe(false);
     expect(isResidentAndRetired(null, true)).toBe(false);
     expect(isResidentAndRetired(undefined, undefined)).toBe(false);
+  });
+});
+
+describe("applyStageCascade", () => {
+  const wp = (over: Partial<Parameters<typeof applyStageCascade>[1]["workplaces"][number]> = {}) => ({
+    name: "مستشفى المقاصد",
+    workplace_type: "hospital" as const,
+    details: "",
+    address: "",
+    hours: "",
+    phone: "",
+    hmo: "",
+    ...over,
+  });
+  const base = { specialtyIds: ["a", "b"], workplaces: [wp()], generalSpecialtyId: "gp" };
+
+  it("replaces the specialties with the general one when switching to general practice", () => {
+    const out = applyStageCascade("general", base);
+    expect(out).toMatchObject({ specialtyIds: ["gp"], specialtiesChanged: true, clearSubspecialty: true });
+  });
+
+  it("empties the specialties when general practice has no id yet", () => {
+    expect(applyStageCascade("general", { ...base, generalSpecialtyId: null }).specialtyIds).toEqual([]);
+  });
+
+  it("drops the general specialty when leaving general practice, and says so", () => {
+    const out = applyStageCascade("specialist", { ...base, specialtyIds: ["gp", "b"] });
+    expect(out).toMatchObject({ specialtyIds: ["b"], specialtiesChanged: true, clearSubspecialty: false });
+  });
+
+  it("leaves specialties alone when there is nothing to drop", () => {
+    expect(applyStageCascade("specialist", base)).toMatchObject({ specialtyIds: ["a", "b"], specialtiesChanged: false });
+  });
+
+  it("gives an unnamed row the stage's default type, and corrects a named row the stage does not offer", () => {
+    const out = applyStageCascade("general", { ...base, workplaces: [wp({ name: " ", workplace_type: "hospital" }), wp()] });
+    expect(out.workplaces[0].workplace_type).toBe("clinic");
+    expect(out.workplacesChanged).toBe(true);
+  });
+
+  it("reports no workplace change when every row already fits", () => {
+    expect(applyStageCascade("specialist", base).workplacesChanged).toBe(false);
+  });
+
+  it("says which fields the stage no longer shows", () => {
+    expect(applyStageCascade("general", base)).toMatchObject({ clearResidencyYear: true });
+    expect(applyStageCascade("resident", base)).toMatchObject({ clearResidencyYear: false });
   });
 });

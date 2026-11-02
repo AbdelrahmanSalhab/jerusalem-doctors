@@ -334,3 +334,56 @@ describe("onLiveError", () => {
     expect(r.status).toBe("not_found");
   });
 });
+
+describe("verifyLicense failures", () => {
+  const withMirrorError = (error: { code: string; message: string }) =>
+    ({
+      from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error }) }) }) }),
+    }) as unknown as SupabaseClient;
+  const input = { licenseNumber: 9417, hebrewFirstName: "דניאל", hebrewFamilyName: "דריפוס" };
+
+  it("throws when the mirror cannot be read, rather than calling the registry live", async () => {
+    await expect(verifyLicense(withMirrorError({ code: "42P01", message: "no table" }), input)).rejects.toThrow("moh_practitioners read failed: no table");
+  });
+
+  it("goes on to the registry when the mirror has no row (PGRST116)", async () => {
+    const mohClient = fakeMohClient(null);
+    const r = await verifyLicense(withMirrorError({ code: "PGRST116", message: "none" }), input, { mohClient });
+    expect(r).toMatchObject({ status: "not_found", source: "none" });
+  });
+
+  it("still answers when the live row cannot be kept", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const supabase = {
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+        upsert: async () => {
+          throw new Error("write failed");
+        },
+      }),
+    } as unknown as SupabaseClient;
+    const record = {
+      "מספר רישיון רופא": 9417,
+      "שם פרטי": "דניאל",
+      "שם משפחה": "דריפוס",
+      "שם התמחות": "פסיכיאטריה",
+    } as unknown as MohRecord;
+    const r = await verifyLicense(supabase, input, { mohClient: fakeMohClient(record) });
+    expect(r.source).toBe("live");
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+});
+
+describe("resolveIlLicense", () => {
+  it("has nothing to resolve without candidates", async () => {
+    await expect(resolveIlLicense(fakeSupabase(null), { candidates: [], hebrewFirstName: "א", hebrewFamilyName: "ב" })).rejects.toThrow("no candidates");
+  });
+});
+
+describe("nameMatchRule on a single edit", () => {
+  it("allows one letter apart and no more", () => {
+    expect(nameMatchRule("דריפוס", "דריפום")).toBe("edit1");
+    expect(nameMatchRule("דריפוס", "דרימום")).toBe("none");
+  });
+});
