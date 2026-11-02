@@ -53,6 +53,13 @@ export default defineConfig({
       name: "sweep",
       testMatch: /ui\/pages\.spec\.ts/,
       fullyParallel: true,
+      // Beside the desktop project, not before it. Playwright runs projects
+      // in phases by dependency depth, and a project with no dependency sits
+      // in the first one with db: the api project then waited for the whole
+      // sweep (40 s in CI) instead of running next to it. Two of the three
+      // workers, so the desktop project's one is never taken.
+      dependencies: ["api"],
+      workers: 2,
       use: { ...devices["Desktop Chrome"] },
     },
     {
