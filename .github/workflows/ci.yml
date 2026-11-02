@@ -35,10 +35,11 @@ jobs:
   # Playwright (database security, the API permission table, user journeys
   # on desktop Chrome and iPhone WebKit). See e2e/README.md.
   #
-  # Two legs, each with its own Supabase and Redis, so they share no data:
-  # the iPhone (WebKit) tests would otherwise have to wait for every desktop
-  # test, because both change the same database (fixed phone numbers and
-  # licences, global event counts, listings). The first leg keeps the name
+  # Three legs, each with its own Supabase and Redis, so they share no data
+  # and no CPU: the iPhone (WebKit) tests would otherwise have to wait for
+  # every desktop test, because both change the same database (fixed phone
+  # numbers and licences, global event counts, listings), and the page sweep
+  # beside the desktop tests slowed them by half. The first leg keeps the name
   # `e2e`. Only it saves caches and checks the database types, once.
   e2e:
     name: ${{ matrix.name }}
@@ -49,10 +50,16 @@ jobs:
       matrix:
         include:
           - name: e2e
-            projects: --project=db --project=api --project=desktop --project=sweep
+            slug: main
+            projects: --project=db --project=api --project=desktop
             first: true
           - name: e2e (phone)
+            slug: phone
             projects: --project=phone --no-deps
+            first: false
+          - name: e2e (sweep)
+            slug: sweep
+            projects: --project=sweep --no-deps
             first: false
     steps:
       - uses: actions/checkout@v7
@@ -172,7 +179,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report-${{ matrix.first && 'main' || 'phone' }}
+          name: playwright-report-${{ matrix.slug }}
           path: |
             e2e/.report
             e2e/.results
