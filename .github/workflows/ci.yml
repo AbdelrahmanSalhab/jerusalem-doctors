@@ -34,9 +34,26 @@ jobs:
   # Supabase, a real Redis for rate limits, the production build, and
   # Playwright (database security, the API permission table, user journeys
   # on desktop Chrome and iPhone WebKit). See e2e/README.md.
+  #
+  # Two legs, each with its own Supabase and Redis, so they share no data:
+  # the iPhone (WebKit) tests would otherwise have to wait for every desktop
+  # test, because both change the same database (fixed phone numbers and
+  # licences, global event counts, listings). The first leg keeps the name
+  # `e2e`. Only it saves caches and checks the database types, once.
   e2e:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: e2e
+            projects: --project=db --project=api --project=desktop --project=sweep
+            first: true
+          - name: e2e (phone)
+            projects: --project=phone --no-deps
+            first: false
     steps:
       - uses: actions/checkout@v7
       - uses: supabase/setup-cli@v3
@@ -96,7 +113,22 @@ jobs:
         run: |
           # e2e/env.ts is the one list of the test stack's settings.
           node --experimental-strip-types -e 'import("./e2e/env.ts").then((m) => { for (const [k, v] of Object.entries(m.appEnv())) console.log(`${k}=${v}`) })' >> "$GITHUB_ENV"
+      # Next's own build cache: a build with it takes a third of the time.
+      # Restored by every run; only main saves it, once a day (as the Docker
+      # images above), so branches do not fill the repository's cache quota.
+      - name: Restore Next's build cache
+        id: next-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: .next/cache
+          key: next-cache-${{ hashFiles('package-lock.json') }}-${{ steps.images.outputs.day }}
+          restore-keys: next-cache-${{ hashFiles('package-lock.json') }}-
       - run: npm run build
+      - uses: actions/cache/save@v6
+        if: matrix.first && github.event_name == 'push' && steps.next-cache.outputs.cache-hit != 'true'
+        with:
+          path: .next/cache
+          key: next-cache-${{ hashFiles('package-lock.json') }}-${{ steps.images.outputs.day }}
       - name: Start Redis for rate limits
         run: docker compose -f e2e/docker-compose.yml -p jd-e2e up -d --wait
       # Ten minutes at most: a stalled install (apt under --with-deps) once
@@ -117,25 +149,30 @@ jobs:
       # The app's database types must match the schema the migrations build.
       # A difference means a migration landed without `npm run db:types`.
       - name: Database types match the migrations
+        if: matrix.first
         run: |
           supabase gen types typescript --local > lib/db/database.types.ts
           git diff --exit-code -- lib/db/database.types.ts \
             || { echo "::error file=lib/db/database.types.ts::Stale: with the local stack up, run npm run db:types and commit the result."; exit 1; }
       - name: Save today's Docker images
-        if: github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
+        if: matrix.first && github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
         run: docker save -o "$RUNNER_TEMP/images.tar" $(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>')
       - uses: actions/cache/save@v6
-        if: github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
+        if: matrix.first && github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ runner.temp }}/images.tar
           key: docker-images-supabase-2.121.0-${{ steps.images.outputs.day }}
-      - run: npx playwright test
+      - run: npx playwright test ${{ matrix.projects }}
         env:
           E2E_PREBUILT: "1"
+      # Where the minutes went: per project, and the slowest tests.
+      - name: Timing summary
+        if: always()
+        run: node scripts/e2e-timing.mjs >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.first && 'main' || 'phone' }}
           path: |
             e2e/.report
             e2e/.results
