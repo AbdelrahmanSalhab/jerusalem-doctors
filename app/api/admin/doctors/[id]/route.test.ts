@@ -6,6 +6,8 @@ const audits: Record<string, unknown>[] = [];
 /** The licence status the doctor being patched currently has. */
 let licenseStatus: string | null = "verified";
 let doctorExists = true;
+let readError: unknown = null;
+let updateError: unknown = null;
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({ id: "00000000-0000-4000-8000-00000000a001" })),
@@ -25,13 +27,13 @@ vi.mock("@/lib/supabase/service", () => ({
         eq: () => ({
           maybeSingle: async () => ({
             data: doctorExists ? { license_verification_status: licenseStatus } : null,
-            error: null,
+            error: readError,
           }),
         }),
       }),
       update(values: Record<string, unknown>) {
         updates.push(values);
-        return { eq: async () => ({ error: null }) };
+        return { eq: async () => ({ error: updateError }) };
       },
       insert: async (row: Record<string, unknown>) => {
         if (table === "audit_logs") audits.push(row);
@@ -58,6 +60,8 @@ beforeEach(() => {
   audits.length = 0;
   licenseStatus = "verified";
   doctorExists = true;
+  readError = null;
+  updateError = null;
 });
 
 describe("PATCH /api/admin/doctors/[id]: featured", () => {
@@ -176,5 +180,23 @@ describe("PATCH /api/admin/doctors/[id]: who and which", () => {
   it("answers 500, not 401, when the admin lookup itself fails", async () => {
     requireAdminOrNull.mockRejectedValueOnce(new Error("db down"));
     expect((await call({ is_visible: false })).status).toBe(500);
+  });
+});
+
+describe("PATCH /api/admin/doctors/[id]: failures", () => {
+  it("answers 500 and changes nothing when the doctor cannot be read", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    readError = { code: "XX000", message: "boom" };
+    expect((await call({ is_visible: false })).status).toBe(500);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("answers 500, without auditing or clearing the cache, when the update fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    updateError = { message: "boom" };
+    directoryChanged.mockClear();
+    expect((await call({ is_visible: false })).status).toBe(500);
+    expect(audits).toHaveLength(0);
+    expect(directoryChanged).not.toHaveBeenCalled();
   });
 });

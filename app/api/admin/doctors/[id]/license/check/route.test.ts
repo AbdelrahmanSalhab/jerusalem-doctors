@@ -9,9 +9,11 @@ let doctor: Record<string, unknown> | null = null;
 let mirrorRows: Record<string, unknown>[] = [];
 let duplicateRow: Record<string, unknown> | null = null;
 let liveThrows = false;
+let readError: { code: string; message?: string } | null = null;
+const gate = vi.hoisted(() => ({ admin: true, allowed: true }));
 
-vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => ({ id: "00000000-0000-4000-8000-00000000a001" })) }));
-vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => (gate.admin ? { id: "00000000-0000-4000-8000-00000000a001" } : null)) }));
+vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: gate.allowed })) }));
 
 vi.mock("@/lib/moh/client", () => ({
   MohClient: class {
@@ -38,7 +40,7 @@ vi.mock("@/lib/supabase/service", () => ({
         chain[m] = () => chain;
       }
       chain.maybeSingle = async () => {
-        if (table === "doctors") return { data: doctor, error: null };
+        if (table === "doctors") return { data: doctor, error: readError };
         if (table === "doctor_license_slots") return { data: duplicateRow, error: null };
         // moh_practitioners single-row lookup inside verifyLicense.
         if (table === "moh_practitioners") return { data: mirrorRows[0] ?? null, error: null };
@@ -85,6 +87,9 @@ async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") 
 }
 
 beforeEach(() => {
+  readError = null;
+  gate.admin = true;
+  gate.allowed = true;
   updates.length = 0;
   doctor = { ...DOCTOR };
   mirrorRows = [];
@@ -163,5 +168,34 @@ describe("POST .../license/check", () => {
 
   it("rejects a body it cannot read", async () => {
     expect((await call({ slot: "third", license_number: "1" })).status).toBe(400);
+  });
+});
+
+describe("POST .../license/check: refusals and failures", () => {
+  const body = { slot: "primary", license_number: "189371" };
+
+  it("refuses a non-admin, and a flood of checks", async () => {
+    gate.admin = false;
+    expect((await call(body)).status).toBe(401);
+    gate.admin = true;
+    gate.allowed = false;
+    expect((await call(body)).status).toBe(429);
+  });
+
+  it("answers 404 for a malformed id and 400 for a body that is not JSON", async () => {
+    expect((await call(body, "abc")).status).toBe(404);
+    const { POST } = await import("./route");
+    const res = await POST(new Request("https://example.test/x", { method: "POST", body: "nope" }), { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000000d1" }) });
+    expect(res.status).toBe(400);
+  });
+
+  it("answers 500 when the doctor cannot be read", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    readError = { code: "XX000", message: "boom" };
+    expect((await call(body)).status).toBe(500);
+  });
+
+  it("checks against the region the admin names, not the one stored", async () => {
+    expect((await call({ ...body, region: "PS" })).status).toBe(200);
   });
 });

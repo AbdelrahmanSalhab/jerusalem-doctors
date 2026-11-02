@@ -10,12 +10,16 @@ let doctor: Record<string, unknown> | null = null;
 let mirrorRows: Record<string, unknown>[] = [];
 let duplicateRow: Record<string, unknown> | null = null;
 let updateError: { code: string } | null = null;
+let readError: { code: string; message?: string } | null = null;
+let registryDown = false;
+const gate = vi.hoisted(() => ({ admin: true, allowed: true }));
 
-vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => ({ id: "00000000-0000-4000-8000-00000000a001" })) }));
-vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: true })) }));
+vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull: vi.fn(async () => (gate.admin ? { id: "00000000-0000-4000-8000-00000000a001" } : null)) }));
+vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: gate.allowed })) }));
 vi.mock("@/lib/moh/client", () => ({
   MohClient: class {
     async findByLicenses() {
+      if (registryDown) throw new Error("registry down");
       return [];
     }
   },
@@ -40,7 +44,7 @@ vi.mock("@/lib/supabase/service", () => ({
         chain[m] = () => chain;
       }
       chain.maybeSingle = async () => {
-        if (table === "doctors") return { data: doctor, error: null };
+        if (table === "doctors") return { data: doctor, error: readError };
         if (table === "doctor_license_slots") return { data: duplicateRow, error: null };
         if (table === "moh_practitioners") return { data: mirrorRows[0] ?? null, error: null };
         return { data: null, error: null };
@@ -92,6 +96,10 @@ beforeEach(() => {
   mirrorRows = [];
   duplicateRow = null;
   updateError = null;
+  readError = null;
+  registryDown = false;
+  gate.admin = true;
+  gate.allowed = true;
 });
 
 describe("POST .../license/save", () => {
@@ -252,5 +260,60 @@ describe("POST .../license/save", () => {
     const res = await call({ slot: "primary", license_number: "2-45678" });
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe("invalid_license");
+  });
+});
+
+async function callWith(id: string, raw: string, init: { slot?: string } = {}) {
+  void init;
+  const { POST } = await import("./route");
+  return POST(new Request("https://example.test/x", { method: "POST", body: raw }), { params: Promise.resolve({ id }) });
+}
+
+describe("POST .../license/save: refusals and failures", () => {
+  const body = { slot: "primary", license_number: "189371" };
+
+  it("refuses a non-admin, and a flood of saves", async () => {
+    gate.admin = false;
+    expect((await call(body)).status).toBe(401);
+    gate.admin = true;
+    gate.allowed = false;
+    expect((await call(body)).status).toBe(429);
+  });
+
+  it("answers 404 for a malformed id and 400 for a body that is not JSON", async () => {
+    expect((await callWith("abc", JSON.stringify(body))).status).toBe(404);
+    expect((await callWith("00000000-0000-4000-8000-0000000000d1", "nope")).status).toBe(400);
+  });
+
+  it("answers 500 when the doctor cannot be read", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    readError = { code: "XX000", message: "boom" };
+    expect((await call(body)).status).toBe(500);
+  });
+
+  it("says the registry is unavailable rather than 'not found'", async () => {
+    registryDown = true;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect((await call(body)).status).toBe(503);
+  });
+
+  it("answers 500 when the update itself fails for another reason", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mirrorRows = [MIRROR];
+    updateError = { code: "XX000" };
+    expect((await call({ ...body, expected_status: "verified" })).status).toBe(500);
+  });
+
+  it("takes the registry's spelling for a soft match, and checks again with it", async () => {
+    mirrorRows = [{ ...MIRROR, hebrew_family_name: "דריפום", hebrew_family_norm: "דריפום" }];
+    doctor = { ...DOCTOR, hebrew_family_name: "דריפוס" };
+    const res = await call({ ...body, adopt_registry_name: true });
+    expect(res.status).toBe(200);
+    expect(updates.some((u) => "hebrew_family_name" in u)).toBe(true);
+  });
+
+  it("refuses to adopt a name when the verdict is not a soft match", async () => {
+    mirrorRows = [MIRROR];
+    expect((await call({ ...body, adopt_registry_name: true })).status).toBe(409);
   });
 });
