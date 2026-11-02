@@ -79,9 +79,9 @@ jobs:
         id: images-cache
         uses: actions/cache/restore@v6
         with:
-          path: ${{ runner.temp }}/images.tar
-          key: docker-images-supabase-2.121.0-${{ steps.images.outputs.day }}
-          restore-keys: docker-images-supabase-2.121.0-
+          path: ${{ runner.temp }}/images
+          key: docker-images-v2-supabase-2.121.0-${{ steps.images.outputs.day }}
+          restore-keys: docker-images-v2-supabase-2.121.0-
       # Supabase spends most of its minute getting images, so it starts first
       # and in the background while npm, the browsers and the build run.
       - name: Start Supabase in the background (every migration from zero)
@@ -89,7 +89,7 @@ jobs:
           # Each phase's seconds go to supabase.phases (printed below), to see
           # which part of the start is the long one.
           (t=$(date +%s); mark() { echo "- $1: $(( $(date +%s) - t )) s" >> "$RUNNER_TEMP/supabase.phases"; t=$(date +%s); }
-            if [ -f "$RUNNER_TEMP/images.tar" ]; then docker load -q -i "$RUNNER_TEMP/images.tar"; fi && mark "docker load" \
+            if [ -d "$RUNNER_TEMP/images" ]; then ls "$RUNNER_TEMP"/images/*.tar | xargs -P 4 -n 1 docker load -q -i; fi && mark "docker load" \
             && supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor && mark "supabase start" \
             && supabase seed buckets && mark "seed buckets"; echo $? > "$RUNNER_TEMP/supabase.exit") > "$RUNNER_TEMP/supabase.log" 2>&1 &
       - uses: actions/setup-node@v7
@@ -165,14 +165,22 @@ jobs:
           supabase gen types typescript --local > lib/db/database.types.ts
           git diff --exit-code -- lib/db/database.types.ts \
             || { echo "::error file=lib/db/database.types.ts::Stale: with the local stack up, run npm run db:types and commit the result."; exit 1; }
+      # One file per image, only the ones the stack runs, so the next run can
+      # load them side by side: one `docker load` of everything took 60 to 70 s
+      # next to npm ci, the longest part of the setup.
       - name: Save today's Docker images
-        if: matrix.first && github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
-        run: docker save -o "$RUNNER_TEMP/images.tar" $(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>')
+        if: matrix.first && (github.event_name == 'push' || github.event_name == 'pull_request') && steps.images-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/images"
+          docker ps --format '{{.Image}}' | sort -u | while read -r image; do
+            docker save -o "$RUNNER_TEMP/images/$(echo "$image" | tr '/:' '__').tar" "$image"
+          done
+          ls -la "$RUNNER_TEMP/images" 
       - uses: actions/cache/save@v6
-        if: matrix.first && github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
+        if: matrix.first && (github.event_name == 'push' || github.event_name == 'pull_request') && steps.images-cache.outputs.cache-hit != 'true'
         with:
-          path: ${{ runner.temp }}/images.tar
-          key: docker-images-supabase-2.121.0-${{ steps.images.outputs.day }}
+          path: ${{ runner.temp }}/images
+          key: docker-images-v2-supabase-2.121.0-${{ steps.images.outputs.day }}
       - run: npx playwright test ${{ matrix.projects }}
         env:
           E2E_PREBUILT: "1"
