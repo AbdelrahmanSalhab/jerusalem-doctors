@@ -28,6 +28,24 @@ production. `npx supabase stop` and `docker compose -p jd-e2e down` stop the sta
 | `ui/` | User journeys; tests tagged `@phone` also run at iPhone size (WebKit in CI) |
 | `smoke/` | Read-only checks against production (`.github/workflows/smoke.yml`): pages and security headers, the SMS hook and cron not blocked by the firewall, an admin sign-in and search, the nightly registry sync; Lighthouse on public pages after each deploy |
 
+## One sign-up test needs Docker to reach the app
+
+Supabase Auth sends codes through the app's own Send SMS hook
+(`http://host.docker.internal:3123/...`, `supabase/config.toml`). The three
+numbers in `[auth.sms.test_otp]` never call it, which is what the sign-up tests
+use. `a new code cancels the old one` uses an ordinary number, so it needs the
+real hook.
+
+- **CI** (Docker on Linux): `host.docker.internal` is the host, and it passes.
+- **Docker Desktop on Windows, app in WSL:** `host.docker.internal` is the
+  Windows host, which has no route to a server inside WSL. Auth's log says
+  `dial tcp 192.168.65.254:3123: connect: connection refused`, and the test used
+  to fail on every local run (#180). It now skips itself, saying so, when a probe
+  from the Auth container (`authReachesApp()` in `helpers.ts`) cannot reach the
+  app. To run it locally, make the app reachable from Docker's side (WSL's
+  mirrored networking mode, `networkingMode=mirrored` in `.wslconfig`, is the
+  likely way; not tried here).
+
 ## Browser diagnostics
 
 Every browser test records console errors and warnings, page errors, failed
