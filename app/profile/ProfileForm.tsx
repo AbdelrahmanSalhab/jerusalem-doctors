@@ -1,5 +1,6 @@
 "use client";
 
+import { cleanEmail } from "@/lib/normalize/email";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -223,7 +224,7 @@ export function ProfileForm({
         <LockableField
           label="البريد الإلكتروني"
           value={email}
-          onChange={setEmail}
+          onChange={(v) => setEmail(cleanEmail(v))}
           type="email"
           dir="ltr"
         />

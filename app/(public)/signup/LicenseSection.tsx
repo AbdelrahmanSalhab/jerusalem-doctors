@@ -9,6 +9,7 @@ import {
   OTHER_REGION,
   type UpdateField,
 } from "@/lib/signup/formState";
+import { cleanEmail } from "@/lib/normalize/email";
 import { Section } from "./SignupFields";
 
 export function LicenseSection({
@@ -153,7 +154,7 @@ export function LicenseSection({
           autoComplete="email"
           className="input"
           value={form.email}
-          onChange={(e) => update("email", e.target.value)}
+          onChange={(e) => update("email", cleanEmail(e.target.value))}
         />
       </Field>
     </Section>

@@ -11,6 +11,7 @@
 // pre-checks in lib/profile/validate.ts, and on the server every rule in
 // lib/profile/save.ts.
 
+import { cleanEmail } from "@/lib/normalize/email";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PhotoUploader } from "@/app/profile/PhotoUploader";
@@ -280,7 +281,7 @@ export function DoctorProfileEditor({
           إلغاء التوثيق يُخفي الطبيب من الدليل ويمنعه من الدخول. لا يتغيّر تلقائيًا عند تبديل الرقم.
         </p>
         <Field label="البريد الإلكتروني">
-          <input className="input" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="input" type="email" dir="ltr" value={email} onChange={(e) => setEmail(cleanEmail(e.target.value))} />
         </Field>
       </Block>
 
