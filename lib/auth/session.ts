@@ -46,6 +46,13 @@ const sessionClaims = cache(async (): Promise<SessionClaims | undefined> => {
   return data?.claims as SessionClaims | undefined;
 });
 
+/** True when the flag is on and this is a password session that has not
+ *  passed the code: it may not start an authenticator of its own, or a leaked
+ *  password would be enough to claim an admin's second factor. */
+export async function awaitingSecondFactor(): Promise<boolean> {
+  return !isDevUserEnabled() && needsSecondFactor(await sessionClaims());
+}
+
 /**
  * Returns the currently authenticated doctor, or null if no session.
  * Honours the dev-user shim when enabled.
@@ -99,6 +106,10 @@ export async function requireDoctor(): Promise<Doctor> {
 export async function requireAdmin(): Promise<Doctor> {
   const admin = await getCurrentAdmin();
   if (!admin) {
+    // An admin who signed in with a password and has not given the code yet
+    // is sent to the code step; everyone else is told nothing is here.
+    const doctor = await getCurrentDoctor();
+    if (doctor?.is_admin && doctor.is_active) redirect("/login/dev?code=1");
     const { notFound } = await import("next/navigation");
     notFound(); // throws, control never returns here
   }

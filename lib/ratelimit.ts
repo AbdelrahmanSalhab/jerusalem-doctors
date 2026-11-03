@@ -72,6 +72,10 @@ export const RATE_LIMITS = {
   ciLoginIp: { limit: 10, window: "15 m" },
   // Each attempt checks the current password: kept as slow as signing in.
   passwordChange: { limit: 5, window: "15 m" },
+  // The authenticator code (app/api/mfa): six digits, so guessing is kept
+  // slow on top of Supabase's own limit.
+  mfaVerify: { limit: 10, window: "15 m" },
+  mfaEnroll: { limit: 10, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;

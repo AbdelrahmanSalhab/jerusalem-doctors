@@ -542,19 +542,33 @@ admin panel and the admin API answer as they do to anyone who is not an admin.
 Sessions that did not begin with a password are not asked: a doctor-admin who
 signs in by phone code, and the smoke check's own sign-in (`/api/login/ci`).
 
-**It is off.** Turning it on before every password account has enrolled locks
-that account out of /admin. Order: build (this is step 1 of 3: the check, with
-the flag off), enrolment and the code step at sign-in, recovery for a lost
-factor; then each password admin enrols, then the flag goes on.
+**Enrolling.** An admin with a password opens «ملفي», presses «تفعيل التحقق بخطوتين»,
+scans the QR with an authenticator app and types the first code. Until that code
+is confirmed the factor does not count, so a bad scan locks nobody out. It can
+be done once, and only while the flag is off: with it on, a password session that has not given its code cannot start one (a leaked password must not be enough to claim an account's factor). Replacing one, or enrolling a new admin, is for the super admins (step 3).
+The browser never talks to Supabase (the site's content-security rules allow
+only its own origin), so this goes through `/api/mfa`, `/api/mfa/enroll` and
+`/api/mfa/verify`.
+
+**Signing in.** After the password, a session that has a factor is asked for the
+code on the same form (`/login/dev`), then lands on `/admin`. With the flag on,
+opening `/admin` without the code sends an admin to `/login/dev?code=1`
+instead of a 404.
+
+**Supabase setting.** Authentication > Multi-Factor must have TOTP enrolment
+and verification on (`mfa_totp_enroll_enabled`, `mfa_totp_verify_enabled`); the
+local stack has them on in `supabase/config.toml`.
+
+**It is off.** Turning it on before every password account has enrolled
+locks that account out of /admin. Order: the check (step 1, merged, flag off),
+enrolment and the code step (step 2), recovery for a lost factor (step 3); then
+each password admin enrols, then `ADMIN_MFA=1` goes on.
 
 ### What this does not have
 
-**MFA is not enforced.** Supabase can enrol TOTP, but `signInWithPassword`
-returns a session at AAL1 and nothing in this app checks the `aal` claim, so
-enrolling it would look like protection without being any. Making it real
-needs a challenge step in `/api/login/password` and an `aal2` check in
-`requireDoctor`. Worth doing if these accounts stay enabled in production
-long term.
+**MFA is not enforced until `ADMIN_MFA=1`.** Enrolling a factor alone adds a
+code step at sign-in, but `/admin` still opens for a password session that
+skipped it (for example by going straight to the URL) while the flag is off.
 
 ## The production smoke check's sign-in (no password)
 

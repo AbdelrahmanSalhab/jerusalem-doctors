@@ -37,6 +37,10 @@ const POLICY: Record<string, Policy> = {
   "POST /api/sms/delivery": "credentials",
   // Admins are the accounts with a password sign-in.
   "POST /api/profile/password": "admin",
+  // The authenticator code of a password sign-in (lib/auth/mfa.ts).
+  "GET /api/mfa": "admin",
+  "POST /api/mfa/enroll": "admin",
+  "POST /api/mfa/verify": "admin",
   "POST /api/admin/doctors/[id]/license/check": "admin",
   "POST /api/admin/doctors/[id]/license/save": "admin",
   "POST /api/admin/doctors/[id]/license/reviewed": "admin",
@@ -81,7 +85,7 @@ const POLICY: Record<string, Policy> = {
 };
 
 /** Calls that would change the seeded accounts if they got through. */
-const DESTRUCTIVE = new Set(["POST /api/profile/delete-request", "POST /api/auth/logout"]);
+const DESTRUCTIVE = new Set(["POST /api/profile/delete-request", "POST /api/auth/logout", "POST /api/mfa/enroll"]);
 
 const API_DIR = path.join(__dirname, "../../app/api");
 

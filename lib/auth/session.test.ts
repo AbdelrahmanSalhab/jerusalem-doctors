@@ -65,11 +65,20 @@ describe("lib/auth/session", () => {
       expect(await (await session()).getCurrentAdmin()).toEqual(admin);
     });
 
-    it("shows the panel's 404 to the turned-away session, like any non-admin", async () => {
+    it("sends the turned-away session to the code step instead of a 404", async () => {
       vi.stubEnv("ADMIN_MFA", "1");
       sessionOf("aal1", "password");
-      db.queue("doctors", { data: admin });
-      await expect((await session()).requireAdmin()).rejects.toThrow("NOT_FOUND");
+      db.queue("doctors", { data: admin }, { data: admin });
+      await expect((await session()).requireAdmin()).rejects.toThrow("REDIRECT /login/dev?code=1");
+    });
+
+    it("says a password session awaits its code only when the flag is on and the code is not given", async () => {
+      sessionOf("aal1", "password");
+      expect(await (await session()).awaitingSecondFactor()).toBe(false);
+      vi.stubEnv("ADMIN_MFA", "1");
+      expect(await (await session()).awaitingSecondFactor()).toBe(true);
+      sessionOf("aal2", "password", "totp");
+      expect(await (await session()).awaitingSecondFactor()).toBe(false);
     });
 
     it("leaves the dev shim alone: it has no token to read", async () => {
