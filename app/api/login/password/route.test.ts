@@ -9,6 +9,8 @@ const audits: Record<string, unknown>[] = [];
 let doctorRow: Record<string, unknown> | null = null;
 let signInFails = false;
 const signOut = vi.fn(async () => ({ error: null }));
+let level = { currentLevel: "aal1", nextLevel: "aal1" };
+const getAuthenticatorAssuranceLevel = vi.fn(async () => ({ data: level, error: null }));
 const signInWithPassword = vi.fn(async ({ email }: { email: string }) =>
   signInFails ? { data: { user: null }, error: { message: "bad" } } : { data: { user: { id: `user-${email}` } }, error: null },
 );
@@ -17,7 +19,7 @@ let limited = false;
 
 vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: !limited })) }));
 vi.mock("@/lib/supabase/server", () => ({
-  createSupabaseServerClient: async () => ({ auth: { signInWithPassword, signOut } }),
+  createSupabaseServerClient: async () => ({ auth: { signInWithPassword, signOut, mfa: { getAuthenticatorAssuranceLevel } } }),
 }));
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
@@ -51,6 +53,7 @@ beforeEach(() => {
   signOut.mockClear();
   signInFails = false;
   limited = false;
+  level = { currentLevel: "aal1", nextLevel: "aal1" };
   doctorRow = { id: "d1", is_active: true, is_admin: true, is_admin_approved: true };
   process.env.DEV_LOGIN = "1";
   process.env.DEV_LOGIN_EMAILS = "dev@example.com, qa@example.com";
@@ -75,7 +78,12 @@ describe("who gets in", () => {
   it("signs in an allowlisted address with the right password", async () => {
     const res = await call(GOOD);
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true });
+    expect(await res.json()).toMatchObject({ ok: true, needs_code: false });
+  });
+
+  it("says an admin with an authenticator still owes its code", async () => {
+    level = { currentLevel: "aal1", nextLevel: "aal2" };
+    expect(await (await call(GOOD)).json()).toMatchObject({ ok: true, needs_code: true });
   });
 
   it("never reaches Supabase for an address that is not allowlisted", async () => {

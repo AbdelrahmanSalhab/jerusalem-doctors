@@ -20,7 +20,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function DevLoginPage() {
+export default async function DevLoginPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
   if (!devLoginEnabled()) notFound();
 
   return (
@@ -36,7 +36,7 @@ export default function DevLoginPage() {
         </p>
       </header>
 
-      <DevLoginForm />
+      <DevLoginForm sentForCode={(await searchParams).code === "1"} />
 
       <p className="text-xs text-muted">يُسجَّل كل دخول من هنا في سجل النشاط.</p>
     </main>

@@ -53,6 +53,11 @@ const EXPECTED: RegExp[] = [
   /^console\.error Executing inline event handler violates the following Content Security Policy/,
   /^console\.error Refused to execute a script for an inline event handler because 'unsafe-inline' does not appear in the script-src/,
   /^(http 404 GET |console\.error Failed to load resource: .* status of 404 .*\[)\/nope\.png/,
+  // A session the auth server has ended (its password was changed from
+  // elsewhere) while its token still checks out: the profile page asks.
+  /^console\.error Failed to load resource: .* status of 401 .*\[\/api\/mfa\]/,
+  // A wrong authenticator code is refused with a 400 (e2e/ui/mfa.spec.ts).
+  /^console\.error Failed to load resource: .* status of 400 .*\[\/api\/mfa\/verify\]/,
   // Next aborts in-flight prefetches when a test navigates on.
   /^requestfailed GET \S+[?&]_rsc=\S+ net::ERR_ABORTED/,
   // The same abort as WebKit (the phone project) reports it: a page error, not a failed request.

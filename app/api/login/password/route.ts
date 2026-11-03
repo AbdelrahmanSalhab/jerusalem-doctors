@@ -84,5 +84,10 @@ export const POST = withJsonErrors(async (req: Request) => {
     metadata: { email, is_admin: doctor.data.is_admin, ...(ciRunOf(req) ? { ci_run: ciRunOf(req) } : {}) },
   });
 
-  return jsonOk({ ok: true, is_admin_approved: doctor.data.is_admin_approved });
+  // An admin with an authenticator still owes its code (lib/auth/mfa.ts);
+  // the form asks for it before going on.
+  const level = await ssr.auth.mfa.getAuthenticatorAssuranceLevel();
+  const needsCode = level.data?.currentLevel === "aal1" && level.data.nextLevel === "aal2";
+
+  return jsonOk({ ok: true, is_admin_approved: doctor.data.is_admin_approved, needs_code: needsCode });
 });

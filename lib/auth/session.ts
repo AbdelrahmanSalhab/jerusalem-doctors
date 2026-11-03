@@ -99,6 +99,10 @@ export async function requireDoctor(): Promise<Doctor> {
 export async function requireAdmin(): Promise<Doctor> {
   const admin = await getCurrentAdmin();
   if (!admin) {
+    // An admin who signed in with a password and has not given the code yet
+    // is sent to the code step; everyone else is told nothing is here.
+    const doctor = await getCurrentDoctor();
+    if (doctor?.is_admin && doctor.is_active) redirect("/login/dev?code=1");
     const { notFound } = await import("next/navigation");
     notFound(); // throws, control never returns here
   }
