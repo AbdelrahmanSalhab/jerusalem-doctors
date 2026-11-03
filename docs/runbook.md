@@ -578,6 +578,52 @@ an answer to a compromise, also have that admin change their password in «مل�
 (it signs out their other sessions), or sign them out in the Supabase dashboard
 (Authentication > Users).
 
+**What can lock everyone out, and what prevents it.** The flag only asks the
+code of a session that began with a **password**. An admin who signs in by phone
+code is never asked, so as long as the SMS provider works and an admin's phone
+number is on their account, they get in. Keep it that way: do not remove the
+phone numbers of the admins who also have a password (three of the four admin
+accounts today; the fourth is the CI account), and do not turn the flag on while
+the SMS provider is failing. Ways in, in the order to try them:
+
+1. Sign in by phone code (not affected by the flag).
+2. Another super admin resets the factor in the panel (above).
+3. **Break-glass by SQL**, which needs no service key: in the Supabase SQL
+   editor (Abdelrahman; or with the Management API token), for the admin's
+   sign-in address:
+
+   ```sql
+   delete from auth.mfa_factors
+   where user_id = (select id from auth.users where email = '<address>');
+   update auth.users
+   set raw_app_meta_data = raw_app_meta_data
+     || jsonb_build_object('mfa_enrol_until', (extract(epoch from now()) * 1000 + 900000)::bigint)
+   where email = '<address>';
+   ```
+
+   (The first removes the authenticator, and its challenges with it; the second
+   opens the 15 minute window.) `npm run mfa:reset` does the same with the
+   service key.
+4. Take the flag off: remove `ADMIN_MFA` in Vercel and redeploy (Abdelrahman).
+   Every password session works again at once.
+
+**Before the flag goes on**, read who is enrolled and who could still get in:
+
+```sql
+select d.is_visible as a_doctor,
+       (u.phone_confirmed_at is not null) as can_sign_in_by_phone,
+       (u.encrypted_password <> '') as has_password,
+       (select count(*) from auth.mfa_factors f where f.user_id = u.id and f.status = 'verified') as authenticators
+from auth.users u join public.doctors d on d.auth_user_id = u.id
+where d.is_admin and d.is_active
+order by 1, 2;
+```
+
+Every row with a password and no phone must have an authenticator, and at least
+two rows must be able to sign in by phone. The authenticator itself is tested
+against real tokens with `E2E_ADMIN_MFA=1` (`e2e/README.md`), which CI does not
+run.
+
 **It is off.** Turning it on before every password account has enrolled
 locks that account out of /admin. Rollout:
 

@@ -74,3 +74,16 @@ reason in `EXPECTED` in `fixtures.ts`.
 
 `api/authz.spec.ts` fails until the new route is added to `POLICY` with who
 may call it.
+
+## The second factor with ADMIN_MFA=1
+
+CI runs the server with `ADMIN_MFA` off: with it on, the shared admin sessions
+(password sign-ins) cannot reach `/admin`. `e2e/ui/mfa-enforced.spec.ts` covers
+the enforced behaviour with real Supabase tokens (a password session without a
+factor cannot enrol, a reset window lets it, `/admin` asks for the code) and
+skips itself unless the server has the flag. Run it alone, before turning the
+flag on in production:
+
+```
+E2E_ADMIN_MFA=1 npx playwright test --project=desktop --no-deps e2e/ui/mfa-enforced.spec.ts
+```
