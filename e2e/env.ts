@@ -42,7 +42,7 @@ export type Role = keyof typeof ACCOUNTS;
 export const CI_LOGIN_EMAIL = "ci@e2e.invalid";
 
 /** Accounts a single test creates and removes (e.g. the deletion request). */
-export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test", "authenticator@e2e.test"];
+export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test", "authenticator@e2e.test", "lostphone@e2e.test"];
 
 /** Sentry's ingest, served by e2e/stubs.mjs. */
 export const SENTRY_STUB_DSN = `${STUB_URL.replace("://", "://e2e@")}/1`;
@@ -58,6 +58,8 @@ export function appEnv(): Record<string, string> {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_SITE_KEY,
     TURNSTILE_SECRET_KEY,
     DEV_LOGIN: "1",
+    // Who may reset another admin's authenticator (lib/auth/superAdmin.ts).
+    SUPER_ADMIN_EMAILS: ACCOUNTS.admin,
     DEV_LOGIN_EMAILS: [...Object.values(ACCOUNTS), ...THROWAWAY_ACCOUNTS].join(","),
     // The smoke check's sign-in (app/api/login/ci), with the stub playing GitHub.
     CI_LOGIN_EMAIL,

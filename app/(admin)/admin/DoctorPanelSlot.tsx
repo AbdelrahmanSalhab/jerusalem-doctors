@@ -22,8 +22,11 @@ export function DoctorPanelSlot({
   closeHref,
   viewHref,
   editHref,
+  canResetSecondFactor = false,
 }: {
   detail: DoctorDetail | null;
+  /** Offer a super admin the reset of another admin's second factor. */
+  canResetSecondFactor?: boolean;
   /** The catalogue the picker needs; only read when editing. */
   specialties: SpecialtyChoice[];
   editing: boolean;
@@ -48,7 +51,7 @@ export function DoctorPanelSlot({
   if (!editing) {
     return (
       <DoctorPanel closeHref={closeHref} title={title}>
-        <DoctorPanelBody detail={detail} closeHref={closeHref} editHref={editHref} />
+        <DoctorPanelBody detail={detail} closeHref={closeHref} editHref={editHref} canResetSecondFactor={canResetSecondFactor} />
       </DoctorPanel>
     );
   }

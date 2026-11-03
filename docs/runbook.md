@@ -559,10 +559,28 @@ instead of a 404.
 and verification on (`mfa_totp_enroll_enabled`, `mfa_totp_verify_enabled`); the
 local stack has them on in `supabase/config.toml`.
 
+**A lost phone.** Two super admins, the addresses in `SUPER_ADMIN_EMAILS`
+(Vercel; Khaled and Abdelrahman), can reset another admin's authenticator from
+the doctor panel in `/admin`: «إعادة تعيين التحقق بخطوتين», pressed twice. It
+removes the factor, is on the audit trail (`admin_mfa_reset`), and gives that
+admin one hour to enrol a new one from «ملفي»: with the flag on, a password
+session without its code cannot enrol otherwise, so a leaked password cannot
+claim an account's factor. The same hour is how a **new** admin is enrolled
+once the flag is on. If neither super admin can sign in, whoever holds the
+project's keys runs `npm run mfa:reset -- --email <address>` (it does not write
+the audit log: say so in the team channel). Super admins reset each other the
+same way, and cannot reset themselves.
+
 **It is off.** Turning it on before every password account has enrolled
-locks that account out of /admin. Order: the check (step 1, merged, flag off),
-enrolment and the code step (step 2), recovery for a lost factor (step 3); then
-each password admin enrols, then `ADMIN_MFA=1` goes on.
+locks that account out of /admin. Rollout:
+
+1. Merge steps 1 to 3. Set `SUPER_ADMIN_EMAILS` in Vercel.
+2. In Supabase, Authentication > Multi-Factor: TOTP enrolment and verification on.
+3. Each password admin enrols in «ملفي». The audit page shows who has
+   (`admin_mfa_enrolled`).
+4. Set `ADMIN_MFA=1` and redeploy. Check that each admin still reaches `/admin`
+   (password, then the code).
+5. To turn it off in an emergency, remove `ADMIN_MFA` and redeploy.
 
 ### What this does not have
 

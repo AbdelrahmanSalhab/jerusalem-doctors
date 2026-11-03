@@ -9,6 +9,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { DoctorAuditList } from "./DoctorAuditList";
 import { DoctorPanelControls } from "./DoctorPanelControls";
+import { MfaReset } from "./MfaReset";
 import { LicenseSection } from "./LicenseSection";
 import { auditTime } from "@/lib/auditText";
 import { careerStageBadge } from "@/lib/careerStage";
@@ -49,9 +50,12 @@ export function DoctorPanelBody({
   detail,
   closeHref,
   editHref,
+  canResetSecondFactor = false,
 }: {
   detail: DoctorDetail;
   closeHref: string;
+  /** A super admin looking at another admin (lib/auth/superAdmin.ts). */
+  canResetSecondFactor?: boolean;
   /** This same panel with the profile editor open. */
   editHref: string;
 }) {
@@ -106,6 +110,8 @@ export function DoctorPanelBody({
         }}
         closeHref={closeHref}
       />
+
+      {canResetSecondFactor && d.is_admin && <MfaReset doctorId={d.id} />}
 
       <Section title="التحقق من الترخيص">
         <div className="flex flex-col gap-4">
