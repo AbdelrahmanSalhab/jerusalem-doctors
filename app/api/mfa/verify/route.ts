@@ -7,6 +7,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { writeAudit } from "@/lib/audit";
 import { requireDoctor } from "@/lib/auth/session";
+import { closeEnrolWindow } from "@/lib/auth/mfaReset";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -33,7 +34,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   // Only the end of an enrolment is recorded as one: a code sent with an id
   // that was already verified is an ordinary challenge.
   if (listed?.all.some((f) => f.id === factorId && f.status === "unverified")) {
-    await writeAudit(createSupabaseServiceClient(), { actor_doctor_id: me.id, action: "admin_mfa_enrolled", target_doctor_id: me.id });
+    const service = createSupabaseServiceClient();
+    await closeEnrolWindow(service, me.auth_user_id);
+    await writeAudit(service, { actor_doctor_id: me.id, action: "admin_mfa_enrolled", target_doctor_id: me.id });
   }
   return jsonOk({ ok: true });
 });

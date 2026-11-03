@@ -41,6 +41,7 @@ const POLICY: Record<string, Policy> = {
   "GET /api/mfa": "admin",
   "POST /api/mfa/enroll": "admin",
   "POST /api/mfa/verify": "admin",
+  "POST /api/admin/doctors/[id]/mfa/reset": "admin",
   "POST /api/admin/doctors/[id]/license/check": "admin",
   "POST /api/admin/doctors/[id]/license/save": "admin",
   "POST /api/admin/doctors/[id]/license/reviewed": "admin",

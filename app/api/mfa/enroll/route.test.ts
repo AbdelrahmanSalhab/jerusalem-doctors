@@ -3,10 +3,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireDoctor = vi.hoisted(() => vi.fn());
-const awaiting = vi.hoisted(() => ({ value: false }));
+const awaiting = vi.hoisted(() => ({ value: false, window: false }));
 const gate = vi.hoisted(() => ({ allowed: true }));
 const mfa = vi.hoisted(() => ({ listFactors: vi.fn(), unenroll: vi.fn(), enroll: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireDoctor, awaitingSecondFactor: async () => awaiting.value }));
+vi.mock("@/lib/auth/mfaReset", () => ({ enrolWindowOpen: async () => awaiting.window }));
+vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({}) }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: gate.allowed })) }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ auth: { mfa } }) }));
 
@@ -16,6 +18,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   gate.allowed = true;
   awaiting.value = false;
+  awaiting.window = false;
   requireDoctor.mockResolvedValue({ id: "d1", is_admin: true, auth_user_id: "u1" });
   mfa.listFactors.mockResolvedValue({ data: { totp: [], all: [] }, error: null });
   mfa.enroll.mockResolvedValue({ data: { id: "f1", totp: { qr_code: "data:image/svg+xml;utf8,<svg/>", secret: "ABC" } }, error: null });
@@ -47,6 +50,12 @@ describe("POST /api/mfa/enroll", () => {
     const res = await call();
     expect(res.status).toBe(403);
     expect(mfa.enroll).not.toHaveBeenCalled();
+  });
+
+  it("lets that session enrol while a super admin's reset window is open", async () => {
+    awaiting.value = true;
+    awaiting.window = true;
+    expect((await call()).status).toBe(200);
   });
 
   it("is for admins only and rate limited", async () => {

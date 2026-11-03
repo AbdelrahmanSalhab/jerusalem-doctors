@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireDoctor = vi.hoisted(() => vi.fn());
 const gate = vi.hoisted(() => ({ allowed: true }));
 const writeAudit = vi.hoisted(() => vi.fn());
+const closeEnrolWindow = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auth/mfaReset", () => ({ closeEnrolWindow }));
 const mfa = vi.hoisted(() => ({ listFactors: vi.fn(), challengeAndVerify: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
 vi.mock("@/lib/audit", () => ({ writeAudit }));
@@ -39,11 +41,13 @@ describe("POST /api/mfa/verify", () => {
     expect((await call({ code: "123456", factorId: other })).status).toBe(200);
     expect(mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: other, code: "123456" });
     expect(writeAudit).toHaveBeenCalledWith({ marker: "service" }, { actor_doctor_id: "d1", action: "admin_mfa_enrolled", target_doctor_id: "d1" });
+    expect(closeEnrolWindow).toHaveBeenCalledWith({ marker: "service" }, "u1");
   });
 
   it("does not record an enrolment when the factor named was already verified", async () => {
     expect((await call({ code: "123456", factorId: FACTOR })).status).toBe(200);
     expect(writeAudit).not.toHaveBeenCalled();
+    expect(closeEnrolWindow).not.toHaveBeenCalled();
   });
 
   it("refuses a wrong code with one answer", async () => {

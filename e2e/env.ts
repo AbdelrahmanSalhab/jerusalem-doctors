@@ -42,7 +42,7 @@ export type Role = keyof typeof ACCOUNTS;
 export const CI_LOGIN_EMAIL = "ci@e2e.invalid";
 
 /** Accounts a single test creates and removes (e.g. the deletion request). */
-export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test", "authenticator@e2e.test"];
+export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test", "authenticator@e2e.test", "lostphone@e2e.test", "enforced@e2e.test", "unenrolled@e2e.test"];
 
 /** Sentry's ingest, served by e2e/stubs.mjs. */
 export const SENTRY_STUB_DSN = `${STUB_URL.replace("://", "://e2e@")}/1`;
@@ -58,6 +58,12 @@ export function appEnv(): Record<string, string> {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_SITE_KEY,
     TURNSTILE_SECRET_KEY,
     DEV_LOGIN: "1",
+    // Who may reset another admin's authenticator (lib/auth/superAdmin.ts).
+    SUPER_ADMIN_EMAILS: ACCOUNTS.admin,
+    // Off, as in CI: it makes every admin password session ask for the code,
+    // which the shared test sessions cannot give. E2E_ADMIN_MFA=1 turns it on
+    // for e2e/ui/mfa-enforced.spec.ts alone (see e2e/README.md).
+    ...(process.env.E2E_ADMIN_MFA === "1" ? { ADMIN_MFA: "1" } : {}),
     DEV_LOGIN_EMAILS: [...Object.values(ACCOUNTS), ...THROWAWAY_ACCOUNTS].join(","),
     // The smoke check's sign-in (app/api/login/ci), with the stub playing GitHub.
     CI_LOGIN_EMAIL,

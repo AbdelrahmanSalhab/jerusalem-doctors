@@ -51,6 +51,7 @@ const TITLE: Record<string, string> = {
   admin_license_reviewed: "مراجعة الترخيص",
   dev_password_login: "دخول فريق التطوير بكلمة مرور",
   admin_mfa_enrolled: "تفعيل التحقق بخطوتين",
+  admin_mfa_reset: "إعادة تعيين التحقق بخطوتين",
   ci_login: "دخول الاختبار الآلي (CI)",
   password_changed: "تغيير كلمة المرور",
   institution_created: "إضافة مؤسسة",

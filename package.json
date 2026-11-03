@@ -12,6 +12,7 @@
     "test:rls": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/rls-smoke-test.ts",
     "test:coverage": "vitest run --coverage",
     "dev-login:list": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts --list",
+    "mfa:reset": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/mfa-reset.ts",
     "dev-login:add": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-dev-login.ts",
     "ci-login:add": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/add-ci-account.ts",
     "e2e:stack": "supabase start && supabase seed buckets && docker compose -f e2e/docker-compose.yml -p jd-e2e up -d",

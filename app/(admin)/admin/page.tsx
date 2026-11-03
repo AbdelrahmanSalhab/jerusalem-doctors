@@ -11,6 +11,7 @@ import { DoctorPanelSlot } from "./DoctorPanelSlot";
 import { fetchDoctorDetail } from "@/lib/admin/doctorDetail";
 import { Tile, TileGrid } from "@/components/AdminParts";
 import { countOf, DOCTORS } from "@/lib/arabicCount";
+import { isSuperAdmin } from "@/lib/auth/superAdmin";
 import { requireAdmin } from "@/lib/auth/session";
 import {
   ADMIN_PAGE_SIZE,
@@ -130,7 +131,7 @@ export default async function AdminDoctorsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const params = parseAdminDoctorsParams(await searchParams);
   const service = createSupabaseServiceClient();
   const { from, to } = pageRange(params.page);
@@ -221,6 +222,7 @@ export default async function AdminDoctorsPage({
           closeHref={listHref}
           viewHref={adminDoctorsHref(params, { doctorId: params.doctorId })}
           editHref={adminDoctorsHref(params, { doctorId: params.doctorId, editing: true })}
+          canResetSecondFactor={detail?.doctor.is_admin === true && detail.doctor.id !== viewer.id && (await isSuperAdmin(service, viewer.auth_user_id))}
         />
       )}
     </main>

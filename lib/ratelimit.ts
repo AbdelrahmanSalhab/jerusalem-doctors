@@ -76,6 +76,8 @@ export const RATE_LIMITS = {
   // slow on top of Supabase's own limit.
   mfaVerify: { limit: 10, window: "15 m" },
   mfaEnroll: { limit: 10, window: "1 h" },
+  // A super admin resetting another admin's authenticator: rare by nature.
+  mfaReset: { limit: 5, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;
