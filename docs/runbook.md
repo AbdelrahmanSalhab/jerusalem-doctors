@@ -363,57 +363,6 @@ Doctors reported exactly that ("I got two codes and both were wrong").
 - The kill switch (`NEXT_PUBLIC_PHONE_AUTH_DISABLED=1`, then redeploy) is also
   enforced in the Send SMS hook, so direct calls send nothing while it is on.
 
-### Backups (the free plan has none)
-
-Supabase's free plan keeps no backups and has no point-in-time recovery
-(checked 1 Nov 2026: 0 backups). `.github/workflows/backup.yml` runs
-`scripts/backup/backup.sh` every night at 01:41 UTC: `pg_dump` of the `public`
-schema (custom format, without the registry mirror, which the nightly sync
-refills), checked with `pg_restore --list`, encrypted with `age`, uploaded to a
-private Cloudflare R2 bucket `jd-backups` (S3-compatible, free 10 GB, no egress
-fees), the newest 30 kept. The database is about 30 MB, so that is far more than
-enough. The bucket also expires `daily/` objects after 60 days, as a backstop.
-
-**The repository is public, so:** the dump is never a workflow artifact, the log
-prints no host, row or connection string (failures say only which step failed),
-the plaintext exists only on the runner's temporary disk, and the secrets sit in
-a GitHub **environment** called `backup`, limited to the `main` branch, so a
-pull request cannot read them. Only the age *public* key is on GitHub; the
-private key is held offline by two people. Sign-ins relink to a doctor by phone
-(`linkAuthUser`), photos live in storage and are not in this dump.
-
-**One-time setup (a repository admin):**
-1. R2: a private bucket (`wrangler r2 bucket create jd-backups`) and an Account
-   API token of the R2 type, **Object Read & Write**, limited to that bucket
-   only (a token with zone permissions can change DNS; do not use one). Endpoint
-   `https://<account id>.r2.cloudflarestorage.com`, region `auto`. Created
-   1 Nov 2026; the key is held by Khaled and must reach the GitHub environment
-   without going through chat.
-2. `age-keygen -o jd-backup.key` on a trusted machine. Keep the file offline in
-   two places (two people). Put the line starting `age1...` in the secret below.
-3. GitHub, Settings, Environments, new environment `backup`: deployment branches
-   limited to `main`, then these secrets: `BACKUP_DATABASE_URL` (Supabase,
-   Connect, **Session pooler**, the URI with the password filled in; the direct
-   host is IPv6-only on the free plan and the runner is IPv4), `BACKUP_AGE_PUBLIC_KEY`,
-   `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
-4. Actions, Nightly backup, Run workflow once: it ends with `backup ok`.
-
-**Restore drill (once now, then after any change to the workflow):** download the
-newest `daily/jd-*.dump.age` from the bucket, `age -d -i jd-backup.key -o jd.dump
-jd-....dump.age`, then into a scratch Supabase project (or a local
-`supabase start`): `pg_restore --no-owner --no-privileges -d "<scratch url>"
-jd.dump`, and compare `select count(*) from doctors` with production. Expect one
-error: the foreign key from `doctors.auth_user_id` to `auth.users`, because a new
-project has no auth users; the data is complete, and a doctor is linked again by
-phone at the next sign-in (`linkAuthUser`). Tested 1 Nov 2026 with the real
-script, the real R2 bucket and a throwaway key against the local database (8 of 8
-doctors back). Delete the scratch project and the decrypted file.
-
-**If a night fails:** GitHub emails the people watching the repository. Scheduled
-workflows stop after 60 days without repository activity, so a long quiet spell
-needs a manual run. Not covered: auth settings (kept in this runbook), storage
-objects (photos), the registry mirror.
-
 ### Usage against the free plans
 
 `/admin/stats` → **الاستخدام الفعلي** shows measured usage, one row per UTC
