@@ -35,7 +35,7 @@ interface NameCandidate {
   firstName: string;
   familyName: string;
   specialtyHe: string | null;
-  kind: "exact" | "family";
+  kind: "exact" | "swapped" | "family";
   distance: number | null;
   heldBy: { id: string; name: string } | null;
 }
@@ -85,6 +85,7 @@ export function LicenseCheckPanel({
     setSaved(null);
     setResult(null);
     setOverride(false);
+    setReason("");
     try {
       const { ok, payload } = await post("check", { slot, license_number: n, region });
       if (!ok) {
@@ -106,7 +107,7 @@ export function LicenseCheckPanel({
     setError(null);
     setSaved(null);
     try {
-      const { ok, payload } = await post("find-by-name", {});
+      const { ok, payload } = await post("find-by-name", { slot });
       if (!ok) {
         setError(apiErrorMessage(payload?.code, "تعذّر البحث. حاول مجددًا."));
         return;
@@ -149,6 +150,7 @@ export function LicenseCheckPanel({
       );
       setResult(null);
       setByName(null);
+      setReason("");
       router.refresh();
     } catch {
       setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
@@ -222,6 +224,7 @@ export function LicenseCheckPanel({
               setResult(null);
               setNumber(storedNumber);
               setByName(null);
+              setReason("");
               setError(null);
             }}
             className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
@@ -264,7 +267,11 @@ export function LicenseCheckPanel({
                   </span>
                   {c.specialtyHe && <span dir="ltr" className="text-muted">{c.specialtyHe}</span>}
                   <span className="text-xs text-muted">
-                    {c.kind === "exact" ? "اسم مطابق" : "نفس اسم العائلة فقط"}
+                    {c.kind === "exact"
+                      ? "اسم مطابق"
+                      : c.kind === "swapped"
+                        ? "الاسم الأول واسم العائلة مقلوبان"
+                        : "نفس اسم العائلة فقط"}
                     {c.distance !== null && c.distance <= 2 ? ` · يختلف بـ ${c.distance} من الأرقام` : ""}
                   </span>
                   {c.heldBy && (
@@ -401,7 +408,10 @@ export function LicenseCheckPanel({
             <button
               type="button"
               disabled={busy}
-              onClick={() => setResult(null)}
+              onClick={() => {
+                setResult(null);
+                setReason("");
+              }}
               className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
             >
               تجاهل النتيجة

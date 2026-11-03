@@ -21,8 +21,8 @@ export interface NameCandidate {
   firstName: string;
   familyName: string;
   specialtyHe: string | null;
-  /** Both names equal, versus only the family name. */
-  kind: "exact" | "family";
+  /** Both names equal; the two names the wrong way round; or only the family name. */
+  kind: "exact" | "swapped" | "family";
   /** Digits that differ from the number we hold; small means a typo. */
   distance: number | null;
   /** The doctor of ours who already holds this number, if any. */
@@ -49,12 +49,19 @@ export async function findByName(
 
   const columns =
     "license_number, hebrew_first_name, hebrew_family_name, hebrew_first_norm, hebrew_family_norm, specialty_name_he";
-  // Two reads, not one read of the family and a filter: a few families hold
-  // hundreds of licences, and a capped read of one could drop the exact name.
-  // The exact read is the (first, family) index; the family read is only a
-  // weaker lead, so a handful is enough.
-  const [exact, others] = await Promise.all([
+  // Separate reads, not one read of the family and a filter: a few families
+  // hold hundreds of licences, and a capped read of one could drop the exact
+  // name. The family read is only a weaker lead, so a handful is enough. There
+  // is no name index (the 21 Oct lint migration dropped it as unused); each
+  // read is a scan of 57k rows, about 9 ms in production for the biggest
+  // family, which is fine for an admin pressing a button.
+  const [exact, swapped, others] = await Promise.all([
     service.from("moh_practitioners").select(columns).eq("hebrew_family_norm", family).eq("hebrew_first_norm", first).limit(20),
+    // A doctor who typed the family name where the first goes. A name that
+    // reads the same both ways has no swapped reading.
+    first === family
+      ? Promise.resolve({ data: [] as Row[], error: null })
+      : service.from("moh_practitioners").select(columns).eq("hebrew_family_norm", first).eq("hebrew_first_norm", family).limit(20),
     service
       .from("moh_practitioners")
       .select(columns)
@@ -63,12 +70,13 @@ export async function findByName(
       .order("license_number")
       .limit(FAMILY_LIMIT),
   ]);
-  for (const r of [exact, others]) {
+  for (const r of [exact, swapped, others]) {
     if (r.error) throw new Error(`moh_practitioners read failed: ${r.error.message}`);
   }
 
   const picked = [
     ...((exact.data ?? []) as Row[]).map((r) => ({ r, kind: "exact" as const })),
+    ...((swapped.data ?? []) as Row[]).map((r) => ({ r, kind: "swapped" as const })),
     ...((others.data ?? []) as Row[]).map((r) => ({ r, kind: "family" as const })),
   ];
   if (picked.length === 0) return [];

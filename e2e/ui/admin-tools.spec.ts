@@ -51,6 +51,19 @@ test.describe("licence correction", () => {
       .poll(async () => (await serviceClient().from("doctors").select("license_number").eq("id", doctor.id).single()).data?.license_number)
       .toBe("510030");
   });
+
+  test("it also finds a doctor whose Hebrew first and family names were typed the wrong way round", async ({ page }) => {
+    const swapped = await createDoctor({ first: "مريم", family: "مقلوب", hebrewFirst: "עודה", hebrewFamily: "מרים", licenseStatus: "not_found" });
+    try {
+      await page.goto(`/admin?doctor=${swapped.id}`);
+      await page.getByRole("button", { name: "بحث في السجل أو تصحيح الرقم" }).first().click();
+      await page.getByRole("button", { name: "بحث بالاسم" }).click();
+      await expect(page.getByText("510030")).toBeVisible();
+      await expect(page.getByText("الاسم الأول واسم العائلة مقلوبان")).toBeVisible();
+    } finally {
+      await swapped.remove();
+    }
+  });
 });
 
 test.describe("residents the registry lists as specialists", () => {

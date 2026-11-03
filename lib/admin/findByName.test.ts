@@ -13,7 +13,7 @@ const calls: { table: string; filters: string[] }[] = [];
 
 // The registry read is asked twice: once for the exact name, once for the
 // family alone (it carries a neq on the first name). Each gets its own rows.
-function service(opts: { exact?: unknown[]; family?: unknown[]; held?: unknown[]; readError?: boolean } = {}) {
+function service(opts: { exact?: unknown[]; swapped?: unknown[]; family?: unknown[]; held?: unknown[]; readError?: boolean } = {}) {
   return {
     from: (table: string) => {
       const call = { table, filters: [] as string[] };
@@ -21,7 +21,14 @@ function service(opts: { exact?: unknown[]; family?: unknown[]; held?: unknown[]
       const result = () => {
         if (table !== "moh_practitioners") return { data: opts.held ?? [], error: null };
         if (opts.readError) return { data: null, error: { message: "boom" } };
-        return { data: (call.filters.some((f) => f.startsWith("neq:")) ? opts.family : opts.exact) ?? [], error: null };
+        // The family read carries a neq; the swapped read asks for the doctor's
+        // first name as the registry's family name.
+        const rows = call.filters.some((f) => f.startsWith("neq:"))
+          ? opts.family
+          : call.filters.includes("eq:hebrew_family_norm=דניאל")
+            ? opts.swapped
+            : opts.exact;
+        return { data: rows ?? [], error: null };
       };
       const chain: Record<string, unknown> = { then: (ok: (v: unknown) => unknown) => Promise.resolve(result()).then(ok) };
       for (const m of ["select", "in", "order", "limit"]) chain[m] = () => chain;
@@ -32,6 +39,7 @@ function service(opts: { exact?: unknown[]; family?: unknown[]; held?: unknown[]
 }
 const EXACT = [ROWS[0]];
 const FAMILY = [ROWS[1]];
+const SWAPPED = [{ license_number: 333333, hebrew_first_name: "דריפוס", hebrew_family_name: "דניאל", hebrew_first_norm: "דריפוס", hebrew_family_norm: "דניאל", specialty_name_he: null }];
 
 const DOC = { id: "d1", hebrew_first_name: "דניאל", hebrew_family_name: "דריפוס" };
 
@@ -51,6 +59,21 @@ describe("findByName", () => {
     const [first, second] = await findByName(service({ exact: EXACT, family: FAMILY }), DOC, "189371");
     expect(first).toMatchObject({ licenseNumber: "189317", kind: "exact", distance: 2, heldBy: null });
     expect(second).toMatchObject({ licenseNumber: "222222", kind: "family" });
+  });
+
+  it("finds a doctor who typed the two names the wrong way round, after the exact ones", async () => {
+    const found = await findByName(service({ exact: EXACT, swapped: SWAPPED, family: FAMILY }), DOC, "189371");
+    expect(found.map((c) => [c.kind, c.licenseNumber])).toEqual([
+      ["exact", "189317"],
+      ["swapped", "333333"],
+      ["family", "222222"],
+    ]);
+  });
+
+  it("does not look for a swapped reading when both names are the same word", async () => {
+    await findByName(service(), { ...DOC, hebrew_first_name: "דריפוס" }, "1");
+    const registry = calls.filter((c) => c.table === "moh_practitioners");
+    expect(registry).toHaveLength(2);
   });
 
   it("names the doctor who already holds a candidate number", async () => {
