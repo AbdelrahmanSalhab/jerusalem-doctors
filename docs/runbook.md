@@ -252,6 +252,28 @@ registry sync clears the mark when it flags a licence as gone, so that doctor
 comes back to the queue. A save that changes nothing writes nothing: use
 «تمت المراجعة» for that.
 
+### Who is in the directory (`listed_doctors`)
+
+"Listed" is five conditions on `doctors`: active, visible, phone verified,
+approved by an admin, and consent to the directory. They are written **once**,
+as the `listed_doctors` view (migration `20261102180000_listed_doctors_view.sql`),
+which has only the columns the directory shows and no grant to the public
+roles. Search (`search_directory()`), the counts (`directory_counts()`) and the
+card query (`lib/directory.ts`) all read it, and so a change to who is listed is
+one edit to the view.
+
+Code that lists doctors must read the view, never the `doctors` table: an ESLint
+rule (`eslint.config.mjs`) fails on `.from("doctors")` outside an allowlist
+(the admin panel, sign-in and sign-up, the cron jobs, the session and a few
+helpers). A file that really needs the row itself is added to the allowlist,
+which is the review point. `e2e/db/listed.spec.ts` takes each condition away
+from a listed doctor and checks the view, search, counts and the admin panel's
+own explanation (`directoryVisibility`) agree.
+
+Two older places still repeat the conditions and read the table: the row-level
+security policies on `doctor_specialties` and `doctor_workplaces`
+(`20261021103844_supabase_lint.sql`). They are not changed here.
+
 ### A doctor asked to delete their account
 
 "طلب حذف الحساب" on /profile hides and suspends the account at once; the

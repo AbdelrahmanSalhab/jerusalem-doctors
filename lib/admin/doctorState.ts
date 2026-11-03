@@ -77,7 +77,8 @@ export interface DirectoryVisibility {
 
 /**
  * Whether a doctor is in the directory right now, mirroring the five
- * conditions directoryQuery() enforces in lib/directory.ts. Two of them are
+ * conditions of the `listed_doctors` view (migration 20261102180000), which
+ * e2e/db/listed.spec.ts checks against it. Two of them are
  * not switches at all, which is exactly why an admin could flip everything
  * they had and still not see the doctor appear.
  */
