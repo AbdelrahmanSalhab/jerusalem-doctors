@@ -93,7 +93,9 @@ const redisFromEnv = (): Redis | null => {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
-  return new Redis({ url, token });
+  // 1.40 changed the default to plain JSON; the old wire format stays until
+  // the limiter has been seen working against the new one in production.
+  return new Redis({ url, token, responseEncoding: "base64" });
 };
 
 const upstashLimiters = new Map<RateLimitKey, Ratelimit>();
