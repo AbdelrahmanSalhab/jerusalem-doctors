@@ -42,7 +42,7 @@ export type Role = keyof typeof ACCOUNTS;
 export const CI_LOGIN_EMAIL = "ci@e2e.invalid";
 
 /** Accounts a single test creates and removes (e.g. the deletion request). */
-export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test"];
+export const THROWAWAY_ACCOUNTS = ["leaving@e2e.test", "rotating@e2e.test", "authenticator@e2e.test", "lostphone@e2e.test", "enforced@e2e.test", "unenrolled@e2e.test"];
 
 /** Sentry's ingest, served by e2e/stubs.mjs. */
 export const SENTRY_STUB_DSN = `${STUB_URL.replace("://", "://e2e@")}/1`;
@@ -58,6 +58,12 @@ export function appEnv(): Record<string, string> {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: TURNSTILE_SITE_KEY,
     TURNSTILE_SECRET_KEY,
     DEV_LOGIN: "1",
+    // Who may reset another admin's authenticator (lib/auth/superAdmin.ts).
+    SUPER_ADMIN_EMAILS: ACCOUNTS.admin,
+    // Off, as in CI: it makes every admin password session ask for the code,
+    // which the shared test sessions cannot give. E2E_ADMIN_MFA=1 turns it on
+    // for e2e/ui/mfa-enforced.spec.ts alone (see e2e/README.md).
+    ...(process.env.E2E_ADMIN_MFA === "1" ? { ADMIN_MFA: "1" } : {}),
     DEV_LOGIN_EMAILS: [...Object.values(ACCOUNTS), ...THROWAWAY_ACCOUNTS].join(","),
     // The smoke check's sign-in (app/api/login/ci), with the stub playing GitHub.
     CI_LOGIN_EMAIL,
@@ -74,6 +80,12 @@ export function appEnv(): Record<string, string> {
     SMS4FREE_SENDER: "JDoctors",
     SEND_SMS_HOOK_SECRET: "v1,whsec_ZTJlLXRlc3QtaG9vay1zZWNyZXQtZm9yLWNp",
     CRON_SECRET,
+    // Admin notifications (lib/push.ts): a key pair made for these tests only,
+    // so the switch shows in the admin pages and the push routes answer.
+    // Nothing is ever sent: no test device subscribes.
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: "BIW_AUJsT77tRi0df7Vwi6_5FdvnFpd_972qjzvknAinH-vXdyVBsfOGMUjp_bw8nAoUApjl7maK-uBr86k0Oyg",
+    VAPID_PRIVATE_KEY: "rYjLluoCImTnEUMldqObF_P9telB_6aS9zKgkbNldL8",
+    VAPID_SUBJECT: "https://jerusalem-doctors.invalid",
     // Tests change doctors straight in the database (lib/cachedReads.ts).
     DIRECTORY_CACHE_SECONDS: "0",
     MOH_API_BASE: `${STUB_URL}/api/3`,

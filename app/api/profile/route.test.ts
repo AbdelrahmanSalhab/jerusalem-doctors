@@ -17,12 +17,16 @@ let me: {
   career_stage: null,
 };
 
+const gate = vi.hoisted(() => ({ allowed: true, signedIn: true }));
 vi.mock("@/lib/ratelimit", () => ({
-  rateLimit: vi.fn(async () => ({ success: true })),
+  rateLimit: vi.fn(async () => ({ success: gate.allowed })),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
-  requireDoctor: vi.fn(async () => me),
+  requireDoctor: vi.fn(async () => {
+    if (!gate.signedIn) throw new Error("no session");
+    return me;
+  }),
 }));
 
 /** Every save_doctor_profile call, and the error the next one returns. */
@@ -343,5 +347,44 @@ describe("PATCH /api/profile: one transaction", () => {
     const id = "11111111-1111-4111-8111-111111111111";
     await call({ specialty_ids: [id, id] });
     expect(rpcSpy.mock.calls[0][1].p_specialty_ids).toEqual([id]);
+  });
+});
+
+describe("PATCH /api/profile: refusals and failures", () => {
+  beforeEach(() => {
+    gate.allowed = true;
+    gate.signedIn = true;
+    rpcError = null;
+  });
+
+  it("wants a signed-in doctor, and stops a flood of saves", async () => {
+    gate.signedIn = false;
+    expect((await call({ bio: "x" })).status).toBe(401);
+    gate.signedIn = true;
+    gate.allowed = false;
+    expect((await call({ bio: "x" })).status).toBe(429);
+  });
+
+  it("names the field when the body is wrong, and refuses a body that is not JSON", async () => {
+    const bad = await call({ email: "not an email" });
+    expect(bad.status).toBe(400);
+    expect(Object.keys((await bad.json()).fields)).toContain("email");
+    const { PATCH } = await import("./route");
+    const raw = await PATCH(new Request("https://example.test/api/profile", { method: "PATCH", body: "nope" }));
+    expect((await raw.json()).fields).toBeUndefined();
+  });
+
+  it("refuses a workplace set without exactly one primary, before writing anything", async () => {
+    const res = await call({ workplaces: [{ name: "أ", workplace_type: "hospital", is_primary: false }] });
+    expect(res.status).toBe(400);
+    expect(rpcSpy).not.toHaveBeenCalled();
+  });
+
+  it("answers 500, never 409, when the save fails, even on a unique violation", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    rpcError = { code: "23505", message: "dup" };
+    expect((await call({ bio: "x" })).status).toBe(500);
+    rpcError = { message: "boom" };
+    expect((await call({ bio: "x" })).status).toBe(500);
   });
 });

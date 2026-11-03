@@ -233,3 +233,16 @@ describe("ilLicenseCandidates", () => {
     expect(ilLicenseCandidates("abc")).toBeNull();
   });
 });
+
+describe("licenseFormatErrorMessage for each refusal", () => {
+  it.each([
+    ["", "أدخل رقم الترخيص"],
+    ["12345678", "رقم الترخيص طويل أكثر من اللازم"],
+  ])("explains %j", (input, start) => {
+    expect(licenseFormatErrorMessage("IL", input)).toContain(start);
+  });
+
+  it("falls through to the general message for a non-numeric number", () => {
+    expect(licenseFormatErrorMessage("IL", "abc")).not.toContain("أدخل رقم الترخيص");
+  });
+});

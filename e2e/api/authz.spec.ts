@@ -27,14 +27,24 @@ type Policy =
 
 const POLICY: Record<string, Policy> = {
   "GET /api/admin/migrations": "admin",
+  // The admin panel's notification switch (lib/push.ts).
+  "POST /api/admin/push": "admin",
+  "DELETE /api/admin/push": "admin",
+  "POST /api/admin/push/test": "admin",
   // The smoke check's sign-in with a GitHub token (lib/auth/githubOidc.ts).
   "POST /api/login/ci": "credentials",
   // SMS4FREE's delivery reports, with the key in the URL (lib/otp/delivery.ts).
   "POST /api/sms/delivery": "credentials",
   // Admins are the accounts with a password sign-in.
   "POST /api/profile/password": "admin",
+  // The authenticator code of a password sign-in (lib/auth/mfa.ts).
+  "GET /api/mfa": "admin",
+  "POST /api/mfa/enroll": "admin",
+  "POST /api/mfa/verify": "admin",
+  "POST /api/admin/doctors/[id]/mfa/reset": "admin",
   "POST /api/admin/doctors/[id]/license/check": "admin",
   "POST /api/admin/doctors/[id]/license/save": "admin",
+  "POST /api/admin/doctors/[id]/license/reviewed": "admin",
   "PATCH /api/admin/doctors/[id]": "admin",
   "POST /api/admin/doctors/[id]/photo": "admin",
   "DELETE /api/admin/doctors/[id]/photo": "admin",
@@ -76,7 +86,7 @@ const POLICY: Record<string, Policy> = {
 };
 
 /** Calls that would change the seeded accounts if they got through. */
-const DESTRUCTIVE = new Set(["POST /api/profile/delete-request", "POST /api/auth/logout"]);
+const DESTRUCTIVE = new Set(["POST /api/profile/delete-request", "POST /api/auth/logout", "POST /api/mfa/enroll"]);
 
 const API_DIR = path.join(__dirname, "../../app/api");
 

@@ -31,9 +31,10 @@ export const GET = withJsonErrors(async (req: Request) => {
     return jsonOk({ ok: true, skipped: true, provider });
   }
 
-  const threshold = Number(
-    process.env.SMS4FREE_LOW_BALANCE_THRESHOLD ?? DEFAULT_THRESHOLD,
-  );
+  // An empty or non-numeric value must not switch the alert off (Number("")
+  // is 0, and nothing is below 0): fall back to the default instead.
+  const configured = Number(process.env.SMS4FREE_LOW_BALANCE_THRESHOLD?.trim() || NaN);
+  const threshold = Number.isFinite(configured) && configured >= 0 ? configured : DEFAULT_THRESHOLD;
 
   let balance: number;
   try {

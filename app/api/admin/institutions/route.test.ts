@@ -91,4 +91,54 @@ describe("admin institutions API", () => {
     expect(res.status).toBe(404);
     expect(relinkWorkplaces).not.toHaveBeenCalled();
   });
+
+  it("refuses a bad body on create, and rethrows any other database error", async () => {
+    const { POST } = await import("./route");
+    const bad = await POST(jsonRequest("/api/admin/institutions", { name_ar: "x" }));
+    expect(bad.status).toBe(400);
+    const notJson = await POST(new Request("http://x/api/admin/institutions", { method: "POST", body: "nope" }));
+    expect(notJson.status).toBe(400);
+    db.queue("institutions", { error: { code: "XX000", message: "boom" } });
+    expect((await POST(jsonRequest("/api/admin/institutions", { name_ar: "مستشفى جديد", kind: "hospital" }))).status).toBe(500);
+  });
+
+  it("edits fields, clearing the Hebrew name when sent empty", async () => {
+    db.queue("institutions", { data: { aliases: [] } }, {});
+    const { PATCH } = await import("./[id]/route");
+    const res = await PATCH(jsonRequest("/api/admin/institutions/inst-1", { name_ar: "اسم جديد", name_he: "", kind: "hmo" }), ctx);
+    expect(res.status).toBe(200);
+    expect(db.argsOf("institutions", "update")[0][0]).toEqual({ name_ar: "اسم جديد", name_he: null, kind: "hmo" });
+  });
+
+  it("keeps the Hebrew name when it is not in the body", async () => {
+    db.queue("institutions", { data: { aliases: [] } }, {});
+    const { PATCH } = await import("./[id]/route");
+    await PATCH(jsonRequest("/api/admin/institutions/inst-1", { kind: "hospital" }), ctx);
+    expect(db.argsOf("institutions", "update")[0][0]).toEqual({ kind: "hospital" });
+  });
+
+  it("refuses a non-admin, a bad body, a missing institution and a duplicate name on edit", async () => {
+    const { PATCH, DELETE } = await import("./[id]/route");
+    requireAdminOrNull.mockResolvedValueOnce(null);
+    expect((await PATCH(jsonRequest("/x", { kind: "hmo" }), ctx)).status).toBe(401);
+    requireAdminOrNull.mockResolvedValueOnce(null);
+    expect((await DELETE(jsonRequest("/x", {}), ctx)).status).toBe(401);
+    expect((await PATCH(jsonRequest("/x", { kind: "moon" }), ctx)).status).toBe(400);
+    expect((await PATCH(new Request("http://x", { method: "PATCH", body: "nope" }), ctx)).status).toBe(400);
+    expect((await PATCH(jsonRequest("/x", { kind: "hmo" }), { params: Promise.resolve({ id: "abc" }) })).status).toBe(404);
+    db.queue("institutions", { data: null });
+    expect((await PATCH(jsonRequest("/x", { kind: "hmo" }), ctx)).status).toBe(404);
+    db.queue("institutions", { data: { aliases: [] } }, { error: { code: "23505" } });
+    expect((await PATCH(jsonRequest("/x", { name_ar: "مكرر" }), ctx)).status).toBe(409);
+  });
+
+  it("rethrows other errors on read, edit and delete", async () => {
+    const { PATCH, DELETE } = await import("./[id]/route");
+    db.queue("institutions", { error: { message: "read" } });
+    expect((await PATCH(jsonRequest("/x", { kind: "hmo" }), ctx)).status).toBe(500);
+    db.queue("institutions", { data: { aliases: [] } }, { error: { code: "XX000", message: "write" } });
+    expect((await PATCH(jsonRequest("/x", { kind: "hmo" }), ctx)).status).toBe(500);
+    db.queue("institutions", { error: { message: "delete" } });
+    expect((await DELETE(jsonRequest("/x", {}), ctx)).status).toBe(500);
+  });
 });

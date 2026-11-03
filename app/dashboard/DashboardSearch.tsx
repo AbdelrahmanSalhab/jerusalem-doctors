@@ -301,7 +301,7 @@ function ResultsRegion({
     return (
       <div className="space-y-8">
         {!hasFeatured && (
-          <p className="rounded border border-dashed border-foreground/20 p-8 text-center text-foreground/60">
+          <p className="rounded border border-dashed border-foreground/20 p-8 text-center text-foreground/70">
             ابدأ بكتابة اسم أو تخصص لعرض النتائج.
           </p>
         )}

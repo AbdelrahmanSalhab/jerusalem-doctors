@@ -161,7 +161,7 @@ export class Sms4FreeOtpSender implements OtpSender {
       );
     }
     this.credentials = { key, user, pass, sender };
-    this.apiUrl = process.env.SMS4FREE_API_URL ?? DEFAULT_API_URL;
+    this.apiUrl = process.env.SMS4FREE_API_URL || DEFAULT_API_URL;
   }
 
   async send(phoneE164: string, code: string): Promise<OtpSendResult> {
@@ -278,7 +278,7 @@ export async function fetchAvailableSms(): Promise<number> {
     );
   }
 
-  const url = process.env.SMS4FREE_BALANCE_URL ?? DEFAULT_BALANCE_URL;
+  const url = process.env.SMS4FREE_BALANCE_URL || DEFAULT_BALANCE_URL;
 
   let res: Response;
   try {

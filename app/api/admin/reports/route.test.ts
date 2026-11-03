@@ -37,3 +37,13 @@ describe("PATCH /api/admin/reports/[id]", () => {
     expect((await call({ note: "تم" })).status).toBe(404);
   });
 });
+
+describe("PATCH /api/admin/reports/[id]: edges", () => {
+  it("404s a malformed id, 400s a body that is not JSON, and fails on a database error", async () => {
+    const { PATCH } = await import("./[id]/route");
+    expect((await PATCH(jsonRequest("/x", { note: "تم" }), { params: Promise.resolve({ id: "abc" }) })).status).toBe(404);
+    expect((await PATCH(new Request("http://x", { method: "PATCH", body: "nope" }), { params: Promise.resolve({ id: ID }) })).status).toBe(400);
+    db.queue("profile_reports", { error: { message: "boom" } });
+    expect((await call({ note: "تم" })).status).toBe(500);
+  });
+});

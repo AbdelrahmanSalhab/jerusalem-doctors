@@ -8,6 +8,8 @@ let doctor: { id: string; is_active: boolean; auth_user_id: string | null } | nu
 let photoError: unknown;
 let userError: { status?: number } | null;
 let rowError: unknown;
+let trailError: unknown;
+let readError: unknown;
 let audits: Record<string, unknown>[];
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
@@ -19,12 +21,12 @@ vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from: (table: string) => ({
       select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: doctor, error: null }) }),
+        eq: () => ({ maybeSingle: async () => ({ data: doctor, error: readError }) }),
       }),
       delete: () => ({
         eq: async () => {
           steps.push(`delete:${table}`);
-          return { error: table === "doctors" ? rowError : null };
+          return { error: table === "doctors" ? rowError : table === "audit_logs" ? trailError : null };
         },
       }),
       insert: async (row: Record<string, unknown>) => {
@@ -66,6 +68,8 @@ describe("DELETE /api/admin/doctors/[id]", () => {
     photoError = null;
     userError = null;
     rowError = null;
+    trailError = null;
+    readError = null;
     audits = [];
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -125,5 +129,18 @@ describe("DELETE /api/admin/doctors/[id]", () => {
     expect((await del()).status).toBe(500);
     expect(steps).toEqual(["photos:00000000-0000-4000-8000-0000000000d1.jpg,00000000-0000-4000-8000-0000000000d1.png,00000000-0000-4000-8000-0000000000d1.webp", "delete:audit_logs", "delete:doctors"]);
     expect(audits).toEqual([]);
+  });
+
+  it("answers 404 to an id that is not an id, and 500 when the doctor cannot be read", async () => {
+    expect((await del("abc")).status).toBe(404);
+    readError = { code: "XX000", message: "boom" };
+    expect((await del()).status).toBe(500);
+  });
+
+  it("stops before erasing the row when the audit trail cannot be scrubbed", async () => {
+    trailError = { message: "boom" };
+    const out = await del();
+    expect(out.status).toBe(500);
+    expect(steps).not.toContain("delete:doctors");
   });
 });

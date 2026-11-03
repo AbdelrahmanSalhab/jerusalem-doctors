@@ -64,11 +64,13 @@ export const FEATURED_LABEL: Record<FeaturedKind, string> = {
   graduate: "طبيب مميز يبحث عن عمل",
 };
 
-/** Listed doctors with what a card shows. Search builds the same card in SQL
- *  (search_directory(), migration 20261021084302); keep the two in step. */
+/** Listed doctors with what a card shows. Who is listed is the
+ *  `listed_doctors` view (migration 20261102180000), the one place the five
+ *  conditions are written; search_directory() and directory_counts() read it
+ *  too. Search builds the same card in SQL: keep the two in step. */
 export function directoryQuery(service: SupabaseClient) {
   return service
-    .from("doctors")
+    .from("listed_doctors")
     .select(
       `
       id,
@@ -93,12 +95,7 @@ export function directoryQuery(service: SupabaseClient) {
       ),
       doctor_workplaces(name, workplace_type, details, address, hours, phone, is_primary, sort_order, institution_id, hmo:institutions!doctor_workplaces_hmo_id_fkey(name_ar))
     `,
-    )
-    .eq("is_active", true)
-    .eq("is_visible", true)
-    .eq("is_phone_verified", true)
-    .eq("is_admin_approved", true)
-    .eq("consent_directory_use", true);
+    );
 }
 
 interface DirectoryRow {

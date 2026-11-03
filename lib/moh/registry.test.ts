@@ -59,3 +59,14 @@ describe("toRegistryRows", () => {
     expect(rows.map((r) => r.license_number)).toEqual([13846, 5]);
   });
 });
+
+describe("toRegistryRows: certificate order", () => {
+  it("sorts undated certificates before dated ones, and the latest dated one is the specialty date", () => {
+    const rows = toRegistryRows([
+      row({ "שם התמחות": "ב", "תאריך רישום התמחות": 1012020 }),
+      row({ "שם התמחות": "א" }),
+      row({ "שם התמחות": "ג", "תאריך רישום התמחות": 1012015 }),
+    ]);
+    expect(rows[0].specialties).toEqual(["א", "ג", "ב"]);
+  });
+});

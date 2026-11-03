@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doctorVCard } from "./vcard";
+import { doctorVCard, vcardFileName } from "./vcard";
 
 const doc = {
   arabic_first_name: "ليلى",
@@ -32,5 +32,15 @@ describe("doctorVCard", () => {
     expect(v).toContain("ORG;CHARSET=UTF-8:مستشفى\\; أ\\, ب");
     expect(v).not.toContain("EMAIL");
     expect(v).not.toContain("TYPE=CELL");
+  });
+});
+
+describe("doctorVCard without workplaces, and the file name", () => {
+  it("leaves out the organisation when there is none", () => {
+    expect(doctorVCard({ ...doc, workplaces: [] })).not.toContain("ORG;");
+  });
+
+  it("names the file after the doctor", () => {
+    expect(vcardFileName(doc)).toBe("ليلى الخطيب.vcf");
   });
 });

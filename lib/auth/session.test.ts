@@ -33,6 +33,64 @@ describe("lib/auth/session", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
+  describe("getCurrentAdmin and the second factor (#164)", () => {
+    const sessionOf = (aal: string, ...methods: string[]) =>
+      auth.getClaims.mockResolvedValue({ data: { claims: { sub: "u1", aal, amr: methods.map((method) => ({ method })) } }, error: null });
+    const admin = { id: "d1", is_admin: true, is_active: true };
+
+    it("lets a password admin in while the flag is off", async () => {
+      sessionOf("aal1", "password");
+      db.queue("doctors", { data: admin });
+      expect(await (await session()).getCurrentAdmin()).toEqual(admin);
+    });
+
+    it("turns away a password admin who has not passed the challenge, as not an admin", async () => {
+      vi.stubEnv("ADMIN_MFA", "1");
+      sessionOf("aal1", "password");
+      db.queue("doctors", { data: admin });
+      expect(await (await session()).getCurrentAdmin()).toBeNull();
+    });
+
+    it("lets the same admin in after the challenge", async () => {
+      vi.stubEnv("ADMIN_MFA", "1");
+      sessionOf("aal2", "password", "totp");
+      db.queue("doctors", { data: admin });
+      expect(await (await session()).getCurrentAdmin()).toEqual(admin);
+    });
+
+    it("does not ask an admin who signed in by phone code", async () => {
+      vi.stubEnv("ADMIN_MFA", "1");
+      sessionOf("aal1", "otp");
+      db.queue("doctors", { data: admin });
+      expect(await (await session()).getCurrentAdmin()).toEqual(admin);
+    });
+
+    it("sends the turned-away session to the code step instead of a 404", async () => {
+      vi.stubEnv("ADMIN_MFA", "1");
+      sessionOf("aal1", "password");
+      db.queue("doctors", { data: admin }, { data: admin });
+      await expect((await session()).requireAdmin()).rejects.toThrow("REDIRECT /login/dev?code=1");
+    });
+
+    it("says a password session awaits its code only when the flag is on and the code is not given", async () => {
+      sessionOf("aal1", "password");
+      expect(await (await session()).awaitingSecondFactor()).toBe(false);
+      vi.stubEnv("ADMIN_MFA", "1");
+      expect(await (await session()).awaitingSecondFactor()).toBe(true);
+      sessionOf("aal2", "password", "totp");
+      expect(await (await session()).awaitingSecondFactor()).toBe(false);
+    });
+
+    it("leaves the dev shim alone: it has no token to read", async () => {
+      vi.stubEnv("ADMIN_MFA", "1");
+      vi.stubEnv("USE_DEV_USER", "1");
+      vi.stubEnv("DEV_DOCTOR_ID", "d1");
+      db.queue("doctors", { data: admin });
+      expect(await (await session()).getCurrentAdmin()).toEqual(admin);
+      expect(auth.getClaims).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getCurrentDoctor", () => {
     it("returns null without a session, never touching the DB", async () => {
       expect(await (await session()).getCurrentDoctor()).toBeNull();

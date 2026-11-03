@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { auth, db, jsonRequest } from "@/test/fakeSupabase";
 
 const requireDoctor = vi.hoisted(() => vi.fn());
+const raiseAlert = vi.hoisted(() => vi.fn(async () => {}));
 
+vi.mock("@/lib/alerts", () => ({ raiseAlert }));
 vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
 vi.mock("@/lib/supabase/server", async () => {
   const { auth } = await import("@/test/fakeSupabase");
@@ -23,6 +25,7 @@ async function call() {
 describe("POST /api/profile/delete-request", () => {
   beforeEach(() => {
     db.reset();
+    vi.clearAllMocks();
     requireDoctor.mockResolvedValue({ id: "d1" });
   });
 
@@ -41,6 +44,12 @@ describe("POST /api/profile/delete-request", () => {
     });
   });
 
+  it("tells the admins an account is waiting for them to finish, after the account is closed", async () => {
+    await call();
+    expect(raiseAlert).toHaveBeenCalledTimes(1);
+    expect(raiseAlert).toHaveBeenCalledWith(db.client, "deletion_requested");
+  });
+
   it("answers 401 without a session", async () => {
     requireDoctor.mockRejectedValue(new Error("NEXT_REDIRECT"));
     expect((await call()).status).toBe(401);
@@ -52,5 +61,6 @@ describe("POST /api/profile/delete-request", () => {
     const res = await call();
     expect(res.status).toBe(500);
     expect(db.argsOf("audit_logs", "insert")).toHaveLength(0);
+    expect(raiseAlert).not.toHaveBeenCalled();
   });
 });

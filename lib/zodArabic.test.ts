@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import "./zodArabic";
+import { arabicIssueMessage } from "./zodArabic";
 
 const messages = (schema: z.ZodType, value: unknown) =>
   schema.safeParse(value).error?.issues.map((i) => i.message);
@@ -17,5 +17,14 @@ describe("zod Arabic messages", () => {
 
   it("keeps a schema's own message", () => {
     expect(messages(z.string().min(2, { message: "مخصص" }), "x")).toEqual(["مخصص"]);
+  });
+});
+
+describe("arabicIssueMessage fallbacks", () => {
+  const issue = (over: object) => over as Parameters<typeof arabicIssueMessage>[0];
+  it("words an array or numeric maximum, and an unknown code", () => {
+    expect(arabicIssueMessage(issue({ code: "too_big", origin: "array", maximum: 5 }))).toBe("5 كحد أقصى.");
+    expect(arabicIssueMessage(issue({ code: "too_big", origin: "number", maximum: 5 }))).toBe("القيمة أكبر من المسموح.");
+    expect(arabicIssueMessage(issue({ code: "custom" }))).toBe("قيمة غير صالحة.");
   });
 });

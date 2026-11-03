@@ -164,7 +164,7 @@ async function flagMissing(supabase: Service, doctors: OurDoctor[], missing: Set
       if (!missing.has(l.number) || l.status === "not_found") continue;
       const flag =
         l.slot === "primary"
-          ? { license_verification_status: "not_found" }
+          ? { license_verification_status: "not_found", license_reviewed_at: null }
           : { secondary_license_verification_status: "not_found" };
       const { error } = await supabase.from("doctors").update(flag).eq("id", d.id);
       if (error) throw new Error(`doctors flag failed: ${error.message}`);

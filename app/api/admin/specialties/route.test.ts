@@ -88,3 +88,12 @@ describe("admin specialties", () => {
     });
   });
 });
+
+describe("admin specialties: a malformed id", () => {
+  it("is not found, before the database is asked", async () => {
+    const { PATCH } = await import("./[id]/route");
+    db.reset();
+    expect((await PATCH(jsonRequest("/x", { is_active: false }), { params: Promise.resolve({ id: "abc" }) })).status).toBe(404);
+    expect(db.calls).toHaveLength(0);
+  });
+});

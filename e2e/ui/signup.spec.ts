@@ -6,6 +6,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import { STUB_URL } from "../env";
 import { flushRateLimits } from "../global-setup";
+import { authReachesApp } from "../helpers";
 import { createDoctor, serviceClient } from "../seed";
 
 /** Numbers supabase/config.toml maps to the code 123456. */
@@ -213,6 +214,8 @@ async function newestCode(phone: string): Promise<string | undefined> {
 // one cancels the last, so the older text, often the first to arrive, fails.
 // An ordinary number, so real codes go through the hook to the stub.
 test("a new code cancels the old one, and the page says to use the newest @phone", async ({ page }) => {
+  // CI always has the hook; a local Docker Desktop with the app in WSL may not.
+  test.skip(!process.env.CI && !(await authReachesApp()), "Supabase Auth cannot reach the app from its container here (e2e/README.md, #180)");
   const phone = "+972521110077";
   // A signup this test left behind (a failed first try) would make the single
   // pending row below ambiguous on the retry.

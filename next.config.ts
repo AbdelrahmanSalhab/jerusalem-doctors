@@ -29,6 +29,11 @@ const nextConfig: NextConfig = {
   // Drop the `x-powered-by: Next.js` response header, minor fingerprint
   // reduction; closes pentest finding L1.
   poweredByHeader: false,
+  // Sentry's diagnostics-channel injection finds its own hook file next to
+  // itself, which it cannot do once Next has bundled it: it then logs "Failed
+  // to register diagnostics-channel injection hooks" on every start. Its own
+  // message says to keep it external.
+  serverExternalPackages: ["@sentry/server-runtime-injection"],
   // Sentry's own size flags (what withSentryConfig's bundleSizeOptimizations
   // sets under Turbopack): drop its tracing code and debug logging, both
   // unused since every config has tracesSampleRate 0. Booleans, not strings:

@@ -22,7 +22,10 @@ export default defineConfig({
   forbidOnly: CI,
   timeout: 30_000,
   expect: { timeout: 7_000 },
-  reporter: CI ? [["github"], ["html", { open: "never", outputFolder: "e2e/.report" }]] : [["list"]],
+  // The JSON report feeds scripts/e2e-timing.mjs (the job summary's timing table).
+  reporter: CI
+    ? [["github"], ["html", { open: "never", outputFolder: "e2e/.report" }], ["json", { outputFile: "e2e/.results/report.json" }]]
+    : [["list"]],
   use: {
     baseURL: BASE_URL,
     locale: "ar",
@@ -50,6 +53,11 @@ export default defineConfig({
       name: "sweep",
       testMatch: /ui\/pages\.spec\.ts/,
       fullyParallel: true,
+      // CI runs it as a job of its own (.github/workflows/ci.yml): beside the
+      // desktop tests on one machine it took their CPU (the desktop project
+      // went from 81 s to 130 s), and before them it held the chain back, as
+      // projects run in phases by dependency depth. Locally it runs with the
+      // rest, first, which costs about 20 s.
       use: { ...devices["Desktop Chrome"] },
     },
     {

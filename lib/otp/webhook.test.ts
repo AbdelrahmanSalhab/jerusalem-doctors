@@ -109,3 +109,9 @@ describe("verifySendSmsHook", () => {
     expect(verifySendSmsHook(BODY, headers({ "webhook-signature": "garbage" }), SECRET, NOW_MS)).toBe(false);
   });
 });
+
+describe("a secret with no key bytes", () => {
+  it("verifies nothing", () => {
+    expect(verifySendSmsHook(BODY, headers(), "v1,whsec_", NOW_MS)).toBe(false);
+  });
+});

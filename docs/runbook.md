@@ -236,6 +236,44 @@ After this, the doctor's next login attempt with the new number works.
 
 By design, these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
 
+### «ترخيص يحتاج مراجعة» on /admin
+
+The tile (and the list behind it, `?status=license`) counts doctors whose
+primary licence is not «موثّق» **and** that no admin has reviewed
+(`doctors.license_reviewed_at`). Before, it counted every licence the registry
+had not confirmed, so a Palestinian licence (no registry to check it against)
+or an Israeli one the registry does not list stayed in it for good, however
+carefully an admin had looked.
+
+A licence is marked reviewed when an admin accepts the doctor with a reason,
+saves the primary licence after a change, or presses «تمت المراجعة» in the
+licence section (an optional note goes to the activity log). The nightly
+registry sync clears the mark when it flags a licence as gone, so that doctor
+comes back to the queue. A save that changes nothing writes nothing: use
+«تمت المراجعة» for that.
+
+### Who is in the directory (`listed_doctors`)
+
+"Listed" is five conditions on `doctors`: active, visible, phone verified,
+approved by an admin, and consent to the directory. They are written **once**,
+as the `listed_doctors` view (migration `20261102180000_listed_doctors_view.sql`),
+which has only the columns the directory shows and no grant to the public
+roles. Search (`search_directory()`), the counts (`directory_counts()`) and the
+card query (`lib/directory.ts`) all read it, and so a change to who is listed is
+one edit to the view.
+
+Code that lists doctors must read the view, never the `doctors` table: an ESLint
+rule (`eslint.config.mjs`) fails on `.from("doctors")` outside an allowlist
+(the admin panel, sign-in and sign-up, the cron jobs, the session and a few
+helpers). A file that really needs the row itself is added to the allowlist,
+which is the review point. `e2e/db/listed.spec.ts` takes each condition away
+from a listed doctor and checks the view, search, counts and the admin panel's
+own explanation (`directoryVisibility`) agree.
+
+Two older places still repeat the conditions and read the table: the row-level
+security policies on `doctor_specialties` and `doctor_workplaces`
+(`20261021103844_supabase_lint.sql`). They are not changed here.
+
 ### A doctor asked to delete their account
 
 "طلب حذف الحساب" on /profile hides and suspends the account at once; the
@@ -401,6 +439,42 @@ badge counts warnings and urgent alerts from the last 24 hours. The rate
 limiter's timeout alert reaches the log at most once an hour (Sentry once a
 minute), so a slow Redis cannot flood it.
 
+### Notifications on admins' phones
+
+The alerts above that need someone to act also reach each admin's phone or
+browser, as a notification: a doctor waiting for approval, a profile report,
+licences gone from the registry, the daily SMS cap or a low SMS balance, the
+database nearing its limit, a doctor asking for a colleague's number, and an
+account-deletion request (`PUSH_TO` in `lib/alerts.ts`; the rest stay in the
+activity log). Web Push, sent by `lib/push.ts` after the response.
+
+- **What it says:** the alert's Arabic title and a link to the admin page.
+  Never a name, a number or a licence: it passes through Apple's and Google's
+  push services.
+- **How often:** one notification per alert in five minutes, and a newer one
+  replaces the older. The admin list always shows every one.
+- **Setup, once:** the `push_subscriptions` migration
+  (`20261102130000_push_subscriptions.sql`), then three Vercel variables, for
+  Production only, and a redeploy (the public key is built in):
+  `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (Sensitive) and
+  `VAPID_SUBJECT` (`https://jerusalem-doctors.vercel.app`). A new pair:
+  `npx web-push generate-vapid-keys`. Changing the pair signs every device out
+  of notifications; admins turn them on again. Without the keys the switch is
+  not shown and nothing is sent.
+- **Each admin, on each device:** open the admin panel and press «تفعيل
+  الإشعارات», then «جرّب» to see one arrive. On an **iPhone** (iOS 16.4 or
+  later) the app must first be added to the Home Screen and opened from there;
+  in Safari's tab the switch says so. If the browser's notifications for the
+  site are blocked, the switch says that too: allow them in the browser's
+  settings and reload.
+- **Who gets them:** admins only, active ones. A demoted or closed account
+  stops at once; a device the push service reports gone (the app removed) is
+  deleted on the next send. «إيقاف» removes the device.
+- **Not arriving:** check the switch says «مفعّلة», press «جرّب» (a 503 means
+  the keys are not set in Vercel), and that the phone's own notification
+  settings for the app are on. Delivery is the push service's: a phone that is
+  off gets it, if at all, for an hour (`TTL` in `lib/push.ts`).
+
 ### Sentry alert rules worth having
 
 Sentry groups identical messages into one issue, and a default "new issue"
@@ -409,6 +483,9 @@ in an issue is more than 0 in 1 minute") for:
 
 - `New doctor waiting for approval`: a doctor needs approval (the admin nav
   badge shows the count too).
+- `Doctor asked the admins for a number` and `Account deletion requested`:
+  someone is waiting on a reply ("طلبات الأرقام"), or an account is closed and
+  waits for "حذف نهائي" (see "A doctor asked to delete their account").
 - `signInWithOtp failed` tagged `route:login/start` or `route:login/resend`:
   login codes are not being sent.
 - `SMS4FREE balance low`: from the daily balance cron. The remaining balance
@@ -510,14 +587,113 @@ Remove their address from `DEV_LOGIN_EMAILS`, redeploy, **and** delete their
 Supabase auth user. The first alone leaves them able to use the project's
 token endpoint directly.
 
+### A second factor for these accounts (#164)
+
+A password alone should not open /admin. With `ADMIN_MFA=1` in Vercel, a session
+that began with a **password** only counts as an admin's once it has passed the
+authenticator-app code (Supabase TOTP, assurance level `aal2`): until then the
+admin panel and the admin API answer as they do to anyone who is not an admin.
+Sessions that did not begin with a password are not asked: a doctor-admin who
+signs in by phone code, and the smoke check's own sign-in (`/api/login/ci`).
+
+**Enrolling.** An admin with a password opens «ملفي», presses «تفعيل التحقق بخطوتين»,
+scans the QR with an authenticator app and types the first code. Until that code
+is confirmed the factor does not count, so a bad scan locks nobody out. It can
+be done once, and only while the flag is off: with it on, a password session that has not given its code cannot start one (a leaked password must not be enough to claim an account's factor). Replacing one, or enrolling a new admin, is for the super admins (step 3).
+The browser never talks to Supabase (the site's content-security rules allow
+only its own origin), so this goes through `/api/mfa`, `/api/mfa/enroll` and
+`/api/mfa/verify`.
+
+**Signing in.** After the password, a session that has a factor is asked for the
+code on the same form (`/login/dev`), then lands on `/admin`. With the flag on,
+opening `/admin` without the code sends an admin to `/login/dev?code=1`
+instead of a 404.
+
+**Supabase setting.** Authentication > Multi-Factor must have TOTP enrolment
+and verification on (`mfa_totp_enroll_enabled`, `mfa_totp_verify_enabled`); the
+local stack has them on in `supabase/config.toml`.
+
+**A lost phone.** Two super admins, the addresses in `SUPER_ADMIN_EMAILS`
+(Vercel; Khaled and Abdelrahman), can reset another admin's authenticator from
+the doctor panel in `/admin`: «إعادة تعيين التحقق بخطوتين», pressed twice. It
+removes the factor, is on the audit trail (`admin_mfa_reset`), and gives that
+admin 15 minutes to enrol a new one from «ملفي»: with the flag on, a password
+session without its code cannot enrol otherwise, so a leaked password cannot
+claim an account's factor. That window is how a **new** admin is enrolled
+once the flag is on. If neither super admin can sign in, whoever holds the
+project's keys runs `npm run mfa:reset -- --email <address>` (it only works on admin accounts and writes the audit log too). Super admins reset each other the
+same way, and cannot reset themselves. Be on the call while it is open: for
+15 minutes a password alone can claim the factor.
+
+**A reset does not end the admin's current sessions.** Supabase's admin API
+cannot revoke a user's sessions, so a session that already passed the code stays
+an admin's until its token lapses (up to an hour, `jwt_expiry`). If the reset is
+an answer to a compromise, also have that admin change their password in «ملفي»
+(it signs out their other sessions), or sign them out in the Supabase dashboard
+(Authentication > Users).
+
+**What can lock everyone out, and what prevents it.** The flag only asks the
+code of a session that began with a **password**. An admin who signs in by phone
+code is never asked, so as long as the SMS provider works and an admin's phone
+number is on their account, they get in. Keep it that way: do not remove the
+phone numbers of the admins who also have a password (three of the four admin
+accounts today; the fourth is the CI account), and do not turn the flag on while
+the SMS provider is failing. Ways in, in the order to try them:
+
+1. Sign in by phone code (not affected by the flag).
+2. Another super admin resets the factor in the panel (above).
+3. **Break-glass by SQL**, which needs no service key: in the Supabase SQL
+   editor (Abdelrahman; or with the Management API token), for the admin's
+   sign-in address:
+
+   ```sql
+   delete from auth.mfa_factors
+   where user_id = (select id from auth.users where email = '<address>');
+   update auth.users
+   set raw_app_meta_data = raw_app_meta_data
+     || jsonb_build_object('mfa_enrol_until', (extract(epoch from now()) * 1000 + 900000)::bigint)
+   where email = '<address>';
+   ```
+
+   (The first removes the authenticator, and its challenges with it; the second
+   opens the 15 minute window.) `npm run mfa:reset` does the same with the
+   service key.
+4. Take the flag off: remove `ADMIN_MFA` in Vercel and redeploy (Abdelrahman).
+   Every password session works again at once.
+
+**Before the flag goes on**, read who is enrolled and who could still get in:
+
+```sql
+select d.is_visible as a_doctor,
+       (u.phone_confirmed_at is not null) as can_sign_in_by_phone,
+       (u.encrypted_password <> '') as has_password,
+       (select count(*) from auth.mfa_factors f where f.user_id = u.id and f.status = 'verified') as authenticators
+from auth.users u join public.doctors d on d.auth_user_id = u.id
+where d.is_admin and d.is_active
+order by 1, 2;
+```
+
+Every row with a password and no phone must have an authenticator, and at least
+two rows must be able to sign in by phone. The authenticator itself is tested
+against real tokens with `E2E_ADMIN_MFA=1` (`e2e/README.md`), which CI does not
+run.
+
+**It is off.** Turning it on before every password account has enrolled
+locks that account out of /admin. Rollout:
+
+1. Merge steps 1 to 3. Set `SUPER_ADMIN_EMAILS` in Vercel.
+2. In Supabase, Authentication > Multi-Factor: TOTP enrolment and verification on.
+3. Each password admin enrols in «ملفي». The audit page shows who has
+   (`admin_mfa_enrolled`).
+4. Set `ADMIN_MFA=1` and redeploy. Check that each admin still reaches `/admin`
+   (password, then the code).
+5. To turn it off in an emergency, remove `ADMIN_MFA` and redeploy.
+
 ### What this does not have
 
-**MFA is not enforced.** Supabase can enrol TOTP, but `signInWithPassword`
-returns a session at AAL1 and nothing in this app checks the `aal` claim, so
-enrolling it would look like protection without being any. Making it real
-needs a challenge step in `/api/login/password` and an `aal2` check in
-`requireDoctor`. Worth doing if these accounts stay enabled in production
-long term.
+**MFA is not enforced until `ADMIN_MFA=1`.** Enrolling a factor alone adds a
+code step at sign-in, but `/admin` still opens for a password session that
+skipped it (for example by going straight to the URL) while the flag is off.
 
 ## The production smoke check's sign-in (no password)
 

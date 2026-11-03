@@ -24,7 +24,7 @@ const local = new Map<string, number>();
 function redis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  return url && token ? new Redis({ url, token }) : null;
+  return url && token ? new Redis({ url, token, responseEncoding: "base64" }) : null;
 }
 
 /** The pair's key; `secret` is SEND_SMS_HOOK_SECRET (unset only in dev). */

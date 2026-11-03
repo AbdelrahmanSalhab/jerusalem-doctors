@@ -53,12 +53,7 @@ export function verifySendSmsHook(
   if (!Number.isFinite(ts)) return false;
   if (Math.abs(nowMs / 1000 - ts) > TOLERANCE_SECONDS) return false;
 
-  let key: Buffer;
-  try {
-    key = parseHookSecret(secret);
-  } catch {
-    return false;
-  }
+  const key = parseHookSecret(secret);
   if (key.length === 0) return false;
 
   const expected = createHmac("sha256", key)

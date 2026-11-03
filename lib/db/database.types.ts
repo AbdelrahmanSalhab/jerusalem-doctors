@@ -56,10 +56,22 @@ isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "audit_logs_actor_doctor_id_fkey"
+      columns: ["actor_doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "audit_logs_target_doctor_id_fkey"
       columns: ["target_doctor_id"]
 isOneToOne: false
       referencedRelation: "doctors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "audit_logs_target_doctor_id_fkey"
+      columns: ["target_doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
       referencedColumns: ["id"]
     }
                   ]
@@ -81,6 +93,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "doctor_license_slots_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
     }
                   ]
                 },"doctor_specialties": {
@@ -100,6 +118,12 @@ isOneToOne: false
       columns: ["doctor_id"]
 isOneToOne: false
       referencedRelation: "doctors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "doctor_specialties_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
       referencedColumns: ["id"]
     },{
       foreignKeyName: "doctor_specialties_specialty_id_fkey"
@@ -128,6 +152,12 @@ isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "doctor_workplaces_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "doctor_workplaces_hmo_id_fkey"
       columns: ["hmo_id"]
 isOneToOne: false
@@ -143,14 +173,14 @@ isOneToOne: false
                   ]
                 },"doctors": {
                   Row: {
-                    "arabic_family_name": string,"arabic_family_name_normalized": string,"arabic_first_name": string,"arabic_first_name_normalized": string,"arabic_full_name": string | null,"arabic_full_name_normalized": string,"auth_user_id": string | null,"bio": string | null,"career_stage": string | null,"certificates": (string)[],"certificates_normalized": string | null,"consent_directory_use": boolean,"consent_timestamp": string,"created_at": string,"email": string | null,"featured": string | null,"featured_at": string | null,"hebrew_family_name": string | null,"hebrew_first_name": string | null,"hebrew_full_name": string | null,"id": string,"is_active": boolean,"is_admin": boolean,"is_admin_approved": boolean,"is_phone_verified": boolean,"is_visible": boolean,"license_number": string,"license_region": string,"license_verification_status": string | null,"license_verified_at": string | null,"phone_display": string | null,"phone_e164": string,"profile_picture_url": string | null,"residency_start_year": number | null,"retired": boolean,"secondary_license_number": string | null,"secondary_license_region": string | null,"secondary_license_verification_status": string | null,"seeking_work": boolean,"subspecialty": string | null,"subspecialty_normalized": string | null,"updated_at": string,"clinic_missing_details": boolean | null,"registry_specialty": string | null
+                    "arabic_family_name": string,"arabic_family_name_normalized": string,"arabic_first_name": string,"arabic_first_name_normalized": string,"arabic_full_name": string | null,"arabic_full_name_normalized": string,"auth_user_id": string | null,"bio": string | null,"career_stage": string | null,"certificates": (string)[],"certificates_normalized": string | null,"consent_directory_use": boolean,"consent_timestamp": string,"created_at": string,"email": string | null,"featured": string | null,"featured_at": string | null,"hebrew_family_name": string | null,"hebrew_first_name": string | null,"hebrew_full_name": string | null,"id": string,"is_active": boolean,"is_admin": boolean,"is_admin_approved": boolean,"is_phone_verified": boolean,"is_visible": boolean,"license_number": string,"license_region": string,"license_reviewed_at": string | null,"license_verification_status": string | null,"license_verified_at": string | null,"phone_display": string | null,"phone_e164": string,"profile_picture_url": string | null,"residency_start_year": number | null,"retired": boolean,"secondary_license_number": string | null,"secondary_license_region": string | null,"secondary_license_verification_status": string | null,"seeking_work": boolean,"subspecialty": string | null,"subspecialty_normalized": string | null,"updated_at": string,"clinic_missing_details": boolean | null,"registry_specialty": string | null
                   }
                   ComputedFields: "clinic_missing_details" | "registry_specialty"
                   Insert: {
-                    "arabic_family_name": string,"arabic_family_name_normalized": string,"arabic_first_name": string,"arabic_first_name_normalized": string,"arabic_full_name"?: never,"arabic_full_name_normalized": string,"auth_user_id"?: string | null,"bio"?: string | null,"career_stage"?: string | null,"certificates"?: (string)[],"certificates_normalized"?: string | null,"consent_directory_use"?: boolean,"consent_timestamp"?: string,"created_at"?: string,"email"?: string | null,"featured"?: string | null,"featured_at"?: string | null,"hebrew_family_name"?: string | null,"hebrew_first_name"?: string | null,"hebrew_full_name"?: never,"id"?: string,"is_active"?: boolean,"is_admin"?: boolean,"is_admin_approved"?: boolean,"is_phone_verified"?: boolean,"is_visible"?: boolean,"license_number": string,"license_region"?: string,"license_verification_status"?: string | null,"license_verified_at"?: string | null,"phone_display"?: string | null,"phone_e164": string,"profile_picture_url"?: string | null,"residency_start_year"?: number | null,"retired"?: boolean,"secondary_license_number"?: string | null,"secondary_license_region"?: string | null,"secondary_license_verification_status"?: string | null,"seeking_work"?: boolean,"subspecialty"?: string | null,"subspecialty_normalized"?: string | null,"updated_at"?: string
+                    "arabic_family_name": string,"arabic_family_name_normalized": string,"arabic_first_name": string,"arabic_first_name_normalized": string,"arabic_full_name"?: never,"arabic_full_name_normalized": string,"auth_user_id"?: string | null,"bio"?: string | null,"career_stage"?: string | null,"certificates"?: (string)[],"certificates_normalized"?: string | null,"consent_directory_use"?: boolean,"consent_timestamp"?: string,"created_at"?: string,"email"?: string | null,"featured"?: string | null,"featured_at"?: string | null,"hebrew_family_name"?: string | null,"hebrew_first_name"?: string | null,"hebrew_full_name"?: never,"id"?: string,"is_active"?: boolean,"is_admin"?: boolean,"is_admin_approved"?: boolean,"is_phone_verified"?: boolean,"is_visible"?: boolean,"license_number": string,"license_region"?: string,"license_reviewed_at"?: string | null,"license_verification_status"?: string | null,"license_verified_at"?: string | null,"phone_display"?: string | null,"phone_e164": string,"profile_picture_url"?: string | null,"residency_start_year"?: number | null,"retired"?: boolean,"secondary_license_number"?: string | null,"secondary_license_region"?: string | null,"secondary_license_verification_status"?: string | null,"seeking_work"?: boolean,"subspecialty"?: string | null,"subspecialty_normalized"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "arabic_family_name"?: string,"arabic_family_name_normalized"?: string,"arabic_first_name"?: string,"arabic_first_name_normalized"?: string,"arabic_full_name"?: never,"arabic_full_name_normalized"?: string,"auth_user_id"?: string | null,"bio"?: string | null,"career_stage"?: string | null,"certificates"?: (string)[],"certificates_normalized"?: string | null,"consent_directory_use"?: boolean,"consent_timestamp"?: string,"created_at"?: string,"email"?: string | null,"featured"?: string | null,"featured_at"?: string | null,"hebrew_family_name"?: string | null,"hebrew_first_name"?: string | null,"hebrew_full_name"?: never,"id"?: string,"is_active"?: boolean,"is_admin"?: boolean,"is_admin_approved"?: boolean,"is_phone_verified"?: boolean,"is_visible"?: boolean,"license_number"?: string,"license_region"?: string,"license_verification_status"?: string | null,"license_verified_at"?: string | null,"phone_display"?: string | null,"phone_e164"?: string,"profile_picture_url"?: string | null,"residency_start_year"?: number | null,"retired"?: boolean,"secondary_license_number"?: string | null,"secondary_license_region"?: string | null,"secondary_license_verification_status"?: string | null,"seeking_work"?: boolean,"subspecialty"?: string | null,"subspecialty_normalized"?: string | null,"updated_at"?: string
+                    "arabic_family_name"?: string,"arabic_family_name_normalized"?: string,"arabic_first_name"?: string,"arabic_first_name_normalized"?: string,"arabic_full_name"?: never,"arabic_full_name_normalized"?: string,"auth_user_id"?: string | null,"bio"?: string | null,"career_stage"?: string | null,"certificates"?: (string)[],"certificates_normalized"?: string | null,"consent_directory_use"?: boolean,"consent_timestamp"?: string,"created_at"?: string,"email"?: string | null,"featured"?: string | null,"featured_at"?: string | null,"hebrew_family_name"?: string | null,"hebrew_first_name"?: string | null,"hebrew_full_name"?: never,"id"?: string,"is_active"?: boolean,"is_admin"?: boolean,"is_admin_approved"?: boolean,"is_phone_verified"?: boolean,"is_visible"?: boolean,"license_number"?: string,"license_region"?: string,"license_reviewed_at"?: string | null,"license_verification_status"?: string | null,"license_verified_at"?: string | null,"phone_display"?: string | null,"phone_e164"?: string,"profile_picture_url"?: string | null,"residency_start_year"?: number | null,"retired"?: boolean,"secondary_license_number"?: string | null,"secondary_license_region"?: string | null,"secondary_license_verification_status"?: string | null,"seeking_work"?: boolean,"subspecialty"?: string | null,"subspecialty_normalized"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -215,6 +245,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "number_requests_requester_id_fkey"
+      columns: ["requester_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
     }
                   ]
                 },"pending_signups": {
@@ -250,8 +286,26 @@ isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "profile_reports_reporter_doctor_id_fkey"
+      columns: ["reporter_doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "profile_reports_resolved_by_fkey"
       columns: ["resolved_by"]
+isOneToOne: false
+      referencedRelation: "doctors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "profile_reports_resolved_by_fkey"
+      columns: ["resolved_by"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "profile_reports_target_doctor_id_fkey"
+      columns: ["target_doctor_id"]
 isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
@@ -259,7 +313,33 @@ isOneToOne: false
       foreignKeyName: "profile_reports_target_doctor_id_fkey"
       columns: ["target_doctor_id"]
 isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"push_subscriptions": {
+                  Row: {
+                    "auth": string,"created_at": string,"doctor_id": string,"endpoint": string,"id": string,"p256dh": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "auth": string,"created_at"?: string,"doctor_id": string,"endpoint": string,"id"?: string,"p256dh": string
+                  }
+                  Update: {
+                    "auth"?: string,"created_at"?: string,"doctor_id"?: string,"endpoint"?: string,"id"?: string,"p256dh"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "push_subscriptions_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
       referencedRelation: "doctors"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "push_subscriptions_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
       referencedColumns: ["id"]
     }
                   ]
@@ -301,12 +381,32 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "doctors"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "usage_events_doctor_id_fkey"
+      columns: ["doctor_id"]
+isOneToOne: false
+      referencedRelation: "listed_doctors"
+      referencedColumns: ["id"]
     }
                   ]
                 }
           }
           Views: {
-            [_ in never]: never
+            "listed_doctors": {
+                  Row: {
+                    "arabic_family_name": string | null,"arabic_first_name": string | null,"arabic_full_name": string | null,"arabic_full_name_normalized": string | null,"bio": string | null,"career_stage": string | null,"certificates": (string)[] | null,"certificates_normalized": string | null,"created_at": string | null,"email": string | null,"featured": string | null,"featured_at": string | null,"hebrew_family_name": string | null,"hebrew_first_name": string | null,"id": string | null,"phone_display": string | null,"phone_e164": string | null,"profile_picture_url": string | null,"residency_start_year": number | null,"retired": boolean | null,"seeking_work": boolean | null,"subspecialty": string | null,"subspecialty_normalized": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                           "arabic_family_name"?: string | null,"arabic_first_name"?: string | null,"arabic_full_name"?: string | null,"arabic_full_name_normalized"?: string | null,"bio"?: string | null,"career_stage"?: string | null,"certificates"?: (string)[] | null,"certificates_normalized"?: string | null,"created_at"?: string | null,"email"?: string | null,"featured"?: string | null,"featured_at"?: string | null,"hebrew_family_name"?: string | null,"hebrew_first_name"?: string | null,"id"?: string | null,"phone_display"?: string | null,"phone_e164"?: string | null,"profile_picture_url"?: string | null,"residency_start_year"?: number | null,"retired"?: boolean | null,"seeking_work"?: boolean | null,"subspecialty"?: string | null,"subspecialty_normalized"?: string | null
+                         }
+                        Update: {
+                           "arabic_family_name"?: string | null,"arabic_first_name"?: string | null,"arabic_full_name"?: string | null,"arabic_full_name_normalized"?: string | null,"bio"?: string | null,"career_stage"?: string | null,"certificates"?: (string)[] | null,"certificates_normalized"?: string | null,"created_at"?: string | null,"email"?: string | null,"featured"?: string | null,"featured_at"?: string | null,"hebrew_family_name"?: string | null,"hebrew_first_name"?: string | null,"id"?: string | null,"phone_display"?: string | null,"phone_e164"?: string | null,"profile_picture_url"?: string | null,"residency_start_year"?: number | null,"retired"?: boolean | null,"seeking_work"?: boolean | null,"subspecialty"?: string | null,"subspecialty_normalized"?: string | null
+                         }
+                        Relationships: [
+                    
+                  ]
+                }
           }
           Functions: {
             "admin_audit_events":

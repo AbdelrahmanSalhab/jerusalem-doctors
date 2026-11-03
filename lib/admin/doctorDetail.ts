@@ -46,6 +46,7 @@ export interface DetailDoctor {
   license_region: "IL" | "PS";
   license_verification_status: string | null;
   license_verified_at: string | null;
+  license_reviewed_at: string | null;
   secondary_license_number: string | null;
   secondary_license_region: "IL" | "PS" | null;
   secondary_license_verification_status: string | null;
@@ -72,6 +73,8 @@ export interface LicenseSlotDetail {
   number: string;
   status: string | null;
   verifiedAt: string | null;
+  /** When an admin last looked at this licence; the primary slot only. */
+  reviewedAt: string | null;
   explanation: LicenseExplanation;
 }
 
@@ -92,7 +95,7 @@ const DOCTOR_COLUMNS = `
   hebrew_first_name, hebrew_family_name,
   phone_e164, phone_display, email, bio, subspecialty, certificates,
   profile_picture_url, career_stage, residency_start_year,
-  license_number, license_region, license_verification_status, license_verified_at,
+  license_number, license_region, license_verification_status, license_verified_at, license_reviewed_at,
   secondary_license_number, secondary_license_region, secondary_license_verification_status,
   is_admin_approved, is_active, is_visible, is_phone_verified, is_admin,
   consent_directory_use, consent_timestamp, seeking_work, retired, featured, featured_at,
@@ -151,6 +154,7 @@ export async function fetchDoctorDetail(
       number: doctor.license_number,
       status: doctor.license_verification_status,
       verifiedAt: doctor.license_verified_at,
+      reviewedAt: doctor.license_reviewed_at,
       explanation: explainLicense({
         status: doctor.license_verification_status,
         region: doctor.license_region,
@@ -174,6 +178,7 @@ export async function fetchDoctorDetail(
       status: doctor.secondary_license_verification_status,
       // There is no secondary_license_verified_at column.
       verifiedAt: null,
+      reviewedAt: null,
       explanation: explainLicense({
         status: doctor.secondary_license_verification_status,
         region: doctor.secondary_license_region,

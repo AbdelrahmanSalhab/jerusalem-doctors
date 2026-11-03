@@ -1,3 +1,4 @@
+import { MfaSection } from "./MfaSection";
 import { PasswordSection } from "./PasswordSection";
 import { ProfileForm } from "./ProfileForm";
 import { requireDoctor } from "@/lib/auth/session";
@@ -60,6 +61,7 @@ export default async function ProfilePage() {
         }
       />
       {loginEmail && <PasswordSection email={loginEmail} />}
+      {loginEmail && <MfaSection />}
     </main>
   );
 }

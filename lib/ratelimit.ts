@@ -53,6 +53,9 @@ export const RATE_LIMITS = {
   // opens and fixes one profile after another. It only brakes a runaway loop.
   adminProfileSave: { limit: 60, window: "1 h" },
   adminPhotoUpload: { limit: 30, window: "1 h" },
+  // Turning notifications on or off for a device, and the test button.
+  adminPush: { limit: 20, window: "1 h" },
+  adminPushTest: { limit: 10, window: "1 h" },
   // Password sign-in for devs and QA. Tight: a leaked password on one of
   // these accounts is the whole risk, so guessing stays slow.
   // Every SMS the site sends, all numbers together: the per-phone and per-IP
@@ -69,6 +72,12 @@ export const RATE_LIMITS = {
   ciLoginIp: { limit: 10, window: "15 m" },
   // Each attempt checks the current password: kept as slow as signing in.
   passwordChange: { limit: 5, window: "15 m" },
+  // The authenticator code (app/api/mfa): six digits, so guessing is kept
+  // slow on top of Supabase's own limit.
+  mfaVerify: { limit: 10, window: "15 m" },
+  mfaEnroll: { limit: 10, window: "1 h" },
+  // A super admin resetting another admin's authenticator: rare by nature.
+  mfaReset: { limit: 5, window: "1 h" },
 } as const satisfies Record<string, LimitDef>;
 
 export type RateLimitKey = keyof typeof RATE_LIMITS;
@@ -84,7 +93,9 @@ const redisFromEnv = (): Redis | null => {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
-  return new Redis({ url, token });
+  // 1.40 changed the default to plain JSON; the old wire format stays until
+  // the limiter has been seen working against the new one in production.
+  return new Redis({ url, token, responseEncoding: "base64" });
 };
 
 const upstashLimiters = new Map<RateLimitKey, Ratelimit>();

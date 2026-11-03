@@ -226,4 +226,36 @@ describe("send-otp hook route", () => {
     expect(res.headers.get("retry-after")).toBeTruthy();
     expect(res.headers.get("content-type")).toContain("application/json");
   });
+
+  describe("configuration edges", () => {
+    const post = async (req: Request) => (await import("./route")).POST(req);
+
+    it("fails closed in production when the secret is missing", async () => {
+      vi.stubEnv("SEND_SMS_HOOK_SECRET", "");
+      vi.stubEnv("NODE_ENV", "production");
+      expect((await post(hookRequest(PAYLOAD))).status).toBe(500);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("lets an unsigned call through in development, and says so", async () => {
+      vi.stubEnv("SEND_SMS_HOOK_SECRET", "");
+      vi.stubEnv("NODE_ENV", "development");
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      expect((await post(hookRequest(PAYLOAD, false))).status).toBe(200);
+      expect(err).toHaveBeenCalledWith(expect.stringContaining("SEND_SMS_HOOK_SECRET unset"));
+      err.mockRestore();
+    });
+
+    it("sends nothing while phone sign-in is switched off, and answers 400 so Supabase does not retry", async () => {
+      vi.stubEnv("NEXT_PUBLIC_PHONE_AUTH_DISABLED", "1");
+      expect((await post(hookRequest(PAYLOAD))).status).toBe(400);
+      expect(send).not.toHaveBeenCalled();
+      vi.unstubAllEnvs();
+    });
+
+    it("takes a number that already has its plus", async () => {
+      expect((await post(hookRequest({ ...PAYLOAD, user: { phone: "+972501234567" } }))).status).toBe(200);
+      expect(send).toHaveBeenCalledWith("+972501234567", expect.any(String));
+    });
+  });
 });

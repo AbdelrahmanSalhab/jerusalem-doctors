@@ -1,4 +1,4 @@
-// Lighthouse (mobile) on the signed-in dashboard, with the smoke run's CI
+// Lighthouse (mobile) on the signed-in dashboard, empty and with a search, with the smoke run's CI
 // session (smoke.setup.ts), before smoke.teardown.ts signs it out (#178).
 //
 // Warn-only while we learn the baseline: it never fails the run. The report
@@ -16,7 +16,10 @@ import { chromium, test } from "@playwright/test";
 const STATE = join(__dirname, "..", ".results", "smoke-session.json");
 const RUN = process.env.CI_RUN_URL ?? "";
 const PORT = 9333;
-const PAGES = ["/dashboard"];
+// The dashboard as it opens, and with a search in the address bar (#177): the
+// results, filters and cards are what a doctor spends the visit on. A
+// specialty word, so no name or number is in the address or the report.
+const PAGES = ["/dashboard", `/dashboard?q=${encodeURIComponent("قلب")}`];
 // The bars the public pages must meet (lighthouserc.json): below them, warn.
 const BARS: Record<string, number> = { performance: 0.85, accessibility: 0.98, "best-practices": 0.95 };
 const METRICS = ["first-contentful-paint", "largest-contentful-paint", "total-blocking-time", "cumulative-layout-shift"];
@@ -50,7 +53,7 @@ async function audit(url: string): Promise<Report> {
 function summaryRow(path: string, r: Report): string {
   const score = (k: string) => Math.round((r.categories[k]?.score ?? 0) * 100);
   const metric = (k: string) => r.audits[k]?.displayValue ?? "-";
-  return `| ${path} | ${Object.keys(BARS).map(score).join(" | ")} | ${METRICS.map(metric).join(" | ")} |`;
+  return `| ${decodeURIComponent(path)} | ${Object.keys(BARS).map(score).join(" | ")} | ${METRICS.map(metric).join(" | ")} |`;
 }
 
 test("Lighthouse on the signed-in dashboard (warn-only)", async ({ baseURL }) => {
@@ -68,15 +71,15 @@ test("Lighthouse on the signed-in dashboard (warn-only)", async ({ baseURL }) =>
       try {
         const report = await audit(`${baseURL}${path}`);
         // Sent to /login: that page's scores would pass for the dashboard's.
-        if (new URL(report.finalDisplayedUrl).pathname !== path) throw new Error(`ended on ${report.finalDisplayedUrl}`);
+        if (new URL(report.finalDisplayedUrl).pathname !== new URL(path, "http://x").pathname) throw new Error(`ended on ${report.finalDisplayedUrl}`);
         rows.push(summaryRow(path, report));
         for (const [k, bar] of Object.entries(BARS)) {
           const s = report.categories[k]?.score ?? 0;
-          if (s < bar) test.info().annotations.push({ type: "warning", description: `${path} ${k} ${s} < ${bar}` });
+          if (s < bar) test.info().annotations.push({ type: "warning", description: `${decodeURIComponent(path)} ${k} ${s} < ${bar}` });
         }
       } catch (e) {
         // Only the message: the report on stdout is never printed.
-        rows.push(`| ${path} | Lighthouse failed: ${(e as Error).message.split("\n")[0]} |`);
+        rows.push(`| ${decodeURIComponent(path)} | Lighthouse failed: ${(e as Error).message.split("\n")[0]} |`);
       }
     }
   } finally {
