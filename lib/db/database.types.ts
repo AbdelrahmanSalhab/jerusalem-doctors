@@ -394,7 +394,7 @@ isOneToOne: false
           Views: {
             "listed_doctors": {
                   Row: {
-                    "arabic_family_name": string,"arabic_first_name": string,"arabic_full_name": string | null,"arabic_full_name_normalized": string,"bio": string | null,"career_stage": string | null,"certificates": (string)[],"certificates_normalized": string | null,"created_at": string,"email": string | null,"featured": string | null,"featured_at": string | null,"hebrew_family_name": string | null,"hebrew_first_name": string | null,"id": string,"phone_display": string | null,"phone_e164": string,"profile_picture_url": string | null,"residency_start_year": number | null,"retired": boolean,"seeking_work": boolean,"subspecialty": string | null,"subspecialty_normalized": string | null
+                    "arabic_family_name": string | null,"arabic_first_name": string | null,"arabic_full_name": string | null,"arabic_full_name_normalized": string | null,"bio": string | null,"career_stage": string | null,"certificates": (string)[] | null,"certificates_normalized": string | null,"created_at": string | null,"email": string | null,"featured": string | null,"featured_at": string | null,"hebrew_family_name": string | null,"hebrew_first_name": string | null,"id": string | null,"phone_display": string | null,"phone_e164": string | null,"profile_picture_url": string | null,"residency_start_year": number | null,"retired": boolean | null,"seeking_work": boolean | null,"subspecialty": string | null,"subspecialty_normalized": string | null
                   }
                   ComputedFields: never
                   Insert: {
