@@ -9,6 +9,7 @@
 
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { needsSecondFactor, type SessionClaims } from "@/lib/auth/mfa";
 import type { Doctor } from "@/lib/db/types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -35,6 +36,16 @@ if (process.env.USE_DEV_USER === "1" && isProd()) {
   );
 }
 
+/** The verified claims of this request's session, once per request. getClaims
+ *  checks the JWT locally against the project's signing keys (no Auth round
+ *  trip); with a legacy symmetric secret it falls back to the same server
+ *  check getUser makes. */
+const sessionClaims = cache(async (): Promise<SessionClaims | undefined> => {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getClaims();
+  return data?.claims as SessionClaims | undefined;
+});
+
 /**
  * Returns the currently authenticated doctor, or null if no session.
  * Honours the dev-user shim when enabled.
@@ -55,12 +66,7 @@ export const getCurrentDoctor = cache(async (): Promise<Doctor | null> => {
     return (data as Doctor | null) ?? null;
   }
 
-  // getClaims verifies the JWT locally against the project's signing keys
-  // (no Auth round trip); with a legacy symmetric secret it falls back to the
-  // same server check getUser makes.
-  const supabase = await createSupabaseServerClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const userId = claimsData?.claims.sub;
+  const userId = (await sessionClaims())?.sub;
   if (!userId) return null;
 
   const service = createSupabaseServiceClient();
@@ -100,10 +106,14 @@ export async function requireAdmin(): Promise<Doctor> {
 }
 
 /** The signed-in active admin, or null. A failed lookup throws rather than
- *  reading as "not an admin". */
+ *  reading as "not an admin". A password session that has not passed the
+ *  second factor is not an admin yet (lib/auth/mfa.ts). */
 export async function getCurrentAdmin(): Promise<Doctor | null> {
   const doctor = await getCurrentDoctor();
-  return doctor && doctor.is_admin && doctor.is_active ? doctor : null;
+  if (!doctor || !doctor.is_admin || !doctor.is_active) return null;
+  // The dev shim has no token to read.
+  if (!isDevUserEnabled() && needsSecondFactor(await sessionClaims())) return null;
+  return doctor;
 }
 
 /**
