@@ -12,6 +12,7 @@ type Step =
   | { name: "loading" }
   | { name: "on" }
   | { name: "off" }
+  | { name: "unknown" }
   | { name: "scan"; factorId: string; qr: string; secret: string };
 
 export function MfaSection() {
@@ -22,9 +23,8 @@ export function MfaSection() {
 
   useEffect(() => {
     fetch("/api/mfa")
-      .then((res) => res.json())
-      .then((data) => setStep(data?.enrolled ? { name: "on" } : { name: "off" }))
-      .catch(() => setStep({ name: "off" }));
+      .then(async (res) => (res.ok ? setStep((await res.json()).enrolled ? { name: "on" } : { name: "off" }) : setStep({ name: "unknown" })))
+      .catch(() => setStep({ name: "unknown" }));
   }, []);
 
   const post = (url: string, body?: unknown) =>
@@ -66,6 +66,7 @@ export function MfaSection() {
     <div className="mt-8">
       <Section title="التحقق بخطوتين">
         {step.name === "loading" && <p className="text-sm text-muted">جارٍ التحميل...</p>}
+        {step.name === "unknown" && <p className="text-sm text-muted">تعذّر معرفة حالة التحقق بخطوتين. أعد تحميل الصفحة.</p>}
         {step.name === "on" && (
           <p role="status" className="rounded border border-success-line bg-success-bg p-3 text-sm text-success">
             مفعّل: يُطلب رمز من تطبيق المصادقة عند الدخول بكلمة المرور.

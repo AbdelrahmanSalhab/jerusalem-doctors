@@ -23,13 +23,16 @@ export const POST = withJsonErrors(async (req: Request) => {
 
   const mfa = (await createSupabaseServerClient()).auth.mfa;
   // A sign-in answers its own verified factor; only enrolment names one.
-  const factorId = parsed.data.factorId ?? (await mfa.listFactors()).data?.totp[0]?.id;
+  const listed = (await mfa.listFactors()).data;
+  const factorId = parsed.data.factorId ?? listed?.totp[0]?.id;
   if (!factorId) return jsonError(400, { error: "no_factor", code: "no_factor" });
 
   const { error } = await mfa.challengeAndVerify({ factorId, code: parsed.data.code });
   if (error) return jsonError(400, { error: "wrong_code", code: "wrong_code" });
 
-  if (parsed.data.factorId) {
+  // Only the end of an enrolment is recorded as one: a code sent with an id
+  // that was already verified is an ordinary challenge.
+  if (listed?.all.some((f) => f.id === factorId && f.status === "unverified")) {
     await writeAudit(createSupabaseServiceClient(), { actor_doctor_id: me.id, action: "admin_mfa_enrolled", target_doctor_id: me.id });
   }
   return jsonOk({ ok: true });

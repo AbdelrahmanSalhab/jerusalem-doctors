@@ -16,7 +16,7 @@ export const GET = withJsonErrors(async () => {
   // The auth server no longer knows this session (its password was changed
   // from elsewhere, say): the page's token still checks out, the session
   // does not.
-  if (factors.error?.name === "AuthSessionMissingError") return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
+  if ([factors.error, level.error].some((e) => e?.name === "AuthSessionMissingError")) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   if (factors.error || level.error) return jsonError(502, { error: "mfa_unavailable", code: "mfa_unavailable" });
   return jsonOk({
     enrolled: factors.data.totp.length > 0,

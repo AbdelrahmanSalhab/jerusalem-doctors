@@ -545,7 +545,7 @@ signs in by phone code, and the smoke check's own sign-in (`/api/login/ci`).
 **Enrolling.** An admin with a password opens «ملفي», presses «تفعيل التحقق بخطوتين»,
 scans the QR with an authenticator app and types the first code. Until that code
 is confirmed the factor does not count, so a bad scan locks nobody out. It can
-be done once; replacing one (a lost phone) is for the super admins (step 3).
+be done once, and only while the flag is off: with it on, a password session that has not given its code cannot start one (a leaked password must not be enough to claim an account's factor). Replacing one, or enrolling a new admin, is for the super admins (step 3).
 The browser never talks to Supabase (the site's content-security rules allow
 only its own origin), so this goes through `/api/mfa`, `/api/mfa/enroll` and
 `/api/mfa/verify`.

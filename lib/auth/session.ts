@@ -46,6 +46,13 @@ const sessionClaims = cache(async (): Promise<SessionClaims | undefined> => {
   return data?.claims as SessionClaims | undefined;
 });
 
+/** True when the flag is on and this is a password session that has not
+ *  passed the code: it may not start an authenticator of its own, or a leaked
+ *  password would be enough to claim an admin's second factor. */
+export async function awaitingSecondFactor(): Promise<boolean> {
+  return !isDevUserEnabled() && needsSecondFactor(await sessionClaims());
+}
+
 /**
  * Returns the currently authenticated doctor, or null if no session.
  * Honours the dev-user shim when enabled.

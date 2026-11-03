@@ -26,8 +26,22 @@ export function DevLoginForm({ sentForCode = false }: { sentForCode?: boolean })
   };
 
   useEffect(() => {
-    if (sentForCode) waitingForCode().then(setNeedsCode).catch(() => {});
+    if (!sentForCode) return;
+    waitingForCode()
+      .then((waiting) => {
+        setNeedsCode(waiting);
+        // Sent here for a code this account has no authenticator to give.
+        if (!waiting) setError("هذا الحساب لم يفعّل التحقق بخطوتين بعد. تواصل مع المسؤولين لتفعيله.");
+      })
+      .catch(() => {});
   }, [sentForCode]);
+
+  const startOver = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setNeedsCode(false);
+    setCode("");
+    setError(null);
+  };
 
   const submitCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +117,9 @@ export function DevLoginForm({ sentForCode = false }: { sentForCode?: boolean })
         )}
         <button type="submit" disabled={submitting || code.length !== 6} className="w-full rounded-md bg-primary px-6 py-3 text-primary-fg disabled:opacity-50">
           {submitting ? "جارٍ التحقق..." : "تأكيد"}
+        </button>
+        <button type="button" onClick={startOver} className="text-sm underline">
+          العودة وتسجيل الدخول بحساب آخر
         </button>
       </form>
     );

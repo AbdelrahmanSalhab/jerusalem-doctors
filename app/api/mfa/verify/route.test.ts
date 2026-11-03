@@ -21,7 +21,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   gate.allowed = true;
   requireDoctor.mockResolvedValue({ id: "d1", is_admin: true, auth_user_id: "u1" });
-  mfa.listFactors.mockResolvedValue({ data: { totp: [{ id: FACTOR }] }, error: null });
+  mfa.listFactors.mockResolvedValue({ data: { totp: [{ id: FACTOR }], all: [{ id: FACTOR, status: "verified" }] }, error: null });
   mfa.challengeAndVerify.mockResolvedValue({ error: null });
 });
 
@@ -35,9 +35,15 @@ describe("POST /api/mfa/verify", () => {
 
   it("confirms a new factor and records that it was turned on", async () => {
     const other = "00000000-0000-4000-8000-0000000000f2";
+    mfa.listFactors.mockResolvedValue({ data: { totp: [], all: [{ id: other, status: "unverified" }] }, error: null });
     expect((await call({ code: "123456", factorId: other })).status).toBe(200);
     expect(mfa.challengeAndVerify).toHaveBeenCalledWith({ factorId: other, code: "123456" });
     expect(writeAudit).toHaveBeenCalledWith({ marker: "service" }, { actor_doctor_id: "d1", action: "admin_mfa_enrolled", target_doctor_id: "d1" });
+  });
+
+  it("does not record an enrolment when the factor named was already verified", async () => {
+    expect((await call({ code: "123456", factorId: FACTOR })).status).toBe(200);
+    expect(writeAudit).not.toHaveBeenCalled();
   });
 
   it("refuses a wrong code with one answer", async () => {

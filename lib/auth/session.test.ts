@@ -72,6 +72,15 @@ describe("lib/auth/session", () => {
       await expect((await session()).requireAdmin()).rejects.toThrow("REDIRECT /login/dev?code=1");
     });
 
+    it("says a password session awaits its code only when the flag is on and the code is not given", async () => {
+      sessionOf("aal1", "password");
+      expect(await (await session()).awaitingSecondFactor()).toBe(false);
+      vi.stubEnv("ADMIN_MFA", "1");
+      expect(await (await session()).awaitingSecondFactor()).toBe(true);
+      sessionOf("aal2", "password", "totp");
+      expect(await (await session()).awaitingSecondFactor()).toBe(false);
+    });
+
     it("leaves the dev shim alone: it has no token to read", async () => {
       vi.stubEnv("ADMIN_MFA", "1");
       vi.stubEnv("USE_DEV_USER", "1");

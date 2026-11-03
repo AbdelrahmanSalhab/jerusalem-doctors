@@ -4,13 +4,16 @@
 // (/api/mfa/verify), so a scan that went wrong locks nobody out.
 
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
-import { requireDoctor } from "@/lib/auth/session";
+import { awaitingSecondFactor, requireDoctor } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const POST = withJsonErrors(async () => {
   const me = await requireDoctor().catch(() => null);
   if (!me?.is_admin || !me.auth_user_id) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
+  // With the flag on every admin has enrolled already; a password session that
+  // has not passed the code must not be able to claim the factor.
+  if (await awaitingSecondFactor()) return jsonError(403, { error: "code_required", code: "code_required" });
   const rl = await rateLimit("mfaEnroll", `doctor:${me.id}`);
   if (!rl.success) return jsonError(429, { error: "rate_limited", code: "rate_limited" });
 

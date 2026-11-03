@@ -45,6 +45,11 @@ describe("GET /api/mfa", () => {
     expect((await call()).status).toBe(401);
   });
 
+  it("reads a session missing on the level call the same way", async () => {
+    mfa.getAuthenticatorAssuranceLevel.mockResolvedValue({ data: null, error: Object.assign(new Error("x"), { name: "AuthSessionMissingError" }) });
+    expect((await call()).status).toBe(401);
+  });
+
   it("answers 502 when the auth server does not", async () => {
     mfa.listFactors.mockResolvedValue({ data: null, error: new Error("down") });
     expect((await call()).status).toBe(502);

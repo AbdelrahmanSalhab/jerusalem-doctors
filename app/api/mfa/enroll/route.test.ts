@@ -3,9 +3,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireDoctor = vi.hoisted(() => vi.fn());
+const awaiting = vi.hoisted(() => ({ value: false }));
 const gate = vi.hoisted(() => ({ allowed: true }));
 const mfa = vi.hoisted(() => ({ listFactors: vi.fn(), unenroll: vi.fn(), enroll: vi.fn() }));
-vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
+vi.mock("@/lib/auth/session", () => ({ requireDoctor, awaitingSecondFactor: async () => awaiting.value }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit: vi.fn(async () => ({ success: gate.allowed })) }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: async () => ({ auth: { mfa } }) }));
 
@@ -14,6 +15,7 @@ const call = async () => (await import("./route")).POST(new Request("http://x/ap
 beforeEach(() => {
   vi.clearAllMocks();
   gate.allowed = true;
+  awaiting.value = false;
   requireDoctor.mockResolvedValue({ id: "d1", is_admin: true, auth_user_id: "u1" });
   mfa.listFactors.mockResolvedValue({ data: { totp: [], all: [] }, error: null });
   mfa.enroll.mockResolvedValue({ data: { id: "f1", totp: { qr_code: "data:image/svg+xml;utf8,<svg/>", secret: "ABC" } }, error: null });
@@ -37,6 +39,13 @@ describe("POST /api/mfa/enroll", () => {
     mfa.listFactors.mockResolvedValue({ data: { totp: [{ id: "f0" }], all: [] }, error: null });
     const res = await call();
     expect(res.status).toBe(409);
+    expect(mfa.enroll).not.toHaveBeenCalled();
+  });
+
+  it("refuses a password session that has not given its code, once the flag is on", async () => {
+    awaiting.value = true;
+    const res = await call();
+    expect(res.status).toBe(403);
     expect(mfa.enroll).not.toHaveBeenCalled();
   });
 
