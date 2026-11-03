@@ -341,7 +341,10 @@ Doctors reported exactly that ("I got two codes and both were wrong").
   doctor every 5 s, which our per-number limit never saw), the unused Twilio
   account SID and message service SID cleared (the auth token field still
   reads back 64 characters; revoke it in Twilio if it matters), and the old
-  `sms_test_otp` mapping (May, expired) emptied. Our own limits sit inside them: a code gets 5 guesses per 10
+  `sms_test_otp` mapping (May, expired) emptied. The database now refuses
+  connections without SSL (`PUT /v1/projects/<ref>/ssl-enforcement`, 1 Nov; the app
+  uses the REST API and is not affected; a direct `psql` needs `sslmode=require`).
+  Our own limits sit inside them: a code gets 5 guesses per 10
   minutes per phone at login (`loginVerify`) and 5 per code at signup, and the
   site sends at most 200 texts a day.
 - **How Supabase calls the hook** (supabase.com/docs/guides/auth/auth-hooks):
