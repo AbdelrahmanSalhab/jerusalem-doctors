@@ -8,6 +8,7 @@
 
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
+import { cleanEmail } from "@/lib/normalize/email";
 import { isResidentAndRetired, RESIDENT_NOT_RETIRED } from "@/lib/careerStage";
 import { purgeUnfinished, RESUME_FORM_MAX_BYTES } from "@/lib/signup/unfinished";
 import { withHmoIds } from "@/lib/institutions";
@@ -68,7 +69,7 @@ const Body = z
       .nullable()
       .optional(),
     subspecialty: z.string().trim().max(120).optional().nullable(),
-    email: z.email().max(254),
+    email: z.string().transform(cleanEmail).pipe(z.email().max(254)),
     bio: z.string().trim().max(500).optional().nullable(),
     // Exactly one entry must be is_primary:true when any are given:
     // validated below. Residents may give none (they rotate).
