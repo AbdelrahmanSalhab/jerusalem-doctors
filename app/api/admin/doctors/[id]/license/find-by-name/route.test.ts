@@ -17,7 +17,7 @@ vi.mock("@/lib/supabase/service", () => ({
         insert: () => writes.push(table),
         maybeSingle: async () => ({ data: table === "doctors" ? doctor : null, error: null }),
       };
-      for (const m of ["select", "eq", "neq", "in", "limit"]) chain[m] = () => chain;
+      for (const m of ["select", "eq", "neq", "in", "order", "limit"]) chain[m] = () => chain;
       return chain;
     },
   }),

@@ -148,6 +148,7 @@ export function LicenseCheckPanel({
             : ""),
       );
       setResult(null);
+      setByName(null);
       router.refresh();
     } catch {
       setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
@@ -272,6 +273,7 @@ export function LicenseCheckPanel({
                   <button
                     type="button"
                     disabled={busy}
+                    aria-label={`فحص الرقم ${c.licenseNumber}`}
                     onClick={() => {
                       setNumber(c.licenseNumber);
                       search(c.licenseNumber);

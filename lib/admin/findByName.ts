@@ -47,19 +47,30 @@ export async function findByName(
   const family = normalizeHebrew(doctor.hebrew_family_name ?? "");
   if (!first || !family) return [];
 
-  const { data, error } = await service
-    .from("moh_practitioners")
-    .select("license_number, hebrew_first_name, hebrew_family_name, hebrew_first_norm, hebrew_family_norm, specialty_name_he")
-    .eq("hebrew_family_norm", family)
-    .limit(200);
-  if (error) throw new Error(`moh_practitioners read failed: ${error.message}`);
+  const columns =
+    "license_number, hebrew_first_name, hebrew_family_name, hebrew_first_norm, hebrew_family_norm, specialty_name_he";
+  // Two reads, not one read of the family and a filter: a few families hold
+  // hundreds of licences, and a capped read of one could drop the exact name.
+  // The exact read is the (first, family) index; the family read is only a
+  // weaker lead, so a handful is enough.
+  const [exact, others] = await Promise.all([
+    service.from("moh_practitioners").select(columns).eq("hebrew_family_norm", family).eq("hebrew_first_norm", first).limit(20),
+    service
+      .from("moh_practitioners")
+      .select(columns)
+      .eq("hebrew_family_norm", family)
+      .neq("hebrew_first_norm", first)
+      .order("license_number")
+      .limit(FAMILY_LIMIT),
+  ]);
+  for (const r of [exact, others]) {
+    if (r.error) throw new Error(`moh_practitioners read failed: ${r.error.message}`);
+  }
 
-  // One family-name read serves both kinds: a family has few members, and the
-  // exact ones are the rows whose first name also matches.
-  const rows = (data ?? []) as Row[];
-  const exact = rows.filter((r) => r.hebrew_first_norm === first);
-  const others = rows.filter((r) => r.hebrew_first_norm !== first).slice(0, FAMILY_LIMIT);
-  const picked = [...exact.map((r) => ({ r, kind: "exact" as const })), ...others.map((r) => ({ r, kind: "family" as const }))];
+  const picked = [
+    ...((exact.data ?? []) as Row[]).map((r) => ({ r, kind: "exact" as const })),
+    ...((others.data ?? []) as Row[]).map((r) => ({ r, kind: "family" as const })),
+  ];
   if (picked.length === 0) return [];
 
   const numbers = picked.map(({ r }) => String(r.license_number));
