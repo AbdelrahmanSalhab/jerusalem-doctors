@@ -1,6 +1,6 @@
 // POST /api/admin/doctors/[id]/mfa/reset: a super admin (lib/auth/superAdmin.ts)
 // removes another admin's authenticator, for a lost phone. The admin then has
-// an hour to enrol a new one from «ملفي». Answers 404 to every other admin, so
+// 15 minutes to enrol a new one from «ملفي». Answers 404 to every other admin, so
 // the route does not announce itself.
 
 import { z } from "zod";

@@ -4,8 +4,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isSuperAdmin, superAdminEmails } from "./superAdmin";
 
-const service = (email: string | undefined) =>
-  ({ auth: { admin: { getUserById: vi.fn(async () => ({ data: { user: email === undefined ? null : { email } } })) } } }) as never;
+const service = (email: string | undefined, confirmed = true) =>
+  ({ auth: { admin: { getUserById: vi.fn(async () => ({ data: { user: email === undefined ? null : { email, email_confirmed_at: confirmed ? "2026-01-01T00:00:00Z" : null } } })) } } }) as never;
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -23,6 +23,11 @@ describe("isSuperAdmin", () => {
     expect(await isSuperAdmin(service("Boss@X.com"), "u1")).toBe(true);
     expect(await isSuperAdmin(service("other@x.com"), "u1")).toBe(false);
     expect(await isSuperAdmin(service(undefined), "u1")).toBe(false);
+  });
+
+  it("does not trust an address nobody has confirmed", async () => {
+    vi.stubEnv("SUPER_ADMIN_EMAILS", "boss@x.com");
+    expect(await isSuperAdmin(service("boss@x.com", false), "u1")).toBe(false);
   });
 
   it("is false with no list, or an account with no sign-in of its own", async () => {

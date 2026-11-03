@@ -18,6 +18,8 @@ export async function isSuperAdmin(service: SupabaseClient, authUserId: string |
   if (!authUserId) return false;
   const list = superAdminEmails();
   if (list.length === 0) return false;
-  const email = (await service.auth.admin.getUserById(authUserId)).data.user?.email?.toLowerCase();
+  const user = (await service.auth.admin.getUserById(authUserId)).data.user;
+  // An address nobody has confirmed proves nothing about who holds it.
+  const email = user?.email_confirmed_at ? user.email?.toLowerCase() : undefined;
   return email !== undefined && list.includes(email);
 }

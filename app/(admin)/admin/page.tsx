@@ -222,7 +222,7 @@ export default async function AdminDoctorsPage({
           closeHref={listHref}
           viewHref={adminDoctorsHref(params, { doctorId: params.doctorId })}
           editHref={adminDoctorsHref(params, { doctorId: params.doctorId, editing: true })}
-          canResetSecondFactor={detail?.doctor.id !== viewer.id && (await isSuperAdmin(service, viewer.auth_user_id))}
+          canResetSecondFactor={detail?.doctor.is_admin === true && detail.doctor.id !== viewer.id && (await isSuperAdmin(service, viewer.auth_user_id))}
         />
       )}
     </main>

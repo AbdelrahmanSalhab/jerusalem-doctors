@@ -1,7 +1,7 @@
 "use client";
 
 // A super admin removes another admin's authenticator after a lost phone
-// (/api/admin/doctors/[id]/mfa/reset). The admin then has an hour to enrol a
+// (/api/admin/doctors/[id]/mfa/reset). The admin then has a quarter of an hour to enrol a
 // new one from «ملفي». Two presses: the first asks, the second does it.
 
 import { useState } from "react";
@@ -17,7 +17,7 @@ export function MfaReset({ doctorId }: { doctorId: string }) {
       const res = await fetch(`/api/admin/doctors/${doctorId}/mfa/reset`, { method: "POST" });
       setResult(
         res.ok
-          ? { ok: true, text: "أُزيل تطبيق المصادقة. أمامه ساعة ليفعّل تطبيقًا جديدًا من «ملفي»." }
+          ? { ok: true, text: "أُزيل تطبيق المصادقة. أمامه ربع ساعة ليفعّل تطبيقًا جديدًا من «ملفي»؛ كن معه على الخط." }
           : { ok: false, text: "تعذّرت إعادة التعيين. حاول مرة أخرى." },
       );
     } catch {

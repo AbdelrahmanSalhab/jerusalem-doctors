@@ -111,7 +111,7 @@ export function DoctorPanelBody({
         closeHref={closeHref}
       />
 
-      {canResetSecondFactor && d.is_admin && <MfaReset doctorId={d.id} />}
+      {canResetSecondFactor && d.is_admin && <MfaReset key={d.id} doctorId={d.id} />}
 
       <Section title="التحقق من الترخيص">
         <div className="flex flex-col gap-4">

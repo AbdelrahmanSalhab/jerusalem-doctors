@@ -563,13 +563,20 @@ local stack has them on in `supabase/config.toml`.
 (Vercel; Khaled and Abdelrahman), can reset another admin's authenticator from
 the doctor panel in `/admin`: «إعادة تعيين التحقق بخطوتين», pressed twice. It
 removes the factor, is on the audit trail (`admin_mfa_reset`), and gives that
-admin one hour to enrol a new one from «ملفي»: with the flag on, a password
+admin 15 minutes to enrol a new one from «ملفي»: with the flag on, a password
 session without its code cannot enrol otherwise, so a leaked password cannot
-claim an account's factor. The same hour is how a **new** admin is enrolled
+claim an account's factor. That window is how a **new** admin is enrolled
 once the flag is on. If neither super admin can sign in, whoever holds the
-project's keys runs `npm run mfa:reset -- --email <address>` (it does not write
-the audit log: say so in the team channel). Super admins reset each other the
-same way, and cannot reset themselves.
+project's keys runs `npm run mfa:reset -- --email <address>` (it only works on admin accounts and writes the audit log too). Super admins reset each other the
+same way, and cannot reset themselves. Be on the call while it is open: for
+15 minutes a password alone can claim the factor.
+
+**A reset does not end the admin's current sessions.** Supabase's admin API
+cannot revoke a user's sessions, so a session that already passed the code stays
+an admin's until its token lapses (up to an hour, `jwt_expiry`). If the reset is
+an answer to a compromise, also have that admin change their password in «ملفي»
+(it signs out their other sessions), or sign them out in the Supabase dashboard
+(Authentication > Users).
 
 **It is off.** Turning it on before every password account has enrolled
 locks that account out of /admin. Rollout:
