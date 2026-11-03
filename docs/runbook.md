@@ -511,6 +511,20 @@ Remove their address from `DEV_LOGIN_EMAILS`, redeploy, **and** delete their
 Supabase auth user. The first alone leaves them able to use the project's
 token endpoint directly.
 
+### A second factor for these accounts (#164)
+
+A password alone should not open /admin. With `ADMIN_MFA=1` in Vercel, a session
+that began with a **password** only counts as an admin's once it has passed the
+authenticator-app code (Supabase TOTP, assurance level `aal2`): until then the
+admin panel and the admin API answer as they do to anyone who is not an admin.
+Sessions that did not begin with a password are not asked: a doctor-admin who
+signs in by phone code, and the smoke check's own sign-in (`/api/login/ci`).
+
+**It is off.** Turning it on before every password account has enrolled locks
+that account out of /admin. Order: build (this is step 1 of 3: the check, with
+the flag off), enrolment and the code step at sign-in, recovery for a lost
+factor; then each password admin enrols, then the flag goes on.
+
 ### What this does not have
 
 **MFA is not enforced.** Supabase can enrol TOTP, but `signInWithPassword`
