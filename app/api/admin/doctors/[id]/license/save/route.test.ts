@@ -77,13 +77,15 @@ const MIRROR = {
   synced_at: "2026-10-19T03:00:00Z",
 };
 
-async function call(body: unknown) {
+// A changed number needs a reason, so every call carries one unless the test
+// is about its absence (pass reason: undefined).
+async function call(body: Record<string, unknown>) {
   const { POST } = await import("./route");
   return POST(
     new Request("https://example.test/api/admin/doctors/d1/license/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ reason: "confirmed with the doctor", ...body }),
     }),
     { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000000d1" }) },
   );
@@ -372,5 +374,15 @@ describe("POST .../license/save: the review mark", () => {
   it("does not touch it when the secondary slot is saved: the queue counts the primary", async () => {
     await call({ slot: "secondary", license_number: "12345", region: "PS" });
     expect(updates[0]).not.toHaveProperty("license_reviewed_at");
+  });
+});
+
+describe("POST .../license/save: a changed number needs a reason", () => {
+  it("refuses to change the number without one, and writes nothing", async () => {
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "verified", reason: undefined });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("reason_required");
+    expect(updates).toHaveLength(0);
   });
 });

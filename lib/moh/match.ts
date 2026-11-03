@@ -101,8 +101,8 @@ function cleanSpecialty(s: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-// Both strings are non-empty: nameMatchRule is the only caller and checks.
-function levenshtein(a: string, b: string): number {
+// Both strings must be non-empty (nameMatchRule checks; so does findByName).
+export function levenshtein(a: string, b: string): number {
   let prev = new Array<number>(b.length + 1);
   let curr = new Array<number>(b.length + 1);
   for (let j = 0; j <= b.length; j++) prev[j] = j;

@@ -152,6 +152,12 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     adopted !== null &&
     (adopted.first !== doctor.hebrew_first_name || adopted.family !== doctor.hebrew_family_name);
 
+  // A different number is a change of identity: the log must say what it
+  // rested on (who confirmed it), like accepting a mismatch does.
+  if (numberChanged && stored.number && !body.reason) {
+    return jsonError(400, { error: "reason_required", code: "reason_required" });
+  }
+
   // Nothing to do. Worth saying rather than writing: a no-op update would
   // still fire the licence-slot trigger.
   if (!numberChanged && !statusChanged && !nameChanged) {
