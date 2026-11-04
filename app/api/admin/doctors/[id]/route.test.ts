@@ -8,8 +8,11 @@ let licenseStatus: string | null = "verified";
 let doctorExists = true;
 let readError: unknown = null;
 let updateError: unknown = null;
-/** The metadata of the doctor's last licence correction in the log, if any. */
-let lastCorrection: Record<string, unknown> | null = null;
+/** Whether the log holds a primary licence correction for the doctor. */
+let corrected = false;
+let auditReadError: { code: string } | null = null;
+/** What the route asked the log, to prove the question is the right one. */
+const auditAsks: string[] = [];
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({ id: "00000000-0000-4000-8000-00000000a001" })),
@@ -29,10 +32,11 @@ vi.mock("@/lib/supabase/service", () => ({
         const chain: Record<string, unknown> = {
           maybeSingle: async () =>
             table === "audit_logs"
-              ? { data: lastCorrection ? { metadata: lastCorrection } : null, error: null }
+              ? { data: corrected ? { id: "a1" } : null, error: auditReadError }
               : { data: doctorExists ? { license_verification_status: licenseStatus } : null, error: readError },
         };
-        for (const m of ["eq", "order", "limit"]) chain[m] = () => chain;
+        chain.eq = (col: string, v: unknown) => (table === "audit_logs" && auditAsks.push(`${col}=${String(v)}`), chain);
+        chain.limit = () => chain;
         return chain;
       },
       update(values: Record<string, unknown>) {
@@ -60,7 +64,9 @@ async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") 
 }
 
 beforeEach(() => {
-  lastCorrection = null;
+  corrected = false;
+  auditReadError = null;
+  auditAsks.length = 0;
   updates.length = 0;
   audits.length = 0;
   licenseStatus = "verified";
@@ -133,24 +139,57 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
     expect(updates).toEqual([]);
   });
 
-  // A name found in the registry matched against itself: "verified" says
-  // nothing about who is signing up (issue #16).
-  it("asks for a reason even when verified, if the number was found by the doctor's name", async () => {
-    licenseStatus = "verified";
-    lastCorrection = { via_name_lookup: true };
-    const res = await call({ is_admin_approved: true });
-    expect(res.status).toBe(400);
-    expect((await res.json()).code).toBe("approval_reason_required");
-    expect(updates).toEqual([]);
-    expect((await call({ is_admin_approved: true, approval_reason: "صورة الهوية" })).status).toBe(200);
-  });
+  // A number an admin set by hand (typed, or found by the doctor's own name in
+  // the registry) can read "verified" without saying who the doctor is (#16).
+  describe("a primary number an admin corrected", () => {
+    it("asks for a reason even when the registry confirms it, and says why", async () => {
+      licenseStatus = "verified";
+      corrected = true;
+      const res = await call({ is_admin_approved: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "approval_reason_required", reason_kind: "corrected_number" });
+      expect(updates).toEqual([]);
+    });
 
-  it("does not ask for a number the admin typed, or when there was no correction", async () => {
-    licenseStatus = "verified";
-    lastCorrection = { reason: "x" };
-    expect((await call({ is_admin_approved: true })).status).toBe(200);
-    lastCorrection = null;
-    expect((await call({ is_admin_approved: true })).status).toBe(200);
+    it("looks at this doctor's primary corrections in the log, and nothing else", async () => {
+      licenseStatus = "verified";
+      corrected = true;
+      await call({ is_admin_approved: true });
+      expect(auditAsks).toEqual([
+        "target_doctor_id=00000000-0000-4000-8000-0000000000d1",
+        "action=admin_license_corrected",
+        "metadata->>slot=primary",
+      ]);
+    });
+
+    it("accepts with a reason, and the log says why one was needed", async () => {
+      licenseStatus = "verified";
+      corrected = true;
+      expect((await call({ is_admin_approved: true, approval_reason: "صورة الهوية" })).status).toBe(200);
+      expect(audits[0]).toMatchObject({ metadata: { approval_reason: "صورة الهوية", number_corrected_by_admin: true } });
+    });
+
+    it("asks nothing of a doctor whose number nobody corrected", async () => {
+      licenseStatus = "verified";
+      expect((await call({ is_admin_approved: true })).status).toBe(200);
+      expect(updates[0]).toEqual({ is_admin_approved: true });
+    });
+
+    it("does not look in the log for an unconfirmed licence, which asks anyway, or when not approving", async () => {
+      licenseStatus = "not_found";
+      expect((await (await call({ is_admin_approved: true })).json()).reason_kind).toBeUndefined();
+      licenseStatus = "verified";
+      await call({ is_visible: false });
+      await call({ is_admin_approved: false });
+      expect(auditAsks).toEqual([]);
+    });
+
+    it("refuses rather than approving when the log cannot be read", async () => {
+      licenseStatus = "verified";
+      auditReadError = { code: "XX000" };
+      expect((await call({ is_admin_approved: true })).status).toBe(500);
+      expect(updates).toEqual([]);
+    });
   });
 
   it("accepts with a reason, and keeps it in the log", async () => {

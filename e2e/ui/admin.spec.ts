@@ -36,6 +36,26 @@ test.describe("accepting a doctor", () => {
     await expect(p.getByText("طالب القبول").first()).toBeVisible();
     await doctor.close();
   });
+
+  // The registry says "verified", but an admin set the number by hand: the
+  // match says nothing about who the doctor is, so accepting asks why.
+  test("asks for a reason when an admin set the verified number by hand", async ({ page }) => {
+    await serviceClient().from("audit_logs").insert({
+      action: "admin_license_corrected",
+      target_doctor_id: waiting.id,
+      metadata: { slot: "primary", via_name_lookup: true },
+    });
+    await page.goto("/admin?status=pending&q=طالب");
+    await expect(page.getByText("طالب القبول")).toBeVisible();
+    await page.getByRole("button", { name: "قبول العضوية" }).click();
+    await expect(page.getByText(/حدّدته الإدارة بيدها/)).toBeVisible();
+    expect((await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved).toBe(false);
+    await page.getByLabel("سبب القبول").fill("تأكّدت من صورة الترخيص");
+    await page.getByRole("button", { name: "قبول العضوية" }).last().click();
+    await expect
+      .poll(async () => (await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved)
+      .toBe(true);
+  });
 });
 
 test("the panel opens from the activity log", async ({ page }) => {

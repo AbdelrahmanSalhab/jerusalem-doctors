@@ -9,7 +9,7 @@
 // and one line saying whether the doctor is actually findable right now.
 
 import { useState } from "react";
-import { ApprovalReasonPrompt } from "./ApprovalReasonPrompt";
+import { ApprovalReasonPrompt, type PatchResult, type ReasonKind } from "./ApprovalReasonPrompt";
 import {
   directoryVisibility,
   STATE_GROUP_HEADING,
@@ -35,9 +35,10 @@ export function StateSwitches({
 }: {
   doctor: SwitchDoctor;
   busy: boolean;
-  onPatch: (body: Record<string, unknown>) => Promise<boolean | "reason">;
+  onPatch: (body: Record<string, unknown>) => Promise<PatchResult>;
 }) {
   const [asking, setAsking] = useState(false);
+  const [kind, setKind] = useState<ReasonKind>("unconfirmed");
   const visibility = directoryVisibility(doctor);
   const value = (field: StateField) => doctor[field];
 
@@ -45,11 +46,15 @@ export function StateSwitches({
     const next = !value(field);
     // Accepting an unverified licence is the one change that wants a reason.
     if (field === "is_admin_approved" && next && approvalNeedsReason(doctor.license_verification_status)) {
+      setKind("unconfirmed");
       setAsking(true);
       return;
     }
     void onPatch({ [field]: next }).then((r) => {
-      if (r === "reason") setAsking(true);
+      if (typeof r === "object") {
+        setKind(r.ask);
+        setAsking(true);
+      }
     });
   };
 
@@ -111,6 +116,7 @@ export function StateSwitches({
           status={doctor.license_verification_status}
           region={doctor.license_region}
           busy={busy}
+          kind={kind}
           onCancel={() => setAsking(false)}
           onConfirm={async (reason) => {
             const ok = await onPatch({ is_admin_approved: true, approval_reason: reason });

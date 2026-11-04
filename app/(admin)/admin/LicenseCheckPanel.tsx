@@ -68,9 +68,12 @@ export function LicenseCheckPanel({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-  const [byName, setByName] = useState<{ hasName: boolean; candidates: NameCandidate[]; more: boolean } | null>(null);
+  const [byName, setByName] = useState<{ hasName: boolean; candidates: NameCandidate[]; more: boolean; familyCut: boolean } | null>(null);
   // The number being checked came from the by-name list, not from the admin.
   const [viaName, setViaName] = useState(false);
+  // The server asked for a reason the panel did not expect (the stored number
+  // moved under it), so the box must appear.
+  const [reasonRequired, setReasonRequired] = useState(false);
 
   const post = async (path: "check" | "save" | "find-by-name", body: Record<string, unknown>) => {
     const res = await fetch(`/api/admin/doctors/${doctorId}/license/${path}`, {
@@ -90,6 +93,7 @@ export function LicenseCheckPanel({
     setOverride(false);
     setReason("");
     setViaName(fromList);
+    setReasonRequired(false);
     try {
       const { ok, payload } = await post("check", { slot, license_number: n, region });
       if (!ok) {
@@ -120,7 +124,7 @@ export function LicenseCheckPanel({
         setError(apiErrorMessage(payload?.code, "تعذّر البحث. حاول مجددًا."));
         return;
       }
-      setByName({ hasName: payload.has_name, candidates: payload.candidates, more: payload.more === true });
+      setByName({ hasName: payload.has_name, candidates: payload.candidates, more: payload.more === true, familyCut: payload.familyCut === true });
     } catch {
       setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
     } finally {
@@ -142,10 +146,11 @@ export function LicenseCheckPanel({
         expected_status: result.column_status,
         ...(adoptName ? { adopt_registry_name: true } : {}),
         ...(override ? { override_name_mismatch: true } : {}),
-        ...((override || changesNumber) && reason.trim() ? { reason: reason.trim() } : {}),
+        ...((override || changesNumber || reasonRequired) && reason.trim() ? { reason: reason.trim() } : {}),
         ...(viaName && changesNumber ? { source: "name_lookup" } : {}),
       });
       if (!ok) {
+        if (payload?.code === "reason_required") setReasonRequired(true);
         setError(fieldErrorMessage(payload?.fields) ?? apiErrorMessage(payload?.code, "تعذّر الحفظ. حاول مجددًا."));
         return;
       }
@@ -188,7 +193,8 @@ export function LicenseCheckPanel({
   const ourName = result ? `${result.our_name.firstName ?? ""} ${result.our_name.familyName ?? ""}`.trim() : "";
   const adoptable = Boolean(result?.adoptable_name);
   const mismatch = result?.status === "name_mismatch";
-  const reasonOk = !(override || changesNumber) || reason.trim().length >= 3;
+  const needsReason = override || changesNumber || reasonRequired;
+  const reasonOk = !needsReason || reason.trim().length >= 3;
   const canSave = Boolean(result) && (!mismatch || override) && reasonOk;
 
   return (
@@ -200,7 +206,7 @@ export function LicenseCheckPanel({
         {region === "IL" && (
           <p className="text-xs text-muted">أدخله كما في سجل الوزارة، مثل 1-189371 أو 189371.</p>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             id={`lic-${slot}`}
             dir="ltr"
@@ -264,7 +270,7 @@ export function LicenseCheckPanel({
           {!byName.hasName ? (
             <p>لا يوجد اسم عبري محفوظ لهذا الطبيب، فلا يمكن البحث بالاسم.</p>
           ) : byName.candidates.length === 0 ? (
-            <p>لا يوجد في السجل أحد بهذا الاسم العائلي.</p>
+            <p>لا يوجد في السجل أحد باسم العائلة هذا.</p>
           ) : (
             <ul className="flex flex-col gap-1.5">
               {byName.candidates.map((c) => (
@@ -282,9 +288,7 @@ export function LicenseCheckPanel({
                       : c.kind === "swapped"
                         ? "الاسم الأول واسم العائلة مقلوبان"
                         : "نفس اسم العائلة فقط"}
-                    {c.distance !== null && c.distance >= 1 && c.distance <= 2
-                      ? ` · يختلف بـ ${c.distance} من الأرقام`
-                      : ""}
+                    {c.distance === 1 ? " · يختلف في رقم واحد" : c.distance === 2 ? " · يختلف في رقمين" : ""}
                   </span>
                   {c.heldBy && (
                     <span className="text-xs text-danger">مسجَّل لـ د. {c.heldBy.name}</span>
@@ -297,7 +301,7 @@ export function LicenseCheckPanel({
                     <button
                       type="button"
                       disabled={busy}
-                      aria-label={`فحص الرقم ${c.licenseNumber}`}
+                      aria-label={`فحص هذا الرقم ${c.licenseNumber}`}
                       onClick={() => {
                         setNumber(c.licenseNumber);
                         search(c.licenseNumber, true);
@@ -311,8 +315,10 @@ export function LicenseCheckPanel({
               ))}
             </ul>
           )}
-          {byName.more && (
-            <p className="text-xs text-muted">القائمة مقتطعة: في السجل أسماء أخرى مشابهة لم تُعرض. اكتب الرقم إن عرفته.</p>
+          {byName.more ? (
+            <p className="text-xs text-muted">القائمة مقتطعة: في السجل أسماء مطابقة أخرى لم تُعرض. اكتب الرقم إن عرفته.</p>
+          ) : (
+            byName.familyCut && <p className="text-xs text-muted">عُرض الأقرب فقط من أصحاب اسم العائلة نفسه.</p>
           )}
         </div>
       )}
@@ -354,16 +360,18 @@ export function LicenseCheckPanel({
             <span className={toneChip(result.explanation.tone)}>{licenseStatusLabel(result.column_status)}</span>
           </p>
 
-          {changesNumber && !mismatch && (
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={2}
-              maxLength={300}
-              aria-label="سبب تغيير الرقم"
-              placeholder="سبب تغيير الرقم، مثل: كلّمت الطبيب وأكّد الرقم الصحيح."
-              className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
-            />
+          {(changesNumber || reasonRequired) && !mismatch && (
+            <label className="flex flex-col gap-1">
+              <span className="font-medium">سبب تغيير الرقم</span>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                maxLength={300}
+                placeholder="مثل: تأكّدت من صورة الترخيص أو من الطبيب بوسيلة مستقلة."
+                className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
+              />
+            </label>
           )}
 
           {mismatch && (
@@ -378,15 +386,17 @@ export function LicenseCheckPanel({
                 <span>أتحمّل مسؤولية الحفظ رغم اختلاف الاسم</span>
               </label>
               {override && (
-                <textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={2}
-                  maxLength={300}
-                  aria-label="سبب الحفظ"
-                  placeholder="مثال: راجعت صورة الترخيص مع الطبيب."
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
-                />
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium">سبب الحفظ</span>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={2}
+                    maxLength={300}
+                    placeholder="مثال: راجعت صورة الترخيص مع الطبيب."
+                    className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
+                  />
+                </label>
               )}
             </div>
           )}

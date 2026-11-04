@@ -193,23 +193,7 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     updates.license_reviewed_at = new Date().toISOString();
   }
 
-  const r = await service.from("doctors").update(updates).eq("id", id);
-  if (r.error) {
-    if ((r.error as { code?: string }).code === UNIQUE_VIOLATION) {
-      const held = (await findDuplicate(service, id, region, outcome.checkedNumber))?.name || null;
-      return jsonError(409, {
-        error: "duplicate_license",
-        code: "duplicate_license",
-        fields: {
-          license_number: `${outcome.checkedNumber} مسجَّل مسبقًا لطبيب آخر${held ? ` (د. ${held})` : ""}. لا يمكن أن يحمل رقمًا واحدًا طبيبان.`,
-        },
-      });
-    }
-    console.error("[admin.license.save] update failed", r.error);
-    return jsonError(500, { error: "update_failed", code: "update_failed" });
-  }
-
-  await writeAudit(service, {
+  const auditRow = {
     actor_doctor_id: admin.id,
     action: numberChanged ? "admin_license_corrected" : "admin_license_rechecked",
     target_doctor_id: id,
@@ -235,7 +219,42 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
       ...(numberChanged && body.source ? { via_name_lookup: true } : {}),
       ...(body.reason ? { reason: body.reason } : {}),
     },
-  });
+  };
+
+  // A changed number is recorded before it is stored: approving the doctor
+  // later asks about the log entry, so a number must never be stored without
+  // one. If the store then fails, the entry is withdrawn.
+  let auditId: string | null = null;
+  if (numberChanged) {
+    const logged = await service.from("audit_logs").insert(auditRow).select("id").single();
+    if (logged.error || !logged.data) {
+      console.error("[admin.license.save] audit failed", logged.error);
+      return jsonError(500, { error: "update_failed", code: "update_failed" });
+    }
+    auditId = logged.data.id as string;
+  }
+  const withdrawAudit = async () => {
+    if (auditId) await service.from("audit_logs").delete().eq("id", auditId);
+  };
+
+  const r = await service.from("doctors").update(updates).eq("id", id);
+  if (r.error) {
+    await withdrawAudit();
+    if ((r.error as { code?: string }).code === UNIQUE_VIOLATION) {
+      const held = (await findDuplicate(service, id, region, outcome.checkedNumber))?.name || null;
+      return jsonError(409, {
+        error: "duplicate_license",
+        code: "duplicate_license",
+        fields: {
+          license_number: `${outcome.checkedNumber} مسجَّل مسبقًا لطبيب آخر${held ? ` (د. ${held})` : ""}. لا يمكن أن يحمل رقمًا واحدًا طبيبان.`,
+        },
+      });
+    }
+    console.error("[admin.license.save] update failed", r.error);
+    return jsonError(500, { error: "update_failed", code: "update_failed" });
+  }
+
+  if (!numberChanged) await writeAudit(service, auditRow);
 
   return jsonOk({
     ok: true,

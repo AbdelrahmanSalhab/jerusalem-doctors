@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updates: Record<string, unknown>[] = [];
 const audits: Record<string, unknown>[] = [];
+/** What touched the database, in order, to prove the log entry comes first. */
+const order: string[] = [];
+const deletedAudits: string[] = [];
+let auditInsertError: { message: string } | null = null;
 
 let doctor: Record<string, unknown> | null = null;
 let mirrorRows: Record<string, unknown>[] = [];
@@ -33,12 +37,24 @@ vi.mock("@/lib/supabase/service", () => ({
           Promise.resolve({ data: table === "moh_practitioners" ? mirrorRows : [], error: null }).then(ok),
         update(values: Record<string, unknown>) {
           updates.push(values);
+          order.push("update");
           return { eq: async () => ({ error: updateError }) };
         },
-        insert: async (row: Record<string, unknown>) => {
-          if (table === "audit_logs") audits.push(row);
-          return { error: null };
+        insert(row: Record<string, unknown>) {
+          if (table !== "audit_logs") return Promise.resolve({ error: null });
+          if (!auditInsertError) audits.push(row);
+          order.push("audit");
+          const done = Promise.resolve({ error: auditInsertError });
+          return Object.assign(done, {
+            select: () => ({ single: async () => ({ data: auditInsertError ? null : { id: "a1" }, error: auditInsertError }) }),
+          });
         },
+        delete: () => ({
+          eq: async (_col: string, id: string) => {
+            deletedAudits.push(id);
+            return { error: null };
+          },
+        }),
       };
       for (const m of ["select", "eq", "neq", "in", "or", "order", "limit"]) {
         chain[m] = () => chain;
@@ -94,6 +110,9 @@ async function call(body: Record<string, unknown>) {
 beforeEach(() => {
   updates.length = 0;
   audits.length = 0;
+  order.length = 0;
+  deletedAudits.length = 0;
+  auditInsertError = null;
   doctor = { ...DOCTOR };
   mirrorRows = [];
   duplicateRow = null;
@@ -447,5 +466,40 @@ describe("POST .../license/save: a number found by name", () => {
 
   it("refuses any other source", async () => {
     expect((await call({ slot: "primary", license_number: "189371", source: "guess" })).status).toBe(400);
+  });
+});
+
+describe("POST .../license/save: the log entry is what approval later asks about", () => {
+  it("is written before the number is stored", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371" });
+    expect(order).toEqual(["audit", "update"]);
+  });
+
+  it("stores nothing when the entry cannot be written", async () => {
+    mirrorRows = [MIRROR];
+    auditInsertError = { message: "boom" };
+    const res = await call({ slot: "primary", license_number: "189371" });
+    expect(res.status).toBe(500);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("withdraws the entry when the number then cannot be stored, so the log does not claim a change", async () => {
+    mirrorRows = [MIRROR];
+    updateError = { code: "23505" };
+    const res = await call({ slot: "primary", license_number: "189371" });
+    expect(res.status).toBe(409);
+    expect(deletedAudits).toEqual(["a1"]);
+    updateError = { code: "XX000" };
+    expect((await call({ slot: "primary", license_number: "189371" })).status).toBe(500);
+    expect(deletedAudits).toEqual(["a1", "a1"]);
+  });
+
+  it("still writes a recheck after the status is stored, and withdraws nothing", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371" });
+    expect(order).toEqual(["update", "audit"]);
+    expect(deletedAudits).toEqual([]);
   });
 });

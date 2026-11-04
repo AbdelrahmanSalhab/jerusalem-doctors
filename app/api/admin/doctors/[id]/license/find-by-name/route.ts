@@ -37,7 +37,7 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
   const found = await service.from("doctors").select(LICENSE_ROW_COLUMNS).eq("id", id).maybeSingle();
   if (found.error && found.error.code !== "PGRST116") {
     console.error("[admin.license.find-by-name] read failed", found.error);
-    return jsonError(500, { error: "update_failed", code: "update_failed" });
+    return jsonError(500, { error: "internal_error", code: "internal_error" });
   }
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
 
@@ -45,8 +45,8 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
   const stored = storedSlot(doctor, body.data.slot);
   const hasName = Boolean(normalizeHebrew(doctor.hebrew_first_name ?? "") && normalizeHebrew(doctor.hebrew_family_name ?? ""));
   // A Palestinian licence has no registry to be found in.
-  if ((stored.region ?? doctor.license_region) === "PS") return jsonOk({ has_name: hasName, candidates: [], more: false });
+  if ((stored.region ?? doctor.license_region) === "PS") return jsonOk({ has_name: hasName, candidates: [], more: false, familyCut: false });
 
-  const { candidates, more } = await findByName(service, doctor, stored.number ?? "");
-  return jsonOk({ has_name: hasName, candidates, more });
+  const { candidates, more, familyCut } = await findByName(service, doctor, stored.number ?? "");
+  return jsonOk({ has_name: hasName, candidates, more, familyCut });
 });

@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { levenshtein } from "@/lib/moh/match";
 import { normalizeHebrew } from "@/lib/normalize/hebrew";
+import { canonicalLicenseNumber } from "@/lib/normalize/license";
 
 /** Same family name, other first name: shown, but a weaker lead. */
 const FAMILY_LIMIT = 8;
@@ -37,8 +38,10 @@ export interface NameCandidate {
 
 export interface NameLookup {
   candidates: NameCandidate[];
-  /** The list was cut: more people in the registry fit than are shown. */
+  /** Exact or swapped names were cut: more people with this name than are shown. */
   more: boolean;
+  /** Only the closest of the same-family names are shown, as always for a big family. */
+  familyCut: boolean;
 }
 
 interface Row {
@@ -63,7 +66,7 @@ export async function findByName(
 ): Promise<NameLookup> {
   const first = normalizeHebrew(doctor.hebrew_first_name ?? "");
   const family = normalizeHebrew(doctor.hebrew_family_name ?? "");
-  if (!first || !family) return { candidates: [], more: false };
+  if (!first || !family) return { candidates: [], more: false, familyCut: false };
 
   const columns =
     "license_number, hebrew_first_name, hebrew_family_name, hebrew_first_norm, hebrew_family_norm, specialty_name_he";
@@ -82,7 +85,7 @@ export async function findByName(
     read(families, firsts).limit(NAME_LIMIT + 1),
     // A doctor who typed the family name where the first goes. A name that
     // reads the same both ways has no swapped reading.
-    first === family
+    firsts.some((f) => families.includes(f))
       ? Promise.resolve({ data: [] as Row[], error: null })
       : read(firsts, families).limit(NAME_LIMIT + 1),
     // Every other first name in the family, ranked here by how close the first
@@ -93,27 +96,27 @@ export async function findByName(
     if (r.error) throw new Error(`moh_practitioners read failed: ${r.error.message}`);
   }
 
-  const digits = storedNumber.replace(/\D/g, "");
+  // The stored number may carry the profession prefix or zeros the registry's
+  // serial does not.
+  const digits = canonicalLicenseNumber("IL", storedNumber) ?? storedNumber.replace(/\D/g, "");
   const gap = (r: Row) => (digits ? levenshtein(digits, String(r.license_number)) : Infinity);
   const nearest = (a: Row, b: Row) => gap(a) - gap(b) || byNumber(a, b);
 
-  const exactRows = ((exact.data ?? []) as Row[]).sort(nearest);
-  const swappedRows = ((swapped.data ?? []) as Row[]).sort(nearest);
-  const familyRows = ((others.data ?? []) as Row[])
+  const exactRows = [...((exact.data ?? []) as Row[])].sort(nearest);
+  const swappedRows = [...((swapped.data ?? []) as Row[])].sort(nearest);
+  const familyRows = [...((others.data ?? []) as Row[])]
     .filter((r) => !firsts.includes(r.hebrew_first_norm))
     .sort((a, b) => levenshtein(first, a.hebrew_first_norm) - levenshtein(first, b.hebrew_first_norm) || nearest(a, b));
   const more =
-    exactRows.length > NAME_LIMIT ||
-    swappedRows.length > NAME_LIMIT ||
-    familyRows.length > FAMILY_LIMIT ||
-    (others.data ?? []).length >= FAMILY_READ;
+    exactRows.length > NAME_LIMIT || swappedRows.length > NAME_LIMIT || (others.data ?? []).length >= FAMILY_READ;
+  const familyCut = familyRows.length > FAMILY_LIMIT;
 
   const picked = [
     ...exactRows.slice(0, NAME_LIMIT).map((r) => ({ r, kind: "exact" as const })),
     ...swappedRows.slice(0, NAME_LIMIT).map((r) => ({ r, kind: "swapped" as const })),
     ...familyRows.slice(0, FAMILY_LIMIT).map((r) => ({ r, kind: "family" as const })),
   ];
-  if (picked.length === 0) return { candidates: [], more };
+  if (picked.length === 0) return { candidates: [], more, familyCut };
 
   const numbers = picked.map(({ r }) => String(r.license_number));
   const held = await service
@@ -148,5 +151,5 @@ export async function findByName(
       own: digits === n ? "stored" : mine ? "other_slot" : null,
     };
   });
-  return { candidates, more };
+  return { candidates, more, familyCut };
 }

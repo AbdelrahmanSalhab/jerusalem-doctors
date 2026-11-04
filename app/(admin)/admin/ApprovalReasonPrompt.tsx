@@ -1,8 +1,10 @@
 "use client";
 
 // Asked before accepting a doctor whose licence is not an exact registry
-// match. Shared by the list row and the panel so neither can send an approval
-// the API will refuse for a missing reason.
+// match, or whose number an admin set by hand (typed or found by name), which
+// can read "verified" without being independent of the name. Shared by the
+// list row and the panel so neither can send an approval the API will refuse
+// for a missing reason.
 //
 // The point is not to slow the admin down. It is that "not in the registry"
 // and "the name is spelled differently" are decisions someone made for a
@@ -12,6 +14,12 @@ import { useState } from "react";
 import { licenseStatusLabel, PS_LABEL } from "@/lib/licenseStatus";
 
 export const REASON_MIN = 3;
+
+/** Why the API wants a reason: the row shows the status, only the server knows
+ *  the number was corrected by hand. */
+export type ReasonKind = "unconfirmed" | "corrected_number";
+/** What an approval attempt gives back: done, failed, or "ask for a reason". */
+export type PatchResult = boolean | { ask: ReasonKind };
 export const REASON_TOO_SHORT = "اكتب سببًا من 3 أحرف على الأقل.";
 
 export function ApprovalReasonPrompt({
@@ -19,6 +27,7 @@ export function ApprovalReasonPrompt({
   status,
   region,
   busy,
+  kind = "unconfirmed",
   onCancel,
   onConfirm,
 }: {
@@ -26,6 +35,7 @@ export function ApprovalReasonPrompt({
   status: string | null;
   region: string | null;
   busy: boolean;
+  kind?: ReasonKind;
   onCancel: () => void;
   onConfirm: (reason: string) => Promise<boolean>;
 }) {
@@ -53,8 +63,8 @@ export function ApprovalReasonPrompt({
       <div>
         <p className="font-semibold">سبب القبول</p>
         <p className="text-foreground/80">
-          {status === "verified"
-            ? `رقم ترخيص د. ${name} وُجد بالبحث بالاسم، والاسم وحده لا يثبت الهوية. اكتب كيف تأكّدت منه (صورة الترخيص أو الهوية أو مكان العمل)؛ يُحفظ في سجل النشاط.`
+          {kind === "corrected_number"
+            ? `رقم ترخيص د. ${name} حدّدته الإدارة بيدها (كتابةً أو بالبحث بالاسم)، وتطابقه مع السجل لا يثبت الهوية. اكتب كيف تأكّدت منه (صورة الترخيص أو الهوية أو مكان العمل)؛ يُحفظ في سجل النشاط.`
             : `ترخيص د. ${name} ليس مطابقًا لسجل الوزارة (الحالة: ${label}). اكتب سببًا قصيرًا للقبول؛ يُحفظ في سجل النشاط.`}
         </p>
       </div>

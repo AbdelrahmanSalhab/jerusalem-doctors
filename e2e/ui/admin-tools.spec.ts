@@ -43,7 +43,7 @@ test.describe("licence correction", () => {
     await page.getByRole("button", { name: "بحث بالاسم" }).click();
     await expect(page.getByText("أرقام في السجل بهذا الاسم")).toBeVisible();
     await expect(page.getByText("510030")).toBeVisible();
-    await page.getByRole("button", { name: /^فحص الرقم/ }).first().click();
+    await page.getByRole("button", { name: /^فحص هذا الرقم/ }).first().click();
     await expect(page.getByText("نتيجة البحث")).toBeVisible();
     await page.getByLabel("سبب تغيير الرقم").fill("اتصلت بالطبيب وأكّد الرقم");
     await page.getByRole("button", { name: "حفظ هذا الرقم" }).click();

@@ -9,6 +9,8 @@ export interface ApiErrorBody {
   error: string;
   code?: string;
   fields?: Record<string, string>;
+  /** Why a reason is wanted, when the client words the question by it. */
+  reason_kind?: "corrected_number";
 }
 
 export function jsonOk<T>(data: T, init?: ResponseInit): NextResponse {

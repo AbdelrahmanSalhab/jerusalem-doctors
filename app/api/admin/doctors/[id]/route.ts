@@ -22,18 +22,25 @@ import { approvalNeedsReason } from "@/lib/licenseStatus";
 
 const APPROVAL_REASON_MIN = 3;
 
-/** The last licence correction for this doctor came from a find-by-name list. */
-async function numberFoundByName(service: SupabaseClient, id: string): Promise<boolean> {
+/**
+ * An admin has set this doctor's primary number by hand. Such a number can
+ * read "verified" without being independent of the name it was found by
+ * (the name list) or told to us (a typed correction), so approving the doctor
+ * is asked about like an unconfirmed licence. Any correction counts, not only
+ * the latest: a later typed fix does not make an earlier lookup any more
+ * independent. The secondary slot is not part of approval.
+ */
+async function primaryNumberCorrected(service: SupabaseClient, id: string): Promise<boolean> {
   const r = await service
     .from("audit_logs")
-    .select("metadata")
+    .select("id")
     .eq("target_doctor_id", id)
     .eq("action", "admin_license_corrected")
-    .order("created_at", { ascending: false })
+    .eq("metadata->>slot", "primary")
     .limit(1)
     .maybeSingle();
   if (r.error && r.error.code !== "PGRST116") throw r.error;
-  return (r.data?.metadata as { via_name_lookup?: boolean } | null)?.via_name_lookup === true;
+  return Boolean(r.data);
 }
 
 const Body = z.object({
@@ -100,11 +107,16 @@ export const PATCH = withJsonErrors(async (
 
   // Accepting a doctor the registry does not confirm is a judgement call, and
   // the log should say what it rested on.
-  // A number found by the doctor's own name reads "verified" without being
-  // independent of the name, so it is asked about like an unconfirmed one.
-  const foundByName = fields.is_admin_approved === true && !approval_reason && (await numberFoundByName(service, id));
-  if (fields.is_admin_approved === true && (approvalNeedsReason(licenseStatus) || foundByName) && !approval_reason) {
-    return jsonError(400, { error: "approval_reason_required", code: "approval_reason_required" });
+  const approving = fields.is_admin_approved === true;
+  const unconfirmed = approving && approvalNeedsReason(licenseStatus);
+  // Only looked up when it can change the answer.
+  const corrected = approving && !unconfirmed && (await primaryNumberCorrected(service, id));
+  if ((unconfirmed || corrected) && !approval_reason) {
+    return jsonError(400, {
+      error: "approval_reason_required",
+      code: "approval_reason_required",
+      ...(corrected ? { reason_kind: "corrected_number" as const } : {}),
+    });
   }
 
   // The columns this route may write, named one by one and checked against
@@ -140,7 +152,7 @@ export const PATCH = withJsonErrors(async (
     metadata: {
       ...fields,
       ...(approval_reason && fields.is_admin_approved === true
-        ? { approval_reason, license_status_at_approval: licenseStatus }
+        ? { approval_reason, license_status_at_approval: licenseStatus, ...(corrected ? { number_corrected_by_admin: true } : {}) }
         : {}),
     },
   });

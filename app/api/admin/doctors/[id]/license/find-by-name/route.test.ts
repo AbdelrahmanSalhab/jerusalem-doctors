@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const gate = vi.hoisted(() => ({ admin: true, allowed: true }));
 const lookup = vi.hoisted(() => ({
-  find: vi.fn(async (...args: unknown[]) => (void args, { candidates: [{ licenseNumber: "189317" }], more: false })),
+  find: vi.fn(async (...args: unknown[]) => (void args, { candidates: [{ licenseNumber: "189317" }], more: false, familyCut: false })),
 }));
 let doctor: Record<string, unknown> | null = null;
 const writes: string[] = [];
@@ -70,7 +70,7 @@ describe("POST .../license/find-by-name", () => {
   it("returns the candidates and writes nothing", async () => {
     const res = await call();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ has_name: true, candidates: [{ licenseNumber: "189317" }], more: false });
+    expect(await res.json()).toEqual({ has_name: true, candidates: [{ licenseNumber: "189317" }], more: false, familyCut: false });
     expect(writes).toEqual([]);
   });
 
@@ -102,7 +102,7 @@ describe("POST .../license/find-by-name", () => {
 
   it("finds nothing for a Palestinian licence, which has no registry, and does not look", async () => {
     doctor = { ...doctor, secondary_license_region: "PS" };
-    expect(await (await call(ID, { slot: "secondary" })).json()).toEqual({ has_name: true, candidates: [], more: false });
+    expect(await (await call(ID, { slot: "secondary" })).json()).toEqual({ has_name: true, candidates: [], more: false, familyCut: false });
     expect(lookup.find).not.toHaveBeenCalled();
   });
 

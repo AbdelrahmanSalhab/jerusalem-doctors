@@ -16,6 +16,7 @@ const row = (license_number: number, first: string, family: string) => ({
 const ROWS = [row(189317, "דניאל", "דריפוס"), row(222222, "משה", "דריפוס")];
 
 const calls: { table: string; filters: string[] }[] = [];
+const NONE = { candidates: [], more: false, familyCut: false };
 
 function service(
   opts: {
@@ -47,7 +48,9 @@ function service(
         return { data: rows ?? [], error: null };
       };
       const chain: Record<string, unknown> = { then: (ok: (v: unknown) => unknown) => Promise.resolve(result()).then(ok) };
-      for (const m of ["select", "order", "limit"]) chain[m] = () => chain;
+      chain.select = () => chain;
+      chain.order = (col: string) => (call.filters.push(`order:${col}`), chain);
+      chain.limit = (n: number) => (call.filters.push(`limit:${n}`), chain);
       for (const m of ["eq", "neq", "in"]) {
         chain[m] = (col: string, v: unknown) => (call.filters.push(`${m}:${col}=${Array.isArray(v) ? v.join("|") : String(v)}`), chain);
       }
@@ -69,8 +72,8 @@ describe("findByName", () => {
   it("asks for the exact name on its own, so a large family cannot push it out", async () => {
     await findByName(service({ exact: EXACT, family: FAMILY }), DOC, "189371");
     const registry = calls.filter((c) => c.table === "moh_practitioners").map((c) => c.filters);
-    expect(registry).toContainEqual(["in:hebrew_family_norm=דריפוס", "in:hebrew_first_norm=דניאל"]);
-    expect(registry).toContainEqual(["in:hebrew_family_norm=דריפוס"]);
+    expect(registry).toContainEqual(["in:hebrew_family_norm=דריפוס", "in:hebrew_first_norm=דניאל", "order:license_number", "limit:21"]);
+    expect(registry).toContainEqual(["in:hebrew_family_norm=דריפוס", "order:license_number", "limit:1000"]);
   });
 
   it("puts the exact name first and says how many digits it is off", async () => {
@@ -94,6 +97,29 @@ describe("findByName", () => {
     expect(calls.filter((c) => c.table === "moh_practitioners")).toHaveLength(2);
   });
 
+  it("treats two names that differ only by a hyphen or a space as the same word", async () => {
+    await findByName(service(), { ...DOC, hebrew_first_name: "כהן לוי", hebrew_family_name: "כהן-לוי" }, "1");
+    expect(calls.filter((c) => c.table === "moh_practitioners")).toHaveLength(2);
+  });
+
+  it("measures from the registry's serial when the stored number carries the profession prefix", async () => {
+    const { candidates } = await findByName(service({ exact: [row(189371, "דניאל", "דריפוס")], family: [row(189371, "דניאל", "דריפוס")] }), DOC, "1-189371");
+    expect(candidates[0]).toMatchObject({ distance: 0, own: "stored" });
+  });
+
+  it("does not change the rows the database handed back", async () => {
+    const family = [row(300, "משה", "דריפוס"), row(100, "משי", "דריפוס")];
+    const before = JSON.stringify(family);
+    await findByName(service({ family }), DOC, "1");
+    expect(JSON.stringify(family)).toBe(before);
+  });
+
+  it("sorts without a stored number to measure from", async () => {
+    const { candidates } = await findByName(service({ exact: [row(300, "דניאל", "דריפוס"), row(100, "דניאל", "דריפוס")], family: [] }), DOC, "");
+    expect(candidates.map((c) => c.licenseNumber)).toEqual(["100", "300"]);
+    expect(candidates[0].distance).toBeNull();
+  });
+
   it("also tries a double-barrelled name written with a space or a hyphen", async () => {
     await findByName(service(), { ...DOC, hebrew_family_name: "כהן-לוי" }, "1");
     const familyIn = calls.flatMap((c) => c.filters).filter((f) => f.startsWith("in:hebrew_family_norm=כהן"));
@@ -108,11 +134,18 @@ describe("findByName", () => {
     ];
     const doc = { id: "d1", hebrew_first_name: "דניאל", hebrew_family_name: "כהן" };
 
-    it("keeps the closest first name, not the lowest licence numbers, and says the list was cut", async () => {
-      const { candidates, more } = await findByName(service({ family: big }), doc, "1");
+    it("keeps the closest first name, not the lowest licence numbers, and says only the closest family names show", async () => {
+      const { candidates, more, familyCut } = await findByName(service({ family: big }), doc, "1");
       expect(candidates).toHaveLength(8);
       expect(candidates[0]).toMatchObject({ licenseNumber: "999999", kind: "family" });
-      expect(more).toBe(true);
+      expect(familyCut).toBe(true);
+      // No exact name was left out, so this is not the alarming kind of cut.
+      expect(more).toBe(false);
+    });
+
+    it("warns when the family read itself hit its cap, so an exact-looking name could be missing", async () => {
+      const capped = Array.from({ length: 1000 }, (_, i) => row(300000 + i, `שם${i}`, "כהן"));
+      expect((await findByName(service({ family: capped }), doc, "1")).more).toBe(true);
     });
 
     it("does not offer the exact first name a second time as a family match", async () => {
@@ -125,6 +158,7 @@ describe("findByName", () => {
       const { candidates, more } = await findByName(service({ exact: many, family: many }), doc, "1");
       expect(candidates).toHaveLength(20);
       expect(more).toBe(true);
+      expect(candidates.map((c) => c.licenseNumber)).not.toContain("200020");
     });
 
     it("does not say it when everything fit", async () => {
@@ -166,15 +200,12 @@ describe("findByName", () => {
   });
 
   it("finds nothing for a doctor with no Hebrew name, without asking the registry", async () => {
-    expect(await findByName(service({ readError: true }), { ...DOC, hebrew_first_name: null }, "1")).toEqual({
-      candidates: [],
-      more: false,
-    });
+    expect(await findByName(service({ readError: true }), { ...DOC, hebrew_first_name: null }, "1")).toEqual(NONE);
     expect(calls).toHaveLength(0);
   });
 
   it("finds nothing when no one in the registry shares the family name", async () => {
-    expect(await findByName(service(), DOC, "189371")).toEqual({ candidates: [], more: false });
+    expect(await findByName(service(), DOC, "189371")).toEqual(NONE);
   });
 
   it("throws when the registry copy cannot be read, rather than reading as no match", async () => {
