@@ -67,7 +67,7 @@ describe("licenseStatus", () => {
     });
 
     it("defaults to the status when no region is known", () => {
-      expect(licenseDisplay({ status: "verified" })).toEqual({ label: "موثّق", tone: "success" });
+      expect(licenseDisplay({ status: "verified" })).toEqual({ label: "يطابق السجل", tone: "success" });
     });
   });
 

@@ -10,7 +10,7 @@ const { requireDoctor, rateLimit, raiseAlert } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/alerts", () => ({ raiseAlert }));
-vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
+vi.mock("@/lib/auth/session", () => ({ requireDoctor, awaitingSecondFactor: async () => false }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");

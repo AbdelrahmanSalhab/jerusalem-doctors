@@ -11,7 +11,7 @@ const nextTurn = vi.hoisted(() => vi.fn());
 vi.mock("web-push", () => ({ default: { sendNotification } }));
 vi.mock("@/lib/otp/sentOnce", () => ({ claimOnce, nextTurn }));
 
-import { PUSH_THROTTLE_SECONDS, pushConfigured, sendPushToAdmins, sendTestPush } from "./push";
+import { PUSH_THROTTLE_SECONDS, TURN_THROTTLE_SECONDS, pushConfigured, sendPushToAdmins, sendTestPush } from "./push";
 
 const MESSAGE = { title: "طبيب جديد بانتظار القبول", url: "/admin?status=pending", tag: "doctor_waiting" };
 const ROW = (id: string, doctor_id = "a") => ({ id, doctor_id, endpoint: `https://push.example/${id}`, p256dh: `p-${id}`, auth: `a-${id}`, doctor: { is_admin: true, is_active: true } });
@@ -135,12 +135,25 @@ describe("sendPushToAdmins in turn", () => {
   const three = [ROW("1", "a"), ROW("2", "b"), ROW("3", "b"), ROW("4", "c")];
   const sentTo = () => sendNotification.mock.calls.map((c) => c[0].endpoint);
 
-  it("sends to the one admin whose turn it is, all their devices, and does not throttle", async () => {
+  it("sends to the one admin whose turn it is, all their devices, throttled per admin and not per alert", async () => {
     nextTurn.mockResolvedValue(1);
     const { service } = client({ data: three });
     await sendPushToAdmins(service, MESSAGE, { rotate: true });
     expect(sentTo()).toEqual(["https://push.example/2", "https://push.example/3"]);
-    expect(claimOnce).not.toHaveBeenCalled();
+    expect(claimOnce).toHaveBeenCalledOnce();
+    expect(claimOnce).toHaveBeenCalledWith("push-turn:doctor_waiting:b", TURN_THROTTLE_SECONDS);
+  });
+
+  it("passes an admin who was just buzzed to the next, and says nothing more once all were", async () => {
+    nextTurn.mockResolvedValue(0);
+    claimOnce.mockImplementation(async (key: string) => !key.endsWith(":a"));
+    const { service } = client({ data: three });
+    await sendPushToAdmins(service, MESSAGE, { rotate: true });
+    expect(sentTo()).toEqual(["https://push.example/2", "https://push.example/3"]);
+    sendNotification.mockClear();
+    claimOnce.mockResolvedValue(false);
+    await sendPushToAdmins(service, MESSAGE, { rotate: true });
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 
   it("takes the next admin round, and wraps", async () => {

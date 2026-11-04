@@ -9,7 +9,7 @@ interface Row {
   query: string;
   /** Already formatted on the server. */
   asked_at: string;
-  requester: { arabic_full_name: string; phone_e164: string; is_admin_approved: boolean } | null;
+  requester: { arabic_full_name: string; phone_e164: string; is_admin_approved: boolean; is_admin: boolean } | null;
 }
 
 export function RequestsList({ rows }: { rows: Row[] }) {
@@ -38,7 +38,7 @@ export function RequestsList({ rows }: { rows: Row[] }) {
             <p className="text-sm text-muted">
               {r.requester?.arabic_full_name ?? "حساب محذوف"} · {r.asked_at}
             </p>
-            {r.requester && !r.requester.is_admin_approved && (
+            {r.requester && !r.requester.is_admin_approved && !r.requester.is_admin && (
               <p className="mt-1 w-fit rounded-md border border-warn-line bg-warn-bg px-2 py-0.5 text-xs text-warn">
                 لم تُقبل عضويته بعد: لا ترسل له رقمًا
               </p>

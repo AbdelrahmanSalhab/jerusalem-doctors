@@ -8,13 +8,20 @@ import { runAfter } from "@/test/after";
 const SPECIALTY = "11111111-1111-4111-8111-111111111111";
 const SHAAREI = "55555555-5555-4555-8555-555555555555";
 
-const { requireDoctor, rateLimit, rpc, recordEvent } = vi.hoisted(() => ({
+const { requireDoctor, rateLimit, rpc, recordEvent, awaiting } = vi.hoisted(() => ({
+  awaiting: { value: false },
   requireDoctor: vi.fn(async (): Promise<Record<string, unknown>> => ({ id: "me", is_active: true, is_admin_approved: true, is_admin: false })),
-  rateLimit: vi.fn(async () => ({ success: true })),
+  rateLimit: vi.fn(async (...args: [name?: string]) => ({ success: args.length >= 0 })),
   rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({ data: [], error: null })),
   recordEvent: vi.fn(async () => {}),
 }));
-vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
+vi.mock("@/lib/auth/session", () => ({ requireDoctor, awaitingSecondFactor: async () => awaiting.value }));
+const { raiseAlert, claimOnce } = vi.hoisted(() => ({
+  raiseAlert: vi.fn(async () => {}),
+  claimOnce: vi.fn(async () => true),
+}));
+vi.mock("@/lib/alerts", () => ({ raiseAlert }));
+vi.mock("@/lib/otp/sentOnce", () => ({ claimOnce }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 vi.mock("@/lib/usage", () => ({ recordEvent }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
@@ -42,6 +49,7 @@ async function search(params: Record<string, string>, headers: Record<string, st
 
 beforeEach(() => {
   vi.clearAllMocks();
+  awaiting.value = false;
   rpc.mockResolvedValue({ data: [], error: null });
   rateLimit.mockResolvedValue({ success: true });
 });
@@ -54,6 +62,25 @@ describe("GET /api/search", () => {
     expect(await res.json()).toMatchObject({ code: "not_approved" });
     expect(rpc).not.toHaveBeenCalled();
     expect(rateLimit).not.toHaveBeenCalled();
+  });
+
+  it("403s an admin who has not given the second factor, approved or not", async () => {
+    awaiting.value = true;
+    for (const approved of [true, false]) {
+      requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: approved, is_admin: true });
+      expect((await search({ q: "سمير" })).status, `approved ${approved}`).toBe(403);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses past the daily cap, and tells the admins once a day per account", async () => {
+    rateLimit.mockImplementation(async (name?: string) => ({ success: name !== "searchDaily" }));
+    expect((await search({ q: "سمير" })).status).toBe(429);
+    expect(raiseAlert).toHaveBeenCalledWith(expect.anything(), "directory_heavy_use", { extra: { doctor_id: "me" } });
+    raiseAlert.mockClear();
+    claimOnce.mockResolvedValueOnce(false);
+    expect((await search({ q: "سمير" })).status).toBe(429);
+    expect(raiseAlert).not.toHaveBeenCalled();
   });
 
   it("lets an unapproved admin (staff) search", async () => {

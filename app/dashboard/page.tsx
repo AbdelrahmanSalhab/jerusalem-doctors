@@ -52,17 +52,18 @@ export default async function DashboardPage({
   // (lib/cachedReads.ts); only this doctor's own rows are read each time.
   const service = createSupabaseServiceClient();
   const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview(), cachedInstitutions()]);
-  // A doctor not yet accepted never uses these; see below.
+  // Started early, but a doctor not yet accepted never gets them: they are not
+  // awaited or rendered below, only left to finish (and cache) quietly.
   reads.catch(() => {});
   const me = await requireDoctor();
-  const approved = canSeeDirectory(me);
+  const approved = await canSeeDirectory(me);
   const [
     [specialties, { featured, counts, recent }, allInstitutions],
     { data: myWorkplaces },
     { data: mySpecialties },
   ] =
     await Promise.all([
-      // Nothing of the directory is read for a doctor who may not see it (#16).
+      // Nothing of the directory reaches the page of a doctor who may not see it (#16).
       approved ? reads : Promise.resolve(EMPTY_OVERVIEW),
       service
         .from("doctor_workplaces")
@@ -71,6 +72,7 @@ export default async function DashboardPage({
       service.from("doctor_specialties").select("specialty_id").eq("doctor_id", me.id),
     ]);
   if (!approved) {
+    const pendingGaps = profileGaps(me, (myWorkplaces ?? []) as Pick<DoctorWorkplace, "name" | "workplace_type" | "address" | "phone">[]);
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
         <header className="text-center">
@@ -79,9 +81,7 @@ export default async function DashboardPage({
         {existing && <ExistingAccountNotice />}
         <WaitingPanel firstName={me.arabic_first_name} />
         <InstallInvite />
-        <ProfileReminder
-          gaps={profileGaps(me, (myWorkplaces ?? []) as Pick<DoctorWorkplace, "name" | "workplace_type" | "address" | "phone">[])}
-        />
+        {pendingGaps.length > 0 && <ProfileReminder gaps={pendingGaps} />}
       </main>
     );
   }

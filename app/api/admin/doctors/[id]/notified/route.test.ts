@@ -33,8 +33,14 @@ describe("POST /api/admin/doctors/[id]/notified", () => {
     expect(db.argsOf("audit_logs", "insert")).toEqual([]);
   });
 
+  it("409s a doctor who is not accepted: nobody has been told anything", async () => {
+    db.queue("doctors", { data: { id: ID, is_admin_approved: false } });
+    expect((await call()).status).toBe(409);
+    expect(db.argsOf("audit_logs", "insert")).toEqual([]);
+  });
+
   it("logs that this admin told the doctor", async () => {
-    db.queue("doctors", { data: { id: ID } });
+    db.queue("doctors", { data: { id: ID, is_admin_approved: true } });
     expect((await call()).status).toBe(200);
     expect(db.argsOf("audit_logs", "insert")[0][0]).toMatchObject({ action: "approval_notified", actor_doctor_id: "a1", target_doctor_id: ID });
   });

@@ -16,6 +16,7 @@ import {
   saveProfileTransaction,
   profileRuleFailure,
 } from "@/lib/profile/save";
+import { recordProfileEdit } from "@/lib/profile/audit";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { directoryChanged } from "@/lib/cachedReads";
@@ -85,6 +86,12 @@ export const PATCH = withJsonErrors(async (req: Request) => {
 
   // A featured card, or "looking for work", shows the change at once.
   directoryChanged();
+  await recordProfileEdit(
+    service,
+    me,
+    parsed,
+    workplaceRows ? workplaceRows.map((w) => String(w.name ?? "")).filter(Boolean) : null,
+  );
   return jsonOk({ ok: true });
 });
 

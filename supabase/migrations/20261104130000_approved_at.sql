@@ -13,9 +13,11 @@
 -- listed_doctors gets the column appended as its last column (create or
 -- replace view only allows appending). Nothing else about it changes.
 --
--- Apply in the Supabase SQL editor BEFORE deploying the code that reads it.
--- Until then the "new this week" section shows nothing (its read fails and
--- is logged); nothing else is affected. Safe to run more than once.
+-- Apply in the Supabase SQL editor BEFORE deploying the code that uses it
+-- (applied on production on 4 Nov 2026). Without it the "new this week"
+-- section shows nothing (its read fails and is logged), AND accepting or
+-- withdrawing a doctor fails with a 500, because that PATCH writes the column.
+-- Safe to run more than once.
 
 alter table public.doctors add column if not exists approved_at timestamptz;
 

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/test/fakeSupabase";
 
 const { requireDoctor, rateLimit } = vi.hoisted(() => ({ requireDoctor: vi.fn(), rateLimit: vi.fn() }));
-vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
+vi.mock("@/lib/auth/session", () => ({ requireDoctor, awaitingSecondFactor: async () => false }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");

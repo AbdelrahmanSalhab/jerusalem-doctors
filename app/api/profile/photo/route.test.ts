@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const uploadSpy = vi.fn();
+const auditSpy = vi.fn();
 
 vi.mock("@/lib/auth/session", () => ({
   requireDoctor: vi.fn(async () => ({ id: "doc-1" })),
@@ -23,6 +24,10 @@ vi.mock("@/lib/supabase/service", () => ({
     },
     from: () => ({
       update: () => ({ eq: async () => ({ error: null }) }),
+      insert: async (row: Record<string, unknown>) => {
+        auditSpy(row);
+        return { error: null };
+      },
     }),
   }),
 }));
@@ -50,5 +55,7 @@ describe("POST /api/profile/photo", () => {
     const res = await POST(upload(PNG, "image/jpeg", "x.jpg"));
     expect(res.status).toBe(200);
     expect(uploadSpy).toHaveBeenCalledWith("doc-1.png", "image/png");
+    // A new photo is on the doctor's card: the log says who changed it.
+    expect(auditSpy).toHaveBeenCalledWith({ actor_doctor_id: "doc-1", action: "doctor_photo_changed", target_doctor_id: "doc-1" });
   });
 });

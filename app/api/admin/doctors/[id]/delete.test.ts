@@ -11,6 +11,9 @@ let rowError: unknown;
 let trailError: unknown;
 let readError: unknown;
 let audits: Record<string, unknown>[];
+let accepted: { id: string; metadata: Record<string, unknown> }[] = [];
+let acceptedError: unknown = null;
+let scrubs: { id: string; values: Record<string, unknown> }[] = [];
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({ id: "00000000-0000-4000-8000-00000000a001" })),
@@ -20,8 +23,23 @@ vi.mock("@/lib/auth/adminApi", () => ({ requireAdminOrNull }));
 vi.mock("@/lib/supabase/service", () => ({
   createSupabaseServiceClient: () => ({
     from: (table: string) => ({
-      select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: doctor, error: readError }) }),
+      select: () => {
+        const chain: Record<string, unknown> = {
+          maybeSingle: async () => ({ data: doctor, error: readError }),
+          // The acceptances kept in the log: .eq().eq().filter()
+          then: (ok: (v: unknown) => unknown) =>
+            Promise.resolve({ data: table === "audit_logs" ? accepted : [], error: acceptedError }).then(ok),
+        };
+        chain.eq = () => chain;
+        chain.filter = () => chain;
+        return chain;
+      },
+      update: (values: Record<string, unknown>) => ({
+        eq: async (_col: string, id: string) => {
+          steps.push(`scrub:${id}`);
+          scrubs.push({ id, values });
+          return { error: null };
+        },
       }),
       delete: () => ({
         eq: async () => {
@@ -71,6 +89,9 @@ describe("DELETE /api/admin/doctors/[id]", () => {
     trailError = null;
     readError = null;
     audits = [];
+    accepted = [];
+    acceptedError = null;
+    scrubs = [];
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -85,6 +106,37 @@ describe("DELETE /api/admin/doctors/[id]", () => {
         metadata: { deleted_doctor_id: "00000000-0000-4000-8000-0000000000d1" },
       },
     ]);
+  });
+
+  it("keeps who accepted the doctor, when and how, scrubbed of the person and the free-text reason", async () => {
+    accepted = [
+      { id: "a1", metadata: { is_admin_approved: true, approval_reason: "اتصلت بالدكتور فلان الذي يعرفه", approval_method: "institution_called", license_status_at_approval: "verified" } },
+    ];
+    expect((await del()).status).toBe(200);
+    // The acceptance is rewritten before the rest of the trail goes.
+    expect(steps.indexOf("scrub:a1")).toBeGreaterThan(steps.indexOf("user:u1"));
+    expect(steps.indexOf("scrub:a1")).toBeLessThan(steps.indexOf("delete:audit_logs"));
+    expect(scrubs).toEqual([
+      {
+        id: "a1",
+        values: {
+          target_doctor_id: null,
+          metadata: {
+            deleted_doctor_id: "00000000-0000-4000-8000-0000000000d1",
+            is_admin_approved: true,
+            approval_method: "institution_called",
+            license_status_at_approval: "verified",
+          },
+        },
+      },
+    ]);
+    expect(JSON.stringify(scrubs)).not.toContain("فلان");
+  });
+
+  it("keeps the row when the acceptances cannot be rewritten", async () => {
+    acceptedError = { message: "boom" };
+    expect((await del()).status).toBe(500);
+    expect(steps).not.toContain("delete:doctors");
   });
 
   it("refuses a non-admin", async () => {

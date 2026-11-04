@@ -18,7 +18,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
-  const refused = refuseUnlessApproved(me);
+  const refused = await refuseUnlessApproved(me);
   if (refused) return refused;
 
   const parsed = Body.safeParse(await req.json().catch(() => null));

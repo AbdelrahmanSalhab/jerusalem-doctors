@@ -20,7 +20,7 @@ const Body = z.object({
 export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
   if (!me) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
-  const refused = refuseUnlessApproved(me);
+  const refused = await refuseUnlessApproved(me);
   if (refused) return refused;
 
   // sendBeacon posts text/plain; parse the body ourselves.

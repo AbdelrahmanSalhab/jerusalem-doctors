@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/metrics",
       "schedule": "30 0 * * *"
+    },
+    {
+      "path": "/api/cron/waiting",
+      "schedule": "0 6 * * *"
     }
   ]
 }

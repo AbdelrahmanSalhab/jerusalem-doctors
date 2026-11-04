@@ -74,9 +74,17 @@ export const POST = withJsonErrors(async (req: Request) => {
       // Echo the serial we actually matched so the form can show the
       // doctor the number as the registry knows it.
       license_number: serial,
-      registry_first_name: result.registryFirstName,
-      registry_family_name: result.registryFamilyName,
-      registry_specialty_he: result.registrySpecialtyHe ?? null,
+      // The registry's spelling only when what was typed is already a near
+      // match (the form asks to confirm it). For a name that does not match it
+      // would tell anyone the right name for any number: the oracle an
+      // impersonator needs (#16).
+      ...(result.status === "soft_match"
+        ? {
+            registry_first_name: result.registryFirstName,
+            registry_family_name: result.registryFamilyName,
+            registry_specialty_he: result.registrySpecialtyHe ?? null,
+          }
+        : {}),
       source: result.source,
     });
   } catch (err) {

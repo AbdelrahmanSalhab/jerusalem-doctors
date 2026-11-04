@@ -50,7 +50,7 @@ vi.mock("@/lib/supabase/service", () => ({
   }),
 }));
 
-async function check(license_number: string) {
+async function check(license_number: string, names = { first: "דניאל", family: "דריפוס" }) {
   const { POST } = await import("./route");
   const res = await POST(
     new Request("https://example.test/api/signup/check-license", {
@@ -58,8 +58,8 @@ async function check(license_number: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         license_number,
-        hebrew_first_name: "דניאל",
-        hebrew_family_name: "דריפוס",
+        hebrew_first_name: names.first,
+        hebrew_family_name: names.family,
       }),
     }),
   );
@@ -86,6 +86,18 @@ describe("POST /api/signup/check-license", () => {
   it("reports not_found under the as-typed serial when nothing matches", async () => {
     const r = await check("777777");
     expect(r.body).toMatchObject({ status: "not_found", license_number: "777777" });
+  });
+
+  it("shows the registry's spelling only for a near match, never for a name that does not match (#16)", async () => {
+    const near = await check("123456", { first: "דניל", family: "דריפוס" });
+    expect(near.body).toMatchObject({ status: "soft_match", registry_first_name: "דניאל", registry_family_name: "דריפוס" });
+    const wrong = await check("123456", { first: "משה", family: "כהן" });
+    expect(wrong.body.status).toBe("name_mismatch");
+    // Otherwise it tells anyone the right name for any number.
+    expect(JSON.stringify(wrong.body)).not.toContain("דניאל");
+    expect(wrong.body).not.toHaveProperty("registry_first_name");
+    const verified = await check("123456");
+    expect(verified.body).not.toHaveProperty("registry_first_name");
   });
 
   it("rejects a non-physician profession code", async () => {

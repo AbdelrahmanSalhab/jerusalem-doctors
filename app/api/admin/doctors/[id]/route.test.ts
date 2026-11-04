@@ -5,6 +5,7 @@ const audits: Record<string, unknown>[] = [];
 
 /** The licence status the doctor being patched currently has. */
 let licenseStatus: string | null = "verified";
+let alreadyAccepted = false;
 let doctorExists = true;
 let readError: unknown = null;
 let updateError: unknown = null;
@@ -33,7 +34,7 @@ vi.mock("@/lib/supabase/service", () => ({
           maybeSingle: async () =>
             table === "audit_logs"
               ? { data: corrected ? { id: "a1" } : null, error: auditReadError }
-              : { data: doctorExists ? { license_verification_status: licenseStatus } : null, error: readError },
+              : { data: doctorExists ? { license_verification_status: licenseStatus, is_admin_approved: alreadyAccepted } : null, error: readError },
         };
         chain.eq = (col: string, v: unknown) => (table === "audit_logs" && auditAsks.push(`${col}=${String(v)}`), chain);
         chain.limit = () => chain;
@@ -65,6 +66,7 @@ async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") 
 
 beforeEach(() => {
   corrected = false;
+  alreadyAccepted = false;
   auditReadError = null;
   auditAsks.length = 0;
   updates.length = 0;
@@ -108,6 +110,27 @@ describe("PATCH /api/admin/doctors/[id]: the doctor must exist", () => {
 });
 
 describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
+  it("answers ok and writes nothing when the doctor is already accepted: no second acceptance time", async () => {
+    alreadyAccepted = true;
+    const res = await call({ is_admin_approved: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ unchanged: true });
+    expect(updates).toEqual([]);
+    expect(audits).toEqual([]);
+  });
+
+  it("wants the method as well as the reason", async () => {
+    licenseStatus = "verified";
+    const res = await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى" });
+    expect(res.status).toBe(400);
+    expect(updates).toEqual([]);
+  });
+
+  it("rejects a reason under ten characters, and a method it does not know", async () => {
+    expect((await call({ is_admin_approved: true, approval_reason: "تمام", approval_method: "documents_seen" })).status).toBe(400);
+    expect((await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى", approval_method: "i_think_so" })).status).toBe(400);
+  });
+
   it("asks how the admin knows even when the registry confirms the licence (#16)", async () => {
     licenseStatus = "verified";
     const res = await call({ is_admin_approved: true });
@@ -118,20 +141,20 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
 
   it("accepts a registry-confirmed doctor with a reason, logged, without marking the licence reviewed", async () => {
     licenseStatus = "verified";
-    expect((await call({ is_admin_approved: true, approval_reason: "اتصلت بالمستشفى" })).status).toBe(200);
+    expect((await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" })).status).toBe(200);
     // The time it was accepted, for «جديد هذا الأسبوع».
     expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String) });
-    expect(audits[0]).toMatchObject({ metadata: { approval_reason: "اتصلت بالمستشفى" } });
+    expect(audits[0]).toMatchObject({ metadata: { approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" } });
   });
 
   it("counts accepting a doctor with a reason as the licence review, and nothing else does", async () => {
     licenseStatus = "not_found";
-    await call({ is_admin_approved: true, approval_reason: "تحققت من الشهادة" });
+    await call({ is_admin_approved: true, approval_reason: "تحققت من الشهادة بالاتصال", approval_method: "documents_seen" });
     expect(updates[0]).toHaveProperty("license_reviewed_at");
     // A verified doctor's reason is about identity, not a licence review.
     updates.length = 0;
     licenseStatus = "verified";
-    await call({ is_admin_approved: true, approval_reason: "اتصلت بالمستشفى" });
+    await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" });
     expect(updates[0]).not.toHaveProperty("license_reviewed_at");
     // Withdrawing acceptance, or any other switch, does not review a licence.
     updates.length = 0;
@@ -175,8 +198,8 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
     it("accepts with a reason, and the log says why one was needed", async () => {
       licenseStatus = "verified";
       corrected = true;
-      expect((await call({ is_admin_approved: true, approval_reason: "صورة الهوية" })).status).toBe(200);
-      expect(audits[0]).toMatchObject({ metadata: { approval_reason: "صورة الهوية", number_corrected_by_admin: true } });
+      expect((await call({ is_admin_approved: true, approval_reason: "رأيت صورة الهوية الأصلية", approval_method: "documents_seen" })).status).toBe(200);
+      expect(audits[0]).toMatchObject({ metadata: { approval_reason: "رأيت صورة الهوية الأصلية", approval_method: "documents_seen", number_corrected_by_admin: true } });
     });
 
     it("asks about identity, not the number, when nobody corrected it", async () => {
@@ -203,12 +226,13 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
 
   it("accepts with a reason, and keeps it in the log", async () => {
     licenseStatus = "not_found";
-    expect((await call({ is_admin_approved: true, approval_reason: "راجعت صورة الشهادة" })).status).toBe(200);
+    expect((await call({ is_admin_approved: true, approval_reason: "راجعت صورة الشهادة الأصلية", approval_method: "documents_seen" })).status).toBe(200);
     expect(audits[0]).toMatchObject({
       action: "admin_doctor_updated",
       metadata: {
         is_admin_approved: true,
-        approval_reason: "راجعت صورة الشهادة",
+        approval_reason: "راجعت صورة الشهادة الأصلية",
+        approval_method: "documents_seen",
         license_status_at_approval: "not_found",
       },
     });
@@ -217,7 +241,7 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
   // approval_reason is not a column; sending it to .update() would fail.
   it("never writes the reason as a column", async () => {
     licenseStatus = "soft_match";
-    await call({ is_admin_approved: true, approval_reason: "تحققت هاتفيًا" });
+    await call({ is_admin_approved: true, approval_reason: "تحققت هاتفيًا من المستشفى", approval_method: "institution_called" });
     expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String), license_reviewed_at: expect.any(String) });
     expect(updates[0]).not.toHaveProperty("approval_reason");
   });

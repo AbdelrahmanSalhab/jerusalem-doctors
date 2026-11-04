@@ -27,6 +27,24 @@ export const ALERTS = {
     level: "warning",
     todo: "افتح «بانتظار الموافقة» وراجع من ينتظر. تصل هذه التنبيهات إلى كل المشرفين لأن الإشعار الأول وصل لواحد منهم فقط.",
   },
+  license_duplicate_attempt: {
+    sentry: "Signup with a licence that is already registered",
+    ar: "محاولة تسجيل بترخيص مسجَّل لطبيب آخر",
+    level: "warning",
+    todo: "افتح سجل النشاط وابحث عن «تسجيل بترخيص مسجَّل» ثم ملف الحساب الذي يحمل الترخيص. إن كان بانتظار القبول ولا تعرفه فقد يكون منتحلًا سبق الطبيب الحقيقي: تواصل مع صاحب الترخيص الحقيقي بطريقة تجدها بنفسك. وإن كان حساب طبيب مقبولًا فقد يحاول أحدهم انتحال هويته.",
+  },
+  doctor_renamed: {
+    sentry: "Accepted doctor changed their Arabic name",
+    ar: "طبيب مقبول غيّر اسمه",
+    level: "info",
+    todo: "افتح سجل النشاط وقارن «الاسم قبل» و«الاسم بعد». تغيير بسيط في الكتابة طبيعي؛ أما أن يصير الاسم مطابقًا لزميل آخر فيستحق مراجعة الملف وسؤاله.",
+  },
+  directory_heavy_use: {
+    sentry: "Doctor account searching far more than usual",
+    ar: "حساب طبيب يبحث في الدليل بكثرة غير معتادة",
+    level: "warning",
+    todo: "بلغ أحد الحسابات حد البحث اليومي (٦٠٠ بحث). افتح ملفه من سجل النشاط: إن كان حساب طبيب حقيقي فلا شيء، وإن بدا أنه ينسخ الدليل (قُبل حديثًا، أو لا تعرفه) فعلّق حسابه.",
+  },
   sms_half_budget: {
     sentry: "Half the daily SMS budget used",
     ar: "استُهلك نصف حد الرسائل اليومي",
@@ -99,6 +117,9 @@ export type AlertCode = keyof typeof ALERTS;
 const PUSH_TO: Partial<Record<AlertCode, string>> = {
   doctor_waiting: "/admin?status=pending",
   doctor_waiting_long: "/admin?status=pending",
+  directory_heavy_use: "/admin/audit",
+  license_duplicate_attempt: "/admin/audit",
+  doctor_renamed: "/admin/audit",
   profile_reported: "/admin/reports",
   licenses_missing: "/admin?status=license",
   sms_cap_reached: "/admin/stats",

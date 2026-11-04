@@ -128,8 +128,8 @@ export function StateSwitches({
           busy={busy}
           kind={kind}
           onCancel={() => setAsking(false)}
-          onConfirm={async (reason) => {
-            const ok = await onPatch({ is_admin_approved: true, approval_reason: reason });
+          onConfirm={async (reason, method) => {
+            const ok = await onPatch({ is_admin_approved: true, approval_reason: reason, approval_method: method });
             if (ok === true) {
               setAsking(false);
               setTold(true);

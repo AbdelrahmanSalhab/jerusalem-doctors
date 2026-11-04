@@ -70,6 +70,7 @@ const POLICY: Record<string, Policy> = {
   "GET /api/cron/metrics": "cron",
   "GET /api/cron/sms-balance": "cron",
   "GET /api/cron/sync-moh": "cron",
+  "GET /api/cron/waiting": "cron",
   "GET /api/institutions": "public",
   "POST /api/login/password": "credentials",
   "POST /api/login/resend": "public",

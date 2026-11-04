@@ -38,12 +38,9 @@ async function exposed(): Promise<{ tables: string[]; rpcs: string[]; firstColum
   };
 }
 
-/** Readable rows per role. Anything not listed must read as empty. */
-const READABLE: Record<string, Record<string, "own" | "all" | "visible">> = {
-  // The directory is read only through the service role (#16): a signed-in
-  // session, accepted or not, has no direct read of the doctor tables.
-  doctor: { specialties: "all" },
-};
+/** Tables a signed-in doctor may read directly: only the list of specialties.
+ *  The directory is read through the service role only (#16). */
+const READABLE_BY_DOCTOR = ["specialties"];
 
 const anon = createClient(SUPABASE_URL, ANON_KEY, opts);
 
@@ -86,23 +83,17 @@ test.describe("row-level security", () => {
   });
 
   test("a signed-in doctor reads no doctor, workplace or specialty row directly", async () => {
-    const ids = seededIds();
     for (const t of tables) {
       const { data, error } = await doctor.from(t).select("*");
       // A missing grant (42501) is a denial; any other error is a bug:
       // is_admin() once recursed through RLS to "stack depth limit
       // exceeded" (0020), which an "empty or error" check let through.
       if (error) expect(error.code, `doctor read ${t}: ${error.message}`).toBe("42501");
-      const rows = (data ?? []) as Record<string, unknown>[];
-      const rule = READABLE.doctor[t];
-      if (!rule) {
-        expect(rows, `doctor read ${t}`).toEqual([]);
-      } else if (rule === "own") {
-        expect(rows.map((r) => r.id), `doctor read ${t}`).toEqual([ids.samer]);
-      } else if (rule === "visible") {
-        const hiddenOrPending = [ids.hidden, ids.pending, ids.admin];
-        expect(rows.length, `doctor read ${t}`).toBeGreaterThan(0);
-        expect(rows.some((r) => hiddenOrPending.includes(r.doctor_id as string)), `doctor read ${t}`).toBe(false);
+      if (READABLE_BY_DOCTOR.includes(t)) {
+        expect(error, `doctor read ${t}`).toBeNull();
+        expect((data ?? []).length, `doctor read ${t}`).toBeGreaterThan(0);
+      } else {
+        expect(data ?? [], `doctor read ${t}`).toEqual([]);
       }
     }
   });
@@ -120,6 +111,7 @@ test.describe("row-level security", () => {
     const admin = await signedIn(ACCOUNTS.admin);
     const doctors = await admin.from("doctors").select("id");
     expect(doctors.data ?? []).toEqual([]);
+    expect(doctors.error?.code).toBe("42501");
     const audit = await admin.from("audit_logs").select("id").limit(1);
     expect(audit.error).toBeNull();
   });
