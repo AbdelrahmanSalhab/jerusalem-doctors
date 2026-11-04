@@ -1,0 +1,81 @@
+name: Nightly backup
+
+# An encrypted dump of the database (the public and private schemas), uploaded
+# to private storage (Cloudflare R2, S3-compatible) every night. The repository
+# is public: the dump is never an artifact, the log shows no data, and the
+# secrets live in the `backup` environment, which is limited to the main branch
+# (Settings > Environments). Setup and the restore drill are in docs/runbook.md
+# ("Backups").
+#
+# A red run means last night has no backup. GitHub emails the person who last
+# edited the schedule (not everyone watching the repository), so the runbook
+# names who that is; the optional BACKUP_HEALTHCHECK_URL secret adds a ping on
+# every success, so a silent failure is noticed by the service that stops
+# hearing it.
+
+on:
+  schedule:
+    - cron: "41 1 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    # Pinned to the current LTS like ci.yml and smoke.yml: a moving label
+    # changes the image under a job nobody looks at for weeks.
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    environment: backup
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Supabase runs Postgres 17: pg_dump must be at least that new. The
+      # image's own client is used when it is; otherwise PGDG's repository, whose
+      # signing key is checked against its published fingerprint. The runner's
+      # default apt mirror sometimes trickles (see ci.yml), so the canonical
+      # archive, and each apt call is retried.
+      - name: Install the Postgres client and age
+        run: |
+          sudo find /etc/apt \( -name sources.list -o -name '*.sources' -o -name apt-mirrors.txt \) \
+            -exec sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' {} +
+          retry() { for i in 1 2 3; do "$@" && return 0; sleep 10; done; return 1; }
+          retry sudo apt-get update -qq
+          retry sudo apt-get install -y -qq postgresql-client age
+          major=$(pg_dump --version | grep -oE '[0-9]+' | head -1)
+          if [ "$major" -lt 17 ]; then
+            key=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsSL -o "$key" https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            fpr=$(gpg --show-keys --with-colons "$key" | awk -F: '/^fpr/ {print $10; exit}')
+            [ "$fpr" = "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8" ] || { echo "PGDG key fingerprint changed"; exit 1; }
+            echo "deb [signed-by=$key] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+            retry sudo apt-get update -qq
+            retry sudo apt-get install -y -qq postgresql-client-17
+            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Dump, encrypt, upload
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: |
+          pg_dump --version
+          scripts/backup/backup.sh
+      # Optional: a dead man's switch (healthchecks.io or similar) that expects
+      # a ping every day and alerts when one is missing. Skipped when unset.
+      - name: Tell the healthcheck
+        env:
+          HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
+        run: |
+          if [ -n "$HEALTHCHECK_URL" ]; then curl -fsS -m 10 --retry 3 "$HEALTHCHECK_URL" >/dev/null; fi
