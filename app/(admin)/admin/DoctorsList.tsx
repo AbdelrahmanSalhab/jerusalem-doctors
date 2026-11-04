@@ -14,6 +14,7 @@ import { useState, useTransition } from "react";
 import { DoctorListRow } from "./DoctorListRow";
 import { adminDoctorsHref, DOCTOR_FILTERS, type DoctorFilter } from "@/lib/admin/doctorsQuery";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
+import type { PatchResult } from "./ApprovalReasonPrompt";
 
 export interface DoctorRowData {
   id: string;
@@ -81,7 +82,7 @@ export function DoctorsList({
 
   /** One row's save. Returns true when it stuck, so a row can close its own
    *  editor only on success. */
-  const patchDoctor = async (id: string, body: Record<string, unknown>): Promise<boolean> => {
+  const patchDoctor = async (id: string, body: Record<string, unknown>): Promise<PatchResult> => {
     setBusy((b) => ({ ...b, [id]: true }));
     setNotice(null);
     try {
@@ -91,6 +92,11 @@ export function DoctorsList({
         body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => ({}));
+      // The server knows something the row does not (a number found by name):
+      // hand back that a reason is wanted so the prompt can open.
+      if (payload?.code === "approval_reason_required" && !body.approval_reason) {
+        return { ask: payload.reason_kind === "corrected_number" ? "corrected_number" : "unconfirmed" };
+      }
       if (!res.ok) {
         setNotice({
           ok: false,

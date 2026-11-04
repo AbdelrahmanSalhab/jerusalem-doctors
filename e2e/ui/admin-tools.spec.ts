@@ -23,6 +23,9 @@ test.describe("licence correction", () => {
     await page.getByLabel(/^رقم الترخيص/).first().fill("510030");
     await page.getByRole("button", { name: "بحث في السجل", exact: true }).click();
     await expect(page.getByText("نتيجة البحث")).toBeVisible();
+    // Changing the number is a change of identity: it needs a reason.
+    await expect(page.getByRole("button", { name: "حفظ هذا الرقم" })).toBeDisabled();
+    await page.getByLabel("سبب تغيير الرقم").fill("اتصلت بالطبيب وأكّد الرقم");
     await page.getByRole("button", { name: "حفظ هذا الرقم" }).click();
     await expect
       .poll(async () => (await serviceClient().from("doctors").select("license_number, license_verification_status").eq("id", doctor.id).single()).data)
@@ -32,6 +35,42 @@ test.describe("licence correction", () => {
     await expect
       .poll(async () => (await serviceClient().from("audit_logs").select("action").eq("target_doctor_id", doctor.id)).data?.map((a) => a.action))
       .toContain("admin_license_corrected");
+  });
+
+  test("an admin finds the number by the doctor's name and saves it with a reason", async ({ page }) => {
+    await page.goto(`/admin?doctor=${doctor.id}`);
+    await page.getByRole("button", { name: "بحث في السجل أو تصحيح الرقم" }).first().click();
+    await page.getByRole("button", { name: "بحث بالاسم" }).click();
+    await expect(page.getByText("أرقام في السجل بهذا الاسم")).toBeVisible();
+    await expect(page.getByText("510030")).toBeVisible();
+    await page.getByRole("button", { name: /^فحص هذا الرقم/ }).first().click();
+    await expect(page.getByText("نتيجة البحث")).toBeVisible();
+    await page.getByLabel("سبب تغيير الرقم").fill("اتصلت بالطبيب وأكّد الرقم");
+    await page.getByRole("button", { name: "حفظ هذا الرقم" }).click();
+    await expect
+      .poll(async () => (await serviceClient().from("doctors").select("license_number").eq("id", doctor.id).single()).data?.license_number)
+      .toBe("510030");
+    // The log says the number came from the name list, which is what makes
+    // accepting this doctor ask for a reason.
+    await expect
+      .poll(async () => {
+        const { data } = await serviceClient().from("audit_logs").select("metadata").eq("target_doctor_id", doctor.id).eq("action", "admin_license_corrected");
+        return (data?.[0]?.metadata as { via_name_lookup?: boolean } | undefined)?.via_name_lookup;
+      })
+      .toBe(true);
+  });
+
+  test("it also finds a doctor whose Hebrew first and family names were typed the wrong way round", async ({ page }) => {
+    const swapped = await createDoctor({ first: "مريم", family: "مقلوب", hebrewFirst: "עודה", hebrewFamily: "מרים", licenseStatus: "not_found" });
+    try {
+      await page.goto(`/admin?doctor=${swapped.id}`);
+      await page.getByRole("button", { name: "بحث في السجل أو تصحيح الرقم" }).first().click();
+      await page.getByRole("button", { name: "بحث بالاسم" }).click();
+      await expect(page.getByText("510030")).toBeVisible();
+      await expect(page.getByText("الاسم الأول واسم العائلة مقلوبان")).toBeVisible();
+    } finally {
+      await swapped.remove();
+    }
   });
 });
 
