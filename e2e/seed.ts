@@ -243,6 +243,9 @@ async function insertDoctor(db: SupabaseClient, d: SeedDoctor, specialtyId: Map<
         is_active: true,
         is_visible: d.visible ?? true,
         is_admin_approved: d.approved ?? true,
+        // The seed's doctors joined long ago; the ones a test creates (i = 30)
+        // are new this week, whatever today is.
+        approved_at: d.approved === false ? null : i >= 30 ? new Date().toISOString() : new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),
         is_admin: d.admin ?? false,
         // Newest first in the admin list follows the seed order.
         created_at: new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),

@@ -119,7 +119,8 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
   it("accepts a registry-confirmed doctor with a reason, logged, without marking the licence reviewed", async () => {
     licenseStatus = "verified";
     expect((await call({ is_admin_approved: true, approval_reason: "اتصلت بالمستشفى" })).status).toBe(200);
-    expect(updates[0]).toEqual({ is_admin_approved: true });
+    // The time it was accepted, for «جديد هذا الأسبوع».
+    expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String) });
     expect(audits[0]).toMatchObject({ metadata: { approval_reason: "اتصلت بالمستشفى" } });
   });
 
@@ -217,7 +218,7 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
   it("never writes the reason as a column", async () => {
     licenseStatus = "soft_match";
     await call({ is_admin_approved: true, approval_reason: "تحققت هاتفيًا" });
-    expect(updates[0]).toEqual({ is_admin_approved: true, license_reviewed_at: expect.any(String) });
+    expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String), license_reviewed_at: expect.any(String) });
     expect(updates[0]).not.toHaveProperty("approval_reason");
   });
 
@@ -229,7 +230,8 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
   it("wants no reason for withdrawing acceptance, only for granting it", async () => {
     licenseStatus = "not_found";
     expect((await call({ is_admin_approved: false })).status).toBe(200);
-    expect(updates[0]).toEqual({ is_admin_approved: false });
+    // Withdrawn: no acceptance time either.
+    expect(updates[0]).toEqual({ is_admin_approved: false, approved_at: null });
   });
 
   it("asks for a change to make", async () => {

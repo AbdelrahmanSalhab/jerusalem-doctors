@@ -17,7 +17,7 @@ const STEPS: { state: StepState; title: string; text: string }[] = [
 function Mark({ state }: { state: StepState }) {
   if (state === "done") {
     return (
-      <span className="grid size-9 place-items-center rounded-full text-white" style={{ background: "var(--success-fg)" }}>
+      <span className="grid size-9 place-items-center rounded-full" style={{ background: "var(--success-fg)" }}>
         <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="var(--surface)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="m5 12.5 4.5 4.5L19 7.5" />
         </svg>
@@ -77,6 +77,7 @@ export function WaitingPanel({ firstName }: { firstName: string }) {
             <Mark state={step.state} />
             <div className="min-w-0 pt-0.5">
               <p className={"font-semibold " + (step.state === "next" ? "text-muted" : "")}>
+                {step.state !== "now" && <span className="sr-only">{step.state === "done" ? "تمّ: " : "لاحقًا: "}</span>}
                 {step.title}
                 {step.state === "now" && (
                   <span className="ms-2 rounded-full border border-warn-line bg-warn-bg px-2 py-0.5 text-xs font-medium text-warn">الآن</span>

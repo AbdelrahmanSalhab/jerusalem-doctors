@@ -16,6 +16,24 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 
+/** A new doctor's alert goes to one admin, in turn; if that admin is away, no
+ *  one else hears. So once a day, anyone waiting over WAITING_ALERT_HOURS is
+ *  told to every admin. Returns how many wait that long. */
+const WAITING_ALERT_HOURS = 24;
+async function alertIfWaitingLong(service: ReturnType<typeof createSupabaseServiceClient>): Promise<number> {
+  const before = new Date(Date.now() - WAITING_ALERT_HOURS * 3_600_000).toISOString();
+  const { count, error } = await service
+    .from("doctors")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", true)
+    .eq("is_admin_approved", false)
+    .eq("is_admin", false)
+    .lt("created_at", before);
+  if (error) throw error;
+  if (count) await raiseAlert(service, "doctor_waiting_long", { extra: { waiting: count } });
+  return count ?? 0;
+}
+
 export const GET = withJsonErrors(async (req: Request) => {
   const denied = verifyCronAuth(req);
   if (denied) return denied;
@@ -30,6 +48,7 @@ export const GET = withJsonErrors(async (req: Request) => {
   if (db_bytes > DB_LIMIT_BYTES * 0.7) {
     await raiseAlert(service, "db_size_high", { extra: { db_bytes, limit_bytes: DB_LIMIT_BYTES } });
   }
+  const waiting = await alertIfWaitingLong(service);
   const unfinished_deleted = await purgeUnfinished(service);
-  return jsonOk({ ok: true, day, db_bytes, unfinished_deleted });
+  return jsonOk({ ok: true, day, db_bytes, unfinished_deleted, waiting });
 });

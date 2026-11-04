@@ -21,6 +21,12 @@ export const ALERTS = {
     level: "info",
     todo: "افتح «بانتظار الموافقة» في لوحة الإدارة، راجع الترخيص والبيانات، ثم اقبل أو ارفض.",
   },
+  doctor_waiting_long: {
+    sentry: "Doctor waiting for approval for over a day",
+    ar: "طبيب ينتظر القبول منذ أكثر من يوم",
+    level: "warning",
+    todo: "افتح «بانتظار الموافقة» وراجع من ينتظر. تصل هذه التنبيهات إلى كل المشرفين لأن الإشعار الأول وصل لواحد منهم فقط.",
+  },
   sms_half_budget: {
     sentry: "Half the daily SMS budget used",
     ar: "استُهلك نصف حد الرسائل اليومي",
@@ -92,6 +98,7 @@ export type AlertCode = keyof typeof ALERTS;
  *  information for the log too, but someone is waiting on a reply. */
 const PUSH_TO: Partial<Record<AlertCode, string>> = {
   doctor_waiting: "/admin?status=pending",
+  doctor_waiting_long: "/admin?status=pending",
   profile_reported: "/admin/reports",
   licenses_missing: "/admin?status=license",
   sms_cap_reached: "/admin/stats",

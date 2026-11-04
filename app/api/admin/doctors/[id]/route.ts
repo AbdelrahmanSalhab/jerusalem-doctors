@@ -127,6 +127,8 @@ export const PATCH = withJsonErrors(async (
   // null is, and clears the column.
   const updates: TablesUpdate<"doctors"> = {
     is_admin_approved: fields.is_admin_approved,
+    // When the directory first had them, for «جديد هذا الأسبوع».
+    ...(fields.is_admin_approved !== undefined && { approved_at: fields.is_admin_approved ? new Date().toISOString() : null }),
     is_active: fields.is_active,
     is_visible: fields.is_visible,
     career_stage: fields.career_stage,

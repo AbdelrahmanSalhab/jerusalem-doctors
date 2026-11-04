@@ -91,7 +91,7 @@ describe("POST /api/signup/verify", () => {
     db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
     const res = await call(BODY);
-    expect(await res.json()).toEqual({ ok: true, auto_approved: false });
+    expect(await res.json()).toEqual({ ok: true });
 
     expect(doctorInsert()).toMatchObject({
       auth_user_id: "u1",
@@ -122,7 +122,7 @@ describe("POST /api/signup/verify", () => {
   it("queues an unverified license for admin approval", async () => {
     db.queue("pending_signups", pending({ payload: payload({ license_verification_status: "not_found", specialty_ids: [], workplaces: [] }) }), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
-    expect(await (await call(BODY)).json()).toEqual({ ok: true, auto_approved: false });
+    expect(await (await call(BODY)).json()).toEqual({ ok: true });
     expect(doctorInsert()).toMatchObject({ is_admin_approved: false, license_verified_at: null });
     expect(db.argsOf("doctor_specialties", "insert")).toHaveLength(0);
     expect(db.argsOf("doctor_workplaces", "insert")).toHaveLength(0);
@@ -237,7 +237,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
       data: { id: "d1", is_active: true, is_admin_approved: true, auth_user_id: null },
     });
     const res = await call(BODY);
-    expect(await res.json()).toEqual({ ok: true, auto_approved: true, existing_account: true });
+    expect(await res.json()).toEqual({ ok: true, existing_account: true });
     expect(db.argsOf("doctors", "insert")).toHaveLength(0);
     expect(db.argsOf("doctors", "update")).toEqual([[{ auth_user_id: "u1" }]]);
     expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);

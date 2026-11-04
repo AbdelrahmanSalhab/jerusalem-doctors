@@ -303,7 +303,7 @@ export const POST = withJsonErrors(async (req: Request) => {
     extra: { doctor_id: insert.data.id },
   });
 
-  return jsonOk({ ok: true, auto_approved: false });
+  return jsonOk({ ok: true });
 });
 
 /** The OTP proved the phone, so the owner is signed in to the account they
@@ -331,9 +331,5 @@ async function signInExisting(
   if (!(await linkAuthUser(service, doctor.data, userId))) {
     return jsonError(500, { error: "link_failed", code: "link_failed" });
   }
-  return jsonOk({
-    ok: true,
-    auto_approved: doctor.data.is_admin_approved,
-    existing_account: true,
-  });
+  return jsonOk({ ok: true, existing_account: true });
 }
