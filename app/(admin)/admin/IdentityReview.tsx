@@ -82,6 +82,7 @@ export function IdentityReview({
         busy={busy}
         heading="كيف تأكّدت أنه هو؟"
         submitLabel="تمت مراجعة الهوية"
+        reasonLabel="سبب المراجعة"
         lead={`د. ${name} مقبول، واسمه ورقمه يطابقان سجل الوزارة، لكن هذه معلومات علنية يستطيع أي شخص كتابتها.`}
         onCancel={() => setAsking(false)}
         onConfirm={confirm}

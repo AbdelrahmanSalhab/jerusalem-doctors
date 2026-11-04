@@ -33,6 +33,7 @@ export function ApprovalReasonPrompt({
   kind = "unconfirmed",
   heading = "كيف تأكّدت من هويته؟",
   submitLabel = "قبول العضوية",
+  reasonLabel = "سبب القبول",
   lead: leadOverride,
   onCancel,
   onConfirm,
@@ -45,6 +46,7 @@ export function ApprovalReasonPrompt({
   /** The same question asked of an accepted doctor (the identity review). */
   heading?: string;
   submitLabel?: string;
+  reasonLabel?: string;
   lead?: string;
   onCancel: () => void;
   onConfirm: (reason: string, method: ApprovalMethod) => Promise<boolean>;
@@ -111,7 +113,7 @@ export function ApprovalReasonPrompt({
         onChange={(e) => setReason(e.target.value)}
         rows={2}
         maxLength={300}
-        aria-label="سبب القبول"
+        aria-label={reasonLabel}
         placeholder="مثال: اتصلت بمقسم المستشفى وأكّدوا أنه يعمل في قسم الأطفال."
         className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
       />

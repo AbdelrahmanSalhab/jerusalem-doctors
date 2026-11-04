@@ -39,14 +39,14 @@ describe("POST /api/admin/doctors/[id]/identity-reviewed", () => {
   it("404s a bad id and a doctor that does not exist, and 409s one who is not accepted", async () => {
     expect((await call(OK, "nope")).status).toBe(404);
     expect((await call()).status).toBe(404);
-    db.queue("doctors", { data: { id: ID, is_admin_approved: false, identity_reviewed_at: null } });
+    db.queue("doctors", { data: { id: ID, is_admin: false, is_visible: true, is_admin_approved: false, identity_reviewed_at: null } });
     expect((await call()).status).toBe(409);
     expect(db.argsOf("doctors", "update")).toEqual([]);
     expect(db.argsOf("audit_logs", "insert")).toEqual([]);
   });
 
   it("marks the review, only while unreviewed, and logs the method and reason with the admin", async () => {
-    db.queue("doctors", { data: { id: ID, is_admin_approved: true, identity_reviewed_at: null } });
+    db.queue("doctors", { data: { id: ID, is_admin: false, is_visible: true, is_admin_approved: true, identity_reviewed_at: null } }, { data: [{ id: ID }] });
     expect((await call()).status).toBe(200);
     expect(db.argsOf("doctors", "update")[0][0]).toEqual({ identity_reviewed_at: expect.any(String) });
     expect(db.argsOf("doctors", "is")).toEqual([["identity_reviewed_at", null]]);
@@ -58,8 +58,22 @@ describe("POST /api/admin/doctors/[id]/identity-reviewed", () => {
     });
   });
 
+  it("refuses a hidden admin account (staff), but not an admin who is a visible doctor", async () => {
+    db.queue("doctors", { data: { id: ID, is_admin: true, is_visible: false, is_admin_approved: true, identity_reviewed_at: null } });
+    expect((await call()).status).toBe(409);
+    expect(db.argsOf("doctors", "update")).toEqual([]);
+    db.queue("doctors", { data: { id: ID, is_admin: true, is_visible: true, is_admin_approved: true, identity_reviewed_at: null } }, { data: [{ id: ID }] });
+    expect((await call()).status).toBe(200);
+  });
+
+  it("writes no second log entry when another admin's review landed between the read and the write", async () => {
+    db.queue("doctors", { data: { id: ID, is_admin: false, is_visible: true, is_admin_approved: true, identity_reviewed_at: null } }, { data: [] });
+    expect(await (await call()).json()).toMatchObject({ unchanged: true });
+    expect(db.argsOf("audit_logs", "insert")).toEqual([]);
+  });
+
   it("does nothing for a doctor another admin already reviewed", async () => {
-    db.queue("doctors", { data: { id: ID, is_admin_approved: true, identity_reviewed_at: "2026-11-04T10:00:00Z" } });
+    db.queue("doctors", { data: { id: ID, is_admin: false, is_visible: true, is_admin_approved: true, identity_reviewed_at: "2026-11-04T10:00:00Z" } });
     const res = await call();
     expect(await res.json()).toMatchObject({ unchanged: true });
     expect(db.argsOf("doctors", "update")).toEqual([]);

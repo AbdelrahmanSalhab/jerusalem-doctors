@@ -173,8 +173,7 @@ describe("/admin doctors list", () => {
     expect(eqArgs()).toContainEqual(["is_admin_approved", true]);
     expect(eqArgs()).toContainEqual(["is_active", true]);
     const ors = calls.filter((c) => c.table === "doctors" && c.method === "or").map((c) => String(c.args[0]));
-    expect(ors).toContain("identity_reviewed_at.is.null");
-    expect(ors).toContain("is_admin.eq.false,is_visible.eq.true");
+    expect(ors).toContain("and(identity_reviewed_at.is.null,or(is_admin.eq.false,is_visible.eq.true))");
   });
 
   it("finds residents whose licence the registry lists with a specialty", async () => {

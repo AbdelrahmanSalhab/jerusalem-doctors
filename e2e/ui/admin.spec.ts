@@ -76,6 +76,18 @@ test.describe("identity review of an accepted doctor", () => {
   });
   test.afterEach(async () => accepted.remove());
 
+  // A hidden admin account is staff: accepted, never reviewed, and not in the list.
+  test("leaves out staff accounts, which are not doctors", async ({ page }) => {
+    const staff = await createDoctor({ first: "قديم", family: "الإدارة", admin: true, visible: false, identityReviewed: false });
+    try {
+      await page.goto("/admin?status=identity&q=قديم");
+      await expect(page.getByText("قديم المراجعة")).toBeVisible();
+      await expect(page.getByText("قديم الإدارة")).toHaveCount(0);
+    } finally {
+      await staff.remove();
+    }
+  });
+
   test("is listed until an admin says how they knew, then leaves the list", async ({ page }) => {
     await page.goto("/admin?status=identity&q=قديم");
     await expect(page.getByText("قديم المراجعة")).toBeVisible();
@@ -87,7 +99,7 @@ test.describe("identity review of an accepted doctor", () => {
     await page.getByRole("button", { name: "تمت مراجعة الهوية" }).click();
     await expect(page.getByText("اختر كيف تأكّدت من هويته.")).toBeVisible();
     await page.getByRole("radio", { name: /رأيت صورة/ }).check();
-    await page.getByLabel("سبب القبول").fill("رأيت صورة الترخيص الأصلية معه");
+    await page.getByLabel("سبب المراجعة").fill("رأيت صورة الترخيص الأصلية معه");
     await page.getByRole("button", { name: "تمت مراجعة الهوية" }).click();
     await expect(page.getByText(/روجعت هوية هذا الطبيب في/)).toBeVisible();
 

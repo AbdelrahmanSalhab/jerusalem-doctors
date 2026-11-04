@@ -116,7 +116,7 @@ export function DoctorPanelBody({
 
       {canResetSecondFactor && d.is_admin && <MfaReset key={d.id} doctorId={d.id} />}
 
-      {d.is_admin_approved && !d.is_admin && (
+      {d.is_admin_approved && d.is_active && !(d.is_admin && !d.is_visible) && (
         <IdentityReview key={d.id} doctorId={d.id} name={`${d.arabic_first_name} ${d.arabic_family_name}`} reviewedAt={d.identity_reviewed_at} />
       )}
 
