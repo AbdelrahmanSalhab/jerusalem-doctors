@@ -367,52 +367,132 @@ Doctors reported exactly that ("I got two codes and both were wrong").
 
 Supabase's free plan keeps no backups and has no point-in-time recovery
 (checked 1 Nov 2026: 0 backups). `.github/workflows/backup.yml` runs
-`scripts/backup/backup.sh` every night at 01:41 UTC: `pg_dump` of the `public`
-schema (custom format, without the registry mirror, which the nightly sync
-refills), checked with `pg_restore --list`, encrypted with `age`, uploaded to a
-private Cloudflare R2 bucket `jd-backups` (S3-compatible, free 10 GB, no egress
-fees), the newest 30 kept. The database is about 30 MB, so that is far more than
-enough. The bucket also expires `daily/` objects after 60 days, as a backstop.
+`scripts/backup/backup.sh` every night at 01:41 UTC:
+
+- **What is dumped:** `pg_dump` of the `public` and `private` schemas, with
+  their privileges (custom format). `private` holds `is_admin()`, which the RLS
+  policies call; the privileges matter because the migrations revoke execute
+  from the public roles on security definer functions, and a restore without
+  them would hand it back. **Left out on purpose:** the registry mirror (the
+  nightly sync refills it), unfinished signups (a phone number and a half-filled
+  form, kept 30 days only), sign-ins (a doctor is linked again by phone at the
+  next sign-in, `linkAuthUser`) and photos (storage).
+- **Checks before it counts:** the database has at least 50 doctors (a wiped
+  table is not tonight's "good" copy), the dump lists, holds the doctors and
+  `private.is_admin()`, and the encrypted file is not under half of the previous
+  one. A failed check is a red run; the log says which step and a coarse
+  category (authentication, network, permission, ...), never the message.
+- **Encrypted on the runner** with `age` (two recipients) and uploaded to a
+  private Cloudflare R2 bucket `jd-backups` (S3-compatible, free 10 GB, no
+  egress fees). `daily/` expires after 60 days by the bucket's own rule;
+  `monthly/` gets a copy on the 1st and expires after a year. The database is about 30
+  MB, so this is far inside the free tier.
+- **Nothing here deletes anything:** the job's token cannot be used to wipe the
+  backups through the script, and the bucket's rules do the expiring.
 
 **The repository is public, so:** the dump is never a workflow artifact, the log
-prints no host, row or connection string (failures say only which step failed),
-the plaintext exists only on the runner's temporary disk, and the secrets sit in
-a GitHub **environment** called `backup`, limited to the `main` branch, so a
-pull request cannot read them. Only the age *public* key is on GitHub; the
-private key is held offline by two people. Sign-ins relink to a doctor by phone
-(`linkAuthUser`), photos live in storage and are not in this dump.
+prints no host, row or connection string, the plaintext exists only on the
+runner's temporary disk, and the secrets sit in a GitHub **environment** called
+`backup`, limited to the `main` branch, so a pull request cannot read them. Only
+the age *public* keys are on GitHub.
 
-**One-time setup (a repository admin):**
-1. R2: a private bucket (`wrangler r2 bucket create jd-backups`) and an Account
+**The database login is a role of its own**, `backup` (login, `bypassrls`,
+member of `pg_read_all_data`, nothing else), not the `postgres` admin: a leak of
+the secret reads the data but cannot change or drop anything. Its pooler user is
+`backup.<project ref>`. If it ever lacks a table, the dump fails loudly
+(`pg_dump` runs with row security off) rather than leaving the table out.
+
+**One-time setup (a repository admin), in this order:**
+1. GitHub, Settings, Environments, new environment `backup` with deployment
+   branches limited to `main` **before the workflow first runs**: a job that
+   names an environment that does not exist creates it with no branch limit.
+2. R2: a private bucket (`wrangler r2 bucket create jd-backups`) and an Account
    API token of the R2 type, **Object Read & Write**, limited to that bucket
-   only (a token with zone permissions can change DNS; do not use one). Endpoint
-   `https://<account id>.r2.cloudflarestorage.com`, region `auto`. Created
-   1 Nov 2026; the key is held by Khaled and must reach the GitHub environment
-   without going through chat.
-2. `age-keygen -o jd-backup.key` on a trusted machine. Keep the file offline in
-   two places (two people). Put the line starting `age1...` in the secret below.
-3. GitHub, Settings, Environments, new environment `backup`: deployment branches
-   limited to `main`, then these secrets: `BACKUP_DATABASE_URL` (Supabase,
-   Connect, **Session pooler**, the URI with the password filled in; the direct
-   host is IPv6-only on the free plan and the runner is IPv4), `BACKUP_AGE_PUBLIC_KEY`,
-   `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
-4. Actions, Nightly backup, Run workflow once: it ends with `backup ok`.
+   only (a token with zone permissions can change DNS; do not use one). That
+   permission includes delete, so also, in the bucket's settings:
+   - two object lifecycle rules: prefix `daily/`, expire after 60 days, and
+     prefix `monthly/`, expire after 365 days (CLI: `wrangler r2 bucket lifecycle
+     add jd-backups --name expire-daily --prefix daily/ --expire-days 60`, and the same with
+     `expire-monthly`, `monthly/`, `365`);
+   - a bucket lock rule if your plan has it: prefix `daily/` and `monthly/`,
+     retention 30 days, so even a valid token cannot delete a recent backup
+     (`wrangler r2 bucket lock add jd-backups ...`; the dashboard has it under
+     Settings, Bucket lock rules).
+   Endpoint `https://<account id>.r2.cloudflarestorage.com`, region `auto`.
+3. Two age keys, for two different people, each generated on that person's own
+   machine: `age-keygen -o jd-backup.key`. Each keeps their file offline and
+   sends only the `age1...` line. Put both lines, one per line, in the secret
+   `BACKUP_AGE_PUBLIC_KEY`. Either key alone restores; losing one loses
+   nothing. (Rotating: add the new key, wait for a night to pass, remove the
+   old one; older files still need the old key.)
+4. The `backup` environment's secrets: `BACKUP_DATABASE_URL` (Supabase, Connect,
+   **Session pooler**, port 5432, with the `backup.<ref>` user and that role's
+   password; the direct host is IPv6-only on the free plan and the runner is
+   IPv4; `sslmode=require` is set by the script), `BACKUP_AGE_PUBLIC_KEY`,
+   `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`,
+   `S3_SECRET_ACCESS_KEY`. Optional: `BACKUP_HEALTHCHECK_URL`, a dead man's
+   switch (healthchecks.io or similar, expecting a ping a day), which is the
+   only way a failure that nobody reads the email about is noticed.
+5. Merge, then Actions, Nightly backup, Run workflow once: it ends with
+   `backup ok: <file>, <bytes> bytes, <n> doctors`. Then the restore drill below.
 
-**Restore drill (once now, then after any change to the workflow):** download the
-newest `daily/jd-*.dump.age` from the bucket, `age -d -i jd-backup.key -o jd.dump
-jd-....dump.age`, then into a scratch Supabase project (or a local
-`supabase start`): `pg_restore --no-owner --no-privileges -d "<scratch url>"
-jd.dump`, and compare `select count(*) from doctors` with production. Expect one
-error: the foreign key from `doctors.auth_user_id` to `auth.users`, because a new
-project has no auth users; the data is complete, and a doctor is linked again by
-phone at the next sign-in (`linkAuthUser`). Tested 1 Nov 2026 with the real
-script, the real R2 bucket and a throwaway key against the local database (8 of 8
-doctors back). Delete the scratch project and the decrypted file.
+**If a night fails:** GitHub emails the person who last edited the schedule
+(or created the workflow), only if their Actions notification settings allow it,
+not everyone watching the repository. Name that person here and check that
+they receive it: the repository admin (Abdelrahman). A red run means last night
+has no backup. Scheduled workflows are also switched off after 60 days without
+repository activity; re-enable it under Actions (a manual run alone does not
+reset that), and a healthcheck URL tells you it stopped.
 
-**If a night fails:** GitHub emails the people watching the repository. Scheduled
-workflows stop after 60 days without repository activity, so a long quiet spell
-needs a manual run. Not covered: auth settings (kept in this runbook), storage
-objects (photos), the registry mirror.
+**Restore drill (once now, then after any change to the workflow or the schema):**
+1. Download the newest `daily/jd-*.dump.age`, then
+   `age -d -i jd-backup.key -o jd.dump jd-....dump.age`.
+2. Into a **fresh** Postgres with Supabase's roles: a scratch Supabase project
+   (the free plan allows two; delete it after), or a scratch database in the
+   local stack: `docker exec supabase_db_jerusalem-doctors createdb -U postgres jd_restore`.
+   Not into the local database that already has the migrations applied: the data
+   collides with what is there.
+3. Create the schema the dump expects, then restore. `pg_restore` must be
+   version 17 or newer:
+   ```sql
+   create schema if not exists extensions;
+   create extension if not exists pg_trgm with schema extensions;
+   ```
+   `pg_restore --no-owner -d "<scratch url>" jd.dump`. Keep the privileges (do
+   not add `--no-privileges`).
+4. **Expected errors, and only these:** `schema "public" already exists`; a
+   foreign key from `doctors.auth_user_id` to `auth.users` (a new project has no
+   auth users, or the schema is missing in a bare database); `permission denied
+   to change default privileges` for roles you do not own. Anything else is a
+   problem.
+5. **Check it:** `select count(*) from doctors` against production; the
+   policies came back (`select count(*) from pg_policies where schemaname =
+   'public'`); and **nothing sensitive is open to the public roles**: this must
+   return no rows:
+   ```sql
+   select proname from pg_proc
+    where prosecdef and pronamespace in ('public'::regnamespace, 'private'::regnamespace)
+      and has_function_privilege('anon', oid, 'execute');
+   ```
+   and `has_table_privilege('anon', 'public.doctors', 'select')` must be false.
+6. Delete the scratch project and the decrypted file.
+
+Drilled 4 Nov 2026 with the real script's flags against the local database
+(8 of 8 doctors back, 15 policies, no function open to `anon`, the errors above).
+
+**After a real restore, in this order:** apply any migration newer than the
+backup; run the registry sync by hand (the mirror table is empty); re-add the
+foreign key to `auth.users` if it was dropped, after the auth users exist; **re-apply
+account deletions made since the backup's date** (a restore brings deleted doctors
+back, and the privacy page promises they are gone); restore the auth settings
+(kept in this runbook) and the storage photos (not in this backup). Doctors
+sign in again by phone and are linked to their rows (`linkAuthUser`).
+
+**Privacy:** the dump holds doctors' personal data, but only encrypted: it is
+encrypted on the runner before it leaves, and Cloudflare holds ciphertext.
+The privacy page says backups exist and how long they last; a deleted account
+can stay in a backup for up to 60 days (`daily/`) or, in the first-of-the-month
+copy, up to a year (`monthly/`); the privacy page says so.
 
 ### Usage against the free plans
 
