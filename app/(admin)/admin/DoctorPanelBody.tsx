@@ -10,6 +10,7 @@ import { Avatar } from "@/components/Avatar";
 import { DoctorAuditList } from "./DoctorAuditList";
 import { DoctorPanelControls } from "./DoctorPanelControls";
 import { MfaReset } from "./MfaReset";
+import { IdentityReview } from "./IdentityReview";
 import { LicenseSection } from "./LicenseSection";
 import { auditTime } from "@/lib/auditText";
 import { careerStageBadge } from "@/lib/careerStage";
@@ -114,6 +115,10 @@ export function DoctorPanelBody({
       />
 
       {canResetSecondFactor && d.is_admin && <MfaReset key={d.id} doctorId={d.id} />}
+
+      {d.is_admin_approved && !d.is_admin && (
+        <IdentityReview key={d.id} doctorId={d.id} name={`${d.arabic_first_name} ${d.arabic_family_name}`} reviewedAt={d.identity_reviewed_at} />
+      )}
 
       <Section title="التحقق من الترخيص">
         <div className="flex flex-col gap-4">

@@ -132,7 +132,7 @@ describe("/admin doctors list", () => {
     await render();
     const heads = calls.filter((c) => c.table === "doctors" && c.method === "select" && JSON.stringify(c.args).includes('"head":true'));
     // The eight filters, and the admins who are not doctors.
-    expect(heads).toHaveLength(9);
+    expect(heads).toHaveLength(10);
     expect(eqArgs()).toEqual(expect.arrayContaining([["clinic_missing_details", true], ["career_stage", "resident"], ["is_admin", true]]));
   });
 
@@ -166,6 +166,15 @@ describe("/admin doctors list", () => {
     expect(ors).toContain(
       "and(or(license_verification_status.is.null,license_verification_status.neq.verified),license_reviewed_at.is.null,or(is_admin.eq.false,is_visible.eq.true))",
     );
+  });
+
+  it("lists accepted, open, real doctors that no admin has reviewed the identity of", async () => {
+    await render({ status: "identity" });
+    expect(eqArgs()).toContainEqual(["is_admin_approved", true]);
+    expect(eqArgs()).toContainEqual(["is_active", true]);
+    const ors = calls.filter((c) => c.table === "doctors" && c.method === "or").map((c) => String(c.args[0]));
+    expect(ors).toContain("identity_reviewed_at.is.null");
+    expect(ors).toContain("is_admin.eq.false,is_visible.eq.true");
   });
 
   it("finds residents whose licence the registry lists with a specialty", async () => {

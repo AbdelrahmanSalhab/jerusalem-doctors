@@ -43,6 +43,7 @@ export interface DoctorRowData {
   retired: boolean;
   subspecialty: string | null;
   created_at: string;
+  identity_reviewed_at: string | null;
   doctor_specialties: { specialty: { name_ar: string } | { name_ar: string }[] | null }[] | null;
 }
 

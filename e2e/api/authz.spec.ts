@@ -60,6 +60,7 @@ const POLICY: Record<string, Policy> = {
   "PATCH /api/admin/institutions/[id]": "admin",
   "PATCH /api/admin/number-requests/[id]": "admin",
   "POST /api/admin/doctors/[id]/notified": "admin",
+  "POST /api/admin/doctors/[id]/identity-reviewed": "admin",
   "DELETE /api/admin/institutions/[id]": "admin",
   "POST /api/admin/institutions": "admin",
   "PATCH /api/admin/specialties/[id]": "admin",

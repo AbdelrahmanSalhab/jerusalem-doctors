@@ -45,6 +45,7 @@ const TITLE: Record<string, string> = {
   unfinished_signup_deleted: "حذف تسجيل لم يكتمل",
   admin_doctor_updated: "تعديل من الإدارة",
   approval_notified: "إبلاغ بالقبول",
+  admin_identity_reviewed: "مراجعة هوية طبيب مقبول",
   signup_duplicate_license: "تسجيل بترخيص مسجَّل",
   doctor_profile_edited: "تعديل صاحب الحساب لملفه",
   doctor_photo_changed: "تغيير صاحب الحساب لصورته",
