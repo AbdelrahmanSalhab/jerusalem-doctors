@@ -458,17 +458,30 @@ reset that), and a healthcheck URL tells you it stopped.
    create schema if not exists extensions;
    create extension if not exists pg_trgm with schema extensions;
    ```
-   `pg_restore --no-owner -d "<scratch url>" jd.dump`. Keep the privileges (do
-   not add `--no-privileges`).
-4. **Expected errors, and only these:** `schema "public" already exists`; a
-   foreign key from `doctors.auth_user_id` to `auth.users` (a new project has no
-   auth users, or the schema is missing in a bare database); `permission denied
-   to change default privileges` for roles you do not own. Anything else is a
-   problem.
-5. **Check it:** `select count(*) from doctors` against production; the
-   policies came back (`select count(*) from pg_policies where schemaname =
-   'public'`); and **nothing sensitive is open to the public roles**: this must
-   return no rows:
+   A scratch Supabase project already has the `auth` schema. In a **bare**
+   database (the local scratch above) create a stub first, or the policies that
+   call `auth.uid()` fail to be created:
+   ```sql
+   create schema auth;
+   create table auth.users (id uuid primary key);
+   create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
+   create function auth.role() returns text language sql as $$ select null::text $$;
+   ```
+   Then `pg_restore --no-owner -d "<scratch url>" jd.dump`. Keep the privileges
+   (do not add `--no-privileges`).
+4. **Expected errors, and only these:** `schema "public" already exists`; the
+   foreign key from `doctors.auth_user_id` to `auth.users` failing to validate
+   (the scratch project has no auth users; the data is all there, only the
+   constraint is missing); `permission denied to change default privileges`
+   (three, for roles you do not own). Anything else is a problem.
+5. **Check it:** `select count(*) from doctors` and the workplace and specialty
+   links against production; the policies came back (`select count(*) from
+   pg_policies where schemaname = 'public'`, the same number as production); and
+   **the grants are those of the source database**: until the migration
+   `20261104150000_no_direct_directory_reads.sql` is applied there, `anon` and
+   `authenticated` still have SELECT on `doctors`, `doctor_workplaces` and
+   `doctor_specialties` (and, with no policy for `anon`, read nothing). This
+   must return no rows, whatever the source:
    ```sql
    select proname from pg_proc
     where prosecdef and pronamespace in ('public'::regnamespace, 'private'::regnamespace)
@@ -477,8 +490,12 @@ reset that), and a healthcheck URL tells you it stopped.
    and `has_table_privilege('anon', 'public.doctors', 'select')` must be false.
 6. Delete the scratch project and the decrypted file.
 
-Drilled 4 Nov 2026 with the real script's flags against the local database
-(8 of 8 doctors back, 15 policies, no function open to `anon`, the errors above).
+Drilled 4 Nov 2026 with the real backup from the first workflow run (downloaded
+from the bucket, decrypted with each of the two age keys, restored into a bare
+scratch database with the `auth` stub): 133 of 133 doctors, 151 workplaces,
+136 specialty links and 18 policies, as in production; no security definer
+function open to `anon`; no unfinished signups or registry rows (left out on
+purpose); exactly the errors listed above.
 
 **After a real restore, in this order:** apply any migration newer than the
 backup; run the registry sync by hand (the mirror table is empty); re-add the
