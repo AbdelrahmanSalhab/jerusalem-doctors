@@ -35,7 +35,7 @@ export function StateSwitches({
 }: {
   doctor: SwitchDoctor;
   busy: boolean;
-  onPatch: (body: Record<string, unknown>) => Promise<boolean>;
+  onPatch: (body: Record<string, unknown>) => Promise<boolean | "reason">;
 }) {
   const [asking, setAsking] = useState(false);
   const visibility = directoryVisibility(doctor);
@@ -48,7 +48,9 @@ export function StateSwitches({
       setAsking(true);
       return;
     }
-    void onPatch({ [field]: next });
+    void onPatch({ [field]: next }).then((r) => {
+      if (r === "reason") setAsking(true);
+    });
   };
 
   return (
@@ -112,8 +114,8 @@ export function StateSwitches({
           onCancel={() => setAsking(false)}
           onConfirm={async (reason) => {
             const ok = await onPatch({ is_admin_approved: true, approval_reason: reason });
-            if (ok) setAsking(false);
-            return ok;
+            if (ok === true) setAsking(false);
+            return ok === true;
           }}
         />
       )}

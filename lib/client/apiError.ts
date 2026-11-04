@@ -21,6 +21,7 @@ const MESSAGES: Record<string, string> = {
   not_found: "لم نجد هذا الحساب. ربما حُذف.",
   no_fields: "لا يوجد تغيير لحفظه.",
   approval_reason_required: "اكتب سبب قبول هذا الطبيب؛ ترخيصه ليس مطابقًا لسجل الوزارة.",
+  reason_required: "اكتب سبب تغيير الرقم؛ يُحفظ في سجل النشاط.",
   still_active: "أغلق الحساب أولًا؛ الحذف النهائي متاح للحسابات المغلقة فقط.",
   cannot_delete_self: "لا يمكنك حذف حسابك أنت.",
   delete_failed: "تعذّر الحذف. حاول مجددًا.",

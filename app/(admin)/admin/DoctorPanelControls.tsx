@@ -35,7 +35,7 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [, startTransition] = useTransition();
 
-  const patch = async (body: Record<string, unknown>): Promise<boolean> => {
+  const patch = async (body: Record<string, unknown>): Promise<boolean | "reason"> => {
     setBusy(true);
     setNotice(null);
     try {
@@ -45,6 +45,9 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
         body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => ({}));
+      // The server knows something the row does not (a number found by name):
+      // hand back that a reason is wanted so the prompt can open.
+      if (payload?.code === "approval_reason_required" && !body.approval_reason) return "reason";
       if (!res.ok) {
         setNotice({
           ok: false,

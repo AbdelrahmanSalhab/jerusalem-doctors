@@ -101,7 +101,7 @@ function cleanSpecialty(s: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-// Both strings must be non-empty (nameMatchRule checks; so does findByName).
+// Edit distance; an empty string is allowed (the distance is the other length).
 export function levenshtein(a: string, b: string): number {
   let prev = new Array<number>(b.length + 1);
   let curr = new Array<number>(b.length + 1);

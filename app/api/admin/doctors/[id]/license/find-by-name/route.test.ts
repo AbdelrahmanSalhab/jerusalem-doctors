@@ -3,7 +3,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const gate = vi.hoisted(() => ({ admin: true, allowed: true }));
-const lookup = vi.hoisted(() => ({ find: vi.fn(async (...args: unknown[]) => (void args, [{ licenseNumber: "189317" }])) }));
+const lookup = vi.hoisted(() => ({
+  find: vi.fn(async (...args: unknown[]) => (void args, { candidates: [{ licenseNumber: "189317" }], more: false })),
+}));
 let doctor: Record<string, unknown> | null = null;
 const writes: string[] = [];
 
@@ -26,10 +28,10 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 const ID = "00000000-0000-4000-8000-0000000000d1";
-async function call(id = ID, body?: unknown) {
+async function call(id = ID, body: unknown = { slot: "primary" }) {
   const { POST } = await import("./route");
   return POST(
-    new Request("https://example.test/x", { method: "POST", ...(body === undefined ? {} : { body: JSON.stringify(body) }) }),
+    new Request("https://example.test/x", { method: "POST", ...(body === null ? {} : { body: JSON.stringify(body) }) }),
     { params: Promise.resolve({ id }) },
   );
 }
@@ -68,7 +70,7 @@ describe("POST .../license/find-by-name", () => {
   it("returns the candidates and writes nothing", async () => {
     const res = await call();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ has_name: true, candidates: [{ licenseNumber: "189317" }] });
+    expect(await res.json()).toEqual({ has_name: true, candidates: [{ licenseNumber: "189317" }], more: false });
     expect(writes).toEqual([]);
   });
 
@@ -79,18 +81,35 @@ describe("POST .../license/find-by-name", () => {
     expect(lookup.find.mock.calls.at(-1)?.[2]).toBe("555555");
   });
 
-  it("refuses a slot that does not exist", async () => {
+  it("refuses a slot that does not exist, and a request with no body", async () => {
     expect((await call(ID, { slot: "third" })).status).toBe(400);
+    expect((await call(ID, null)).status).toBe(400);
+    expect(lookup.find).not.toHaveBeenCalled();
+  });
+
+  it("answers 500 when the lookup fails, rather than an empty list", async () => {
+    lookup.find.mockRejectedValueOnce(new Error("moh_practitioners read failed: boom"));
+    const res = await call();
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ code: "internal_error" });
+  });
+
+  it("counts lookups apart from checks", async () => {
+    const { rateLimit } = await import("@/lib/ratelimit");
+    await call();
+    expect(vi.mocked(rateLimit).mock.calls.at(-1)).toEqual(["adminLicenseCheck", expect.stringMatching(/:by-name$/)]);
   });
 
   it("finds nothing for a Palestinian licence, which has no registry, and does not look", async () => {
     doctor = { ...doctor, secondary_license_region: "PS" };
-    expect(await (await call(ID, { slot: "secondary" })).json()).toEqual({ has_name: true, candidates: [] });
+    expect(await (await call(ID, { slot: "secondary" })).json()).toEqual({ has_name: true, candidates: [], more: false });
     expect(lookup.find).not.toHaveBeenCalled();
   });
 
-  it("says when there is no Hebrew name to search with", async () => {
+  it("says when there is no Hebrew name to search with, including a name that is only marks", async () => {
     doctor = { ...doctor, hebrew_first_name: null };
+    expect((await (await call()).json()).has_name).toBe(false);
+    doctor = { ...doctor, hebrew_first_name: "\u05B0\u05B8", hebrew_family_name: "דריפוס" };
     expect((await (await call()).json()).has_name).toBe(false);
   });
 });

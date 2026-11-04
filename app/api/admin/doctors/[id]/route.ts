@@ -7,6 +7,7 @@
 // page promises after a deletion request.
 // Audit-logs every state change.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { FEATURED_KINDS } from "@/lib/directory";
@@ -20,6 +21,20 @@ import { directoryChanged } from "@/lib/cachedReads";
 import { approvalNeedsReason } from "@/lib/licenseStatus";
 
 const APPROVAL_REASON_MIN = 3;
+
+/** The last licence correction for this doctor came from a find-by-name list. */
+async function numberFoundByName(service: SupabaseClient, id: string): Promise<boolean> {
+  const r = await service
+    .from("audit_logs")
+    .select("metadata")
+    .eq("target_doctor_id", id)
+    .eq("action", "admin_license_corrected")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (r.error && r.error.code !== "PGRST116") throw r.error;
+  return (r.data?.metadata as { via_name_lookup?: boolean } | null)?.via_name_lookup === true;
+}
 
 const Body = z.object({
   is_admin_approved: z.boolean().optional(),
@@ -85,7 +100,10 @@ export const PATCH = withJsonErrors(async (
 
   // Accepting a doctor the registry does not confirm is a judgement call, and
   // the log should say what it rested on.
-  if (fields.is_admin_approved === true && approvalNeedsReason(licenseStatus) && !approval_reason) {
+  // A number found by the doctor's own name reads "verified" without being
+  // independent of the name, so it is asked about like an unconfirmed one.
+  const foundByName = fields.is_admin_approved === true && !approval_reason && (await numberFoundByName(service, id));
+  if (fields.is_admin_approved === true && (approvalNeedsReason(licenseStatus) || foundByName) && !approval_reason) {
     return jsonError(400, { error: "approval_reason_required", code: "approval_reason_required" });
   }
 

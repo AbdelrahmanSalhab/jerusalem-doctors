@@ -385,4 +385,67 @@ describe("POST .../license/save: a changed number needs a reason", () => {
     expect((await res.json()).code).toBe("reason_required");
     expect(updates).toHaveLength(0);
   });
+
+  it("asks just as much for the other slot, and for a first number in an empty one", async () => {
+    mirrorRows = [MIRROR];
+    doctor = { ...DOCTOR, secondary_license_number: "555555", secondary_license_region: "IL" };
+    expect((await call({ slot: "secondary", license_number: "189371", reason: undefined })).status).toBe(400);
+    doctor = { ...DOCTOR };
+    expect((await call({ slot: "secondary", license_number: "189371", reason: undefined })).status).toBe(400);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("asks for one when only the region changes", async () => {
+    doctor = { ...DOCTOR, license_number: "12345", license_region: "IL" };
+    const res = await call({ slot: "primary", license_number: "12345", region: "PS", reason: undefined });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("reason_required");
+  });
+
+  // The rule must not catch a recheck: those never had a reason to give.
+  it("does not ask when the number is the one already stored", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "verified", reason: undefined });
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({ action: "admin_license_rechecked" });
+  });
+
+  it("keeps the reason in the log of a plain correction", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", reason: "صورة الترخيص" });
+    expect(audits[0]).toMatchObject({ action: "admin_license_corrected", metadata: { reason: "صورة الترخيص" } });
+  });
+
+  it("keeps the reason when the number changes together with taking the registry's spelling", async () => {
+    mirrorRows = [{ ...MIRROR, hebrew_first_name: "דניאלה", hebrew_first_norm: "דניאלה" }];
+    const res = await call({ slot: "primary", license_number: "189371", adopt_registry_name: true, reason: "تأكدت" });
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({ metadata: { adopted_registry_name: true, reason: "تأكدت" } });
+  });
+});
+
+describe("POST .../license/save: a number found by name", () => {
+  it("is marked in the log, so approving the doctor can ask about it", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", source: "name_lookup" });
+    expect(audits[0]).toMatchObject({ metadata: { via_name_lookup: true } });
+  });
+
+  it("is not marked when the admin typed it", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371" });
+    expect(audits[0].metadata).not.toHaveProperty("via_name_lookup");
+  });
+
+  it("is not marked on a recheck of the number already stored", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", source: "name_lookup" });
+    expect(audits[0].metadata).not.toHaveProperty("via_name_lookup");
+  });
+
+  it("refuses any other source", async () => {
+    expect((await call({ slot: "primary", license_number: "189371", source: "guess" })).status).toBe(400);
+  });
 });

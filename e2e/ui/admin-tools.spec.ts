@@ -50,6 +50,14 @@ test.describe("licence correction", () => {
     await expect
       .poll(async () => (await serviceClient().from("doctors").select("license_number").eq("id", doctor.id).single()).data?.license_number)
       .toBe("510030");
+    // The log says the number came from the name list, which is what makes
+    // accepting this doctor ask for a reason.
+    await expect
+      .poll(async () => {
+        const { data } = await serviceClient().from("audit_logs").select("metadata").eq("target_doctor_id", doctor.id).eq("action", "admin_license_corrected");
+        return (data?.[0]?.metadata as { via_name_lookup?: boolean } | undefined)?.via_name_lookup;
+      })
+      .toBe(true);
   });
 
   test("it also finds a doctor whose Hebrew first and family names were typed the wrong way round", async ({ page }) => {

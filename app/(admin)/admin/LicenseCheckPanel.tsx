@@ -38,6 +38,7 @@ interface NameCandidate {
   kind: "exact" | "swapped" | "family";
   distance: number | null;
   heldBy: { id: string; name: string } | null;
+  own: "stored" | "other_slot" | null;
 }
 
 const TONE_BOX: Record<StatusTone, string> = {
@@ -67,7 +68,9 @@ export function LicenseCheckPanel({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-  const [byName, setByName] = useState<{ hasName: boolean; candidates: NameCandidate[] } | null>(null);
+  const [byName, setByName] = useState<{ hasName: boolean; candidates: NameCandidate[]; more: boolean } | null>(null);
+  // The number being checked came from the by-name list, not from the admin.
+  const [viaName, setViaName] = useState(false);
 
   const post = async (path: "check" | "save" | "find-by-name", body: Record<string, unknown>) => {
     const res = await fetch(`/api/admin/doctors/${doctorId}/license/${path}`, {
@@ -79,13 +82,14 @@ export function LicenseCheckPanel({
     return { ok: res.ok, payload };
   };
 
-  const search = async (n = number) => {
+  const search = async (n = number, fromList = false) => {
     setBusy(true);
     setError(null);
     setSaved(null);
     setResult(null);
     setOverride(false);
     setReason("");
+    setViaName(fromList);
     try {
       const { ok, payload } = await post("check", { slot, license_number: n, region });
       if (!ok) {
@@ -106,19 +110,25 @@ export function LicenseCheckPanel({
     setBusy(true);
     setError(null);
     setSaved(null);
+    // An older result and the reason typed for it belong to the old search.
+    setResult(null);
+    setOverride(false);
+    setReason("");
     try {
       const { ok, payload } = await post("find-by-name", { slot });
       if (!ok) {
         setError(apiErrorMessage(payload?.code, "تعذّر البحث. حاول مجددًا."));
         return;
       }
-      setByName({ hasName: payload.has_name, candidates: payload.candidates });
+      setByName({ hasName: payload.has_name, candidates: payload.candidates, more: payload.more === true });
     } catch {
       setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
     } finally {
       setBusy(false);
     }
   };
+
+  const changesNumber = Boolean(result) && result?.checked_number !== storedNumber;
 
   const save = async (adoptName = false) => {
     if (!result) return;
@@ -132,7 +142,8 @@ export function LicenseCheckPanel({
         expected_status: result.column_status,
         ...(adoptName ? { adopt_registry_name: true } : {}),
         ...(override ? { override_name_mismatch: true } : {}),
-        ...(override || result.checked_number !== storedNumber ? { reason: reason.trim() } : {}),
+        ...((override || changesNumber) && reason.trim() ? { reason: reason.trim() } : {}),
+        ...(viaName && changesNumber ? { source: "name_lookup" } : {}),
       });
       if (!ok) {
         setError(fieldErrorMessage(payload?.fields) ?? apiErrorMessage(payload?.code, "تعذّر الحفظ. حاول مجددًا."));
@@ -177,9 +188,8 @@ export function LicenseCheckPanel({
   const ourName = result ? `${result.our_name.firstName ?? ""} ${result.our_name.familyName ?? ""}`.trim() : "";
   const adoptable = Boolean(result?.adoptable_name);
   const mismatch = result?.status === "name_mismatch";
-  const changesNumber = Boolean(result) && result?.checked_number !== storedNumber;
-  const canSave =
-    Boolean(result) && (!mismatch || override) && (!(override || changesNumber) || reason.trim().length >= 3);
+  const reasonOk = !(override || changesNumber) || reason.trim().length >= 3;
+  const canSave = Boolean(result) && (!mismatch || override) && reasonOk;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-line bg-background/60 p-3 text-sm">
@@ -249,7 +259,7 @@ export function LicenseCheckPanel({
         <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
           <p className="font-medium">أرقام في السجل بهذا الاسم</p>
           <p className="text-xs text-muted">
-            اسم مطابق لا يثبت الهوية: تأكّد من الطبيب (اتصال أو واتساب) قبل اعتماد أي رقم.
+            اسم مطابق لا يثبت الهوية، وهاتف الحساب نفسه لا يثبتها أيضًا. تأكّد بوسيلة مستقلة (صورة الترخيص أو الهوية، أو مكان العمل) قبل اعتماد أي رقم.
           </p>
           {!byName.hasName ? (
             <p>لا يوجد اسم عبري محفوظ لهذا الطبيب، فلا يمكن البحث بالاسم.</p>
@@ -272,26 +282,37 @@ export function LicenseCheckPanel({
                       : c.kind === "swapped"
                         ? "الاسم الأول واسم العائلة مقلوبان"
                         : "نفس اسم العائلة فقط"}
-                    {c.distance !== null && c.distance <= 2 ? ` · يختلف بـ ${c.distance} من الأرقام` : ""}
+                    {c.distance !== null && c.distance >= 1 && c.distance <= 2
+                      ? ` · يختلف بـ ${c.distance} من الأرقام`
+                      : ""}
                   </span>
                   {c.heldBy && (
                     <span className="text-xs text-danger">مسجَّل لـ د. {c.heldBy.name}</span>
                   )}
-                  <button
-                    type="button"
-                    disabled={busy}
-                    aria-label={`فحص الرقم ${c.licenseNumber}`}
-                    onClick={() => {
-                      setNumber(c.licenseNumber);
-                      search(c.licenseNumber);
-                    }}
-                    className="rounded-md border border-line bg-background px-2 py-1 text-xs hover:bg-foreground/5 disabled:opacity-50"
-                  >
-                    فحص هذا الرقم
-                  </button>
+                  {c.own ? (
+                    <span className="text-xs text-muted">
+                      {c.own === "stored" ? "هذا هو الرقم المحفوظ حاليًا" : "الطبيب يحمل هذا الرقم في ترخيصه الآخر"}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`فحص الرقم ${c.licenseNumber}`}
+                      onClick={() => {
+                        setNumber(c.licenseNumber);
+                        search(c.licenseNumber, true);
+                      }}
+                      className="rounded-md border border-line bg-background px-2 py-1 text-xs hover:bg-foreground/5 disabled:opacity-50"
+                    >
+                      فحص هذا الرقم
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
+          )}
+          {byName.more && (
+            <p className="text-xs text-muted">القائمة مقتطعة: في السجل أسماء أخرى مشابهة لم تُعرض. اكتب الرقم إن عرفته.</p>
           )}
         </div>
       )}
@@ -383,7 +404,7 @@ export function LicenseCheckPanel({
               </p>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || !reasonOk}
                 onClick={() => save(true)}
                 className="w-fit rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-40"
               >

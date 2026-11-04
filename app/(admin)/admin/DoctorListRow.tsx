@@ -42,7 +42,7 @@ export function DoctorListRow({
   busy: boolean;
   open: boolean;
   onOpen: () => void;
-  onPatch: (body: Record<string, unknown>) => Promise<boolean>;
+  onPatch: (body: Record<string, unknown>) => Promise<boolean | "reason">;
 }) {
   const [asking, setAsking] = useState(false);
   const name = `${row.arabic_first_name} ${row.arabic_family_name}`;
@@ -59,7 +59,10 @@ export function DoctorListRow({
   // design rather than suspect.
   const accept = () => {
     if (approvalNeedsReason(row.license_verification_status)) setAsking(true);
-    else void onPatch({ is_admin_approved: true });
+    else
+      void onPatch({ is_admin_approved: true }).then((r) => {
+        if (r === "reason") setAsking(true);
+      });
   };
 
   return (
@@ -159,8 +162,8 @@ export function DoctorListRow({
             onCancel={() => setAsking(false)}
             onConfirm={async (reason) => {
               const ok = await onPatch({ is_admin_approved: true, ...(reason ? { approval_reason: reason } : {}) });
-              if (ok) setAsking(false);
-              return ok;
+              if (ok === true) setAsking(false);
+              return ok === true;
             }}
           />
         </div>

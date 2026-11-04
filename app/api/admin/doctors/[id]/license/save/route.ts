@@ -37,6 +37,10 @@ const Body = z.object({
   adopt_registry_name: z.boolean().optional(),
   override_name_mismatch: z.boolean().optional(),
   reason: z.string().trim().min(3).max(300).optional(),
+  /** The number was picked from a find-by-name list, which is a lead from the
+   *  doctor's own name and so proves nothing about who they are. Kept in the
+   *  log, and it makes accepting the doctor ask for a reason again. */
+  source: z.literal("name_lookup").optional(),
 });
 
 /** Postgres unique violation. Two different constraints can raise it, so the
@@ -152,9 +156,10 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
     adopted !== null &&
     (adopted.first !== doctor.hebrew_first_name || adopted.family !== doctor.hebrew_family_name);
 
-  // A different number is a change of identity: the log must say what it
-  // rested on (who confirmed it), like accepting a mismatch does.
-  if (numberChanged && stored.number && !body.reason) {
+  // A different number is a change of identity, and so is a first one in an
+  // empty slot: the log must say what it rested on (who confirmed it), like
+  // accepting a mismatch does.
+  if (numberChanged && !body.reason) {
     return jsonError(400, { error: "reason_required", code: "reason_required" });
   }
 
@@ -227,6 +232,7 @@ export const POST = withJsonErrors(async (req: Request, ctx: { params: Promise<{
             hebrew_name_after: `${adopted.first} ${adopted.family}`,
           }
         : {}),
+      ...(numberChanged && body.source ? { via_name_lookup: true } : {}),
       ...(body.reason ? { reason: body.reason } : {}),
     },
   });

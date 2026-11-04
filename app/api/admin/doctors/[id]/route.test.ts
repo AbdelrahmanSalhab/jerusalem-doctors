@@ -8,6 +8,8 @@ let licenseStatus: string | null = "verified";
 let doctorExists = true;
 let readError: unknown = null;
 let updateError: unknown = null;
+/** The metadata of the doctor's last licence correction in the log, if any. */
+let lastCorrection: Record<string, unknown> | null = null;
 
 const { requireAdminOrNull } = vi.hoisted(() => ({
   requireAdminOrNull: vi.fn(async (): Promise<{ id: string } | null> => ({ id: "00000000-0000-4000-8000-00000000a001" })),
@@ -23,14 +25,16 @@ vi.mock("@/lib/supabase/service", () => ({
     from: (table: string) => ({
       // The route reads the current licence status before writing, to know
       // whether accepting this doctor needs a reason.
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({
-            data: doctorExists ? { license_verification_status: licenseStatus } : null,
-            error: readError,
-          }),
-        }),
-      }),
+      select: () => {
+        const chain: Record<string, unknown> = {
+          maybeSingle: async () =>
+            table === "audit_logs"
+              ? { data: lastCorrection ? { metadata: lastCorrection } : null, error: null }
+              : { data: doctorExists ? { license_verification_status: licenseStatus } : null, error: readError },
+        };
+        for (const m of ["eq", "order", "limit"]) chain[m] = () => chain;
+        return chain;
+      },
       update(values: Record<string, unknown>) {
         updates.push(values);
         return { eq: async () => ({ error: updateError }) };
@@ -56,6 +60,7 @@ async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") 
 }
 
 beforeEach(() => {
+  lastCorrection = null;
   updates.length = 0;
   audits.length = 0;
   licenseStatus = "verified";
@@ -126,6 +131,26 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
       expect((await res.json()).code).toBe("approval_reason_required");
     }
     expect(updates).toEqual([]);
+  });
+
+  // A name found in the registry matched against itself: "verified" says
+  // nothing about who is signing up (issue #16).
+  it("asks for a reason even when verified, if the number was found by the doctor's name", async () => {
+    licenseStatus = "verified";
+    lastCorrection = { via_name_lookup: true };
+    const res = await call({ is_admin_approved: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("approval_reason_required");
+    expect(updates).toEqual([]);
+    expect((await call({ is_admin_approved: true, approval_reason: "صورة الهوية" })).status).toBe(200);
+  });
+
+  it("does not ask for a number the admin typed, or when there was no correction", async () => {
+    licenseStatus = "verified";
+    lastCorrection = { reason: "x" };
+    expect((await call({ is_admin_approved: true })).status).toBe(200);
+    lastCorrection = null;
+    expect((await call({ is_admin_approved: true })).status).toBe(200);
   });
 
   it("accepts with a reason, and keeps it in the log", async () => {
