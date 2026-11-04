@@ -9,7 +9,8 @@
 // and one line saying whether the doctor is actually findable right now.
 
 import { useState } from "react";
-import { ApprovalReasonPrompt } from "./ApprovalReasonPrompt";
+import { ApprovedNotice } from "./ApprovedNotice";
+import { ApprovalReasonPrompt, type PatchResult, type ReasonKind } from "./ApprovalReasonPrompt";
 import {
   directoryVisibility,
   STATE_GROUP_HEADING,
@@ -22,6 +23,8 @@ import {
 import { approvalNeedsReason, toneChip } from "@/lib/licenseStatus";
 
 export interface SwitchDoctor extends VisibilityFlags {
+  id: string;
+  phone_e164: string;
   arabic_first_name: string;
   arabic_family_name: string;
   license_verification_status: string | null;
@@ -35,20 +38,30 @@ export function StateSwitches({
 }: {
   doctor: SwitchDoctor;
   busy: boolean;
-  onPatch: (body: Record<string, unknown>) => Promise<boolean>;
+  onPatch: (body: Record<string, unknown>) => Promise<PatchResult>;
 }) {
   const [asking, setAsking] = useState(false);
+  const [told, setTold] = useState(false);
+  const [kind, setKind] = useState<ReasonKind>("unconfirmed");
   const visibility = directoryVisibility(doctor);
   const value = (field: StateField) => doctor[field];
 
   const toggle = (field: StateField) => {
     const next = !value(field);
-    // Accepting an unverified licence is the one change that wants a reason.
+    // Accepting an unverified licence opens the prompt at once; any other
+    // acceptance asks the server, which answers with the question to put.
     if (field === "is_admin_approved" && next && approvalNeedsReason(doctor.license_verification_status)) {
+      setKind("unconfirmed");
       setAsking(true);
       return;
     }
-    void onPatch({ [field]: next });
+    void onPatch({ [field]: next }).then((r) => {
+      if (r === true && field === "is_admin_approved" && next) setTold(true);
+      if (typeof r === "object") {
+        setKind(r.ask);
+        setAsking(true);
+      }
+    });
   };
 
   return (
@@ -103,17 +116,25 @@ export function StateSwitches({
         {visibility.sentence}
       </p>
 
+      {told && doctor.is_admin_approved && (
+        <ApprovedNotice doctorId={doctor.id} phone={doctor.phone_e164} firstName={doctor.arabic_first_name} listed={visibility.listed} />
+      )}
+
       {asking && (
         <ApprovalReasonPrompt
           name={`${doctor.arabic_first_name} ${doctor.arabic_family_name}`}
           status={doctor.license_verification_status}
           region={doctor.license_region}
           busy={busy}
+          kind={kind}
           onCancel={() => setAsking(false)}
           onConfirm={async (reason) => {
             const ok = await onPatch({ is_admin_approved: true, approval_reason: reason });
-            if (ok) setAsking(false);
-            return ok;
+            if (ok === true) {
+              setAsking(false);
+              setTold(true);
+            }
+            return ok === true;
           }}
         />
       )}

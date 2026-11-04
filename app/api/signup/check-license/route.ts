@@ -3,7 +3,7 @@
 // (data.gov.il, see plan §13). Called before /start.
 //
 // Outcomes:
-//   { status: "verified" }, proceed to /start, auto-approve later
+//   { status: "verified" }, proceed to /start (an admin still approves, #16)
 //   { status: "soft_match", registry_first/family }, confirm-then-proceed (admin queue)
 //   { status: "name_mismatch", registry_first/family}, block; ask user to retype
 //   { status: "not_found" }, proceed to /start; admin queue

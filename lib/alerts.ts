@@ -21,6 +21,12 @@ export const ALERTS = {
     level: "info",
     todo: "افتح «بانتظار الموافقة» في لوحة الإدارة، راجع الترخيص والبيانات، ثم اقبل أو ارفض.",
   },
+  doctor_waiting_long: {
+    sentry: "Doctor waiting for approval for over a day",
+    ar: "طبيب ينتظر القبول منذ أكثر من يوم",
+    level: "warning",
+    todo: "افتح «بانتظار الموافقة» وراجع من ينتظر. تصل هذه التنبيهات إلى كل المشرفين لأن الإشعار الأول وصل لواحد منهم فقط.",
+  },
   sms_half_budget: {
     sentry: "Half the daily SMS budget used",
     ar: "استُهلك نصف حد الرسائل اليومي",
@@ -92,6 +98,7 @@ export type AlertCode = keyof typeof ALERTS;
  *  information for the log too, but someone is waiting on a reply. */
 const PUSH_TO: Partial<Record<AlertCode, string>> = {
   doctor_waiting: "/admin?status=pending",
+  doctor_waiting_long: "/admin?status=pending",
   profile_reported: "/admin/reports",
   licenses_missing: "/admin?status=license",
   sms_cap_reached: "/admin/stats",
@@ -100,6 +107,10 @@ const PUSH_TO: Partial<Record<AlertCode, string>> = {
   number_requested: "/admin/requests",
   deletion_requested: "/admin?status=suspended",
 };
+
+/** The alerts that go to one admin at a time, in turn, so the same person is
+ *  not always the one woken for them (lib/push.ts). */
+const PUSH_IN_TURN: AlertCode[] = ["doctor_waiting"];
 
 export function isAlertCode(v: unknown): v is AlertCode {
   return typeof v === "string" && v in ALERTS;
@@ -125,7 +136,7 @@ export async function raiseAlert(
 
   const url = PUSH_TO[code];
   if (url) {
-    const push = () => sendPushToAdmins(service, { title: ALERTS[code].ar, url, tag: code });
+    const push = () => sendPushToAdmins(service, { title: ALERTS[code].ar, url, tag: code }, { rotate: PUSH_IN_TURN.includes(code) });
     // After the response, so a signup does not wait for Apple's push service;
     // outside a request (after() throws there) it simply starts.
     try {

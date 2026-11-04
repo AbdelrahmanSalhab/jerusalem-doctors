@@ -7,7 +7,7 @@
 // carries the accept action, and a button inside a button is invalid markup.
 
 import { Avatar } from "@/components/Avatar";
-import { ApprovalReasonPrompt } from "./ApprovalReasonPrompt";
+import { ApprovalReasonPrompt, type PatchResult, type ReasonKind } from "./ApprovalReasonPrompt";
 import type { DoctorRowData } from "./DoctorsList";
 import { directoryVisibility, staffKind } from "@/lib/admin/doctorState";
 import { careerStageBadge } from "@/lib/careerStage";
@@ -42,9 +42,10 @@ export function DoctorListRow({
   busy: boolean;
   open: boolean;
   onOpen: () => void;
-  onPatch: (body: Record<string, unknown>) => Promise<boolean>;
+  onPatch: (body: Record<string, unknown>) => Promise<PatchResult>;
 }) {
   const [asking, setAsking] = useState(false);
+  const [kind, setKind] = useState<ReasonKind>("unconfirmed");
   const name = `${row.arabic_first_name} ${row.arabic_family_name}`;
   const licence = licenseDisplay({ status: row.license_verification_status, region: row.license_region });
   const stage = row.career_stage ? careerStageBadge(row.career_stage, row.residency_start_year) : "طب عام";
@@ -54,12 +55,22 @@ export function DoctorListRow({
   // are instead of «د.», a stage and a licence nobody holds.
   const staff = staffKind(row);
 
-  // An exact registry match needs no explanation; anything else is a
-  // judgement call, including a Palestinian licence, which is unverifiable by
-  // design rather than suspect.
+  // Every acceptance needs a reason. An unconfirmed licence (a Palestinian one
+  // is unverifiable by design, not suspect) opens the prompt at once; any other
+  // goes to the server first, which knows whether a number was set by hand and
+  // so which question to ask (identity, or the corrected number).
   const accept = () => {
-    if (approvalNeedsReason(row.license_verification_status)) setAsking(true);
-    else void onPatch({ is_admin_approved: true });
+    if (approvalNeedsReason(row.license_verification_status)) {
+      setKind("unconfirmed");
+      setAsking(true);
+    } else {
+      void onPatch({ is_admin_approved: true }).then((r) => {
+        if (typeof r === "object") {
+          setKind(r.ask);
+          setAsking(true);
+        }
+      });
+    }
   };
 
   return (
@@ -156,11 +167,12 @@ export function DoctorListRow({
             status={row.license_verification_status}
             region={row.license_region}
             busy={busy}
+            kind={kind}
             onCancel={() => setAsking(false)}
             onConfirm={async (reason) => {
               const ok = await onPatch({ is_admin_approved: true, ...(reason ? { approval_reason: reason } : {}) });
-              if (ok) setAsking(false);
-              return ok;
+              if (ok === true) setAsking(false);
+              return ok === true;
             }}
           />
         </div>

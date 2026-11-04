@@ -60,9 +60,10 @@ test.describe("as a doctor", () => {
 test.describe("as a doctor waiting for approval", () => {
   test.use({ storageState: stateFile("pending") });
 
-  test("is told the account is under review, and can already search", async ({ page }) => {
+  test("sees the waiting panel, and can already search", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page.getByRole("status").filter({ hasText: "حسابك قيد المراجعة" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /استلمنا طلبك/ })).toBeVisible();
+    await expect(page.getByText("تراجع الإدارة طلبك")).toBeVisible();
     await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("ليلى");
     await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
   });

@@ -9,6 +9,7 @@
 // fields only an admin may touch).
 
 import { z } from "zod";
+import { cleanEmail } from "@/lib/normalize/email";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CAREER_STAGES, isResidentAndRetired, RESIDENCY_YEAR_MIN, RESIDENT_NOT_RETIRED } from "@/lib/careerStage";
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
@@ -19,7 +20,7 @@ import { WorkplaceInputSchema } from "@/lib/workplace";
 export const ProfileFieldsSchema = z.object({
   arabic_first_name: z.string().trim().min(2).max(80).optional(),
   arabic_family_name: z.string().trim().min(2).max(80).optional(),
-  email: z.email().max(254).optional(),
+  email: z.string().transform(cleanEmail).pipe(z.email().max(254)).optional(),
   subspecialty: z.string().trim().max(120).nullable().optional(),
   bio: z.string().trim().max(500).nullable().optional(),
   specialty_ids: z.array(z.uuid()).min(1).max(5).optional(),

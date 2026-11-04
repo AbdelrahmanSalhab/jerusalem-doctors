@@ -235,13 +235,15 @@ export const RECENT_MAX = 6;
  *  still make the cut. */
 const RECENT_POOL = 24;
 
-/** Listed doctors who joined in the last 7 days, newest first. Empty on a
- *  failed read: the section just does not show. */
+/** Listed doctors accepted in the last 7 days, newest first (by acceptance,
+ *  not signup: a doctor accepted a week after signing up is still new to the
+ *  directory). Empty on a failed read, which also covers the column not being
+ *  there yet (migration 20261104130000): the section just does not show. */
 export async function fetchRecent(service: SupabaseClient): Promise<SearchHit[]> {
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const { data, error } = await directoryQuery(service)
-    .gte("created_at", since)
-    .order("created_at", { ascending: false })
+    .gte("approved_at", since)
+    .order("approved_at", { ascending: false })
     .limit(RECENT_POOL);
   if (error) console.error("[directory] recent read failed", error);
   return toSearchHits(data);

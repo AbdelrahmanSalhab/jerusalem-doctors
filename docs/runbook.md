@@ -234,7 +234,7 @@ After this, the doctor's next login attempt with the new number works.
 
 ### A signup got through with `license_verification_status = 'not_found'`
 
-By design, these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
+By design, every new signup lands in the admin queue (`is_admin_approved=false`), whatever the registry says (#16): the registry match is public data, so it proves nothing about who is typing. They DO NOT show up in search. Review at `/admin?status=pending`; accepting asks for a reason (how you know it is them), or use the action buttons to suspend.
 
 ### «ترخيص يحتاج مراجعة» on /admin
 
@@ -341,7 +341,10 @@ Doctors reported exactly that ("I got two codes and both were wrong").
   doctor every 5 s, which our per-number limit never saw), the unused Twilio
   account SID and message service SID cleared (the auth token field still
   reads back 64 characters; revoke it in Twilio if it matters), and the old
-  `sms_test_otp` mapping (May, expired) emptied. Our own limits sit inside them: a code gets 5 guesses per 10
+  `sms_test_otp` mapping (May, expired) emptied. The database now refuses
+  connections without SSL (`PUT /v1/projects/<ref>/ssl-enforcement`, 1 Nov; the app
+  uses the REST API and is not affected; a direct `psql` needs `sslmode=require`).
+  Our own limits sit inside them: a code gets 5 guesses per 10
   minutes per phone at login (`loginVerify`) and 5 per code at signup, and the
   site sends at most 200 texts a day.
 - **How Supabase calls the hook** (supabase.com/docs/guides/auth/auth-hooks):
@@ -449,7 +452,10 @@ activity log). Web Push, sent by `lib/push.ts` after the response.
   Never a name, a number or a licence: it passes through Apple's and Google's
   push services.
 - **How often:** one notification per alert in five minutes, and a newer one
-  replaces the older. The admin list always shows every one.
+  replaces the older. The admin list always shows every one. A new doctor
+  waiting is the exception: it goes to one admin at a time, in turn (each
+  signup, no throttle), and a daily check pushes to all admins if anyone has
+  waited over 24 hours.
 - **Setup, once:** the `push_subscriptions` migration
   (`20261102130000_push_subscriptions.sql`), then three Vercel variables, for
   Production only, and a redeploy (the public key is built in):

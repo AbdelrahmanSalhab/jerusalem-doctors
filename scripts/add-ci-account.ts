@@ -63,6 +63,7 @@ async function main() {
         is_active: true,
         is_admin: true,
         is_admin_approved: true,
+        approved_at: new Date().toISOString(),
         is_visible: false,
       })
       .select("id")

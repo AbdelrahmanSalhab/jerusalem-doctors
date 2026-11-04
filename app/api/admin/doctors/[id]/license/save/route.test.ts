@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const updates: Record<string, unknown>[] = [];
 const audits: Record<string, unknown>[] = [];
+/** What touched the database, in order, to prove the log entry comes first. */
+const order: string[] = [];
+const deletedAudits: string[] = [];
+let auditInsertError: { message: string } | null = null;
 
 let doctor: Record<string, unknown> | null = null;
 let mirrorRows: Record<string, unknown>[] = [];
@@ -33,12 +37,24 @@ vi.mock("@/lib/supabase/service", () => ({
           Promise.resolve({ data: table === "moh_practitioners" ? mirrorRows : [], error: null }).then(ok),
         update(values: Record<string, unknown>) {
           updates.push(values);
+          order.push("update");
           return { eq: async () => ({ error: updateError }) };
         },
-        insert: async (row: Record<string, unknown>) => {
-          if (table === "audit_logs") audits.push(row);
-          return { error: null };
+        insert(row: Record<string, unknown>) {
+          if (table !== "audit_logs") return Promise.resolve({ error: null });
+          if (!auditInsertError) audits.push(row);
+          order.push("audit");
+          const done = Promise.resolve({ error: auditInsertError });
+          return Object.assign(done, {
+            select: () => ({ single: async () => ({ data: auditInsertError ? null : { id: "a1" }, error: auditInsertError }) }),
+          });
         },
+        delete: () => ({
+          eq: async (_col: string, id: string) => {
+            deletedAudits.push(id);
+            return { error: null };
+          },
+        }),
       };
       for (const m of ["select", "eq", "neq", "in", "or", "order", "limit"]) {
         chain[m] = () => chain;
@@ -77,13 +93,15 @@ const MIRROR = {
   synced_at: "2026-10-19T03:00:00Z",
 };
 
-async function call(body: unknown) {
+// A changed number needs a reason, so every call carries one unless the test
+// is about its absence (pass reason: undefined).
+async function call(body: Record<string, unknown>) {
   const { POST } = await import("./route");
   return POST(
     new Request("https://example.test/api/admin/doctors/d1/license/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ reason: "confirmed with the doctor", ...body }),
     }),
     { params: Promise.resolve({ id: "00000000-0000-4000-8000-0000000000d1" }) },
   );
@@ -92,6 +110,9 @@ async function call(body: unknown) {
 beforeEach(() => {
   updates.length = 0;
   audits.length = 0;
+  order.length = 0;
+  deletedAudits.length = 0;
+  auditInsertError = null;
   doctor = { ...DOCTOR };
   mirrorRows = [];
   duplicateRow = null;
@@ -372,5 +393,113 @@ describe("POST .../license/save: the review mark", () => {
   it("does not touch it when the secondary slot is saved: the queue counts the primary", async () => {
     await call({ slot: "secondary", license_number: "12345", region: "PS" });
     expect(updates[0]).not.toHaveProperty("license_reviewed_at");
+  });
+});
+
+describe("POST .../license/save: a changed number needs a reason", () => {
+  it("refuses to change the number without one, and writes nothing", async () => {
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "verified", reason: undefined });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("reason_required");
+    expect(updates).toHaveLength(0);
+  });
+
+  it("asks just as much for the other slot, and for a first number in an empty one", async () => {
+    mirrorRows = [MIRROR];
+    doctor = { ...DOCTOR, secondary_license_number: "555555", secondary_license_region: "IL" };
+    expect((await call({ slot: "secondary", license_number: "189371", reason: undefined })).status).toBe(400);
+    doctor = { ...DOCTOR };
+    expect((await call({ slot: "secondary", license_number: "189371", reason: undefined })).status).toBe(400);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("asks for one when only the region changes", async () => {
+    doctor = { ...DOCTOR, license_number: "12345", license_region: "IL" };
+    const res = await call({ slot: "primary", license_number: "12345", region: "PS", reason: undefined });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("reason_required");
+  });
+
+  // The rule must not catch a recheck: those never had a reason to give.
+  it("does not ask when the number is the one already stored", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [MIRROR];
+    const res = await call({ slot: "primary", license_number: "189371", expected_status: "verified", reason: undefined });
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({ action: "admin_license_rechecked" });
+  });
+
+  it("keeps the reason in the log of a plain correction", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", reason: "صورة الترخيص" });
+    expect(audits[0]).toMatchObject({ action: "admin_license_corrected", metadata: { reason: "صورة الترخيص" } });
+  });
+
+  it("keeps the reason when the number changes together with taking the registry's spelling", async () => {
+    mirrorRows = [{ ...MIRROR, hebrew_first_name: "דניאלה", hebrew_first_norm: "דניאלה" }];
+    const res = await call({ slot: "primary", license_number: "189371", adopt_registry_name: true, reason: "تأكدت" });
+    expect(res.status).toBe(200);
+    expect(audits[0]).toMatchObject({ metadata: { adopted_registry_name: true, reason: "تأكدت" } });
+  });
+});
+
+describe("POST .../license/save: a number found by name", () => {
+  it("is marked in the log, so approving the doctor can ask about it", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", source: "name_lookup" });
+    expect(audits[0]).toMatchObject({ metadata: { via_name_lookup: true } });
+  });
+
+  it("is not marked when the admin typed it", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371" });
+    expect(audits[0].metadata).not.toHaveProperty("via_name_lookup");
+  });
+
+  it("is not marked on a recheck of the number already stored", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371", source: "name_lookup" });
+    expect(audits[0].metadata).not.toHaveProperty("via_name_lookup");
+  });
+
+  it("refuses any other source", async () => {
+    expect((await call({ slot: "primary", license_number: "189371", source: "guess" })).status).toBe(400);
+  });
+});
+
+describe("POST .../license/save: the log entry is what approval later asks about", () => {
+  it("is written before the number is stored", async () => {
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371" });
+    expect(order).toEqual(["audit", "update"]);
+  });
+
+  it("stores nothing when the entry cannot be written", async () => {
+    mirrorRows = [MIRROR];
+    auditInsertError = { message: "boom" };
+    const res = await call({ slot: "primary", license_number: "189371" });
+    expect(res.status).toBe(500);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("withdraws the entry when the number then cannot be stored, so the log does not claim a change", async () => {
+    mirrorRows = [MIRROR];
+    updateError = { code: "23505" };
+    const res = await call({ slot: "primary", license_number: "189371" });
+    expect(res.status).toBe(409);
+    expect(deletedAudits).toEqual(["a1"]);
+    updateError = { code: "XX000" };
+    expect((await call({ slot: "primary", license_number: "189371" })).status).toBe(500);
+    expect(deletedAudits).toEqual(["a1", "a1"]);
+  });
+
+  it("still writes a recheck after the status is stored, and withdraws nothing", async () => {
+    doctor = { ...DOCTOR, license_number: "189371" };
+    mirrorRows = [MIRROR];
+    await call({ slot: "primary", license_number: "189371" });
+    expect(order).toEqual(["update", "audit"]);
+    expect(deletedAudits).toEqual([]);
   });
 });

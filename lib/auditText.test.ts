@@ -97,6 +97,17 @@ describe("audit log text", () => {
       expect(detail).toContain("السبب: «تحققت هاتفيًا»");
     });
 
+    it("says when the number was found by searching the doctor's name", () => {
+      const detail = auditDetail(
+        { action: "admin_license_corrected", metadata: { license_number: "55", via_name_lookup: true, reason: "صورة الترخيص" } },
+        none,
+      );
+      expect(detail).toContain("الرقم وُجد بالبحث بالاسم");
+      expect(auditFields({ action: "admin_license_corrected", metadata: { via_name_lookup: true } }, none)).toEqual([
+        { label: "وُجد الرقم بالبحث بالاسم", value: expect.any(String) },
+      ]);
+    });
+
     it("renders both actions with an Arabic title, never the raw code", () => {
       for (const action of ["admin_license_rechecked", "admin_license_corrected"]) {
         expect(auditTitle(action)).not.toBe(action);

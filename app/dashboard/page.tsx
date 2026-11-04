@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { DoctorWorkplace } from "@/lib/db/types";
 import { ProfileReminder } from "@/components/ProfileReminder";
+import { WaitingPanel } from "./WaitingPanel";
 import { InstallInvite } from "@/components/install/InstallInvite";
 import { DashboardSearch } from "./DashboardSearch";
 import { searchFromParams } from "@/lib/searchFilters";
@@ -105,16 +106,7 @@ export default async function DashboardPage({
         </p>
       )}
 
-      {!me.is_admin_approved && !me.is_admin && (
-        <p
-          role="status"
-          className="rounded-md border border-warn-line bg-warn-bg p-4 text-sm text-warn"
-        >
-          <strong className="font-semibold">حسابك قيد المراجعة.</strong> يمكنك
-          البحث في الدليل الآن، لكن اسمك لن يظهر للأطباء الآخرين حتى تتحقق
-          الإدارة من ترخيصك.
-        </p>
-      )}
+      {!me.is_admin_approved && !me.is_admin && <WaitingPanel firstName={me.arabic_first_name} />}
 
       <InstallInvite />
 

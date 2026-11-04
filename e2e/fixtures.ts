@@ -58,6 +58,9 @@ const EXPECTED: RegExp[] = [
   /^console\.error Failed to load resource: .* status of 401 .*\[\/api\/mfa\]/,
   // A wrong authenticator code is refused with a 400 (e2e/ui/mfa.spec.ts).
   /^console\.error Failed to load resource: .* status of 400 .*\[\/api\/mfa\/verify\]/,
+  // Accepting a doctor is refused with a 400 until a reason is given; the page
+  // then asks for it (e2e/ui/admin.spec.ts).
+  /^console\.error Failed to load resource: .* status of 400 .*\[\/api\/admin\/doctors\/[0-9a-f-]{36}\]/,
   // Next aborts in-flight prefetches when a test navigates on.
   /^requestfailed GET \S+[?&]_rsc=\S+ net::ERR_ABORTED/,
   // The same abort as WebKit (the phone project) reports it: a page error, not a failed request.

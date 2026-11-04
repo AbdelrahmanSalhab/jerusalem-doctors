@@ -43,6 +43,7 @@ const TITLE: Record<string, string> = {
   unfinished_signup_reminded: "تذكير بتسجيل لم يكتمل",
   unfinished_signup_deleted: "حذف تسجيل لم يكتمل",
   admin_doctor_updated: "تعديل من الإدارة",
+  approval_notified: "إبلاغ بالقبول",
   admin_doctor_profile_edited: "تعديل الملف من الإدارة",
   admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
   admin_doctor_deleted: "حذف نهائي لحساب",
@@ -142,6 +143,7 @@ function licenseCheckDetail(m: Record<string, unknown>): string {
   if (m.adopted_registry_name) {
     parts.push(`الاسم العبري: ${quote(m.hebrew_name_before)} ← ${quote(m.hebrew_name_after)} (كتابة السجل)`);
   }
+  if (m.via_name_lookup) parts.push("الرقم وُجد بالبحث بالاسم");
   if (m.reason) parts.push(`السبب: ${quote(m.reason)}`);
   return parts.join(" · ");
 }
@@ -257,6 +259,7 @@ const FIELD_LABEL: Record<string, string> = {
   match_family: "مطابقة اسم العائلة",
   candidates: "القراءات المحتملة للرقم",
   override_name_mismatch: "حُفظ رغم اختلاف الاسم",
+  via_name_lookup: "وُجد الرقم بالبحث بالاسم",
   registry_first_name: "الاسم الأول في السجل",
   registry_family_name: "اسم العائلة في السجل",
   reason: "السبب",

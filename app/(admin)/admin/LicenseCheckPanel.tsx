@@ -30,6 +30,17 @@ interface CheckResult {
   stored_status: string | null;
 }
 
+interface NameCandidate {
+  licenseNumber: string;
+  firstName: string;
+  familyName: string;
+  specialtyHe: string | null;
+  kind: "exact" | "swapped" | "family";
+  distance: number | null;
+  heldBy: { id: string; name: string } | null;
+  own: "stored" | "other_slot" | null;
+}
+
 const TONE_BOX: Record<StatusTone, string> = {
   success: "border-success-line bg-success-bg",
   warn: "border-warn-line bg-warn-bg",
@@ -57,8 +68,14 @@ export function LicenseCheckPanel({
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [byName, setByName] = useState<{ hasName: boolean; candidates: NameCandidate[]; more: boolean; familyCut: boolean } | null>(null);
+  // The number being checked came from the by-name list, not from the admin.
+  const [viaName, setViaName] = useState(false);
+  // The server asked for a reason the panel did not expect (the stored number
+  // moved under it), so the box must appear.
+  const [reasonRequired, setReasonRequired] = useState(false);
 
-  const post = async (path: "check" | "save", body: Record<string, unknown>) => {
+  const post = async (path: "check" | "save" | "find-by-name", body: Record<string, unknown>) => {
     const res = await fetch(`/api/admin/doctors/${doctorId}/license/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,14 +85,17 @@ export function LicenseCheckPanel({
     return { ok: res.ok, payload };
   };
 
-  const search = async () => {
+  const search = async (n = number, fromList = false) => {
     setBusy(true);
     setError(null);
     setSaved(null);
     setResult(null);
     setOverride(false);
+    setReason("");
+    setViaName(fromList);
+    setReasonRequired(false);
     try {
-      const { ok, payload } = await post("check", { slot, license_number: number, region });
+      const { ok, payload } = await post("check", { slot, license_number: n, region });
       if (!ok) {
         setError(fieldErrorMessage(payload?.fields) ?? apiErrorMessage(payload?.code, "تعذّر البحث. حاول مجددًا."));
         return;
@@ -88,6 +108,32 @@ export function LicenseCheckPanel({
     }
   };
 
+  // Candidates by Hebrew name: a lead for the admin to confirm with the
+  // doctor, never a fix. Picking one only runs the usual check on it.
+  const findByName = async () => {
+    setBusy(true);
+    setError(null);
+    setSaved(null);
+    // An older result and the reason typed for it belong to the old search.
+    setResult(null);
+    setOverride(false);
+    setReason("");
+    try {
+      const { ok, payload } = await post("find-by-name", { slot });
+      if (!ok) {
+        setError(apiErrorMessage(payload?.code, "تعذّر البحث. حاول مجددًا."));
+        return;
+      }
+      setByName({ hasName: payload.has_name, candidates: payload.candidates, more: payload.more === true, familyCut: payload.familyCut === true });
+    } catch {
+      setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changesNumber = Boolean(result) && result?.checked_number !== storedNumber;
+
   const save = async (adoptName = false) => {
     if (!result) return;
     setBusy(true);
@@ -99,9 +145,12 @@ export function LicenseCheckPanel({
         region,
         expected_status: result.column_status,
         ...(adoptName ? { adopt_registry_name: true } : {}),
-        ...(override ? { override_name_mismatch: true, reason: reason.trim() } : {}),
+        ...(override ? { override_name_mismatch: true } : {}),
+        ...((override || changesNumber || reasonRequired) && reason.trim() ? { reason: reason.trim() } : {}),
+        ...(viaName && changesNumber ? { source: "name_lookup" } : {}),
       });
       if (!ok) {
+        if (payload?.code === "reason_required") setReasonRequired(true);
         setError(fieldErrorMessage(payload?.fields) ?? apiErrorMessage(payload?.code, "تعذّر الحفظ. حاول مجددًا."));
         return;
       }
@@ -116,6 +165,8 @@ export function LicenseCheckPanel({
             : ""),
       );
       setResult(null);
+      setByName(null);
+      setReason("");
       router.refresh();
     } catch {
       setError("تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا.");
@@ -142,7 +193,9 @@ export function LicenseCheckPanel({
   const ourName = result ? `${result.our_name.firstName ?? ""} ${result.our_name.familyName ?? ""}`.trim() : "";
   const adoptable = Boolean(result?.adoptable_name);
   const mismatch = result?.status === "name_mismatch";
-  const canSave = Boolean(result) && (!mismatch || (override && reason.trim().length >= 3));
+  const needsReason = override || changesNumber || reasonRequired;
+  const reasonOk = !needsReason || reason.trim().length >= 3;
+  const canSave = Boolean(result) && (!mismatch || override) && reasonOk;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-line bg-background/60 p-3 text-sm">
@@ -153,7 +206,7 @@ export function LicenseCheckPanel({
         {region === "IL" && (
           <p className="text-xs text-muted">أدخله كما في سجل الوزارة، مثل 1-189371 أو 189371.</p>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             id={`lic-${slot}`}
             dir="ltr"
@@ -164,11 +217,21 @@ export function LicenseCheckPanel({
           <button
             type="button"
             disabled={busy || !number.trim()}
-            onClick={search}
+            onClick={() => search()}
             className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
           >
             {busy ? "جارٍ البحث…" : "بحث في السجل"}
           </button>
+          {region === "IL" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={findByName}
+              className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
+            >
+              بحث بالاسم
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}
@@ -176,6 +239,8 @@ export function LicenseCheckPanel({
               setOpen(false);
               setResult(null);
               setNumber(storedNumber);
+              setByName(null);
+              setReason("");
               setError(null);
             }}
             className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
@@ -194,6 +259,68 @@ export function LicenseCheckPanel({
         <p role="status" className="rounded-md border border-success-line bg-success-bg px-3 py-2 text-success">
           {saved}
         </p>
+      )}
+
+      {byName && (
+        <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
+          <p className="font-medium">أرقام في السجل بهذا الاسم</p>
+          <p className="text-xs text-muted">
+            اسم مطابق لا يثبت الهوية، وهاتف الحساب نفسه لا يثبتها أيضًا. تأكّد بوسيلة مستقلة (صورة الترخيص أو الهوية، أو مكان العمل) قبل اعتماد أي رقم.
+          </p>
+          {!byName.hasName ? (
+            <p>لا يوجد اسم عبري محفوظ لهذا الطبيب، فلا يمكن البحث بالاسم.</p>
+          ) : byName.candidates.length === 0 ? (
+            <p>لا يوجد في السجل أحد باسم العائلة هذا.</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {byName.candidates.map((c) => (
+                <li key={c.licenseNumber} className="flex flex-wrap items-center gap-2">
+                  <span dir="ltr" className="tabular-nums">
+                    {c.licenseNumber}
+                  </span>
+                  <span dir="ltr">
+                    {c.firstName} {c.familyName}
+                  </span>
+                  {c.specialtyHe && <span dir="ltr" className="text-muted">{c.specialtyHe}</span>}
+                  <span className="text-xs text-muted">
+                    {c.kind === "exact"
+                      ? "اسم مطابق"
+                      : c.kind === "swapped"
+                        ? "الاسم الأول واسم العائلة مقلوبان"
+                        : "نفس اسم العائلة فقط"}
+                    {c.distance === 1 ? " · يختلف في رقم واحد" : c.distance === 2 ? " · يختلف في رقمين" : ""}
+                  </span>
+                  {c.heldBy && (
+                    <span className="text-xs text-danger">مسجَّل لـ د. {c.heldBy.name}</span>
+                  )}
+                  {c.own ? (
+                    <span className="text-xs text-muted">
+                      {c.own === "stored" ? "هذا هو الرقم المحفوظ حاليًا" : "الطبيب يحمل هذا الرقم في ترخيصه الآخر"}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      aria-label={`فحص هذا الرقم ${c.licenseNumber}`}
+                      onClick={() => {
+                        setNumber(c.licenseNumber);
+                        search(c.licenseNumber, true);
+                      }}
+                      className="rounded-md border border-line bg-background px-2 py-1 text-xs hover:bg-foreground/5 disabled:opacity-50"
+                    >
+                      فحص هذا الرقم
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {byName.more ? (
+            <p className="text-xs text-muted">القائمة مقتطعة: في السجل أسماء مطابقة أخرى لم تُعرض. اكتب الرقم إن عرفته.</p>
+          ) : (
+            byName.familyCut && <p className="text-xs text-muted">عُرض الأقرب فقط من أصحاب اسم العائلة نفسه.</p>
+          )}
+        </div>
       )}
 
       {result && (
@@ -233,6 +360,20 @@ export function LicenseCheckPanel({
             <span className={toneChip(result.explanation.tone)}>{licenseStatusLabel(result.column_status)}</span>
           </p>
 
+          {(changesNumber || reasonRequired) && !mismatch && (
+            <label className="flex flex-col gap-1">
+              <span className="font-medium">سبب تغيير الرقم</span>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                maxLength={300}
+                placeholder="مثل: تأكّدت من صورة الترخيص أو من الطبيب بوسيلة مستقلة."
+                className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
+              />
+            </label>
+          )}
+
           {mismatch && (
             <div className="flex flex-col gap-2 rounded-md border border-danger-line bg-surface p-2">
               <label className="flex items-start gap-2">
@@ -245,15 +386,17 @@ export function LicenseCheckPanel({
                 <span>أتحمّل مسؤولية الحفظ رغم اختلاف الاسم</span>
               </label>
               {override && (
-                <textarea
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  rows={2}
-                  maxLength={300}
-                  aria-label="سبب الحفظ"
-                  placeholder="مثال: راجعت صورة الترخيص مع الطبيب."
-                  className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
-                />
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium">سبب الحفظ</span>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={2}
+                    maxLength={300}
+                    placeholder="مثال: راجعت صورة الترخيص مع الطبيب."
+                    className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
+                  />
+                </label>
               )}
             </div>
           )}
@@ -271,7 +414,7 @@ export function LicenseCheckPanel({
               </p>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || !reasonOk}
                 onClick={() => save(true)}
                 className="w-fit rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-40"
               >
@@ -296,7 +439,10 @@ export function LicenseCheckPanel({
             <button
               type="button"
               disabled={busy}
-              onClick={() => setResult(null)}
+              onClick={() => {
+                setResult(null);
+                setReason("");
+              }}
               className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
             >
               تجاهل النتيجة

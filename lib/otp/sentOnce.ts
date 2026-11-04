@@ -76,3 +76,17 @@ export async function claimOnce(key: string, ttlSeconds: number): Promise<boolea
     return true;
   }
 }
+
+/** A counter that goes up by one each call, for taking turns. Without Redis (or
+ *  when it fails) a random number, so the turns are still spread. */
+export async function nextTurn(key: string): Promise<number> {
+  const r = redis();
+  if (r) {
+    try {
+      return await r.incr(key);
+    } catch {
+      // Falls through to a random turn.
+    }
+  }
+  return Math.floor(Math.random() * 2 ** 31);
+}

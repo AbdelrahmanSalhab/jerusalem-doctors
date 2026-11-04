@@ -11,9 +11,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { ApprovedNotice } from "./ApprovedNotice";
 import { DoctorListRow } from "./DoctorListRow";
 import { adminDoctorsHref, DOCTOR_FILTERS, type DoctorFilter } from "@/lib/admin/doctorsQuery";
+import { directoryVisibility } from "@/lib/admin/doctorState";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
+import type { PatchResult } from "./ApprovalReasonPrompt";
 
 export interface DoctorRowData {
   id: string;
@@ -70,6 +73,9 @@ export function DoctorsList({
   const [search, setSearch] = useState(q);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [notice, setNotice] = useState<Notice | null>(null);
+  // The doctor just accepted: the row leaves the waiting list, so the admin
+  // is handed the WhatsApp message here, not on the row.
+  const [accepted, setAccepted] = useState<{ id: string; phone: string; firstName: string; listed: boolean } | null>(null);
   const [navigating, startTransition] = useTransition();
 
   const here = { filter, q, page };
@@ -81,9 +87,10 @@ export function DoctorsList({
 
   /** One row's save. Returns true when it stuck, so a row can close its own
    *  editor only on success. */
-  const patchDoctor = async (id: string, body: Record<string, unknown>): Promise<boolean> => {
+  const patchDoctor = async (id: string, body: Record<string, unknown>): Promise<PatchResult> => {
     setBusy((b) => ({ ...b, [id]: true }));
     setNotice(null);
+    setAccepted(null);
     try {
       const res = await fetch(`/api/admin/doctors/${id}`, {
         method: "PATCH",
@@ -91,6 +98,11 @@ export function DoctorsList({
         body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => ({}));
+      // The server knows something the row does not (a number found by name):
+      // hand back that a reason is wanted so the prompt can open.
+      if (payload?.code === "approval_reason_required" && !body.approval_reason) {
+        return { ask: payload.reason_kind ?? "unconfirmed" };
+      }
       if (!res.ok) {
         setNotice({
           ok: false,
@@ -99,6 +111,12 @@ export function DoctorsList({
         return false;
       }
       setNotice({ ok: true, text: "حُفظ التغيير." });
+      const row = body.is_admin_approved === true ? rows.find((r) => r.id === id) : undefined;
+      setAccepted(
+        row
+          ? { id, phone: row.phone_e164, firstName: row.arabic_first_name, listed: directoryVisibility({ ...row, is_admin_approved: true }).listed }
+          : null,
+      );
       startTransition(() => router.refresh());
       return true;
     } catch {
@@ -173,6 +191,7 @@ export function DoctorsList({
           {notice.text}
         </p>
       )}
+      {accepted && <ApprovedNotice doctorId={accepted.id} phone={accepted.phone} firstName={accepted.firstName} listed={accepted.listed} />}
 
       <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
         <div

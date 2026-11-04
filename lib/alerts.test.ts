@@ -44,22 +44,22 @@ describe("raiseAlert", () => {
 describe("raiseAlert and the admins' phones", () => {
   it("pushes the alerts that need an admin, with the Arabic title, the page to open and a tag of its own", async () => {
     await raiseAlert(service, "doctor_waiting");
-    expect(sendPushToAdmins).toHaveBeenCalledWith(service, { title: ALERTS.doctor_waiting.ar, url: "/admin?status=pending", tag: "doctor_waiting" });
+    expect(sendPushToAdmins).toHaveBeenCalledWith(service, { title: ALERTS.doctor_waiting.ar, url: "/admin?status=pending", tag: "doctor_waiting" }, { rotate: true });
     await raiseAlert(service, "sms_cap_reached");
-    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, expect.objectContaining({ url: "/admin/stats", tag: "sms_cap_reached" }));
+    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, expect.objectContaining({ url: "/admin/stats", tag: "sms_cap_reached" }), { rotate: false });
   });
 
-  it("pushes exactly the eight that call for action, none of the noisy ones", async () => {
+  it("pushes exactly the nine that call for action, none of the noisy ones", async () => {
     for (const code of Object.keys(ALERTS) as (keyof typeof ALERTS)[]) await raiseAlert(service, code);
     const pushed = sendPushToAdmins.mock.calls.map((c) => (c as unknown as [unknown, { tag: string }])[1].tag).sort();
-    expect(pushed).toEqual(["db_size_high", "deletion_requested", "doctor_waiting", "licenses_missing", "number_requested", "profile_reported", "sms_balance_low", "sms_cap_reached"]);
+    expect(pushed).toEqual(["db_size_high", "deletion_requested", "doctor_waiting", "doctor_waiting_long", "licenses_missing", "number_requested", "profile_reported", "sms_balance_low", "sms_cap_reached"]);
   });
 
   it("sends the two new ones to the page that deals with them", async () => {
     await raiseAlert(service, "number_requested");
-    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, { title: ALERTS.number_requested.ar, url: "/admin/requests", tag: "number_requested" });
+    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, { title: ALERTS.number_requested.ar, url: "/admin/requests", tag: "number_requested" }, { rotate: false });
     await raiseAlert(service, "deletion_requested");
-    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, { title: ALERTS.deletion_requested.ar, url: "/admin?status=suspended", tag: "deletion_requested" });
+    expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, { title: ALERTS.deletion_requested.ar, url: "/admin?status=suspended", tag: "deletion_requested" }, { rotate: false });
   });
 
   it("never carries details: the push has the title and link only", async () => {

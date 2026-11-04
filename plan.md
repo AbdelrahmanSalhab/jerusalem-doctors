@@ -87,7 +87,7 @@
 3. Client `POST /api/signup/start` with full form → server re-validates, normalizes Arabic + phone, writes a **pending_signups** row (token + payload + expiry), calls Supabase `auth.signInWithOtp({ phone, channel: 'whatsapp' })`.
 4. Twilio sends WA template message to the doctor's phone.
 5. Client `POST /api/signup/verify` { signup_session_id, otp_code } → server calls `auth.verifyOtp`, on success copies pending payload into `doctors`, links `auth_user_id`, marks `is_phone_verified=true`, sets `is_admin_approved` per license-check outcome, deletes pending row, returns session cookie.
-6. Redirect → `/dashboard`. License-verified doctors are auto-approved; `not_found` / `specialty_warning` doctors land in the admin queue (`is_admin_approved=false` until reviewed).
+6. Redirect → `/dashboard`. Every new doctor lands in the admin queue (`is_admin_approved=false` until an admin accepts, #16); a verified licence is a signal, not an approval.
 
 ### Auth flow, login
 1. `POST /api/login/start` { phone } → normalize → check doctor exists & active → `auth.signInWithOtp` (login channel).

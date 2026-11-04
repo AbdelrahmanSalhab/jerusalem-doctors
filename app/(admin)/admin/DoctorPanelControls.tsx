@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { StateSwitches, type SwitchDoctor } from "./StateSwitches";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
+import type { PatchResult } from "./ApprovalReasonPrompt";
 import {
   RESIDENCY_YEAR_MIN,
   residencyYearMax,
@@ -35,7 +36,7 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [, startTransition] = useTransition();
 
-  const patch = async (body: Record<string, unknown>): Promise<boolean> => {
+  const patch = async (body: Record<string, unknown>): Promise<PatchResult> => {
     setBusy(true);
     setNotice(null);
     try {
@@ -45,6 +46,11 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
         body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => ({}));
+      // The server knows something the row does not (a number found by name):
+      // hand back that a reason is wanted so the prompt can open.
+      if (payload?.code === "approval_reason_required" && !body.approval_reason) {
+        return { ask: payload.reason_kind ?? "unconfirmed" };
+      }
       if (!res.ok) {
         setNotice({
           ok: false,
