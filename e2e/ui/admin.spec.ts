@@ -24,10 +24,16 @@ test.describe("accepting a doctor", () => {
     // The search leaves this doctor alone on screen.
     await expect(page.getByText("طالب القبول")).toBeVisible();
     await page.getByRole("button", { name: "قبول العضوية" }).click();
-    await expect(page.getByText("حُفظ التغيير.")).toBeVisible();
+    // Even an exact registry match asks how the admin knows (#16).
+    await expect(page.getByText(/لا يثبت أنه صاحبها/)).toBeVisible();
+    expect((await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved).toBe(false);
+    await page.getByLabel("سبب القبول").fill("اتصلت بمكان عمله وأكّدوا");
+    await page.getByRole("button", { name: "قبول العضوية" }).last().click();
     await expect
       .poll(async () => (await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved)
       .toBe(true);
+    // Doctors get no push: the admin is handed the WhatsApp message to send.
+    await expect(page.getByRole("link", { name: "أرسل رسالة واتساب" })).toHaveAttribute("href", /wa\.me\/.*text=/);
 
     const doctor = await browser.newContext({ storageState: stateFile("doctor") });
     const p = await doctor.newPage();

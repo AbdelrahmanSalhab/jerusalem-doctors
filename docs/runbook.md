@@ -234,7 +234,7 @@ After this, the doctor's next login attempt with the new number works.
 
 ### A signup got through with `license_verification_status = 'not_found'`
 
-By design, these land in admin queue (`is_admin_approved=false`). They DO NOT show up in search. Review at `/admin?status=pending` and approve if legitimate, or use the action buttons to suspend.
+By design, every new signup lands in the admin queue (`is_admin_approved=false`), whatever the registry says (#16): the registry match is public data, so it proves nothing about who is typing. They DO NOT show up in search. Review at `/admin?status=pending`; accepting asks for a reason (how you know it is them), or use the action buttons to suspend.
 
 ### «ترخيص يحتاج مراجعة» on /admin
 
@@ -401,7 +401,10 @@ activity log). Web Push, sent by `lib/push.ts` after the response.
   Never a name, a number or a licence: it passes through Apple's and Google's
   push services.
 - **How often:** one notification per alert in five minutes, and a newer one
-  replaces the older. The admin list always shows every one.
+  replaces the older. The admin list always shows every one. A new doctor
+  waiting is the exception: it goes to one admin at a time, in turn (each
+  signup, no throttle), and a daily check pushes to all admins if anyone has
+  waited over 24 hours.
 - **Setup, once:** the `push_subscriptions` migration
   (`20261102130000_push_subscriptions.sql`), then three Vercel variables, for
   Production only, and a redeploy (the public key is built in):

@@ -12,7 +12,6 @@ import { relinkDoctor } from "@/lib/institutions";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { WorkplaceType } from "@/lib/workplace";
 import { writeAudit } from "@/lib/audit";
-import { directoryChanged } from "@/lib/cachedReads";
 import { raiseAlert } from "@/lib/alerts";
 import { recordEvent } from "@/lib/usage";
 import { after } from "next/server";
@@ -178,8 +177,9 @@ export const POST = withJsonErrors(async (req: Request) => {
   }
   const payload = stored;
 
-  const isAutoApproved = payload.license_verification_status === "verified";
-
+  // Never approved here. A registry match on the typed name and number is
+  // public data matched against itself, so it proves nothing about who is
+  // typing (#16); an admin approves every new doctor.
   const insert = await service
     .from("doctors")
     .insert({
@@ -226,7 +226,7 @@ export const POST = withJsonErrors(async (req: Request) => {
       consent_timestamp: new Date().toISOString(),
 
       is_phone_verified: true,
-      is_admin_approved: isAutoApproved,
+      is_admin_approved: false,
       is_visible: true,
       is_active: true,
     })
@@ -292,22 +292,18 @@ export const POST = withJsonErrors(async (req: Request) => {
     target_doctor_id: insert.data.id,
     metadata: {
       license_status: payload.license_verification_status,
-      auto_approved: isAutoApproved,
+      auto_approved: false,
     },
   });
 
-  if (!isAutoApproved) {
-    // Sentry and the admin's alerts list; the admin nav also shows the
-    // pending count.
-    await raiseAlert(service, "doctor_waiting", {
-      tags: { license_status: String(payload.license_verification_status) },
-      extra: { doctor_id: insert.data.id },
-    });
-  }
+  // Sentry, the admin's alerts list and one admin's phone; the admin nav also
+  // shows the pending count.
+  await raiseAlert(service, "doctor_waiting", {
+    tags: { license_status: String(payload.license_verification_status) },
+    extra: { doctor_id: insert.data.id },
+  });
 
-  // An auto-approved doctor is listed now; the dashboard count shows it.
-  if (isAutoApproved) directoryChanged();
-  return jsonOk({ ok: true, auto_approved: isAutoApproved });
+  return jsonOk({ ok: true });
 });
 
 /** The OTP proved the phone, so the owner is signed in to the account they
@@ -335,9 +331,5 @@ async function signInExisting(
   if (!(await linkAuthUser(service, doctor.data, userId))) {
     return jsonError(500, { error: "link_failed", code: "link_failed" });
   }
-  return jsonOk({
-    ok: true,
-    auto_approved: doctor.data.is_admin_approved,
-    existing_account: true,
-  });
+  return jsonOk({ ok: true, existing_account: true });
 }

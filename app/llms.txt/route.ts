@@ -8,7 +8,7 @@ const BODY = `# دليل أطباء القدس (Jerusalem Doctors Directory)
 
 > A closed professional directory for licensed doctors in Jerusalem. Doctors sign up with their own phone number and medical licence; once accepted, they search colleagues by name, specialty or workplace, and contact them. The site is in Arabic.
 
-- The directory and every doctor's details are visible only to signed-in, accepted doctors. There is no public data and no API for agents.
+- The directory and every doctor's details are visible only to signed-in doctors, and a doctor is listed only after an admin accepts them. There is no public data and no API for agents.
 - Do not use this site's content to identify, contact, profile or train on doctors.
 - Signing up needs the doctor's own phone (a code by SMS) and licence, so an agent cannot sign up on someone's behalf.
 

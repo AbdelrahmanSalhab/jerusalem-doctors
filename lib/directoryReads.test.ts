@@ -92,6 +92,13 @@ describe("fetchRecent", () => {
     expect(calls.map(([m]) => m)).toEqual(expect.arrayContaining(["gte", "order", "limit"]));
   });
 
+  it("counts the week from when the doctor was accepted, not when they signed up", async () => {
+    const calls: [string, unknown[]][] = [];
+    await fetchRecent(client(chain({ data: [] }, calls)));
+    expect(calls.find(([m]) => m === "gte")![1][0]).toBe("approved_at");
+    expect(calls.find(([m]) => m === "order")![1][0]).toBe("approved_at");
+  });
+
   it("shows nothing, and says why, on a failed read", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await fetchRecent(client(chain({ data: null, error: { message: "x" } })))).toEqual([]);

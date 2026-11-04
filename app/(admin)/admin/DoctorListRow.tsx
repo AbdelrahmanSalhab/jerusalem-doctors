@@ -55,9 +55,10 @@ export function DoctorListRow({
   // are instead of «د.», a stage and a licence nobody holds.
   const staff = staffKind(row);
 
-  // An exact registry match needs no explanation; anything else is a
-  // judgement call, including a Palestinian licence, which is unverifiable by
-  // design rather than suspect.
+  // Every acceptance needs a reason. An unconfirmed licence (a Palestinian one
+  // is unverifiable by design, not suspect) opens the prompt at once; any other
+  // goes to the server first, which knows whether a number was set by hand and
+  // so which question to ask (identity, or the corrected number).
   const accept = () => {
     if (approvalNeedsReason(row.license_verification_status)) {
       setKind("unconfirmed");

@@ -10,7 +10,7 @@ export interface ApiErrorBody {
   code?: string;
   fields?: Record<string, string>;
   /** Why a reason is wanted, when the client words the question by it. */
-  reason_kind?: "corrected_number";
+  reason_kind?: "corrected_number" | "identity";
 }
 
 export function jsonOk<T>(data: T, init?: ResponseInit): NextResponse {

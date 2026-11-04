@@ -53,6 +53,9 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(typeof data.title === "string" && data.title ? data.title : "دليل أطباء القدس", {
       // A newer notification with the same tag replaces the older one.
       tag: typeof data.tag === "string" ? data.tag : undefined,
+      // Without it, a second signup replaces the first on the same device with
+      // no sound or buzz, and the admin never learns there were two.
+      renotify: typeof data.tag === "string",
       icon: "/icon-192.png",
       lang: "ar",
       dir: "rtl",

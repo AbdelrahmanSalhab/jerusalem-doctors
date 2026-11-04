@@ -57,7 +57,7 @@ This directory closes that gap. It's a **closed, identity-verified, Arabic-first
 ## A few engineering details I'm proud of
 
 - **Single-source Arabic normalization.** A pure JS function handles hamza variants, alef-maksura, tatweel, and diacritics, and the same rules are baked into the seed migration so the DB and the search query agree to the byte. Test corpus: 18 Arabic edge cases.
-- **MoH license matching.** Three-tier match: exact, soft (Levenshtein ≤ 1 or substring, for spelling variants like דוד / דויד), or not-found. Soft matches and not-founds land in admin queue rather than silently auto-approving.
+- **MoH license matching.** Three-tier match: exact, soft (Levenshtein ≤ 1 or substring, for spelling variants like דוד / דויד), or not-found. The match is a signal for the admin, not an approval: every new signup waits for an admin, who gives a reason when accepting (#16).
 - **Mirrored 56k-row MoH dataset.** Daily cron deduplicates doctors with multiple specialty certificates (the public dataset has one row per certificate, not per doctor) and upserts in batches of 500 to avoid Postgres' "ON CONFLICT cannot affect a row twice" trap.
 - **Mobile-first responsive shell.** Tested on real Android/iOS phones, RTL preserved, big tap targets.
 

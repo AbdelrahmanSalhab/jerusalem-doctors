@@ -87,16 +87,16 @@ describe("POST /api/signup/verify", () => {
     auth.verifyOtp.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   });
 
-  it("creates an auto-approved doctor for a verified license", async () => {
+  it("creates a waiting doctor even for an exact registry match (#16), and tells the admins", async () => {
     db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
     const res = await call(BODY);
-    expect(await res.json()).toEqual({ ok: true, auto_approved: true });
+    expect(await res.json()).toEqual({ ok: true });
 
     expect(doctorInsert()).toMatchObject({
       auth_user_id: "u1",
       phone_e164: "+972501234567",
-      is_admin_approved: true,
+      is_admin_approved: false,
       is_phone_verified: true,
       consent_directory_use: true,
       // Keys absent from pre-0013 payloads get explicit defaults.
@@ -115,13 +115,14 @@ describe("POST /api/signup/verify", () => {
       expect.objectContaining({ doctor_id: "d1", name: "عيادة", address: null, hours: null, phone: null }),
     ]);
     expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);
-    expect(db.argsOf("audit_logs", "insert")[0][0]).toMatchObject({ action: "signup_verified" });
+    expect(db.argsOf("audit_logs", "insert")[0][0]).toMatchObject({ action: "signup_verified", metadata: { auto_approved: false } });
+    expect(db.argsOf("audit_logs", "insert")[1][0]).toMatchObject({ action: "alert", metadata: { alert: "doctor_waiting" } });
   });
 
   it("queues an unverified license for admin approval", async () => {
     db.queue("pending_signups", pending({ payload: payload({ license_verification_status: "not_found", specialty_ids: [], workplaces: [] }) }), CLAIMED);
     db.queue("doctors", { data: { id: "d1" } });
-    expect(await (await call(BODY)).json()).toEqual({ ok: true, auto_approved: false });
+    expect(await (await call(BODY)).json()).toEqual({ ok: true });
     expect(doctorInsert()).toMatchObject({ is_admin_approved: false, license_verified_at: null });
     expect(db.argsOf("doctor_specialties", "insert")).toHaveLength(0);
     expect(db.argsOf("doctor_workplaces", "insert")).toHaveLength(0);
@@ -236,7 +237,7 @@ describe("POST /api/signup/verify: a phone that already has an account", () => {
       data: { id: "d1", is_active: true, is_admin_approved: true, auth_user_id: null },
     });
     const res = await call(BODY);
-    expect(await res.json()).toEqual({ ok: true, auto_approved: true, existing_account: true });
+    expect(await res.json()).toEqual({ ok: true, existing_account: true });
     expect(db.argsOf("doctors", "insert")).toHaveLength(0);
     expect(db.argsOf("doctors", "update")).toEqual([[{ auth_user_id: "u1" }]]);
     expect(db.argsOf("pending_signups", "delete")).toHaveLength(1);

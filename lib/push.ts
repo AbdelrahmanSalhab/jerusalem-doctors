@@ -9,7 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
-import { claimOnce } from "@/lib/otp/sentOnce";
+import { claimOnce, nextTurn } from "@/lib/otp/sentOnce";
 
 export interface PushMessage {
   title: string;
@@ -77,23 +77,43 @@ async function deliver(
   return accepted;
 }
 
-export async function sendPushToAdmins(service: SupabaseClient, message: PushMessage): Promise<void> {
+/** `rotate`: the message goes to one admin, whose turn it is, instead of all of
+ *  them, and is not throttled (each one is its own news). If that admin's
+ *  devices are all gone, the next admin gets it. */
+export async function sendPushToAdmins(
+  service: SupabaseClient,
+  message: PushMessage,
+  options: { rotate?: boolean } = {},
+): Promise<void> {
   try {
     const keys = vapid();
     if (!keys) return;
-    if (!(await claimOnce(`push:${message.tag}`, PUSH_THROTTLE_SECONDS))) return;
+    if (!options.rotate && !(await claimOnce(`push:${message.tag}`, PUSH_THROTTLE_SECONDS))) return;
 
     // Only admins who still are: a demoted or closed account stops getting them.
     const { data, error } = await service
       .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth, doctor:doctors!inner(is_admin, is_active)")
+      .select("id, doctor_id, endpoint, p256dh, auth, doctor:doctors!inner(is_admin, is_active)")
       .eq("doctor.is_admin", true)
       .eq("doctor.is_active", true);
     if (error) {
       console.error("[push] subscriptions not read", error.code ?? error.message);
       return;
     }
-    if (data?.length) await deliver(service, keys, data, message);
+    if (!data?.length) return;
+    if (!options.rotate) {
+      await deliver(service, keys, data, message);
+      return;
+    }
+
+    const byAdmin = new Map<string, Subscription[]>();
+    for (const row of data) byAdmin.set(row.doctor_id, [...(byAdmin.get(row.doctor_id) ?? []), row]);
+    const admins = [...byAdmin.keys()].sort();
+    const first = (await nextTurn("push-turn:" + message.tag)) % admins.length;
+    for (let i = 0; i < admins.length; i++) {
+      const rows = byAdmin.get(admins[(first + i) % admins.length])!;
+      if ((await deliver(service, keys, rows, message)) > 0) return;
+    }
   } catch (err) {
     console.error("[push] failed", (err as Error).message);
   }

@@ -92,8 +92,10 @@ export function DoctorPanelBody({
       </header>
 
       <DoctorPanelControls
+        key={d.id}
         doctor={{
           id: d.id,
+          phone_e164: d.phone_e164,
           arabic_first_name: d.arabic_first_name,
           arabic_family_name: d.arabic_family_name,
           license_verification_status: d.license_verification_status,

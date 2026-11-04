@@ -5,7 +5,7 @@ import { SupportContact } from "@/components/SupportContact";
 export const dynamic = "force-dynamic";
 
 const STATUS_NOTICE: Record<string, string> = {
-  inactive: "حسابك غير مفعّل حاليًا. إن كان هذا خطأ، تواصل مع الإدارة.",
+  inactive: "حسابك غير مفعّل حاليًا: إما لم تُقبل عضويتك، أو أُغلق الحساب. تواصل مع الإدارة لمعرفة السبب.",
   deleted: "استلمنا طلب حذف حسابك وأخفيناه من البحث. ستكمل الإدارة الحذف قريبًا.",
 };
 
