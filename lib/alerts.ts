@@ -101,6 +101,10 @@ const PUSH_TO: Partial<Record<AlertCode, string>> = {
   deletion_requested: "/admin?status=suspended",
 };
 
+/** The alerts that go to one admin at a time, in turn, so the same person is
+ *  not always the one woken for them (lib/push.ts). */
+const PUSH_IN_TURN: AlertCode[] = ["doctor_waiting"];
+
 export function isAlertCode(v: unknown): v is AlertCode {
   return typeof v === "string" && v in ALERTS;
 }
@@ -125,7 +129,7 @@ export async function raiseAlert(
 
   const url = PUSH_TO[code];
   if (url) {
-    const push = () => sendPushToAdmins(service, { title: ALERTS[code].ar, url, tag: code });
+    const push = () => sendPushToAdmins(service, { title: ALERTS[code].ar, url, tag: code }, { rotate: PUSH_IN_TURN.includes(code) });
     // After the response, so a signup does not wait for Apple's push service;
     // outside a request (after() throws there) it simply starts.
     try {

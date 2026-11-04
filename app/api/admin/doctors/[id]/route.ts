@@ -105,17 +105,19 @@ export const PATCH = withJsonErrors(async (
   }
   const licenseStatus = current.data.license_verification_status as string | null;
 
-  // Accepting a doctor the registry does not confirm is a judgement call, and
-  // the log should say what it rested on.
+  // Accepting a doctor always needs a reason. For an exact registry match it
+  // says how the admin knew this is that doctor, because the match alone is
+  // public data (#16); for an unconfirmed licence or a number set by hand it
+  // says what the call rested on. The log keeps it.
   const approving = fields.is_admin_approved === true;
   const unconfirmed = approving && approvalNeedsReason(licenseStatus);
   // Only looked up when it can change the answer.
   const corrected = approving && !unconfirmed && (await primaryNumberCorrected(service, id));
-  if ((unconfirmed || corrected) && !approval_reason) {
+  if (approving && !approval_reason) {
     return jsonError(400, {
       error: "approval_reason_required",
       code: "approval_reason_required",
-      ...(corrected ? { reason_kind: "corrected_number" as const } : {}),
+      ...(!unconfirmed ? { reason_kind: corrected ? ("corrected_number" as const) : ("identity" as const) } : {}),
     });
   }
 
@@ -134,7 +136,7 @@ export const PATCH = withJsonErrors(async (
     ...(fields.featured !== undefined && { featured_at: fields.featured ? new Date().toISOString() : null }),
     // Accepting a doctor the registry does not confirm, with a reason, is the
     // review the licence queue waits for.
-    ...(fields.is_admin_approved === true && approval_reason && { license_reviewed_at: new Date().toISOString() }),
+    ...(approving && (unconfirmed || corrected) && { license_reviewed_at: new Date().toISOString() }),
   };
 
   const r = await service.from("doctors").update(updates).eq("id", id);

@@ -69,25 +69,26 @@ async function signUp(page: Page, s: Signup, { wrongFirst = false } = {}) {
   await expect(page).toHaveURL(/\/dashboard/, { timeout: 15_000 });
 }
 
-test("a doctor the registry knows signs up and is listed straight away @phone", async ({ page, browser }) => {
+// #16: the registry match is public data, so it proves nothing about who is
+// typing. Even an exact match waits for an admin, and is not in the directory.
+test("a doctor the registry knows signs up and waits for an admin, unlisted @phone", async ({ page, browser }) => {
   await signUp(page, { phone: PHONES.matched, license: "510020", arabic: ["سمير", "خوري"], hebrew: ["סמיר", "חורי"] }, { wrongFirst: true });
   await expect(page.getByRole("heading", { name: "مرحبًا د. سمير" })).toBeVisible();
-  await expect(page.getByText("حسابك قيد المراجعة")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /استلمنا طلبك يا د\. سمير/ })).toBeVisible();
 
   const { data } = await serviceClient()
     .from("doctors")
     .select("is_admin_approved, license_verification_status, seeking_work, career_stage")
     .eq("phone_e164", PHONES.matched)
     .single();
-  expect(data).toEqual({ is_admin_approved: true, license_verification_status: "verified", seeking_work: true, career_stage: null });
+  expect(data).toEqual({ is_admin_approved: false, license_verification_status: "verified", seeking_work: true, career_stage: null });
 
-  // A colleague finds them, marked as looking for work.
+  // A colleague does not find them.
   const colleague = await browser.newContext({ storageState: (await import("../helpers")).stateFile("doctor") });
   const p = await colleague.newPage();
   await p.goto("/dashboard");
   await p.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("سمير");
-  await expect(p.getByText("سمير خوري").first()).toBeVisible();
-  await expect(p.getByText("يبحث عن فرصة عمل").first()).toBeVisible();
+  await expect(p.getByText("سمير خوري")).toHaveCount(0);
   await colleague.close();
 });
 
@@ -115,7 +116,7 @@ test("signing up needs the pledge to keep colleagues' numbers among doctors", as
 
 test("a licence the registry does not have waits for an admin", async ({ page }) => {
   await signUp(page, { phone: PHONES.unknown, license: "599999", arabic: ["مجهول", "الترخيص"], hebrew: ["מג'הול", "אלתרח'יס"] });
-  await expect(page.getByText("حسابك قيد المراجعة")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /استلمنا طلبك/ })).toBeVisible();
   const { data } = await serviceClient().from("doctors").select("is_admin_approved").eq("phone_e164", PHONES.unknown).single();
   expect(data!.is_admin_approved).toBe(false);
 });

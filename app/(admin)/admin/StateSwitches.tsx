@@ -9,6 +9,7 @@
 // and one line saying whether the doctor is actually findable right now.
 
 import { useState } from "react";
+import { ApprovedNotice } from "./ApprovedNotice";
 import { ApprovalReasonPrompt, type PatchResult, type ReasonKind } from "./ApprovalReasonPrompt";
 import {
   directoryVisibility,
@@ -22,6 +23,7 @@ import {
 import { approvalNeedsReason, toneChip } from "@/lib/licenseStatus";
 
 export interface SwitchDoctor extends VisibilityFlags {
+  phone_e164: string;
   arabic_first_name: string;
   arabic_family_name: string;
   license_verification_status: string | null;
@@ -38,6 +40,7 @@ export function StateSwitches({
   onPatch: (body: Record<string, unknown>) => Promise<PatchResult>;
 }) {
   const [asking, setAsking] = useState(false);
+  const [told, setTold] = useState(false);
   const [kind, setKind] = useState<ReasonKind>("unconfirmed");
   const visibility = directoryVisibility(doctor);
   const value = (field: StateField) => doctor[field];
@@ -51,6 +54,7 @@ export function StateSwitches({
       return;
     }
     void onPatch({ [field]: next }).then((r) => {
+      if (r === true && field === "is_admin_approved" && next) setTold(true);
       if (typeof r === "object") {
         setKind(r.ask);
         setAsking(true);
@@ -110,6 +114,8 @@ export function StateSwitches({
         {visibility.sentence}
       </p>
 
+      {told && doctor.is_admin_approved && <ApprovedNotice phone={doctor.phone_e164} firstName={doctor.arabic_first_name} />}
+
       {asking && (
         <ApprovalReasonPrompt
           name={`${doctor.arabic_first_name} ${doctor.arabic_family_name}`}
@@ -120,7 +126,10 @@ export function StateSwitches({
           onCancel={() => setAsking(false)}
           onConfirm={async (reason) => {
             const ok = await onPatch({ is_admin_approved: true, approval_reason: reason });
-            if (ok === true) setAsking(false);
+            if (ok === true) {
+              setAsking(false);
+              setTold(true);
+            }
             return ok === true;
           }}
         />

@@ -49,7 +49,7 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
       // The server knows something the row does not (a number found by name):
       // hand back that a reason is wanted so the prompt can open.
       if (payload?.code === "approval_reason_required" && !body.approval_reason) {
-        return { ask: payload.reason_kind === "corrected_number" ? "corrected_number" : "unconfirmed" };
+        return { ask: payload.reason_kind ?? "unconfirmed" };
       }
       if (!res.ok) {
         setNotice({
