@@ -43,7 +43,7 @@ const TITLE: Record<string, string> = {
   unfinished_signup_reminded: "تذكير بتسجيل لم يكتمل",
   unfinished_signup_deleted: "حذف تسجيل لم يكتمل",
   admin_doctor_updated: "تعديل من الإدارة",
-  approval_notified: "إبلاغ الطبيب بالقبول",
+  approval_notified: "إبلاغ بالقبول",
   admin_doctor_profile_edited: "تعديل الملف من الإدارة",
   admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
   admin_doctor_deleted: "حذف نهائي لحساب",
