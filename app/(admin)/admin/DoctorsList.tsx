@@ -14,6 +14,7 @@ import { useState, useTransition } from "react";
 import { ApprovedNotice } from "./ApprovedNotice";
 import { DoctorListRow } from "./DoctorListRow";
 import { adminDoctorsHref, DOCTOR_FILTERS, type DoctorFilter } from "@/lib/admin/doctorsQuery";
+import { directoryVisibility } from "@/lib/admin/doctorState";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import type { PatchResult } from "./ApprovalReasonPrompt";
 
@@ -74,7 +75,7 @@ export function DoctorsList({
   const [notice, setNotice] = useState<Notice | null>(null);
   // The doctor just accepted: the row leaves the waiting list, so the admin
   // is handed the WhatsApp message here, not on the row.
-  const [accepted, setAccepted] = useState<{ phone: string; firstName: string } | null>(null);
+  const [accepted, setAccepted] = useState<{ id: string; phone: string; firstName: string; listed: boolean } | null>(null);
   const [navigating, startTransition] = useTransition();
 
   const here = { filter, q, page };
@@ -111,7 +112,11 @@ export function DoctorsList({
       }
       setNotice({ ok: true, text: "حُفظ التغيير." });
       const row = body.is_admin_approved === true ? rows.find((r) => r.id === id) : undefined;
-      setAccepted(row ? { phone: row.phone_e164, firstName: row.arabic_first_name } : null);
+      setAccepted(
+        row
+          ? { id, phone: row.phone_e164, firstName: row.arabic_first_name, listed: directoryVisibility({ ...row, is_admin_approved: true }).listed }
+          : null,
+      );
       startTransition(() => router.refresh());
       return true;
     } catch {
@@ -186,7 +191,7 @@ export function DoctorsList({
           {notice.text}
         </p>
       )}
-      {accepted && <ApprovedNotice phone={accepted.phone} firstName={accepted.firstName} />}
+      {accepted && <ApprovedNotice doctorId={accepted.id} phone={accepted.phone} firstName={accepted.firstName} listed={accepted.listed} />}
 
       <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
         <div

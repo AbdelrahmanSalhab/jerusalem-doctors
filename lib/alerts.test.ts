@@ -49,10 +49,10 @@ describe("raiseAlert and the admins' phones", () => {
     expect(sendPushToAdmins).toHaveBeenLastCalledWith(service, expect.objectContaining({ url: "/admin/stats", tag: "sms_cap_reached" }), { rotate: false });
   });
 
-  it("pushes exactly the eight that call for action, none of the noisy ones", async () => {
+  it("pushes exactly the nine that call for action, none of the noisy ones", async () => {
     for (const code of Object.keys(ALERTS) as (keyof typeof ALERTS)[]) await raiseAlert(service, code);
     const pushed = sendPushToAdmins.mock.calls.map((c) => (c as unknown as [unknown, { tag: string }])[1].tag).sort();
-    expect(pushed).toEqual(["db_size_high", "deletion_requested", "doctor_waiting", "licenses_missing", "number_requested", "profile_reported", "sms_balance_low", "sms_cap_reached"]);
+    expect(pushed).toEqual(["db_size_high", "deletion_requested", "doctor_waiting", "doctor_waiting_long", "licenses_missing", "number_requested", "profile_reported", "sms_balance_low", "sms_cap_reached"]);
   });
 
   it("sends the two new ones to the page that deals with them", async () => {

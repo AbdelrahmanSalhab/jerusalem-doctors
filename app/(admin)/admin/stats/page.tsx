@@ -244,7 +244,7 @@ export default async function AdminStatsPage() {
               ]}
             />
             <p className="text-xs text-muted">
-              الموافقة: تلقائية {d.approved_auto} · من الإدارة {d.approved_manual}
+              الترخيص: مطابق للسجل {d.approved_auto} · غير مطابق أو بقرار الإدارة {d.approved_manual}
             </p>
           </div>
           <div className="flex flex-col gap-2">

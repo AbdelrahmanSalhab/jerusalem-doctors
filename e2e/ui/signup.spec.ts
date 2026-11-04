@@ -87,7 +87,14 @@ test("a doctor the registry knows signs up and waits for an admin, unlisted @pho
   const colleague = await browser.newContext({ storageState: (await import("../helpers")).stateFile("doctor") });
   const p = await colleague.newPage();
   await p.goto("/dashboard");
+  // The search is debounced: wait for its answer, or "not listed" is checked
+  // before any request has gone out and can never fail.
+  const answer = p.waitForResponse((r) => r.url().includes("/api/search") && r.request().method() === "GET");
   await p.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("سمير");
+  const res = await answer;
+  expect(res.status()).toBe(200);
+  expect(JSON.stringify(await res.json())).not.toContain("خوري");
+  // Nor in the sections the dashboard opens with («جديد هذا الأسبوع»).
   await expect(p.getByText("سمير خوري")).toHaveCount(0);
   await colleague.close();
 });

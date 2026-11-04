@@ -56,6 +56,7 @@ const POLICY: Record<string, Policy> = {
   "DELETE /api/admin/pending-signups/[id]": "admin",
   "PATCH /api/admin/institutions/[id]": "admin",
   "PATCH /api/admin/number-requests/[id]": "admin",
+  "POST /api/admin/doctors/[id]/notified": "admin",
   "DELETE /api/admin/institutions/[id]": "admin",
   "POST /api/admin/institutions": "admin",
   "PATCH /api/admin/specialties/[id]": "admin",

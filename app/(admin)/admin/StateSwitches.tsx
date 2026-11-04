@@ -23,6 +23,7 @@ import {
 import { approvalNeedsReason, toneChip } from "@/lib/licenseStatus";
 
 export interface SwitchDoctor extends VisibilityFlags {
+  id: string;
   phone_e164: string;
   arabic_first_name: string;
   arabic_family_name: string;
@@ -47,7 +48,8 @@ export function StateSwitches({
 
   const toggle = (field: StateField) => {
     const next = !value(field);
-    // Accepting an unverified licence is the one change that wants a reason.
+    // Accepting an unverified licence opens the prompt at once; any other
+    // acceptance asks the server, which answers with the question to put.
     if (field === "is_admin_approved" && next && approvalNeedsReason(doctor.license_verification_status)) {
       setKind("unconfirmed");
       setAsking(true);
@@ -114,7 +116,9 @@ export function StateSwitches({
         {visibility.sentence}
       </p>
 
-      {told && doctor.is_admin_approved && <ApprovedNotice phone={doctor.phone_e164} firstName={doctor.arabic_first_name} />}
+      {told && doctor.is_admin_approved && (
+        <ApprovedNotice doctorId={doctor.id} phone={doctor.phone_e164} firstName={doctor.arabic_first_name} listed={visibility.listed} />
+      )}
 
       {asking && (
         <ApprovalReasonPrompt
