@@ -12,7 +12,7 @@ export default async function AdminRequestsPage() {
   await requireAdmin();
   const { data, error } = await createSupabaseServiceClient()
     .from("number_requests")
-    .select("id, query, created_at, requester:doctors!requester_id(arabic_full_name, phone_e164)")
+    .select("id, query, created_at, requester:doctors!requester_id(arabic_full_name, phone_e164, is_admin_approved)")
     .is("resolved_at", null)
     .order("created_at");
 

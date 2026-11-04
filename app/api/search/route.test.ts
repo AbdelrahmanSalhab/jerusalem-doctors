@@ -9,7 +9,7 @@ const SPECIALTY = "11111111-1111-4111-8111-111111111111";
 const SHAAREI = "55555555-5555-4555-8555-555555555555";
 
 const { requireDoctor, rateLimit, rpc, recordEvent } = vi.hoisted(() => ({
-  requireDoctor: vi.fn(async () => ({ id: "me" })),
+  requireDoctor: vi.fn(async (): Promise<Record<string, unknown>> => ({ id: "me", is_active: true, is_admin_approved: true, is_admin: false })),
   rateLimit: vi.fn(async () => ({ success: true })),
   rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({ data: [], error: null })),
   recordEvent: vi.fn(async () => {}),
@@ -47,6 +47,20 @@ beforeEach(() => {
 });
 
 describe("GET /api/search", () => {
+  it("403s a doctor an admin has not accepted yet, before any query or count (#16)", async () => {
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: false, is_admin: false });
+    const res = await search({ q: "سمير" });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "not_approved" });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(rateLimit).not.toHaveBeenCalled();
+  });
+
+  it("lets an unapproved admin (staff) search", async () => {
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: false, is_admin: true });
+    expect((await search({ q: "سمير" })).status).toBe(200);
+  });
+
   it("401s when requireDoctor refuses (no session, or a deactivated doctor)", async () => {
     requireDoctor.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
     expect((await search({ q: "x" })).status).toBe(401);

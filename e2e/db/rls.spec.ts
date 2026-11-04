@@ -40,7 +40,9 @@ async function exposed(): Promise<{ tables: string[]; rpcs: string[]; firstColum
 
 /** Readable rows per role. Anything not listed must read as empty. */
 const READABLE: Record<string, Record<string, "own" | "all" | "visible">> = {
-  doctor: { doctors: "own", specialties: "all", doctor_specialties: "visible", doctor_workplaces: "visible" },
+  // The directory is read only through the service role (#16): a signed-in
+  // session, accepted or not, has no direct read of the doctor tables.
+  doctor: { specialties: "all" },
 };
 
 const anon = createClient(SUPABASE_URL, ANON_KEY, opts);
@@ -83,7 +85,7 @@ test.describe("row-level security", () => {
     }
   });
 
-  test("a signed-in doctor reads only what the directory already shows", async () => {
+  test("a signed-in doctor reads no doctor, workplace or specialty row directly", async () => {
     const ids = seededIds();
     for (const t of tables) {
       const { data, error } = await doctor.from(t).select("*");
@@ -105,12 +107,19 @@ test.describe("row-level security", () => {
     }
   });
 
-  test("an admin's own session reads every doctor and the activity log", async () => {
+  test("a doctor an admin has not accepted cannot read workplaces through the REST API either", async () => {
+    const pending = await signedIn(ACCOUNTS.pending);
+    for (const t of ["doctor_workplaces", "doctor_specialties", "doctors"]) {
+      const { data, error } = await pending.from(t).select("*").limit(1);
+      expect(data ?? [], `pending read ${t}`).toEqual([]);
+      expect(error?.code, `pending read ${t}`).toBe("42501");
+    }
+  });
+
+  test("an admin's own session reads the activity log, and the doctors only through the app", async () => {
     const admin = await signedIn(ACCOUNTS.admin);
     const doctors = await admin.from("doctors").select("id");
-    expect(doctors.error).toBeNull();
-    const all = await serviceClient().from("doctors").select("id", { count: "exact", head: true });
-    expect(doctors.data?.length).toBe(all.count);
+    expect(doctors.data ?? []).toEqual([]);
     const audit = await admin.from("audit_logs").select("id").limit(1);
     expect(audit.error).toBeNull();
   });

@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
+import { refuseUnlessApproved } from "@/lib/auth/directoryAccess";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { recordEvent } from "@/lib/usage";
@@ -19,6 +20,8 @@ const Body = z.object({
 export const POST = withJsonErrors(async (req: Request) => {
   const me = await requireDoctor().catch(() => null);
   if (!me) return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
+  const refused = refuseUnlessApproved(me);
+  if (refused) return refused;
 
   // sendBeacon posts text/plain; parse the body ourselves.
   const parsed = Body.safeParse(await req.text().then((t) => JSON.parse(t)).catch(() => null));

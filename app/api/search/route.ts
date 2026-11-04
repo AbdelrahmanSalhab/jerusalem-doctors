@@ -20,6 +20,7 @@ import { SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { WORKPLACE_TYPES } from "@/lib/workplace";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
+import { refuseUnlessApproved } from "@/lib/auth/directoryAccess";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { ciRunOf } from "@/lib/ciRun";
@@ -57,6 +58,9 @@ export const GET = withJsonErrors(async (req: Request) => {
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
+  // A doctor not yet accepted does not search (#16).
+  const refused = refuseUnlessApproved(me);
+  if (refused) return refused;
   if (!parsed.success) {
     return jsonError(400, { error: "invalid_query", code: "invalid_query" });
   }

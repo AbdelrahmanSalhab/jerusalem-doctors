@@ -26,7 +26,7 @@ describe("POST /api/number-requests", () => {
   beforeEach(() => {
     db.reset();
     vi.clearAllMocks();
-    requireDoctor.mockResolvedValue({ id: "d1" });
+    requireDoctor.mockResolvedValue({ id: "d1", is_active: true, is_admin_approved: true, is_admin: false });
     rateLimit.mockResolvedValue({ success: true });
   });
 
@@ -41,6 +41,13 @@ describe("POST /api/number-requests", () => {
     await call({ q: "أحمد خليل" });
     expect(raiseAlert).toHaveBeenCalledTimes(1);
     expect(raiseAlert).toHaveBeenCalledWith(db.client, "number_requested");
+  });
+
+  it("403s a doctor an admin has not accepted yet: no request, no alert (#16)", async () => {
+    requireDoctor.mockResolvedValueOnce({ id: "d1", is_active: true, is_admin_approved: false, is_admin: false });
+    expect((await call({ q: "أحمد خليل" })).status).toBe(403);
+    expect(db.argsOf("number_requests", "insert")).toEqual([]);
+    expect(raiseAlert).not.toHaveBeenCalled();
   });
 
   it("answers 401 without a session", async () => {

@@ -2,6 +2,7 @@
 // this instead of the raw code (which is English and meant for logs).
 
 const MESSAGES: Record<string, string> = {
+  not_approved: "البحث والتواصل يفتحان بعد أن تقبل الإدارة عضويتك.",
   rate_limited: "عدد كبير من المحاولات. انتظر قليلًا ثم حاول مجددًا.",
   turnstile_failed: "لم يكتمل التحقق من المتصفح. تأكد من الاتصال وأعد المحاولة.",
   otp_send_failed: "تعذّر إرسال رمز التحقق. حاول بعد دقيقة.",
