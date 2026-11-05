@@ -18,6 +18,8 @@ let me: {
 };
 
 const gate = vi.hoisted(() => ({ allowed: true, signedIn: true }));
+const recordProfileEdit = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/lib/profile/audit", () => ({ recordProfileEdit }));
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: gate.allowed })),
 }));
@@ -386,5 +388,31 @@ describe("PATCH /api/profile: refusals and failures", () => {
     expect((await call({ bio: "x" })).status).toBe(500);
     rpcError = { message: "boom" };
     expect((await call({ bio: "x" })).status).toBe(500);
+  });
+});
+
+describe("PATCH /api/profile, the activity log", () => {
+  beforeEach(() => {
+    recordProfileEdit.mockClear();
+    rpcError = null;
+  });
+
+  it("records what the doctor changed, with the workplace names, once it has saved", async () => {
+    const res = await call({
+      arabic_first_name: "سامر",
+      workplaces: [{ name: "عيادة الشفاء", workplace_type: "clinic", is_primary: true }],
+    });
+    expect(res.status).toBe(200);
+    expect(recordProfileEdit).toHaveBeenCalledWith(expect.anything(), me, expect.objectContaining({ arabic_first_name: "سامر" }), ["عيادة الشفاء"]);
+  });
+
+  it("records nothing for a save that failed", async () => {
+    rpcError = { code: "XX000", message: "boom" };
+    try {
+      expect((await call({ bio: "نبذة" })).status).toBeGreaterThanOrEqual(400);
+      expect(recordProfileEdit).not.toHaveBeenCalled();
+    } finally {
+      rpcError = null;
+    }
   });
 });

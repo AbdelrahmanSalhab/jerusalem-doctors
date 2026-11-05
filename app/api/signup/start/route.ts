@@ -8,6 +8,9 @@
 
 import { CertificatesSchema, certificatesNormalized } from "@/lib/certificates";
 import { z } from "zod";
+import { raiseAlert } from "@/lib/alerts";
+import { writeAudit } from "@/lib/audit";
+import { claimOnce } from "@/lib/otp/sentOnce";
 import { cleanEmail } from "@/lib/normalize/email";
 import { isResidentAndRetired, RESIDENT_NOT_RETIRED } from "@/lib/careerStage";
 import { purgeUnfinished, RESUME_FORM_MAX_BYTES } from "@/lib/signup/unfinished";
@@ -292,6 +295,7 @@ export const POST = withJsonErrors(async (req: Request) => {
   // confirms the phone is registered (and whose it is, licenses being
   // public). The owner signs in from /login instead.
   if (dupe.data) {
+    await flagDuplicateLicense(service, dupe.data.id, `${region}:${license}`);
     return jsonError(409, {
       error: "duplicate",
       code: "duplicate",
@@ -536,4 +540,27 @@ function licenseStatusToColumn(
 /** Services and certificates, with their search key. */
 function certificateFields(certificates: string[]) {
   return { certificates, certificates_normalized: certificatesNormalized(certificates) };
+}
+
+/** Someone typed a licence that is already registered: the same doctor again,
+ *  or someone holding a real doctor's licence (#16). The doctor gets only the
+ *  409; the admins get an alert and a log entry naming the account that holds
+ *  it, once a day per licence. */
+async function flagDuplicateLicense(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  existingId: string,
+  licenseKey: string,
+) {
+  try {
+    if (!(await claimOnce(`dup-license:${licenseKey}`, 86_400))) return;
+    const holder = await service.from("doctors").select("is_admin_approved").eq("id", existingId).maybeSingle();
+    await raiseAlert(service, "license_duplicate_attempt", {
+      extra: { existing_approved: holder.data?.is_admin_approved ?? null },
+      logOnly: { existing_doctor_id: existingId },
+    });
+    await writeAudit(service, { action: "signup_duplicate_license", target_doctor_id: existingId, metadata: { existing_approved: holder.data?.is_admin_approved ?? null } });
+  } catch (err) {
+    // Never fails the signup's answer.
+    console.error("[signup/start] duplicate licence not flagged", err);
+  }
 }

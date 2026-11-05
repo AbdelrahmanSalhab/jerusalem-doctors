@@ -26,8 +26,10 @@ test.describe("accepting a doctor", () => {
     await page.getByRole("button", { name: "قبول العضوية" }).click();
     // Even an exact registry match asks how the admin knows (#16).
     await expect(page.getByText(/لا يثبت أنه صاحبها/)).toBeVisible();
+    await expect(page.getByText(/لا تعتمد على رقم هاتف أو مكان عمل مكتوب في ملفه/)).toBeVisible();
     expect((await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved).toBe(false);
-    await page.getByLabel("سبب القبول").fill("اتصلت بمكان عمله وأكّدوا");
+    await page.getByRole("radio", { name: /اتصلت بمكان عمله/ }).check();
+    await page.getByLabel("سبب القبول").fill("اتصلت بمقسم المستشفى وأكّدوا أنه يعمل عندهم");
     await page.getByRole("button", { name: "قبول العضوية" }).last().click();
     await expect
       .poll(async () => (await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved)
@@ -56,7 +58,8 @@ test.describe("accepting a doctor", () => {
     await page.getByRole("button", { name: "قبول العضوية" }).click();
     await expect(page.getByText(/حدّدته الإدارة بيدها/)).toBeVisible();
     expect((await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved).toBe(false);
-    await page.getByLabel("سبب القبول").fill("تأكّدت من صورة الترخيص");
+    await page.getByRole("radio", { name: /رأيت صورة/ }).check();
+    await page.getByLabel("سبب القبول").fill("تأكّدت من صورة الترخيص الأصلية");
     await page.getByRole("button", { name: "قبول العضوية" }).last().click();
     await expect
       .poll(async () => (await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved)

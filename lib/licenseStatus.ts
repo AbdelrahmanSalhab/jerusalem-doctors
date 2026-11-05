@@ -25,7 +25,7 @@ export type LicenseStatusValue = LicenseStatusColumn | null;
 export type StatusTone = "success" | "warn" | "danger" | "neutral";
 
 const LABEL: Record<LicenseStatusColumn, string> = {
-  verified: "موثّق",
+  verified: "يطابق السجل",
   soft_match: "تطابق جزئي",
   not_found: "غير موجود في السجل",
   name_mismatch_overridden: "تم التغاضي يدويًا",

@@ -81,7 +81,8 @@ export function DoctorListRow({
       }
     >
       <div className="flex min-w-0 items-center gap-3">
-        <Avatar url={row.profile_picture_url} fallback={row.arabic_first_name} size="sm" />
+        {/* A waiting doctor's photo is theirs to choose and not yet vetted: initials until accepted. */}
+        <Avatar url={row.is_admin_approved ? row.profile_picture_url : null} fallback={row.arabic_first_name} size="sm" />
         <div className="min-w-0">
           <button
             type="button"
@@ -169,8 +170,8 @@ export function DoctorListRow({
             busy={busy}
             kind={kind}
             onCancel={() => setAsking(false)}
-            onConfirm={async (reason) => {
-              const ok = await onPatch({ is_admin_approved: true, ...(reason ? { approval_reason: reason } : {}) });
+            onConfirm={async (reason, method) => {
+              const ok = await onPatch({ is_admin_approved: true, approval_reason: reason, approval_method: method });
               if (ok === true) setAsking(false);
               return ok === true;
             }}

@@ -163,10 +163,8 @@ export function SignupForm({
         }).then((r) => r.json());
 
         if (lic?.status === "name_mismatch" && !overrideMismatch) {
-          setRegistryName({
-            first: lic.registry_first_name,
-            family: lic.registry_family_name,
-          });
+          // The registry's spelling is not sent for a name that does not match.
+          setRegistryName({});
           showFieldErrors({
             hebrew_full_name:
               "الاسم العبري لا يطابق سجل وزارة الصحة. تحقق من الكتابة كما تظهر على رخصتك.",

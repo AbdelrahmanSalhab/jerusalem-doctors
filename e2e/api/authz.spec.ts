@@ -14,8 +14,11 @@ import { createDoctor } from "../seed";
 type Policy =
   /** Signed-in admins only; everyone else 401. */
   | "admin"
-  /** Any signed-in open account (pending doctors can search by design). */
+  /** Any signed-in open account, pending doctors included (profile, reports). */
   | "doctor"
+  /** An accepted doctor or an admin. A pending doctor is refused with 403: the
+   *  directory is closed to anyone an admin has not accepted (#16). */
+  | "approved"
   /** No session needed: signup, login, the institutions list. */
   | "public"
   /** Vercel cron, with CRON_SECRET. */
@@ -67,6 +70,7 @@ const POLICY: Record<string, Policy> = {
   "GET /api/cron/metrics": "cron",
   "GET /api/cron/sms-balance": "cron",
   "GET /api/cron/sync-moh": "cron",
+  "GET /api/cron/waiting": "cron",
   "GET /api/institutions": "public",
   "POST /api/login/password": "credentials",
   "POST /api/login/resend": "public",
@@ -75,15 +79,15 @@ const POLICY: Record<string, Policy> = {
   "POST /api/profile/delete-request": "doctor",
   "POST /api/profile/photo": "doctor",
   "PATCH /api/profile": "doctor",
-  "POST /api/number-requests": "doctor",
+  "POST /api/number-requests": "approved",
   "POST /api/reports": "doctor",
   "POST /api/reports/public": "public",
-  "GET /api/search": "doctor",
+  "GET /api/search": "approved",
   "POST /api/signup/check-license": "public",
   "POST /api/signup/resend": "public",
   "POST /api/signup/start": "public",
   "POST /api/signup/verify": "public",
-  "POST /api/usage/contact": "doctor",
+  "POST /api/usage/contact": "approved",
   "POST /api/usage/install": "doctor",
 };
 
@@ -132,6 +136,7 @@ for (const [key, policy] of Object.entries(POLICY)) {
       const allowed =
         policy === "public" ||
         (policy === "doctor" && caller !== "anon" && caller !== "closed") ||
+        (policy === "approved" && (caller === "doctor" || caller === "admin")) ||
         (policy === "admin" && caller === "admin");
       if (allowed && DESTRUCTIVE.has(key)) continue;
       const ctx = await as(caller);
@@ -141,6 +146,8 @@ for (const [key, policy] of Object.entries(POLICY)) {
         // Past the gate: whatever the empty body earns, never a refusal.
         expect([401, 403], `${caller} ${key} got ${status}`).not.toContain(status);
         expect(status, `${caller} ${key}`).toBeLessThan(500);
+      } else if (policy === "approved" && caller === "pending") {
+        expect(status, `${caller} ${key}`).toBe(403);
       } else {
         expect(status, `${caller} ${key}`).toBe(401);
       }

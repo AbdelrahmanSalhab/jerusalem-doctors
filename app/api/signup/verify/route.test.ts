@@ -210,12 +210,15 @@ describe("POST /api/signup/verify", () => {
     const res = await call(BODY);
     expect(res.status).toBe(409);
     expect(await res.json()).toMatchObject({ code: "duplicate" });
+    // verifyOtp already signed them in; a signup that made no doctor leaves no session.
+    expect(auth.signOut).toHaveBeenCalled();
   });
 
   it("maps any other insert error to 500", async () => {
     db.queue("pending_signups", pending(), CLAIMED);
     db.queue("doctors", { error: { code: "XX000" } });
     expect(await (await call(BODY)).json()).toMatchObject({ code: "create_failed" });
+    expect(auth.signOut).toHaveBeenCalled();
   });
 });
 

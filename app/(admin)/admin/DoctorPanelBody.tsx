@@ -66,7 +66,7 @@ export function DoctorPanelBody({
   return (
     <>
       <header className="flex items-start gap-4">
-        <Avatar url={d.profile_picture_url} fallback={d.arabic_first_name} size="xl" />
+        <Avatar url={d.is_admin_approved ? d.profile_picture_url : null} fallback={d.arabic_first_name} size="xl" />
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-lg font-semibold">
             د. {d.arabic_first_name} {d.arabic_family_name}

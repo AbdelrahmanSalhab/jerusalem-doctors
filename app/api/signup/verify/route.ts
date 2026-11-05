@@ -239,9 +239,13 @@ export const POST = withJsonErrors(async (req: Request) => {
     // it gets its own code rather than a generic 500.
     if (insert.error.code === "23505") {
       console.warn("[signup/verify] doctor insert race (duplicate)", insert.error);
+      await ssr.auth.signOut();
       return jsonError(409, { error: "duplicate", code: "duplicate" });
     }
     console.error("[signup/verify] doctor insert failed", insert.error);
+    // verifyOtp already set the session cookies; a signup that created no
+    // doctor must not leave one behind.
+    await ssr.auth.signOut();
     return jsonError(500, { error: "create_failed", code: "create_failed" });
   }
 

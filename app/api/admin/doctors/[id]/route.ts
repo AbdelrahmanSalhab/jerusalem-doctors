@@ -19,8 +19,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { writeAudit } from "@/lib/audit";
 import { directoryChanged } from "@/lib/cachedReads";
 import { approvalNeedsReason } from "@/lib/licenseStatus";
+import { APPROVAL_METHOD_KEYS, APPROVAL_REASON_MIN } from "@/lib/admin/approvalMethods";
 
-const APPROVAL_REASON_MIN = 3;
 
 /**
  * An admin has set this doctor's primary number by hand. Such a number can
@@ -63,6 +63,8 @@ const Body = z.object({
   // Not a column: why an admin accepted a doctor whose licence the registry
   // does not confirm. It is stripped before the update and kept in the log.
   approval_reason: z.string().trim().min(APPROVAL_REASON_MIN).max(300).optional(),
+  // How the admin knew (lib/admin/approvalMethods.ts): required to accept.
+  approval_method: z.enum(APPROVAL_METHOD_KEYS).optional(),
 });
 
 
@@ -84,7 +86,7 @@ export const PATCH = withJsonErrors(async (
   } catch {
     return jsonError(400, { error: "invalid_body", code: "invalid_body" });
   }
-  const { approval_reason, ...fields } = body;
+  const { approval_reason, approval_method, ...fields } = body;
   if (Object.keys(fields).length === 0) {
     return jsonError(400, { error: "no_fields", code: "no_fields" });
   }
@@ -93,7 +95,7 @@ export const PATCH = withJsonErrors(async (
 
   const current = await service
     .from("doctors")
-    .select("license_verification_status")
+    .select("license_verification_status, is_admin_approved")
     .eq("id", id)
     .maybeSingle();
   if (current.error && current.error.code !== "PGRST116") {
@@ -105,15 +107,21 @@ export const PATCH = withJsonErrors(async (
   }
   const licenseStatus = current.data.license_verification_status as string | null;
 
+  // Already accepted (a stale tab, two admins at once): nothing to do, and
+  // above all no second acceptance time, reason prompt or message to send.
+  const alreadyAccepted = fields.is_admin_approved === true && current.data.is_admin_approved === true;
+  if (alreadyAccepted && Object.keys(fields).length === 1) return jsonOk({ ok: true, unchanged: true });
+  const approvalChange = alreadyAccepted ? undefined : fields.is_admin_approved;
+
   // Accepting a doctor always needs a reason. For an exact registry match it
   // says how the admin knew this is that doctor, because the match alone is
   // public data (#16); for an unconfirmed licence or a number set by hand it
   // says what the call rested on. The log keeps it.
-  const approving = fields.is_admin_approved === true;
+  const approving = approvalChange === true;
   const unconfirmed = approving && approvalNeedsReason(licenseStatus);
   // Only looked up when it can change the answer.
   const corrected = approving && !unconfirmed && (await primaryNumberCorrected(service, id));
-  if (approving && !approval_reason) {
+  if (approving && (!approval_reason || !approval_method)) {
     return jsonError(400, {
       error: "approval_reason_required",
       code: "approval_reason_required",
@@ -126,9 +134,9 @@ export const PATCH = withJsonErrors(async (
   // A field the body left out is undefined, which is not sent; an explicit
   // null is, and clears the column.
   const updates: TablesUpdate<"doctors"> = {
-    is_admin_approved: fields.is_admin_approved,
+    is_admin_approved: approvalChange,
     // When the directory first had them, for «جديد هذا الأسبوع».
-    ...(fields.is_admin_approved !== undefined && { approved_at: fields.is_admin_approved ? new Date().toISOString() : null }),
+    ...(approvalChange !== undefined && { approved_at: approvalChange ? new Date().toISOString() : null }),
     is_active: fields.is_active,
     is_visible: fields.is_visible,
     career_stage: fields.career_stage,
@@ -155,8 +163,9 @@ export const PATCH = withJsonErrors(async (
     target_doctor_id: id,
     metadata: {
       ...fields,
-      ...(approval_reason && fields.is_admin_approved === true
-        ? { approval_reason, license_status_at_approval: licenseStatus, ...(corrected ? { number_corrected_by_admin: true } : {}) }
+      is_admin_approved: approvalChange,
+      ...(approval_reason && approving
+        ? { approval_reason, approval_method, license_status_at_approval: licenseStatus, ...(corrected ? { number_corrected_by_admin: true } : {}) }
         : {}),
     },
   });
@@ -209,6 +218,15 @@ export const DELETE = withJsonErrors(async (
       return jsonError(500, { error: "delete_failed", code: "delete_failed" });
     }
   }
+  // Who accepted them, when and how outlives the doctor (it is the answer to
+  // "who let this one in" for an impersonator removed later), with the person
+  // scrubbed: no target, and not the free-text reason, which may name people.
+  // Everything else about them is erased below.
+  const kept = await keepApprovalTrail(service, id);
+  if (kept.error) {
+    console.error("[admin.doctors.delete] approval trail not kept", kept.error);
+    return jsonError(500, { error: "delete_failed", code: "delete_failed" });
+  }
   // Their audit rows would otherwise outlive them with only the id nulled
   // (on delete set null), keeping e.g. the delete request's IP.
   const trail = await service.from("audit_logs").delete().eq("target_doctor_id", id);
@@ -232,3 +250,31 @@ export const DELETE = withJsonErrors(async (
 
   return jsonOk({ ok: true });
 });
+
+/** Rewrites each acceptance of this doctor in the log to its anonymous facts. */
+async function keepApprovalTrail(service: SupabaseClient, doctorId: string): Promise<{ error: unknown }> {
+  const accepted = await service
+    .from("audit_logs")
+    .select("id, metadata")
+    .eq("target_doctor_id", doctorId)
+    .eq("action", "admin_doctor_updated")
+    .filter("metadata->>is_admin_approved", "eq", "true");
+  if (accepted.error) return { error: accepted.error };
+  for (const row of accepted.data ?? []) {
+    const m = (row.metadata ?? {}) as Record<string, unknown>;
+    const scrubbed = await service
+      .from("audit_logs")
+      .update({
+        target_doctor_id: null,
+        metadata: {
+          deleted_doctor_id: doctorId,
+          is_admin_approved: true,
+          ...(m.approval_method ? { approval_method: m.approval_method } : {}),
+          ...(m.license_status_at_approval ? { license_status_at_approval: m.license_status_at_approval } : {}),
+        },
+      })
+      .eq("id", row.id);
+    if (scrubbed.error) return { error: scrubbed.error };
+  }
+  return { error: null };
+}

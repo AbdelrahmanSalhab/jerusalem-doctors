@@ -16,6 +16,12 @@ let licenseHolder: { id: string } | null = null;
 const purges: [string, string][] = [];
 let purgeError: unknown = null;
 
+const { raiseAlert, claimOnce } = vi.hoisted(() => ({
+  raiseAlert: vi.fn(async () => {}),
+  claimOnce: vi.fn(async () => true),
+}));
+vi.mock("@/lib/alerts", () => ({ raiseAlert }));
+vi.mock("@/lib/otp/sentOnce", () => ({ claimOnce }));
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: true })),
 }));
@@ -285,6 +291,19 @@ describe("POST /api/signup/start: a phone that already has an account", () => {
     licenseHolder = null;
     expect(existing.status).toBe(409);
     expect(existing).toEqual(fresh);
+  });
+
+  it("tells the admins, once a day per licence, when a licence is already held (#16)", async () => {
+    licenseHolder = { id: "doc-2" };
+    phoneOwner = null;
+    expect((await start({ license_number: "123456" })).status).toBe(409);
+    expect(raiseAlert).toHaveBeenCalledWith(expect.anything(), "license_duplicate_attempt", expect.objectContaining({ logOnly: { existing_doctor_id: "doc-2" } }));
+    // The same licence again the same day: the answer is the same, no second alert.
+    raiseAlert.mockClear();
+    claimOnce.mockResolvedValueOnce(false);
+    expect((await start({ license_number: "123456" })).status).toBe(409);
+    expect(raiseAlert).not.toHaveBeenCalled();
+    licenseHolder = null;
   });
 
   it("answers an invalid workplace set exactly like an unregistered phone does", async () => {

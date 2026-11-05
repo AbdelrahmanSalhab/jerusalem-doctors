@@ -60,11 +60,15 @@ test.describe("as a doctor", () => {
 test.describe("as a doctor waiting for approval", () => {
   test.use({ storageState: stateFile("pending") });
 
-  test("sees the waiting panel, and can already search", async ({ page }) => {
+  test("sees the waiting panel and no directory: no search box, no cards, search refused (#16)", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page.getByRole("heading", { name: /استلمنا طلبك/ })).toBeVisible();
     await expect(page.getByText("تراجع الإدارة طلبك")).toBeVisible();
-    await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("ليلى");
-    await expect(page.getByText("ليلى الخطيب").first()).toBeVisible();
+    await expect(page.getByPlaceholder("ابحث عن طبيب أو تخصص")).toHaveCount(0);
+    await expect(page.getByText("ليلى الخطيب")).toHaveCount(0);
+    // Nothing the page does reaches the directory either: the API refuses.
+    const res = await page.request.get("/api/search?q=ليلى");
+    expect(res.status()).toBe(403);
+    expect(JSON.stringify(await res.json())).not.toContain("الخطيب");
   });
 });

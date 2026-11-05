@@ -77,11 +77,17 @@ export function NameSection({
       {registryName && (
         <div className="rounded border border-warn-line bg-warn-bg p-4 text-base">
           <p className="mb-2">
-            الاسم في سجل وزارة الصحة لرقم الترخيص هذا هو:{" "}
-            <strong dir="auto">
-              {registryName.first} {registryName.family}
-            </strong>
-            .
+            {registryName.first || registryName.family ? (
+              <>
+                الاسم في سجل وزارة الصحة لرقم الترخيص هذا هو:{" "}
+                <strong dir="auto">
+                  {registryName.first} {registryName.family}
+                </strong>
+                .
+              </>
+            ) : (
+              "الاسم الذي كتبته لا يطابق ما في سجل وزارة الصحة لرقم الترخيص هذا. تأكد من كتابته كما هو على رخصتك."
+            )}
           </p>
           <p className="mb-2">
             إذا كنت متأكدًا أنك أنت، يمكنك المتابعة وسيتم مراجعة طلبك من قبل

@@ -22,6 +22,9 @@ export interface PushMessage {
 /** One notification per tag in this many seconds: a burst of signups is one
  *  buzz, and the admin list shows all of them. */
 export const PUSH_THROTTLE_SECONDS = 300;
+/** In turn, one admin is buzzed at most once in this many seconds per alert: a
+ *  burst of signups reaches each admin once, and the list shows them all. */
+export const TURN_THROTTLE_SECONDS = 120;
 /** A push service that hangs must not hold the request's function open. */
 const SEND_TIMEOUT_MS = 5_000;
 /** How long the push service keeps a message for a phone that is off. */
@@ -78,8 +81,8 @@ async function deliver(
 }
 
 /** `rotate`: the message goes to one admin, whose turn it is, instead of all of
- *  them, and is not throttled (each one is its own news). If that admin's
- *  devices are all gone, the next admin gets it. */
+ *  them. If that admin's devices are all gone, or they were just buzzed for the
+ *  same alert, the next admin gets it. */
 export async function sendPushToAdmins(
   service: SupabaseClient,
   message: PushMessage,
@@ -111,8 +114,9 @@ export async function sendPushToAdmins(
     const admins = [...byAdmin.keys()].sort();
     const first = (await nextTurn("push-turn:" + message.tag)) % admins.length;
     for (let i = 0; i < admins.length; i++) {
-      const rows = byAdmin.get(admins[(first + i) % admins.length])!;
-      if ((await deliver(service, keys, rows, message)) > 0) return;
+      const admin = admins[(first + i) % admins.length];
+      if (!(await claimOnce(`push-turn:${message.tag}:${admin}`, TURN_THROTTLE_SECONDS))) continue;
+      if ((await deliver(service, keys, byAdmin.get(admin)!, message)) > 0) return;
     }
   } catch (err) {
     console.error("[push] failed", (err as Error).message);

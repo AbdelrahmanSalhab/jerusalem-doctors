@@ -2,6 +2,7 @@
 // a one-line summary instead of the raw metadata. Codes stay in the
 // database; this is only how /admin/audit shows them.
 
+import { approvalMethodLabel } from "@/lib/admin/approvalMethods";
 import { ALERTS, isAlertCode } from "@/lib/alerts";
 import { FIELD_LABELS } from "@/lib/client/apiError";
 import { FEATURED_LABEL, type FeaturedKind } from "@/lib/directory";
@@ -44,6 +45,9 @@ const TITLE: Record<string, string> = {
   unfinished_signup_deleted: "حذف تسجيل لم يكتمل",
   admin_doctor_updated: "تعديل من الإدارة",
   approval_notified: "إبلاغ بالقبول",
+  signup_duplicate_license: "تسجيل بترخيص مسجَّل",
+  doctor_profile_edited: "تعديل صاحب الحساب لملفه",
+  doctor_photo_changed: "تغيير صاحب الحساب لصورته",
   admin_doctor_profile_edited: "تعديل الملف من الإدارة",
   admin_doctor_photo_changed: "تغيير الصورة من الإدارة",
   admin_doctor_deleted: "حذف نهائي لحساب",
@@ -88,6 +92,7 @@ function doctorChanges(m: Record<string, unknown>): string[] {
   if ("featured" in m) {
     out.push(m.featured ? `عُرض في «${FEATURED_LABEL[m.featured as FeaturedKind] ?? m.featured}»` : "أُزيل من المعروضين");
   }
+  if (m.approval_method) out.push(`طريقة التأكد: ${approvalMethodLabel(m.approval_method)}`);
   if (m.approval_reason) out.push(`السبب: ${quote(m.approval_reason)}`);
   return out;
 }
@@ -247,6 +252,13 @@ const FIELD_LABEL: Record<string, string> = {
   is_active: "الحساب",
   is_visible: "الظهور في الدليل",
   approval_reason: "سبب القبول",
+  approval_method: "طريقة التأكد",
+  name_before: "الاسم قبل",
+  name_after: "الاسم بعد",
+  workplace_names: "أماكن العمل",
+  existing_approved: "الحساب القائم مقبول",
+  existing_doctor_id: "الحساب الذي يحمل الترخيص",
+  doctor_id: "الطبيب",
   license_status_at_approval: "حالة الترخيص عند القبول",
   slot: "الترخيص",
   license_number: "رقم الترخيص",

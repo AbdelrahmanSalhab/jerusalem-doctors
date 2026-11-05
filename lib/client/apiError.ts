@@ -2,6 +2,7 @@
 // this instead of the raw code (which is English and meant for logs).
 
 const MESSAGES: Record<string, string> = {
+  not_approved: "البحث والتواصل يفتحان بعد أن تقبل الإدارة عضويتك.",
   rate_limited: "عدد كبير من المحاولات. انتظر قليلًا ثم حاول مجددًا.",
   turnstile_failed: "لم يكتمل التحقق من المتصفح. تأكد من الاتصال وأعد المحاولة.",
   otp_send_failed: "تعذّر إرسال رمز التحقق. حاول بعد دقيقة.",
@@ -20,7 +21,7 @@ const MESSAGES: Record<string, string> = {
   update_failed: "تعذّر حفظ التغييرات. حاول مجددًا.",
   not_found: "لم نجد هذا الحساب. ربما حُذف.",
   no_fields: "لا يوجد تغيير لحفظه.",
-  approval_reason_required: "اكتب كيف تأكّدت من هوية هذا الطبيب قبل قبوله؛ يُحفظ في سجل النشاط.",
+  approval_reason_required: "اختر كيف تأكّدت من هوية هذا الطبيب واكتب سببًا؛ يُحفظ في سجل النشاط.",
   reason_required: "اكتب سبب تغيير الرقم؛ يُحفظ في سجل النشاط.",
   still_active: "أغلق الحساب أولًا؛ الحذف النهائي متاح للحسابات المغلقة فقط.",
   cannot_delete_self: "لا يمكنك حذف حسابك أنت.",

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/test/fakeSupabase";
 
 const { requireDoctor, rateLimit } = vi.hoisted(() => ({ requireDoctor: vi.fn(), rateLimit: vi.fn() }));
-vi.mock("@/lib/auth/session", () => ({ requireDoctor }));
+vi.mock("@/lib/auth/session", () => ({ requireDoctor, awaitingSecondFactor: async () => false }));
 vi.mock("@/lib/ratelimit", () => ({ rateLimit }));
 vi.mock("@/lib/supabase/service", async () => {
   const { db } = await import("@/test/fakeSupabase");
@@ -25,7 +25,7 @@ describe("POST /api/usage/contact", () => {
   beforeEach(() => {
     db.reset();
     vi.clearAllMocks();
-    requireDoctor.mockResolvedValue({ id: "me" });
+    requireDoctor.mockResolvedValue({ id: "me", is_active: true, is_admin_approved: true, is_admin: false });
     rateLimit.mockResolvedValue({ success: true });
   });
 
@@ -44,6 +44,13 @@ describe("POST /api/usage/contact", () => {
     expect((await post({ target: "x", channel: "whatsapp" })).status).toBe(400);
     requireDoctor.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
     expect((await post({ target: TARGET, channel: "call" })).status).toBe(401);
+    expect(db.argsOf("usage_events", "insert")).toEqual([]);
+  });
+
+  it("403s a doctor an admin has not accepted yet, and records nothing (#16)", async () => {
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: false, is_admin: false });
+    const res = await post({ target: TARGET, channel: "whatsapp" });
+    expect(res.status).toBe(403);
     expect(db.argsOf("usage_events", "insert")).toEqual([]);
   });
 

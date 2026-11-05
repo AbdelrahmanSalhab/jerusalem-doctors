@@ -101,6 +101,20 @@ if (doctorJwt) {
     global: { headers: { Authorization: `Bearer ${doctorJwt}` } },
   });
   checks.push(...writeChecks("doctor", asDoctor));
+  checks.push(...readChecks("doctor", asDoctor));
+}
+
+/** No signed-in session reads the directory tables itself (migration
+ *  20261104150000): without the SELECT grant this fails with 42501. */
+function readChecks(role: string, client: typeof anon): Check[] {
+  return (["doctors", "doctor_workplaces", "doctor_specialties"] as const).map((table) => ({
+    name: `${role} cannot read ${table}`,
+    run: async () => {
+      const { data, error } = await client.from(table).select("id").limit(1);
+      if (error) return deniedOrUnreachable(error);
+      return { leaked: true, detail: `LEAK: SELECT privilege granted (${data?.length ?? 0} rows)` };
+    },
+  }));
 }
 
 function writeChecks(role: string, client: typeof anon): Check[] {

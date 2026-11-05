@@ -28,7 +28,7 @@ export const RATE_LIMITS = {
   signupVerifyIp: { limit: 50, window: "10 m" },
   signupResend: { limit: 3, window: "10 m" },
   signupResendIp: { limit: 20, window: "10 m" },
-  signupCheckLicense: { limit: 100, window: "1 h" },
+  signupCheckLicense: { limit: 40, window: "1 h" },
   loginStart: { limit: 5, window: "1 h" },
   loginStartIp: { limit: 30, window: "1 h" },
   loginVerify: { limit: 5, window: "10 m" },
@@ -36,6 +36,9 @@ export const RATE_LIMITS = {
   loginResend: { limit: 3, window: "10 m" },
   loginResendIp: { limit: 20, window: "10 m" },
   search: { limit: 30, window: "1 m" },
+  // Paging the whole directory: 30 a minute is 1,800 searches an hour for as
+  // long as someone cares to. A doctor uses a few hundred a day at most.
+  searchDaily: { limit: 600, window: "1 d" },
   contactClick: { limit: 60, window: "1 m" },
   // A handful per visit at most; more is a loop or someone filling the table.
   installEvent: { limit: 20, window: "1 m" },

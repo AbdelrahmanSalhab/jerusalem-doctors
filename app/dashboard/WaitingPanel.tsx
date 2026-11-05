@@ -90,7 +90,7 @@ export function WaitingPanel({ firstName }: { firstName: string }) {
       </ol>
 
       <div className="flex flex-col gap-3 border-t border-line bg-background/60 px-5 py-4 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <p className="text-foreground/80">في هذه الأثناء يمكنك البحث في الدليل أدناه، وإكمال ملفك ليكون جاهزًا حين تقبلك الإدارة.</p>
+        <p className="text-foreground/80">البحث في الدليل يفتح بعد أن تقبل الإدارة عضويتك. في هذه الأثناء أكمل ملفك ليكون جاهزًا.</p>
         <Link
           href="/profile"
           className="shrink-0 rounded-md border border-line bg-surface px-4 py-2 text-center font-semibold hover:bg-foreground/5"

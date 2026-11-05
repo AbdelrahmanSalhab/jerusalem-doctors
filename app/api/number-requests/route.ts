@@ -7,6 +7,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { raiseAlert } from "@/lib/alerts";
 import { requireDoctor } from "@/lib/auth/session";
+import { refuseUnlessApproved } from "@/lib/auth/directoryAccess";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -17,6 +18,8 @@ export const POST = withJsonErrors(async (req: Request) => {
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
+  const refused = await refuseUnlessApproved(me);
+  if (refused) return refused;
 
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

@@ -6,6 +6,7 @@
 // The upload itself lives in lib/profile/photoUpload.ts, shared with the
 // admin's route; this one only decides that the doctor may write their own.
 
+import { writeAudit } from "@/lib/audit";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
 import { uploadDoctorPhoto } from "@/lib/profile/photoUpload";
@@ -29,5 +30,6 @@ export const POST = withJsonErrors(async (req: Request) => {
     return jsonError(result.error.status, { error: result.error.code, code: result.error.code });
   }
 
+  await writeAudit(service, { actor_doctor_id: me.id, action: "doctor_photo_changed", target_doctor_id: me.id });
   return jsonOk({ ok: true, url: result.url });
 });

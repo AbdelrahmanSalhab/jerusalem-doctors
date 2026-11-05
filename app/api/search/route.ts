@@ -20,10 +20,13 @@ import { SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { WORKPLACE_TYPES } from "@/lib/workplace";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireDoctor } from "@/lib/auth/session";
+import { refuseUnlessApproved } from "@/lib/auth/directoryAccess";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
 import { rateLimit } from "@/lib/ratelimit";
 import { ciRunOf } from "@/lib/ciRun";
 import { recordEvent } from "@/lib/usage";
+import { raiseAlert } from "@/lib/alerts";
+import { claimOnce } from "@/lib/otp/sentOnce";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const Query = z.object({
@@ -57,6 +60,9 @@ export const GET = withJsonErrors(async (req: Request) => {
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
+  // A doctor not yet accepted does not search (#16).
+  const refused = await refuseUnlessApproved(me);
+  if (refused) return refused;
   if (!parsed.success) {
     return jsonError(400, { error: "invalid_query", code: "invalid_query" });
   }
@@ -76,8 +82,9 @@ export const GET = withJsonErrors(async (req: Request) => {
   // ponytail: the query runs alongside the rate limit rather than after it,
   // to save a round trip; a refused caller costs one indexed read, and gets
   // nothing back.
-  const [rl, found] = await Promise.all([
+  const [rl, rlDay, found] = await Promise.all([
     rateLimit("search", `doctor:${me.id}`),
+    rateLimit("searchDaily", `doctor:${me.id}`),
     service.rpc("search_directory", {
       // Left out means NULL: every optional argument defaults to it.
       p_term: term || undefined,
@@ -92,6 +99,13 @@ export const GET = withJsonErrors(async (req: Request) => {
     }),
   ]);
   if (!rl.success) {
+    return jsonError(429, { error: "rate_limited", code: "rate_limited" });
+  }
+  if (!rlDay.success) {
+    // One alert a day per account: someone may be copying the directory.
+    if (await claimOnce(`heavy-search:${me.id}`, 86_400)) {
+      after(() => raiseAlert(service, "directory_heavy_use", { extra: { doctor_id: me.id } }));
+    }
     return jsonError(429, { error: "rate_limited", code: "rate_limited" });
   }
   // A swallowed error would read as "nobody matched".

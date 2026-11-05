@@ -8,11 +8,30 @@ import { searchFromParams } from "@/lib/searchFilters";
 import { ViewerProvider } from "@/components/ViewerContext";
 import { cachedDirectoryOverview, cachedInstitutions, cachedSpecialties } from "@/lib/cachedReads";
 import { rankRecent } from "@/lib/directory";
+import { canSeeDirectory } from "@/lib/auth/directoryAccess";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
+
+const EMPTY_OVERVIEW: [
+  Awaited<ReturnType<typeof cachedSpecialties>>,
+  Awaited<ReturnType<typeof cachedDirectoryOverview>>,
+  Awaited<ReturnType<typeof cachedInstitutions>>,
+] = [[], { featured: { doctor: null, graduates: [] }, counts: { listed: null, byDomain: {}, byInstitution: {} }, recent: [] }, []];
+
+function ExistingAccountNotice() {
+  return (
+    <p role="status" className="rounded-md border border-info-line bg-info-bg p-4 text-sm text-info">
+      <strong className="font-semibold">هذا الرقم مسجَّل مسبقًا.</strong> أدخلناك إلى حسابك بدل إنشاء حساب جديد. ليس
+      حسابك؟{" "}
+      <Link href="/report" className="font-semibold underline">
+        أبلغ الإدارة
+      </Link>
+    </p>
+  );
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -33,20 +52,40 @@ export default async function DashboardPage({
   // (lib/cachedReads.ts); only this doctor's own rows are read each time.
   const service = createSupabaseServiceClient();
   const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview(), cachedInstitutions()]);
+  // Started early, but a doctor not yet accepted never gets them: they are not
+  // awaited or rendered below, only left to finish (and cache) quietly.
+  reads.catch(() => {});
   const me = await requireDoctor();
+  const approved = await canSeeDirectory(me);
   const [
     [specialties, { featured, counts, recent }, allInstitutions],
     { data: myWorkplaces },
     { data: mySpecialties },
   ] =
     await Promise.all([
-      reads,
+      // Nothing of the directory reaches the page of a doctor who may not see it (#16).
+      approved ? reads : Promise.resolve(EMPTY_OVERVIEW),
       service
         .from("doctor_workplaces")
         .select("name, workplace_type, address, phone, is_primary, sort_order, institution_id")
         .eq("doctor_id", me.id),
       service.from("doctor_specialties").select("specialty_id").eq("doctor_id", me.id),
     ]);
+  if (!approved) {
+    const pendingGaps = profileGaps(me, (myWorkplaces ?? []) as Pick<DoctorWorkplace, "name" | "workplace_type" | "address" | "phone">[]);
+    return (
+      <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
+        <header className="text-center">
+          <h1 className="text-2xl font-bold sm:text-3xl">مرحبًا د. {me.arabic_first_name}</h1>
+        </header>
+        {existing && <ExistingAccountNotice />}
+        <WaitingPanel firstName={me.arabic_first_name} />
+        <InstallInvite />
+        {pendingGaps.length > 0 && <ProfileReminder gaps={pendingGaps} />}
+      </main>
+    );
+  }
+
   // How this doctor introduces themselves in a WhatsApp message.
   const specialtyName = (id: string) => specialties?.find((s) => s.id === id)?.name_ar;
   const primary = [...(myWorkplaces ?? [])].sort(
@@ -96,17 +135,7 @@ export default async function DashboardPage({
         </p>
       </header>
 
-      {existing && (
-        <p role="status" className="rounded-md border border-info-line bg-info-bg p-4 text-sm text-info">
-          <strong className="font-semibold">هذا الرقم مسجَّل مسبقًا.</strong> أدخلناك إلى حسابك
-          بدل إنشاء حساب جديد. ليس حسابك؟{" "}
-          <Link href="/report" className="font-semibold underline">
-            أبلغ الإدارة
-          </Link>
-        </p>
-      )}
-
-      {!me.is_admin_approved && !me.is_admin && <WaitingPanel firstName={me.arabic_first_name} />}
+      {existing && <ExistingAccountNotice />}
 
       <InstallInvite />
 

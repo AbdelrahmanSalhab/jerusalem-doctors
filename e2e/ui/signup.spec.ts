@@ -75,6 +75,8 @@ test("a doctor the registry knows signs up and waits for an admin, unlisted @pho
   await signUp(page, { phone: PHONES.matched, license: "510020", arabic: ["سمير", "خوري"], hebrew: ["סמיר", "חורי"] }, { wrongFirst: true });
   await expect(page.getByRole("heading", { name: "مرحبًا د. سمير" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /استلمنا طلبك يا د\. سمير/ })).toBeVisible();
+  // And no directory until then (#16).
+  await expect(page.getByPlaceholder("ابحث عن طبيب أو تخصص")).toHaveCount(0);
 
   const { data } = await serviceClient()
     .from("doctors")

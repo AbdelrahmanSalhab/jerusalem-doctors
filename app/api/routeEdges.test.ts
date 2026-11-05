@@ -19,7 +19,7 @@ const bad = (path: string) => new Request(`http://x${path}`, { method: "POST", b
 
 beforeEach(() => {
   vi.clearAllMocks();
-  requireDoctor.mockResolvedValue({ id: "me" });
+  requireDoctor.mockResolvedValue({ id: "me", is_active: true, is_admin_approved: true, is_admin: false });
 });
 
 describe("GET /api/institutions", () => {

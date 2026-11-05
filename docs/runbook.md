@@ -274,6 +274,32 @@ Two older places still repeat the conditions and read the table: the row-level
 security policies on `doctor_specialties` and `doctor_workplaces`
 (`20261021103844_supabase_lint.sql`). They are not changed here.
 
+### New doctors, and who may search (#16)
+
+Every signup waits for an admin, whatever the registry says: the registry match
+is public data, so it proves nothing about who is typing. Until accepted a
+doctor sees only a waiting panel and can edit their profile; search, contact
+clicks and number requests answer 403 `not_approved` (`lib/auth/directoryAccess.ts`,
+and an admin must also have passed the second factor). The new-doctor alert goes
+to one admin at a time, in turn; a morning check (`/api/cron/waiting`) tells every
+admin about doctors who have waited a day.
+
+Accepting asks how you knew it is them (a number you found yourself, not one on
+their profile or their phone; a colleague who vouches; a licence or ID you saw)
+and a few words. Both are kept in the activity log.
+
+- **Migrations first.** `20261104130000_approved_at.sql` must be applied before
+  the code that accepts doctors is deployed: accepting writes `approved_at`, and
+  fails with a 500 without it.
+- **The WhatsApp message to a newly accepted doctor** is sent from the admin's
+  own WhatsApp, so the doctor sees that admin's number. Use a shared admin or
+  business number for it if that matters.
+- **A duplicate licence at signup** (someone registered it first) raises an
+  alert and an activity-log entry naming the existing account: either a doctor
+  who signed up twice, or someone holding a real doctor's licence.
+- **A heavy searcher:** an account over 600 searches in a day is refused and an
+  alert is raised once a day for it.
+
 ### A doctor asked to delete their account
 
 "طلب حذف الحساب" on /profile hides and suspends the account at once; the
@@ -552,7 +578,7 @@ activity log). Web Push, sent by `lib/push.ts` after the response.
   replaces the older. The admin list always shows every one. A new doctor
   waiting is the exception: it goes to one admin at a time, in turn (each
   signup, no throttle), and a daily check pushes to all admins if anyone has
-  waited over 24 hours.
+  waited a day (a morning check, once per doctor).
 - **Setup, once:** the `push_subscriptions` migration
   (`20261102130000_push_subscriptions.sql`), then three Vercel variables, for
   Production only, and a redeploy (the public key is built in):

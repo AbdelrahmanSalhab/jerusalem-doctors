@@ -38,10 +38,9 @@ async function exposed(): Promise<{ tables: string[]; rpcs: string[]; firstColum
   };
 }
 
-/** Readable rows per role. Anything not listed must read as empty. */
-const READABLE: Record<string, Record<string, "own" | "all" | "visible">> = {
-  doctor: { doctors: "own", specialties: "all", doctor_specialties: "visible", doctor_workplaces: "visible" },
-};
+/** Tables a signed-in doctor may read directly: only the list of specialties.
+ *  The directory is read through the service role only (#16). */
+const READABLE_BY_DOCTOR = ["specialties"];
 
 const anon = createClient(SUPABASE_URL, ANON_KEY, opts);
 
@@ -83,34 +82,36 @@ test.describe("row-level security", () => {
     }
   });
 
-  test("a signed-in doctor reads only what the directory already shows", async () => {
-    const ids = seededIds();
+  test("a signed-in doctor reads no doctor, workplace or specialty row directly", async () => {
     for (const t of tables) {
       const { data, error } = await doctor.from(t).select("*");
       // A missing grant (42501) is a denial; any other error is a bug:
       // is_admin() once recursed through RLS to "stack depth limit
       // exceeded" (0020), which an "empty or error" check let through.
       if (error) expect(error.code, `doctor read ${t}: ${error.message}`).toBe("42501");
-      const rows = (data ?? []) as Record<string, unknown>[];
-      const rule = READABLE.doctor[t];
-      if (!rule) {
-        expect(rows, `doctor read ${t}`).toEqual([]);
-      } else if (rule === "own") {
-        expect(rows.map((r) => r.id), `doctor read ${t}`).toEqual([ids.samer]);
-      } else if (rule === "visible") {
-        const hiddenOrPending = [ids.hidden, ids.pending, ids.admin];
-        expect(rows.length, `doctor read ${t}`).toBeGreaterThan(0);
-        expect(rows.some((r) => hiddenOrPending.includes(r.doctor_id as string)), `doctor read ${t}`).toBe(false);
+      if (READABLE_BY_DOCTOR.includes(t)) {
+        expect(error, `doctor read ${t}`).toBeNull();
+        expect((data ?? []).length, `doctor read ${t}`).toBeGreaterThan(0);
+      } else {
+        expect(data ?? [], `doctor read ${t}`).toEqual([]);
       }
     }
   });
 
-  test("an admin's own session reads every doctor and the activity log", async () => {
+  test("a doctor an admin has not accepted cannot read workplaces through the REST API either", async () => {
+    const pending = await signedIn(ACCOUNTS.pending);
+    for (const t of ["doctor_workplaces", "doctor_specialties", "doctors"]) {
+      const { data, error } = await pending.from(t).select("*").limit(1);
+      expect(data ?? [], `pending read ${t}`).toEqual([]);
+      expect(error?.code, `pending read ${t}`).toBe("42501");
+    }
+  });
+
+  test("an admin's own session reads the activity log, and the doctors only through the app", async () => {
     const admin = await signedIn(ACCOUNTS.admin);
     const doctors = await admin.from("doctors").select("id");
-    expect(doctors.error).toBeNull();
-    const all = await serviceClient().from("doctors").select("id", { count: "exact", head: true });
-    expect(doctors.data?.length).toBe(all.count);
+    expect(doctors.data ?? []).toEqual([]);
+    expect(doctors.error?.code).toBe("42501");
     const audit = await admin.from("audit_logs").select("id").limit(1);
     expect(audit.error).toBeNull();
   });
