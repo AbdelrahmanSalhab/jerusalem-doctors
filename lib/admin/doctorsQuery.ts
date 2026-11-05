@@ -15,6 +15,10 @@ export const DOCTOR_FILTERS = [
   { key: "all", label: "كل الحسابات", tile: true },
   { key: "pending", label: "بانتظار القبول", tile: true, attention: true },
   { key: "license", label: "ترخيص يحتاج مراجعة", tile: true, attention: true },
+  // Accepted, but no admin has satisfied themselves it is them (#16): the
+  // doctors the signup accepted on a registry match alone, before every
+  // acceptance asked how the admin knew.
+  { key: "identity", label: "لم تُراجَع هويته", attention: true },
   { key: "stage", label: "مقيم والسجل يقول أخصائي", attention: true },
   { key: "clinic", label: "عيادة بلا عنوان أو هاتف", attention: true },
   { key: "hidden", label: "مخفي من الدليل", tile: true },

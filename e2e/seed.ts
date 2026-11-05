@@ -39,6 +39,8 @@ export interface SeedDoctor {
   featured?: "doctor" | "graduate";
   visible?: boolean;
   approved?: boolean;
+  /** Accepted but not yet identity-reviewed by an admin (default: reviewed). */
+  identityReviewed?: boolean;
   admin?: boolean;
   licenseStatus?: string;
   certificates?: string[];
@@ -245,6 +247,8 @@ async function insertDoctor(db: SupabaseClient, d: SeedDoctor, specialtyId: Map<
         is_admin_approved: d.approved ?? true,
         // The seed's doctors joined long ago; the ones a test creates (i = 30)
         // are new this week, whatever today is.
+        // An accepted doctor has been reviewed, unless a test says it was not.
+        identity_reviewed_at: d.approved === false || d.identityReviewed === false ? null : new Date().toISOString(),
         approved_at: d.approved === false ? null : i >= 30 ? new Date().toISOString() : new Date(Date.UTC(2026, 9, 1 + i)).toISOString(),
         is_admin: d.admin ?? false,
         // Newest first in the admin list follows the seed order.

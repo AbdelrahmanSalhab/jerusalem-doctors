@@ -135,6 +135,10 @@ export function DoctorListRow({
           <span className={toneChip("warn")}>مخفي من الدليل</span>
         )}
         {visibility.listed && <span className={toneChip("success")}>في الدليل</span>}
+        {/* Accepted on a registry match alone: no admin has satisfied themselves it is them (#16). */}
+        {!staff && row.is_active && row.is_admin_approved && !row.identity_reviewed_at && (
+          <span className={toneChip("warn")}>لم تُراجَع هويته</span>
+        )}
         {row.seeking_work && <span className={toneChip("neutral")}>يبحث عن عمل</span>}
         {row.retired && <span className={toneChip("neutral")}>طبيب متقاعد</span>}
       </div>

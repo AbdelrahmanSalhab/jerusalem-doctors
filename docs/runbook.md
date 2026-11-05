@@ -288,9 +288,15 @@ Accepting asks how you knew it is them (a number you found yourself, not one on
 their profile or their phone; a colleague who vouches; a licence or ID you saw)
 and a few words. Both are kept in the activity log.
 
-- **Migrations first.** `20261104130000_approved_at.sql` must be applied before
-  the code that accepts doctors is deployed: accepting writes `approved_at`, and
-  fails with a 500 without it.
+- **Migrations first.** `20261104130000_approved_at.sql` and
+  `20261104170000_identity_reviewed_at.sql` must be applied before the code that
+  accepts doctors is deployed: accepting writes both columns, and fails with a
+  500 without them.
+- **Doctors accepted before this (on a registry match alone) are listed under
+  «لم تُراجَع هويته»** in the admin list, with a badge on the row. Open one, press
+  «مراجعة الهوية», say how you knew it is them and a few words; it goes to the
+  activity log and the doctor leaves the list. Accepting a new doctor is the same
+  review, so only the older ones are in it.
 - **The WhatsApp message to a newly accepted doctor** is sent from the admin's
   own WhatsApp, so the doctor sees that admin's number. Use a shared admin or
   business number for it if that matters.

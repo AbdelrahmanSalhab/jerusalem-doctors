@@ -31,6 +31,10 @@ export function ApprovalReasonPrompt({
   region,
   busy,
   kind = "unconfirmed",
+  heading = "كيف تأكّدت من هويته؟",
+  submitLabel = "قبول العضوية",
+  reasonLabel = "سبب القبول",
+  lead: leadOverride,
   onCancel,
   onConfirm,
 }: {
@@ -39,6 +43,11 @@ export function ApprovalReasonPrompt({
   region: string | null;
   busy: boolean;
   kind?: ReasonKind;
+  /** The same question asked of an accepted doctor (the identity review). */
+  heading?: string;
+  submitLabel?: string;
+  reasonLabel?: string;
+  lead?: string;
   onCancel: () => void;
   onConfirm: (reason: string, method: ApprovalMethod) => Promise<boolean>;
 }) {
@@ -64,11 +73,12 @@ export function ApprovalReasonPrompt({
   };
 
   const lead =
-    kind === "identity"
+    leadOverride ??
+    (kind === "identity"
       ? `ترخيص د. ${name} يطابق سجل الوزارة، لكن الاسم والرقم معلومات علنية يستطيع أي شخص كتابتها، فالتطابق لا يثبت أنه صاحبها.`
       : kind === "corrected_number"
         ? `رقم ترخيص د. ${name} حدّدته الإدارة بيدها (كتابةً أو بالبحث بالاسم)، وتطابقه مع السجل لا يثبت الهوية.`
-        : `ترخيص د. ${name} ليس مطابقًا لسجل الوزارة (الحالة: ${label})، فلا شيء في السجل يثبت أنه هو.`;
+        : `ترخيص د. ${name} ليس مطابقًا لسجل الوزارة (الحالة: ${label})، فلا شيء في السجل يثبت أنه هو.`);
 
   return (
     <form
@@ -76,7 +86,7 @@ export function ApprovalReasonPrompt({
       className="flex flex-col gap-3 rounded-lg border border-warn-line bg-warn-bg p-3 text-sm"
     >
       <div>
-        <p className="font-semibold">كيف تأكّدت من هويته؟</p>
+        <p className="font-semibold">{heading}</p>
         <p className="text-foreground/80">
           {lead} لا تعتمد على رقم هاتف أو مكان عمل مكتوب في ملفه، ولا على الرقم الذي سجّل به: كلها من إدخاله هو.
           يُحفظ ما تكتبه في سجل النشاط.
@@ -103,7 +113,7 @@ export function ApprovalReasonPrompt({
         onChange={(e) => setReason(e.target.value)}
         rows={2}
         maxLength={300}
-        aria-label="سبب القبول"
+        aria-label={reasonLabel}
         placeholder="مثال: اتصلت بمقسم المستشفى وأكّدوا أنه يعمل في قسم الأطفال."
         className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
       />
@@ -114,7 +124,7 @@ export function ApprovalReasonPrompt({
           disabled={busy}
           className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-50"
         >
-          قبول العضوية
+          {submitLabel}
         </button>
         <button
           type="button"

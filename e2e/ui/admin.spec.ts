@@ -67,6 +67,49 @@ test.describe("accepting a doctor", () => {
   });
 });
 
+// #16: the doctors accepted at signup on a registry match alone have never had
+// an admin satisfy themselves it is them; the list says so and a review clears it.
+test.describe("identity review of an accepted doctor", () => {
+  let accepted: Awaited<ReturnType<typeof createDoctor>>;
+  test.beforeEach(async () => {
+    accepted = await createDoctor({ first: "قديم", family: "المراجعة", identityReviewed: false });
+  });
+  test.afterEach(async () => accepted.remove());
+
+  // A hidden admin account is staff: accepted, never reviewed, and not in the list.
+  test("leaves out staff accounts, which are not doctors", async ({ page }) => {
+    const staff = await createDoctor({ first: "قديم", family: "الإدارة", admin: true, visible: false, identityReviewed: false });
+    try {
+      await page.goto("/admin?status=identity&q=قديم");
+      await expect(page.getByText("قديم المراجعة")).toBeVisible();
+      await expect(page.getByText("قديم الإدارة")).toHaveCount(0);
+    } finally {
+      await staff.remove();
+    }
+  });
+
+  test("is listed until an admin says how they knew, then leaves the list", async ({ page }) => {
+    await page.goto("/admin?status=identity&q=قديم");
+    await expect(page.getByText("قديم المراجعة")).toBeVisible();
+    await expect(page.getByText("لم تُراجَع هويته").first()).toBeVisible();
+
+    await page.getByRole("button", { name: "قديم المراجعة" }).click();
+    await page.getByRole("button", { name: "مراجعة الهوية" }).click();
+    // Both are asked for, like accepting.
+    await page.getByRole("button", { name: "تمت مراجعة الهوية" }).click();
+    await expect(page.getByText("اختر كيف تأكّدت من هويته.")).toBeVisible();
+    await page.getByRole("radio", { name: /رأيت صورة/ }).check();
+    await page.getByLabel("سبب المراجعة").fill("رأيت صورة الترخيص الأصلية معه");
+    await page.getByRole("button", { name: "تمت مراجعة الهوية" }).click();
+    await expect(page.getByText(/روجعت هوية هذا الطبيب في/)).toBeVisible();
+
+    const { data } = await serviceClient().from("doctors").select("identity_reviewed_at").eq("id", accepted.id).single();
+    expect(data!.identity_reviewed_at).not.toBeNull();
+    await page.goto("/admin?status=identity&q=قديم");
+    await expect(page.getByText("قديم المراجعة")).toHaveCount(0);
+  });
+});
+
 test("the panel opens from the activity log", async ({ page }) => {
   await page.goto("/admin/audit");
   // An entry opens on click; the first one about a doctor has the link.

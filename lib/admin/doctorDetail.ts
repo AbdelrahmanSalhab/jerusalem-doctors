@@ -47,6 +47,7 @@ export interface DetailDoctor {
   license_verification_status: string | null;
   license_verified_at: string | null;
   license_reviewed_at: string | null;
+  identity_reviewed_at: string | null;
   secondary_license_number: string | null;
   secondary_license_region: "IL" | "PS" | null;
   secondary_license_verification_status: string | null;
@@ -95,7 +96,7 @@ const DOCTOR_COLUMNS = `
   hebrew_first_name, hebrew_family_name,
   phone_e164, phone_display, email, bio, subspecialty, certificates,
   profile_picture_url, career_stage, residency_start_year,
-  license_number, license_region, license_verification_status, license_verified_at, license_reviewed_at,
+  license_number, license_region, license_verification_status, license_verified_at, license_reviewed_at, identity_reviewed_at,
   secondary_license_number, secondary_license_region, secondary_license_verification_status,
   is_admin_approved, is_active, is_visible, is_phone_verified, is_admin,
   consent_directory_use, consent_timestamp, seeking_work, retired, featured, featured_at,

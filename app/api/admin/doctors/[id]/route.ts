@@ -137,6 +137,9 @@ export const PATCH = withJsonErrors(async (
     is_admin_approved: approvalChange,
     // When the directory first had them, for «جديد هذا الأسبوع».
     ...(approvalChange !== undefined && { approved_at: approvalChange ? new Date().toISOString() : null }),
+    // Accepting asks how the admin knew it is them (the method and reason), so
+    // it is also the identity review.
+    ...(approving && { identity_reviewed_at: new Date().toISOString() }),
     is_active: fields.is_active,
     is_visible: fields.is_visible,
     career_stage: fields.career_stage,

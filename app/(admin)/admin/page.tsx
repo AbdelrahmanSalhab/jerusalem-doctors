@@ -54,6 +54,7 @@ const ROW_COLUMNS = `
   retired,
   subspecialty,
   created_at,
+  identity_reviewed_at,
   doctor_specialties(specialty:specialties(name_ar))
 `;
 
@@ -113,6 +114,14 @@ function applyFilter<
     case "license":
       // Both groups inside one or=, so they combine with AND.
       return query.or(`and(or(${LICENCE_NOT_VERIFIED}),${NOT_REVIEWED},or(${REAL_DOCTOR}))`);
+    case "identity":
+      // Accepted and open, not yet reviewed, and a real doctor: staff rows have
+      // nothing to be who they say.
+      // One or=, like the licence filter, so the groups combine with AND.
+      return query
+        .eq("is_admin_approved", true)
+        .eq("is_active", true)
+        .or(`and(identity_reviewed_at.is.null,or(${REAL_DOCTOR}))`);
     case "stage":
       // Marked طبيب مقيم, but the registry lists a specialty, which it only
       // does once the board certificate is granted (registry_specialty()).

@@ -143,7 +143,8 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
     licenseStatus = "verified";
     expect((await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" })).status).toBe(200);
     // The time it was accepted, for «جديد هذا الأسبوع».
-    expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String) });
+    // Accepting asks how the admin knew, so it is also the identity review.
+    expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String), identity_reviewed_at: expect.any(String) });
     expect(audits[0]).toMatchObject({ metadata: { approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" } });
   });
 
@@ -242,7 +243,7 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
   it("never writes the reason as a column", async () => {
     licenseStatus = "soft_match";
     await call({ is_admin_approved: true, approval_reason: "تحققت هاتفيًا من المستشفى", approval_method: "institution_called" });
-    expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String), license_reviewed_at: expect.any(String) });
+    expect(updates[0]).toEqual({ is_admin_approved: true, approved_at: expect.any(String), identity_reviewed_at: expect.any(String), license_reviewed_at: expect.any(String) });
     expect(updates[0]).not.toHaveProperty("approval_reason");
   });
 
