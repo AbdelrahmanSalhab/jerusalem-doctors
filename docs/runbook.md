@@ -305,6 +305,12 @@ and a few words. Both are kept in the activity log.
   who signed up twice, or someone holding a real doctor's licence.
 - **A heavy searcher:** an account over 600 searches in a day is refused and an
   alert is raised once a day for it.
+- **An accepted doctor changes their Arabic name:** it is saved, logged with the
+  old and new name, and the admins are alerted. The one rename that is refused
+  is to the exact Arabic name another listed doctor already has (they are told
+  to write to the admins); a real namesake is then fixed by an admin in the
+  panel, which does not have this check. Any other new name is not held for
+  review (#247).
 
 ### A doctor asked to delete their account
 
