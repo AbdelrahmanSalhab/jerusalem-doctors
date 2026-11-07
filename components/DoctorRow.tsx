@@ -1,8 +1,8 @@
 import { Avatar } from "@/components/Avatar";
-import { ContactButtons } from "@/components/ContactButtons";
+import { RevealContact } from "@/components/RevealContact";
 import { cardChips, cardServices, RETIRED_LABEL, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
-import { workplaceInfoLine, clinicTelHref } from "@/lib/workplace";
+import { workplaceInfoLine } from "@/lib/workplace";
 
 
 
@@ -91,31 +91,9 @@ export function DoctorRow({ doctor }: { doctor: SearchHit }) {
             )}
           </div>
         )}
-
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm text-foreground/65">
-          {doctor.phone_display && (
-            <a
-              href={clinicTelHref(doctor.phone_display) ?? undefined}
-              className="inline-flex items-center gap-1 hover:underline"
-              dir="ltr"
-            >
-              <span aria-hidden="true">📞</span>
-              {doctor.phone_display}
-            </a>
-          )}
-          {doctor.email && (
-            <span
-              className="inline-flex items-center gap-1 break-all"
-              dir="ltr"
-            >
-              <span aria-hidden="true">✉️</span>
-              {doctor.email}
-            </span>
-          )}
-        </div>
       </div>
 
-      <ContactButtons doctor={doctor} compact />
+      <RevealContact doctor={doctor} compact />
     </article>
   );
 }

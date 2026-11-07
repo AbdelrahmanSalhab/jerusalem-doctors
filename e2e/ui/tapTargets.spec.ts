@@ -44,8 +44,11 @@ test.describe("signed in @phone", () => {
     expect(await tooSmall(page), "/dashboard").toEqual([]);
 
     await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill("د");
-    await expect(page.getByRole("button", { name: "+ إضافة لجهات الاتصال" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "إظهار الهاتف والبريد" }).first()).toBeVisible();
     expect(await tooSmall(page), "/dashboard with results").toEqual([]);
+    await page.getByRole("button", { name: "إظهار الهاتف والبريد" }).first().click();
+    await expect(page.getByRole("button", { name: "+ إضافة لجهات الاتصال" }).first()).toBeVisible();
+    expect(await tooSmall(page), "/dashboard with a number shown").toEqual([]);
 
     await page.goto("/profile");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

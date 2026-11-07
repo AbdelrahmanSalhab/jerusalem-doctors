@@ -1,7 +1,6 @@
 import { Avatar } from "@/components/Avatar";
-import { ContactButtons } from "@/components/ContactButtons";
+import { RevealContact } from "@/components/RevealContact";
 import { ReportProfileButton } from "@/components/ReportProfileButton";
-import { clinicTelHref } from "@/lib/workplace";
 import { cardChips, cardServices, RETIRED_LABEL, SEEKING_WORK_LABEL, type SearchHit } from "@/lib/directory";
 import { careerStageBadge } from "@/lib/careerStage";
 import { WorkplaceDetails } from "@/components/WorkplaceDetails";
@@ -100,30 +99,7 @@ export function DoctorCard({ doctor }: { doctor: SearchHit }) {
         </div>
       )}
 
-      {(doctor.phone_display || doctor.email) && (
-        <dl className="flex flex-col gap-1 text-sm">
-          {doctor.phone_display && (
-            <div className="flex items-baseline gap-2">
-              <dt className="text-foreground/65">الهاتف:</dt>
-              <dd dir="ltr">
-                <a href={clinicTelHref(doctor.phone_display) ?? undefined} className="hover:underline">
-                  {doctor.phone_display}
-                </a>
-              </dd>
-            </div>
-          )}
-          {doctor.email && (
-            <div className="flex items-baseline gap-2">
-              <dt className="text-foreground/65">البريد:</dt>
-              <dd dir="ltr" className="break-all">
-                {doctor.email}
-              </dd>
-            </div>
-          )}
-        </dl>
-      )}
-
-      <ContactButtons doctor={doctor} />
+      <RevealContact doctor={doctor} />
       <ReportProfileButton doctorId={doctor.id} name={name} />
     </article>
   );

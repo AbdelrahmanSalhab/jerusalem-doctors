@@ -40,6 +40,9 @@ export const RATE_LIMITS = {
   // long as someone cares to. A doctor uses a few hundred a day at most.
   searchDaily: { limit: 600, window: "1 d" },
   contactClick: { limit: 60, window: "1 m" },
+  // Showing a colleague's number is a tap; the day's budget of different
+  // doctors is lib/contactBudget.ts, this only stops a loop.
+  contactReveal: { limit: 30, window: "1 m" },
   // A handful per visit at most; more is a loop or someone filling the table.
   installEvent: { limit: 20, window: "1 m" },
   // "Ask the admins for this doctor's number": each one is a person's work.

@@ -48,8 +48,8 @@ describe("toSearchHits detail", () => {
   });
 
   it("survives a row with no specialties, workplaces or number", () => {
-    const [hit] = toSearchHits([ROW({ doctor_specialties: null, doctor_workplaces: null, phone_e164: null })]);
-    expect(hit).toMatchObject({ specialties: [], workplaces: [], whatsapp_url: null });
+    const [hit] = toSearchHits([ROW({ doctor_specialties: null, doctor_workplaces: null, phone_e164: null, phone_display: null, email: null })]);
+    expect(hit).toMatchObject({ specialties: [], workplaces: [], has_contact: false });
   });
 });
 

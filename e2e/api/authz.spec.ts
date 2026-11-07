@@ -89,6 +89,7 @@ const POLICY: Record<string, Policy> = {
   "POST /api/signup/start": "public",
   "POST /api/signup/verify": "public",
   "POST /api/usage/contact": "approved",
+  "POST /api/doctors/[id]/contact": "approved",
   "POST /api/usage/install": "doctor",
 };
 
