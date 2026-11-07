@@ -11,6 +11,29 @@ async function search(page: Page, q: string) {
   await page.getByPlaceholder("ابحث عن طبيب أو تخصص").fill(q);
 }
 
+/** A colleague's number and email are behind a tap (#16): press the first card's. */
+async function reveal(page: Page) {
+  await page.getByRole("button", { name: "إظهار الهاتف والبريد" }).first().click();
+  await expect(page.getByRole("link", { name: "اتصال" }).first()).toBeVisible();
+}
+
+test("a card shows no number, link or email until the doctor taps it (#16)", async ({ page }) => {
+  const bodies: string[] = [];
+  page.on("response", async (r) => {
+    if (r.url().includes("/api/search")) bodies.push(await r.text());
+  });
+  await search(page, "ليلى");
+  await expect(page.getByRole("button", { name: "إظهار الهاتف والبريد" }).first()).toBeVisible();
+  await expect.poll(() => bodies.length).toBeGreaterThan(0);
+  const before = bodies.join("\n") + (await page.content());
+  for (const secret of ["0521234502", "972521234502"]) expect(before, secret).not.toContain(secret);
+  // (The footer's support WhatsApp link is the site's own, not a doctor's.)
+  await expect(page.locator('a[href*="0521234502"], a[href*="972521234502"]')).toHaveCount(0);
+
+  await reveal(page);
+  await expect(page.getByRole("link", { name: "اتصال" }).first()).toHaveAttribute("href", "tel:0521234502");
+});
+
 test("the dashboard counts the listed doctors and shows the featured ones @phone", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page.getByText(`${LISTED.length} أطباء`)).toBeVisible();
@@ -156,6 +179,7 @@ test("the filter chips narrow the list with no text, and clear @phone", async ({
 
 test("saving a contact gives name and numbers, never the licence @phone", async ({ page }) => {
   await search(page, "ليلى");
+  await reveal(page);
   const [download] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: /إضافة لجهات الاتصال/ }).first().click(),
@@ -171,6 +195,7 @@ test("WhatsApp opens with the viewer's introduction, and the press is counted @p
   const db = serviceClient();
   const before = (await db.from("usage_events").select("*", { count: "exact", head: true })).count ?? 0;
   await search(page, "ليلى");
+  await reveal(page);
   const wa = page.getByRole("link", { name: "واتساب" }).first();
   const href = (await wa.getAttribute("href"))!;
   expect(href).toMatch(/^https:\/\/wa\.me\/972521234502\?text=/);
@@ -188,6 +213,7 @@ test("the call button dials the doctor's number, and the press is counted @phone
     (await db.from("usage_events").select("*", { count: "exact", head: true }).eq("kind", "contact_call")).count ?? 0;
   const before = await calls();
   await search(page, "ليلى");
+  await reveal(page);
   const call = page.getByRole("link", { name: "اتصال" }).first();
   await expect(call).toHaveAttribute("href", "tel:0521234502");
   // Leave the dialer closed: the page's own handler still runs.
@@ -204,7 +230,7 @@ test("no search response carries a licence number or another doctor's private fi
   await search(page, "ا");
   await expect.poll(() => bodies.length).toBeGreaterThan(0);
   const all = bodies.join("\n") + (await page.content());
-  for (const secret of ["510001", "510002", "510003", "510004", "license_number", "auth_user_id", "is_admin"]) {
+  for (const secret of ["510001", "510002", "510003", "510004", "license_number", "auth_user_id", "is_admin", "phone_e164", "whatsapp_url"]) {
     expect(all, secret).not.toContain(secret);
   }
 });
