@@ -426,7 +426,7 @@ under any plan, so the nightly job copies them separately (see Photos below).
   them would hand it back. **Left out on purpose:** the registry mirror (the
   nightly sync refills it), unfinished signups (a phone number and a half-filled
   form, kept 30 days only), sign-ins (a doctor is linked again by phone at the
-  next sign-in, `linkAuthUser`) and photos (storage, copied by their own step).
+  next sign-in, `linkAuthUser`) and photos (storage; copied by `photos.sh`, below).
 - **Checks before it counts:** the database has at least 50 doctors (a wiped
   table is not tonight's "good" copy), the dump lists, holds the doctors and
   `private.is_admin()`, and the encrypted file is not under half of the previous
@@ -452,6 +452,22 @@ the secret reads the data but cannot change or drop anything. Its pooler user is
 `backup.<project ref>`. If it ever lacks a table, the dump fails loudly
 (`pg_dump` runs with row security off) rather than leaving the table out.
 
+**Photos.** Supabase Storage holds the profile photos (bucket `doctor-photos`,
+public, one file per doctor named by id) and no database backup includes them.
+After the dump, `scripts/backup/photos.sh` copies them to `photos/` in the same
+bucket, unencrypted (anyone with the link can already see them). It needs no new
+secret: the list comes from `storage.objects` through the same read-only role,
+and the files from the bucket's public URL, the project being the part after the
+dot of the connection string's user (`backup.<ref>`). It overwrites and never
+deletes; a photo whose doctor is deleted or who replaced it stops being
+refreshed and the `photos/` lifecycle rule (60 days, in the setup below) removes
+it, so the privacy page's promise about deleted accounts holds for the copy too.
+`photos/` has no bucket lock: a valid token could change these copies, which
+are public pictures. If only the photo step is red, that night's dump is fine.
+**To restore:** download `photos/` from the bucket and upload each file back
+into `doctor-photos` under the same name (dashboard, or the Storage API with the
+service key); the restored `profile_picture_url` already points at that name.
+
 **One-time setup (a repository admin), in this order:**
 1. GitHub, Settings, Environments, new environment `backup` with deployment
    branches limited to `main` **before the workflow first runs**: a job that
@@ -464,6 +480,10 @@ the secret reads the data but cannot change or drop anything. Its pooler user is
      prefix `monthly/`, expire after 365 days (CLI: `wrangler r2 bucket lifecycle
      add jd-backups --name expire-daily --prefix daily/ --expire-days 60`, and the same with
      `expire-monthly`, `monthly/`, `365`);
+   - a third lifecycle rule for the photo copy: prefix `photos/`, expire after
+     60 days (`... --name expire-photos --prefix photos/ --expire-days 60`).
+     **Needed, not optional**: the photo copy never deletes, so without it a
+     deleted doctor's photo would stay in the backup for good;
    - a bucket lock rule if your plan has it: prefix `daily/` and `monthly/`,
      retention 30 days, so even a valid token cannot delete a recent backup
      (`wrangler r2 bucket lock add jd-backups ...`; the dashboard has it under
@@ -552,7 +572,7 @@ backup; run the registry sync by hand (the mirror table is empty); re-add the
 foreign key to `auth.users` if it was dropped, after the auth users exist; **re-apply
 account deletions made since the backup's date** (a restore brings deleted doctors
 back, and the privacy page promises they are gone); restore the auth settings
-(kept in this runbook) and the storage photos (from the `photos/` copy, see Photos). Doctors
+(kept in this runbook) and the storage photos (from `photos/` in the bucket, below). Doctors
 sign in again by phone and are linked to their rows (`linkAuthUser`).
 
 **Privacy:** the dump holds doctors' personal data, but only encrypted: it is

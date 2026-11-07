@@ -7,6 +7,10 @@ name: Nightly backup
 # (Settings > Environments). Setup and the restore drill are in docs/runbook.md
 # ("Backups").
 #
+# The doctors' profile photos (Supabase Storage, in no database dump) are copied
+# to the same bucket under photos/ by a second step, scripts/backup/photos.sh. If
+# only that step is red, the database dump of that night is fine.
+#
 # A red run means last night has no backup. GitHub emails the person who last
 # edited the schedule (not everyone watching the repository), so the runbook
 # names who that is; the optional BACKUP_HEALTHCHECK_URL secret adds a ping on
@@ -72,6 +76,15 @@ jobs:
         run: |
           pg_dump --version
           scripts/backup/backup.sh
+      - name: Copy the profile photos
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
+          S3_REGION: ${{ secrets.S3_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+        run: scripts/backup/photos.sh
       # Optional: a dead man's switch (healthchecks.io or similar) that expects
       # a ping every day and alerts when one is missing. Skipped when unset.
       - name: Tell the healthcheck
