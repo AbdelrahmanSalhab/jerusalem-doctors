@@ -28,14 +28,10 @@ export interface SearchHit {
   arabic_family_name: string;
   hebrew_first_name: string | null;
   hebrew_family_name: string | null;
-  /** Null only when the column itself is unset; the directory always shows it. */
-  phone_display: string | null;
-  /** Drives the WhatsApp button on the card. No prefilled text: the card
-   *  adds the viewer's own introduction (lib/contactIntro.ts). */
-  whatsapp_url: string | null;
-  /** For "add to contacts". */
-  phone_e164: string | null;
-  email: string | null;
+  /** Whether there is a number or an email to reveal. The numbers themselves
+   *  never travel in a search or a card: the viewer asks for one doctor's
+   *  (POST /api/doctors/[id]/contact), counted against a daily budget (#16). */
+  has_contact: boolean;
   subspecialty: string | null;
   bio: string | null;
   career_stage: "resident" | "specialist" | null;
@@ -49,6 +45,29 @@ export interface SearchHit {
   /** Empty only for a doctor with no workplace rows. */
   workplaces: SearchWorkplace[];
   profile_picture_url: string | null;
+}
+
+/** What a doctor's card reveals on a tap (lib/contactBudget.ts is its limit). */
+export interface ContactDetails {
+  /** Null only when the column itself is unset. */
+  phone_display: string | null;
+  /** Drives the WhatsApp button. No prefilled text: the card adds the
+   *  viewer's own introduction (lib/contactIntro.ts). */
+  whatsapp_url: string | null;
+  /** For "add to contacts". */
+  phone_e164: string | null;
+  email: string | null;
+}
+
+export function toContactDetails(d: Pick<ContactDetails, "phone_display" | "phone_e164" | "email">): ContactDetails {
+  return {
+    phone_display: d.phone_display,
+    // buildWhatsAppLink throws on an empty string; one malformed row must
+    // not fail the whole response.
+    whatsapp_url: d.phone_e164 ? buildWhatsAppLink(d.phone_e164, "") : null,
+    phone_e164: d.phone_e164,
+    email: d.email,
+  };
 }
 
 /** Search returns at most this many doctors; the UI says so when more matched. */
@@ -165,12 +184,7 @@ function toSearchHit(d: DirectoryRow): SearchHit {
     arabic_family_name: d.arabic_family_name,
     hebrew_first_name: d.hebrew_first_name,
     hebrew_family_name: d.hebrew_family_name,
-    phone_display: d.phone_display,
-    // buildWhatsAppLink throws on an empty string; one malformed row must
-    // not fail the whole response.
-    whatsapp_url: d.phone_e164 ? buildWhatsAppLink(d.phone_e164, "") : null,
-    phone_e164: d.phone_e164,
-    email: d.email,
+    has_contact: Boolean(d.phone_display || d.phone_e164 || d.email),
     subspecialty: d.subspecialty,
     bio: d.bio,
     career_stage: d.career_stage,

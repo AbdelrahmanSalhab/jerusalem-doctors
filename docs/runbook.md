@@ -305,6 +305,15 @@ and a few words. Both are kept in the activity log.
   who signed up twice, or someone holding a real doctor's licence.
 - **A heavy searcher:** an account over 600 searches in a day is refused and an
   alert is raised once a day for it.
+- **Numbers and emails are behind a tap (#16).** A search or a card carries no
+  phone or email; the doctor taps «إظهار الهاتف والبريد» and
+  `POST /api/doctors/[id]/contact` returns them. Each account may reveal 25
+  different doctors a day (10 in the 14 days after an admin accepted it);
+  revealing the same doctor again is free, and over the limit the doctor is told
+  to write to the admins and the same «حساب طبيب يبحث في الدليل بكثرة» alert is
+  raised once a day. The counts are in Redis (`reveal:<doctor id>:<day>`), per
+  UTC day. Limits: `lib/contactBudget.ts`. A clinic's own phone on a workplace
+  is still on the card: it is a business number, not the doctor's.
 - **An accepted doctor changes their Arabic name:** it is saved, logged with the
   old and new name, and the admins are alerted. The one rename that is refused
   is to the exact Arabic name another listed doctor already has (they are told

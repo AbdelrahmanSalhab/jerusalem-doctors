@@ -6,22 +6,11 @@
 
 import { useViewer } from "@/components/ViewerContext";
 import { whatsappHref, whatsappIntro } from "@/lib/contactIntro";
-import type { SearchHit } from "@/lib/directory";
+import type { ContactDetails, SearchHit } from "@/lib/directory";
 import { doctorVCard, vcardFileName } from "@/lib/vcard";
 import { clinicTelHref } from "@/lib/workplace";
 
-type ContactDoctor = Pick<
-  SearchHit,
-  | "id"
-  | "arabic_first_name"
-  | "arabic_family_name"
-  | "phone_display"
-  | "phone_e164"
-  | "whatsapp_url"
-  | "email"
-  | "specialties"
-  | "workplaces"
->;
+type ContactDoctor = Pick<SearchHit, "id" | "arabic_first_name" | "arabic_family_name" | "specialties" | "workplaces"> & ContactDetails;
 
 /** Counts the press for the stats page (0017). A beacon survives the page
  *  handing off to WhatsApp or the dialer, and never delays it. */

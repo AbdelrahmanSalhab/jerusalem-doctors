@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardChips, rankRecent, type SearchHit, toSearchHits } from "@/lib/directory";
+import { cardChips, rankRecent, type SearchHit, toContactDetails, toSearchHits } from "@/lib/directory";
 
 const ROW = {
   id: "d1",
@@ -32,7 +32,7 @@ describe("toSearchHits", () => {
     expect(hit.certificates).toEqual([]);
     expect(hit.seeking_work).toBe(false);
     expect(hit.retired).toBe(false);
-    expect(hit.whatsapp_url).toBeNull();
+    expect(hit.has_contact).toBe(false);
     expect(hit.workplaces.map((w) => w.name)).toEqual(["أ", "ب"]);
     expect(hit.specialties).toEqual(["الطب العام"]);
   });
@@ -42,8 +42,25 @@ describe("toSearchHits", () => {
     expect(JSON.stringify(hit)).not.toContain("123456");
   });
 
+  it("says there is something to reveal, but never carries a number or an email (#16)", () => {
+    const [hit] = toSearchHits([{ ...ROW, phone_display: "050-123-4567", phone_e164: "+972501234567", email: "ahmad@example.test" }]);
+    expect(hit.has_contact).toBe(true);
+    const json = JSON.stringify(hit);
+    for (const secret of ["050-123-4567", "972501234567", "ahmad@example.test"]) expect(json).not.toContain(secret);
+  });
+
   it("returns [] for no data", () => {
     expect(toSearchHits(null)).toEqual([]);
+  });
+});
+
+describe("toContactDetails", () => {
+  it("builds the WhatsApp link from the number, and none from an empty one", () => {
+    expect(toContactDetails({ phone_display: "050", phone_e164: "+972501234567", email: "a@b.test" })).toMatchObject({
+      whatsapp_url: expect.stringContaining("972501234567"),
+      email: "a@b.test",
+    });
+    expect(toContactDetails({ phone_display: null, phone_e164: "", email: null }).whatsapp_url).toBeNull();
   });
 });
 
