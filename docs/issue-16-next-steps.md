@@ -4,6 +4,8 @@ Research only, no code. Numbers are from production on 2026-11-05.
 
 ## Where we are
 
+Step A is built in #252 (reveal on tap, the budget, the alert); see below.
+
 Done (#244, #245, #249): signup no longer auto-approves; the directory is closed
 to a doctor an admin has not accepted; every acceptance records how the admin
 knew and why; the 99 doctors accepted before that were checked in bulk and
@@ -58,8 +60,23 @@ would notice.
    dashboard sections build their cards from the same shape. Checking each is
    part of the PR; only the search API was traced here.
 
-Before building: measure real reveals per account excluding admin and CI,
-decide the budget numbers, and decide whether new doctors get the tighter budget.
+Checked on 2026-11-07, before building (admins excluded, last 30 days, 158
+doctor-days):
+
+- **Surfaces.** Outside admin, a number or email is shown only by the reveal
+  route and on the doctor's own profile. The profile page and the dashboard
+  sections show none.
+- **Direct database access.** A signed-in account cannot read the doctor tables
+  through Supabase's own API: no grants for its role, no column grants, and row
+  level security on with no policy. The only way to a number is our routes.
+- **Real use.** Searches per doctor-day: median 2, 95% at 24 or fewer, maximum
+  46 (the earlier 206 was an admin or the CI account). Contact clicks per
+  doctor-day: 95% at 1 or fewer, maximum 6; 10 doctors made 23 in total.
+- **Budget.** 25 distinct doctors a day, 10 for the first 14 days, is well above
+  anything seen. Kept. Lowering it buys little: at 25 a day, copying 133 doctors
+  takes about 6 days and the alert fires on the first refusal. Reveals are not
+  measured yet (nobody can reveal in production), so contact clicks are a
+  proxy: look at real reveals per account a week after it ships.
 
 Then C, then B only if email sending exists.
 
