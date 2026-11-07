@@ -17,6 +17,7 @@ import {
   profileRuleFailure,
 } from "@/lib/profile/save";
 import { recordProfileEdit } from "@/lib/profile/audit";
+import { nameTakenByAnother } from "@/lib/profile/nameTaken";
 import { rateLimit } from "@/lib/ratelimit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { directoryChanged } from "@/lib/cachedReads";
@@ -52,6 +53,19 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     });
   }
 
+  const service = createSupabaseServiceClient();
+  // A vetted account taking a colleague's name (#247).
+  if (await nameTakenByAnother(service, me, parsed)) {
+    const message = "هذا الاسم لطبيب آخر في الدليل. إن كان اسمك فعلًا فراسل الإدارة ونصحّحه معك.";
+    return jsonError(400, {
+      error: "invalid_body",
+      code: "invalid_body",
+      fields: Object.fromEntries(
+        (["arabic_first_name", "arabic_family_name"] as const).filter((k) => parsed[k] !== undefined).map((k) => [k, message]),
+      ),
+    });
+  }
+
   // Validate everything before writing anything.
   let workplaceRows: Record<string, unknown>[] | null = null;
   if (parsed.workplaces) {
@@ -66,7 +80,6 @@ export const PATCH = withJsonErrors(async (req: Request) => {
     workplaceRows = built.rows;
   }
 
-  const service = createSupabaseServiceClient();
   const { failure } = await saveProfileTransaction(
     service,
     me.id,

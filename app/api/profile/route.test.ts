@@ -20,6 +20,8 @@ let me: {
 const gate = vi.hoisted(() => ({ allowed: true, signedIn: true }));
 const recordProfileEdit = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@/lib/profile/audit", () => ({ recordProfileEdit }));
+const nameTakenByAnother = vi.hoisted(() => vi.fn(async () => false));
+vi.mock("@/lib/profile/nameTaken", () => ({ nameTakenByAnother }));
 vi.mock("@/lib/ratelimit", () => ({
   rateLimit: vi.fn(async () => ({ success: gate.allowed })),
 }));
@@ -414,5 +416,28 @@ describe("PATCH /api/profile, the activity log", () => {
     } finally {
       rpcError = null;
     }
+  });
+});
+
+describe("PATCH /api/profile: renaming to a listed doctor's name (#247)", () => {
+  beforeEach(() => {
+    updateSpy.mockClear();
+    nameTakenByAnother.mockClear();
+  });
+
+  it("refuses it with a message on the name field sent, and saves nothing", async () => {
+    nameTakenByAnother.mockResolvedValueOnce(true);
+    const res = await call({ arabic_first_name: "سمير" });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("invalid_body");
+    expect(Object.keys(body.fields)).toEqual(["arabic_first_name"]);
+    expect(doctorUpdate()).toBeNull();
+  });
+
+  it("lets any other save through", async () => {
+    const res = await call({ arabic_first_name: "كمال" });
+    expect(res.status).toBe(200);
+    expect(doctorUpdate()).toMatchObject({ arabic_first_name: "كمال" });
   });
 });
