@@ -417,7 +417,7 @@ been run end to end. Revisit when a day of changes stops being acceptable (many
 more doctors, or things doctors enter that cannot be re-entered) or when the
 dashboard restore is wanted for convenience. Prices are Supabase's, read 7 Nov;
 check before paying. Profile photos are in Storage and in no database backup
-under any plan, so they need their own copy.
+under any plan, so the nightly job copies them separately (see Photos below).
 
 - **What is dumped:** `pg_dump` of the `public` and `private` schemas, with
   their privileges (custom format). `private` holds `is_admin()`, which the RLS
@@ -426,7 +426,7 @@ under any plan, so they need their own copy.
   them would hand it back. **Left out on purpose:** the registry mirror (the
   nightly sync refills it), unfinished signups (a phone number and a half-filled
   form, kept 30 days only), sign-ins (a doctor is linked again by phone at the
-  next sign-in, `linkAuthUser`) and photos (storage).
+  next sign-in, `linkAuthUser`) and photos (storage, copied by their own step).
 - **Checks before it counts:** the database has at least 50 doctors (a wiped
   table is not tonight's "good" copy), the dump lists, holds the doctors and
   `private.is_admin()`, and the encrypted file is not under half of the previous
@@ -552,7 +552,7 @@ backup; run the registry sync by hand (the mirror table is empty); re-add the
 foreign key to `auth.users` if it was dropped, after the auth users exist; **re-apply
 account deletions made since the backup's date** (a restore brings deleted doctors
 back, and the privacy page promises they are gone); restore the auth settings
-(kept in this runbook) and the storage photos (not in this backup). Doctors
+(kept in this runbook) and the storage photos (from the `photos/` copy, see Photos). Doctors
 sign in again by phone and are linked to their rows (`linkAuthUser`).
 
 **Privacy:** the dump holds doctors' personal data, but only encrypted: it is
