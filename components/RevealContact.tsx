@@ -20,10 +20,23 @@ type State = { kind: "hidden" } | { kind: "loading" } | { kind: "shown"; contact
 const LIMIT_MESSAGE = "بلغت حد اليوم من إظهار أرقام الزملاء. يتجدّد غدًا، وإن احتجت رقمًا الآن فراسل الإدارة.";
 const FAILED_MESSAGE = "تعذّر إظهار البيانات. حاول مرة أخرى.";
 
+// What this tab has already revealed. The search re-runs on load and swaps the
+// cards for a "searching" line and back, which remounts them: without this a
+// number tapped in that moment vanishes. Memory only, gone with the tab, and a
+// doctor already revealed costs no second request.
+const revealed = new Map<string, ContactDetails>();
+
+/** On sign-out: the next account in this tab starts with nothing revealed. */
+export const forgetRevealed = () => revealed.clear();
+
 async function fetchContact(id: string): Promise<State> {
   try {
     const res = await fetch(`/api/doctors/${id}/contact`, { method: "POST" });
-    if (res.ok) return { kind: "shown", contact: (await res.json()) as ContactDetails };
+    if (res.ok) {
+      const contact = (await res.json()) as ContactDetails;
+      revealed.set(id, contact);
+      return { kind: "shown", contact };
+    }
     return { kind: "refused", message: res.status === 429 ? LIMIT_MESSAGE : FAILED_MESSAGE };
   } catch {
     return { kind: "refused", message: FAILED_MESSAGE };
@@ -31,7 +44,10 @@ async function fetchContact(id: string): Promise<State> {
 }
 
 export function RevealContact({ doctor, compact = false }: { doctor: Doctor; compact?: boolean }) {
-  const [state, setState] = useState<State>({ kind: "hidden" });
+  const [state, setState] = useState<State>(() => {
+    const contact = revealed.get(doctor.id);
+    return contact ? { kind: "shown", contact } : { kind: "hidden" };
+  });
   if (!doctor.has_contact) return null;
 
   if (state.kind !== "shown") {

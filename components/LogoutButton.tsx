@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { forgetRevealed } from "@/components/RevealContact";
 
 export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
@@ -14,6 +15,7 @@ export function LogoutButton({ className }: { className?: string }) {
     } catch {
       // Best-effort, proceed to home regardless.
     }
+    forgetRevealed();
     router.replace("/");
     router.refresh();
   };
