@@ -488,6 +488,9 @@ service key); the restored `profile_picture_url` already points at that name.
      retention 30 days, so even a valid token cannot delete a recent backup
      (`wrangler r2 bucket lock add jd-backups ...`; the dashboard has it under
      Settings, Bucket lock rules).
+     A prefix with no lock rule is not locked: a new backup prefix needs its
+     own rule. `photos/` is left unlocked on purpose, the nightly copy
+     overwrites a replaced photo under the same name.
    Endpoint `https://<account id>.r2.cloudflarestorage.com`, region `auto`.
 3. Two age keys, for two different people, each generated on that person's own
    machine: `age-keygen -o jd-backup.key`. Each keeps their file offline and
