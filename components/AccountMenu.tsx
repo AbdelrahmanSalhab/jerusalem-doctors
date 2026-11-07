@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { useInstall } from "@/components/install/InstallProvider";
+import { forgetRevealed } from "@/components/RevealContact";
 
 export function AccountMenu({
   photoUrl,
@@ -52,6 +53,7 @@ export function AccountMenu({
     } catch {
       // Best-effort, proceed to home regardless.
     }
+    forgetRevealed();
     router.replace("/");
     router.refresh();
   };

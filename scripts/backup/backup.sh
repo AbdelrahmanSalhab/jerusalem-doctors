@@ -62,7 +62,8 @@ case "$doctors" in ''|*[!0-9]*) fail "doctor count is not a number" ;; esac
 # functions, and a restore without those grants would hand them back. Left
 # out: the registry mirror (refilled by the nightly sync), unfinished signups
 # (a phone number and a half-filled form, kept 30 days only), sign-ins (they
-# relink to a doctor by phone, linkAuthUser) and photos (storage).
+# relink to a doctor by phone, linkAuthUser) and photos (storage; copied by
+# photos.sh).
 pg_dump "$BACKUP_DATABASE_URL" --format=custom --no-owner \
   --schema=public --schema=private \
   --exclude-table-data=public.moh_practitioners --exclude-table-data=public.pending_signups \

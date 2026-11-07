@@ -2,7 +2,7 @@
 // offers to save the colleague, so their name shows on future calls and
 // messages instead of an unknown number.
 
-import type { SearchHit } from "@/lib/directory";
+import type { ContactDetails, SearchHit } from "@/lib/directory";
 
 /** vCard text values escape backslash, comma, semicolon and newlines. */
 function esc(s: string): string {
@@ -10,15 +10,8 @@ function esc(s: string): string {
 }
 
 export function doctorVCard(
-  d: Pick<
-    SearchHit,
-    | "arabic_first_name"
-    | "arabic_family_name"
-    | "phone_e164"
-    | "email"
-    | "specialties"
-    | "workplaces"
-  >,
+  d: Pick<SearchHit, "arabic_first_name" | "arabic_family_name" | "specialties" | "workplaces"> &
+    Pick<ContactDetails, "phone_e164" | "email">,
 ): string {
   const primary = d.workplaces.find((w) => w.is_primary) ?? d.workplaces[0];
   const lines = [

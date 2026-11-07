@@ -305,6 +305,15 @@ and a few words. Both are kept in the activity log.
   who signed up twice, or someone holding a real doctor's licence.
 - **A heavy searcher:** an account over 600 searches in a day is refused and an
   alert is raised once a day for it.
+- **Numbers and emails are behind a tap (#16).** A search or a card carries no
+  phone or email; the doctor taps «إظهار الهاتف والبريد» and
+  `POST /api/doctors/[id]/contact` returns them. Each account may reveal 25
+  different doctors a day (10 in the 14 days after an admin accepted it);
+  revealing the same doctor again is free, and over the limit the doctor is told
+  to write to the admins and the same «حساب طبيب يبحث في الدليل بكثرة» alert is
+  raised once a day. The counts are in Redis (`reveal:<doctor id>:<day>`), per
+  UTC day. Limits: `lib/contactBudget.ts`. A clinic's own phone on a workplace
+  is still on the card: it is a business number, not the doctor's.
 - **An accepted doctor changes their Arabic name:** it is saved, logged with the
   old and new name, and the admins are alerted. The one rename that is refused
   is to the exact Arabic name another listed doctor already has (they are told
@@ -407,6 +416,18 @@ Supabase's free plan keeps no backups and has no point-in-time recovery
 (checked 1 Nov 2026: 0 backups). `.github/workflows/backup.yml` runs
 `scripts/backup/backup.sh` every night at 01:41 UTC:
 
+**The plan decision (7 Nov 2026): stay on the free plan and rely on these
+dumps.** Considered: Supabase Pro (from $25 a month: daily backups, last 7 days,
+restorable from the dashboard) and Pro with point-in-time recovery (about $125
+a month: restore to within about 2 minutes). Chosen because the worst case here
+is a day of profile edits, signups and admin decisions, all re-doable by hand;
+the dump is off Supabase, so it survives losing the account, and its restore has
+been run end to end. Revisit when a day of changes stops being acceptable (many
+more doctors, or things doctors enter that cannot be re-entered) or when the
+dashboard restore is wanted for convenience. Prices are Supabase's, read 7 Nov;
+check before paying. Profile photos are in Storage and in no database backup
+under any plan, so the nightly job copies them separately (see Photos below).
+
 - **What is dumped:** `pg_dump` of the `public` and `private` schemas, with
   their privileges (custom format). `private` holds `is_admin()`, which the RLS
   policies call; the privileges matter because the migrations revoke execute
@@ -414,7 +435,7 @@ Supabase's free plan keeps no backups and has no point-in-time recovery
   them would hand it back. **Left out on purpose:** the registry mirror (the
   nightly sync refills it), unfinished signups (a phone number and a half-filled
   form, kept 30 days only), sign-ins (a doctor is linked again by phone at the
-  next sign-in, `linkAuthUser`) and photos (storage).
+  next sign-in, `linkAuthUser`) and photos (storage; copied by `photos.sh`, below).
 - **Checks before it counts:** the database has at least 50 doctors (a wiped
   table is not tonight's "good" copy), the dump lists, holds the doctors and
   `private.is_admin()`, and the encrypted file is not under half of the previous
@@ -440,6 +461,22 @@ the secret reads the data but cannot change or drop anything. Its pooler user is
 `backup.<project ref>`. If it ever lacks a table, the dump fails loudly
 (`pg_dump` runs with row security off) rather than leaving the table out.
 
+**Photos.** Supabase Storage holds the profile photos (bucket `doctor-photos`,
+public, one file per doctor named by id) and no database backup includes them.
+After the dump, `scripts/backup/photos.sh` copies them to `photos/` in the same
+bucket, unencrypted (anyone with the link can already see them). It needs no new
+secret: the list comes from `storage.objects` through the same read-only role,
+and the files from the bucket's public URL, the project being the part after the
+dot of the connection string's user (`backup.<ref>`). It overwrites and never
+deletes; a photo whose doctor is deleted or who replaced it stops being
+refreshed and the `photos/` lifecycle rule (60 days, in the setup below) removes
+it, so the privacy page's promise about deleted accounts holds for the copy too.
+`photos/` has no bucket lock: a valid token could change these copies, which
+are public pictures. If only the photo step is red, that night's dump is fine.
+**To restore:** download `photos/` from the bucket and upload each file back
+into `doctor-photos` under the same name (dashboard, or the Storage API with the
+service key); the restored `profile_picture_url` already points at that name.
+
 **One-time setup (a repository admin), in this order:**
 1. GitHub, Settings, Environments, new environment `backup` with deployment
    branches limited to `main` **before the workflow first runs**: a job that
@@ -452,10 +489,17 @@ the secret reads the data but cannot change or drop anything. Its pooler user is
      prefix `monthly/`, expire after 365 days (CLI: `wrangler r2 bucket lifecycle
      add jd-backups --name expire-daily --prefix daily/ --expire-days 60`, and the same with
      `expire-monthly`, `monthly/`, `365`);
+   - a third lifecycle rule for the photo copy: prefix `photos/`, expire after
+     60 days (`... --name expire-photos --prefix photos/ --expire-days 60`).
+     **Needed, not optional**: the photo copy never deletes, so without it a
+     deleted doctor's photo would stay in the backup for good;
    - a bucket lock rule if your plan has it: prefix `daily/` and `monthly/`,
      retention 30 days, so even a valid token cannot delete a recent backup
      (`wrangler r2 bucket lock add jd-backups ...`; the dashboard has it under
      Settings, Bucket lock rules).
+     A prefix with no lock rule is not locked: a new backup prefix needs its
+     own rule. `photos/` is left unlocked on purpose, the nightly copy
+     overwrites a replaced photo under the same name.
    Endpoint `https://<account id>.r2.cloudflarestorage.com`, region `auto`.
 3. Two age keys, for two different people, each generated on that person's own
    machine: `age-keygen -o jd-backup.key`. Each keeps their file offline and
@@ -540,7 +584,7 @@ backup; run the registry sync by hand (the mirror table is empty); re-add the
 foreign key to `auth.users` if it was dropped, after the auth users exist; **re-apply
 account deletions made since the backup's date** (a restore brings deleted doctors
 back, and the privacy page promises they are gone); restore the auth settings
-(kept in this runbook) and the storage photos (not in this backup). Doctors
+(kept in this runbook) and the storage photos (from `photos/` in the bucket, below). Doctors
 sign in again by phone and are linked to their rows (`linkAuthUser`).
 
 **Privacy:** the dump holds doctors' personal data, but only encrypted: it is
