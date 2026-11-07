@@ -407,6 +407,18 @@ Supabase's free plan keeps no backups and has no point-in-time recovery
 (checked 1 Nov 2026: 0 backups). `.github/workflows/backup.yml` runs
 `scripts/backup/backup.sh` every night at 01:41 UTC:
 
+**The plan decision (7 Nov 2026): stay on the free plan and rely on these
+dumps.** Considered: Supabase Pro (from $25 a month: daily backups, last 7 days,
+restorable from the dashboard) and Pro with point-in-time recovery (about $125
+a month: restore to within about 2 minutes). Chosen because the worst case here
+is a day of profile edits, signups and admin decisions, all re-doable by hand;
+the dump is off Supabase, so it survives losing the account, and its restore has
+been run end to end. Revisit when a day of changes stops being acceptable (many
+more doctors, or things doctors enter that cannot be re-entered) or when the
+dashboard restore is wanted for convenience. Prices are Supabase's, read 7 Nov;
+check before paying. Profile photos are in Storage and in no database backup
+under any plan, so they need their own copy.
+
 - **What is dumped:** `pg_dump` of the `public` and `private` schemas, with
   their privileges (custom format). `private` holds `is_admin()`, which the RLS
   policies call; the privileges matter because the migrations revoke execute
