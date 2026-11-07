@@ -416,6 +416,18 @@ Supabase's free plan keeps no backups and has no point-in-time recovery
 (checked 1 Nov 2026: 0 backups). `.github/workflows/backup.yml` runs
 `scripts/backup/backup.sh` every night at 01:41 UTC:
 
+**The plan decision (7 Nov 2026): stay on the free plan and rely on these
+dumps.** Considered: Supabase Pro (from $25 a month: daily backups, last 7 days,
+restorable from the dashboard) and Pro with point-in-time recovery (about $125
+a month: restore to within about 2 minutes). Chosen because the worst case here
+is a day of profile edits, signups and admin decisions, all re-doable by hand;
+the dump is off Supabase, so it survives losing the account, and its restore has
+been run end to end. Revisit when a day of changes stops being acceptable (many
+more doctors, or things doctors enter that cannot be re-entered) or when the
+dashboard restore is wanted for convenience. Prices are Supabase's, read 7 Nov;
+check before paying. Profile photos are in Storage and in no database backup
+under any plan, so the nightly job copies them separately (see Photos below).
+
 - **What is dumped:** `pg_dump` of the `public` and `private` schemas, with
   their privileges (custom format). `private` holds `is_admin()`, which the RLS
   policies call; the privileges matter because the migrations revoke execute
@@ -485,6 +497,9 @@ service key); the restored `profile_picture_url` already points at that name.
      retention 30 days, so even a valid token cannot delete a recent backup
      (`wrangler r2 bucket lock add jd-backups ...`; the dashboard has it under
      Settings, Bucket lock rules).
+     A prefix with no lock rule is not locked: a new backup prefix needs its
+     own rule. `photos/` is left unlocked on purpose, the nightly copy
+     overwrites a replaced photo under the same name.
    Endpoint `https://<account id>.r2.cloudflarestorage.com`, region `auto`.
 3. Two age keys, for two different people, each generated on that person's own
    machine: `age-keygen -o jd-backup.key`. Each keeps their file offline and
