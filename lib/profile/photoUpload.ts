@@ -55,6 +55,15 @@ export async function uploadDoctorPhoto(
     return { error: { status: 500, code: "update_failed" } };
   }
 
+  // The same doctor's photo under the other types: a replaced photo of another
+  // type would otherwise stay in the public bucket (and in the backup copy).
+  // After the profile points at the new one, so a failure here costs only a
+  // leftover, never the photo.
+  const old = await service.storage
+    .from(PHOTO_BUCKET)
+    .remove(allPhotoPaths(doctorId).filter((name) => name !== path));
+  if (old.error) console.error(`[${logPrefix}] old photo removal failed`, old.error);
+
   return { url };
 }
 
