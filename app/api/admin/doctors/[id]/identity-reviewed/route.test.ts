@@ -29,6 +29,11 @@ describe("POST /api/admin/doctors/[id]/identity-reviewed", () => {
     expect(db.argsOf("doctors", "update")).toEqual([]);
   });
 
+  it("takes «المعلومات مطابقة» as a method like the others", async () => {
+    db.queue("doctors", { data: { id: ID, is_admin: false, is_visible: true, is_admin_approved: true, identity_reviewed_at: null } }, { data: [{ id: ID }] });
+    expect((await call({ approval_method: "info_matches", approval_reason: OK.approval_reason })).status).toBe(200);
+  });
+
   it("wants both the method and a reason of ten characters", async () => {
     expect((await call({ approval_reason: OK.approval_reason })).status).toBe(400);
     expect((await call({ approval_method: "documents_seen", approval_reason: "تمام" })).status).toBe(400);
