@@ -95,7 +95,7 @@ export const PATCH = withJsonErrors(async (
 
   const current = await service
     .from("doctors")
-    .select("license_verification_status, is_admin_approved")
+    .select("license_verification_status, is_admin_approved, is_active")
     .eq("id", id)
     .maybeSingle();
   if (current.error && current.error.code !== "PGRST116") {
@@ -112,6 +112,17 @@ export const PATCH = withJsonErrors(async (
   const alreadyAccepted = fields.is_admin_approved === true && current.data.is_admin_approved === true;
   if (alreadyAccepted && Object.keys(fields).length === 1) return jsonOk({ ok: true, unchanged: true });
   const approvalChange = alreadyAccepted ? undefined : fields.is_admin_approved;
+
+  // Two acceptances that are never right, whatever reason is given. An admin lets
+  // someone in; they do not let in themselves (#16), and a closed account (a
+  // deletion request, or one an admin shut) is not a doctor waiting to be let in:
+  // open it first, or in the same request.
+  if (approvalChange === true) {
+    if (id === admin.id) return jsonError(409, { error: "cannot_approve_self", code: "cannot_approve_self" });
+    if (current.data.is_active === false && fields.is_active !== true) {
+      return jsonError(409, { error: "account_closed", code: "account_closed" });
+    }
+  }
 
   // Accepting a doctor always needs a reason. For an exact registry match it
   // says how the admin knew this is that doctor, because the match alone is

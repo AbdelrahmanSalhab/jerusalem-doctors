@@ -65,6 +65,9 @@ const EXPECTED: RegExp[] = [
   /^requestfailed GET \S+[?&]_rsc=\S+ net::ERR_ABORTED/,
   // The same abort as WebKit (the phone project) reports it: a page error, not a failed request.
   /^pageerror Fetch API cannot load .*[?&]_rsc=\S+ due to access control checks/,
+  // The dashboard's search, aborted when the test moves on while it is in flight: the page
+  // catches the AbortError itself (DashboardSearch), WebKit reports the abort as a page error too.
+  /^pageerror Fetch API cannot load .*\/api\/search\?\S+ due to access control checks/,
 ];
 
 export const isExpected = (i: Issue) => EXPECTED.some((re) => re.test(`${i.kind} ${i.text}`));

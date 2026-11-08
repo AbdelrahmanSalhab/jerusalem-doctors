@@ -23,6 +23,8 @@ const MESSAGES: Record<string, string> = {
   no_fields: "لا يوجد تغيير لحفظه.",
   approval_reason_required: "اختر كيف تأكّدت من هوية هذا الطبيب واكتب سببًا؛ يُحفظ في سجل النشاط.",
   reason_required: "اكتب سبب تغيير الرقم؛ يُحفظ في سجل النشاط.",
+  cannot_approve_self: "لا تقبل حسابك بنفسك؛ يقبله مدير آخر.",
+  account_closed: "هذا الحساب مغلق. افتحه أولًا ثم اقبله.",
   still_active: "أغلق الحساب أولًا؛ الحذف النهائي متاح للحسابات المغلقة فقط.",
   cannot_delete_self: "لا يمكنك حذف حسابك أنت.",
   delete_failed: "تعذّر الحذف. حاول مجددًا.",
