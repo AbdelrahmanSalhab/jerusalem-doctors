@@ -16,7 +16,7 @@ import { useEffect, useRef } from "react";
 
 /** The read-only record fits a narrow sheet; the profile editor's workplace
  *  rows do not. */
-const STEP = "rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-2.5";
+const STEP = "rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-3";
 
 const WIDTH = { md: "max-w-xl", lg: "max-w-3xl" } as const;
 

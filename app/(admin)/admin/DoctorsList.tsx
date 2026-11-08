@@ -107,7 +107,7 @@ export function DoctorsList({
                 href={adminDoctorsHref({ filter: f.key, q, page: 1 })}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors pointer-coarse:py-2.5 " +
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors pointer-coarse:py-3 " +
                   (active
                     ? "border-foreground bg-foreground/5 font-semibold"
                     : waiting

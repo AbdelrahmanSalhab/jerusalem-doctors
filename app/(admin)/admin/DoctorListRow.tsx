@@ -129,7 +129,7 @@ export function DoctorListRow({
             type="button"
             disabled={busy}
             onClick={onOpen}
-            className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-sm text-success hover:opacity-90 disabled:opacity-50 pointer-coarse:py-2.5"
+            className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-sm text-success hover:opacity-90 disabled:opacity-50 pointer-coarse:py-3"
           >
             مراجعة وقبول
           </button>
@@ -139,7 +139,7 @@ export function DoctorListRow({
             <button
               type="button"
               onClick={onOpen}
-              className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-2.5"
+              className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-3"
             >
               التفاصيل
             </button>
