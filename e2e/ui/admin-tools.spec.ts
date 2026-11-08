@@ -166,10 +166,11 @@ test.describe("alerts", () => {
 
   test("the alerts tab counts what needs attention and opens the log on alerts", async ({ page }) => {
     await page.goto("/admin");
-    // The count is on the activity tab, which opens on the alerts while there are any.
+    // The count is on the activity tab and on its alerts pill.
     const tab = page.getByRole("navigation", { name: "أقسام الإدارة" }).getByRole("link", { name: /سجل النشاط/ });
-    await expect(tab.getByLabel("تنبيه واحد في آخر 24 ساعة")).toHaveText("1");
+    await expect(tab).toContainText("تنبيه واحد في آخر 24 ساعة");
     await tab.click();
+    await page.getByRole("navigation", { name: /سجل النشاط: صفحات القسم/ }).getByRole("link", { name: /التنبيهات/ }).click();
     await expect(page).toHaveURL(/\/admin\/audit\?action=alert/);
     await expect(page.getByText("حدثان تطابق التصفية")).toBeVisible();
     await expect(page.getByText("عاجل · بلغت الرسائل الحد اليومي", { exact: false })).toBeVisible();

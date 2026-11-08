@@ -40,8 +40,9 @@ const shown = (n: number) => (n > 99 ? "99+" : String(n));
 function Badge({ n, label }: { n?: number; label?: string }) {
   if (!n) return null;
   return (
-    <span className="ms-1.5 rounded-full bg-warn-solid px-1.5 text-xs font-semibold text-white" aria-label={label ?? `${n} بانتظار المراجعة`}>
-      {shown(n)}
+    <span className="ms-1.5 rounded-full border border-warn-line bg-warn-bg px-1.5 text-xs font-semibold text-warn">
+      <span aria-hidden="true">{shown(n)}</span>
+      <span className="sr-only">{` (${label ?? `${n} بانتظار المراجعة`})`}</span>
     </span>
   );
 }
@@ -73,8 +74,10 @@ export function NavTabs({ tabs, label }: { tabs: NavTab[]; label: string }) {
         {tabs.map((t) => (
           <Link
             key={t.label}
-            href={t.href}
-            aria-current={active(t) ? "page" : undefined}
+            // Open already: it goes to the page the admin is on (or the group's first), not wherever the counts would send a visitor.
+            href={active(t) && t.children ? (lit?.href ?? t.children[0].href) : t.href}
+            // A group is "true", not "page": the pill under it carries the page.
+            aria-current={active(t) ? (t.children ? "true" : "page") : undefined}
             className={
               "shrink-0 whitespace-nowrap border-b-2 px-2.5 py-2 text-sm transition-colors pointer-coarse:py-3 sm:px-3 " +
               (active(t) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted hover:text-foreground")
