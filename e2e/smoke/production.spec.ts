@@ -3,10 +3,15 @@
 // people or the services the site depends on.
 
 import { existsSync } from "node:fs";
+import { devices } from "@playwright/test";
 import { join } from "node:path";
 import { expect, test } from "../fixtures";
 import { repoMigrations } from "../../lib/migrationFiles";
 import { checkDoctorsPage, checkPhone, checkStatsLinks, checkTabs } from "./adminStructure";
+
+// The iPhone preset without its browser choice, which a describe cannot set.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { defaultBrowserType: _browser, ...PHONE } = devices["iPhone 13"];
 
 const RUN = process.env.CI_RUN_URL ?? "";
 
@@ -79,7 +84,8 @@ test.describe("signed in as an admin", () => {
   test("the stats page links to every section it has", async ({ page }) => checkStatsLinks(page));
 
   test.describe("on a phone", () => {
-    test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    // A real phone preset: bare hasTouch leaves the pointer "fine", so pointer-coarse: sizes never apply.
+    test.use(PHONE);
     test("the tabs fit and the links are tap-sized", async ({ page }) => checkPhone(page));
   });
 
