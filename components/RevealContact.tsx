@@ -3,7 +3,9 @@
 // A colleague's number, WhatsApp and email, behind a tap (#16). The card
 // carries only that there is something to show; the details come from
 // POST /api/doctors/[id]/contact, which counts the doctor against the day's
-// budget. Once shown they stay for as long as the card does.
+// budget. Once shown they stay for as long as the card does. When the admins
+// turned on «contacts_without_tap» the card arrives with them
+// (SearchHit.contact) and shows them at once.
 
 import { useState } from "react";
 import { ContactButtons } from "@/components/ContactButtons";
@@ -12,7 +14,7 @@ import { clinicTelHref } from "@/lib/workplace";
 
 type Doctor = Pick<
   SearchHit,
-  "id" | "arabic_first_name" | "arabic_family_name" | "has_contact" | "specialties" | "workplaces"
+  "id" | "arabic_first_name" | "arabic_family_name" | "has_contact" | "contact" | "specialties" | "workplaces"
 >;
 
 type State = { kind: "hidden" } | { kind: "loading" } | { kind: "shown"; contact: ContactDetails } | { kind: "refused"; message: string };
@@ -50,7 +52,9 @@ export function RevealContact({ doctor, compact = false }: { doctor: Doctor; com
   });
   if (!doctor.has_contact) return null;
 
-  if (state.kind !== "shown") {
+  // Sent with the card, or fetched by tap: either way it is what is shown.
+  const contact = doctor.contact ?? (state.kind === "shown" ? state.contact : undefined);
+  if (!contact) {
     return (
       <div className={compact ? "flex shrink-0 flex-col items-start gap-1" : "flex flex-col items-start gap-1"}>
         <button
@@ -73,7 +77,6 @@ export function RevealContact({ doctor, compact = false }: { doctor: Doctor; com
     );
   }
 
-  const { contact } = state;
   const full = { ...doctor, ...contact };
   return (
     <div className="flex flex-col gap-2">

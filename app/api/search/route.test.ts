@@ -8,8 +8,10 @@ import { runAfter } from "@/test/after";
 const SPECIALTY = "11111111-1111-4111-8111-111111111111";
 const SHAAREI = "55555555-5555-4555-8555-555555555555";
 
-const { requireDoctor, rateLimit, rpc, recordEvent, awaiting } = vi.hoisted(() => ({
+const { requireDoctor, rateLimit, rpc, recordEvent, awaiting, switches } = vi.hoisted(() => ({
   awaiting: { value: false },
+  // The admins' switches (lib/siteSettings.ts); both off unless a test opens one.
+  switches: { search_before_review: false, contacts_without_tap: false },
   requireDoctor: vi.fn(async (): Promise<Record<string, unknown>> => ({ id: "me", is_active: true, is_admin_approved: true, is_admin: false })),
   rateLimit: vi.fn(async (...args: [name?: string]) => ({ success: args.length >= 0 })),
   rpc: vi.fn(async (): Promise<{ data: unknown; error: unknown }> => ({ data: [], error: null })),
@@ -27,6 +29,7 @@ vi.mock("@/lib/usage", () => ({ recordEvent }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/supabase/service", () => ({ createSupabaseServiceClient: () => ({ rpc }) }));
 vi.mock("@/lib/cachedReads", () => ({
+  cachedSiteSettings: async () => ({ ...switches }),
   cachedInstitutions: async () => [
     { id: SHAAREI, name_ar: "شعاري تسيدك", name_he: "שערי צדק", kind: "hospital", aliases: ["شعري"] },
   ],
@@ -50,6 +53,7 @@ async function search(params: Record<string, string>, headers: Record<string, st
 beforeEach(() => {
   vi.clearAllMocks();
   awaiting.value = false;
+  Object.assign(switches, { search_before_review: false, contacts_without_tap: false });
   rpc.mockResolvedValue({ data: [], error: null });
   rateLimit.mockResolvedValue({ success: true });
 });
@@ -62,6 +66,23 @@ describe("GET /api/search", () => {
     expect(await res.json()).toMatchObject({ code: "not_approved" });
     expect(rpc).not.toHaveBeenCalled();
     expect(rateLimit).not.toHaveBeenCalled();
+  });
+
+  it("lets a doctor not yet accepted search once the admins opened «search before review»", async () => {
+    switches.search_before_review = true;
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: false, is_admin: false });
+    expect((await search({ q: "سمير" })).status).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("still refuses a closed account and an admin without the second factor when it is open", async () => {
+    switches.search_before_review = true;
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: false, is_admin_approved: false, is_admin: false });
+    expect((await search({ q: "سمير" })).status).toBe(403);
+    awaiting.value = true;
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: false, is_admin: true });
+    expect((await search({ q: "سمير" })).status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("403s an admin who has not given the second factor, approved or not", async () => {
@@ -152,6 +173,34 @@ describe("GET /api/search", () => {
 
   it("400s on a malformed specialty id", async () => {
     expect((await search({ specialty_id: "nope" })).status).toBe(400);
+  });
+
+  // The rows search_directory() returns carry the numbers; a card gets them only on request.
+  const withNumbers = { ...doctor(1), phone_display: "050-123-4567", phone_e164: "+972501234567", email: "a@b.test" };
+
+  it("keeps numbers and emails out of the results by default", async () => {
+    rpc.mockResolvedValueOnce({ data: [withNumbers], error: null });
+    const [hit] = (await (await search({ q: "د" })).json()).results;
+    expect(hit.has_contact).toBe(true);
+    expect(JSON.stringify(hit)).not.toMatch(/050-123|972501234567|a@b\.test/);
+  });
+
+  it("puts them on each card once «contacts without tap» is open, for an accepted doctor", async () => {
+    switches.contacts_without_tap = true;
+    rpc.mockResolvedValueOnce({ data: [withNumbers], error: null });
+    const [hit] = (await (await search({ q: "د" })).json()).results;
+    expect(hit.contact).toMatchObject({ phone_display: "050-123-4567", phone_e164: "+972501234567", email: "a@b.test", whatsapp_url: expect.stringContaining("972501234567") });
+  });
+
+  it("does not, for an account still in review, even with both switches open", async () => {
+    Object.assign(switches, { search_before_review: true, contacts_without_tap: true });
+    requireDoctor.mockResolvedValueOnce({ id: "me", is_active: true, is_admin_approved: false, is_admin: false });
+    rpc.mockResolvedValueOnce({ data: [withNumbers], error: null });
+    const res = await search({ q: "د" });
+    expect(res.status).toBe(200);
+    const [hit] = (await res.json()).results;
+    expect(hit.has_contact).toBe(true);
+    expect(JSON.stringify(hit)).not.toMatch(/050-123|972501234567|a@b\.test/);
   });
 
   it("says how long the server took", async () => {

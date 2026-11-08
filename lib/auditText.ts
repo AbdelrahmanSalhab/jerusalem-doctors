@@ -7,6 +7,8 @@ import { ALERTS, isAlertCode } from "@/lib/alerts";
 import { FIELD_LABELS } from "@/lib/client/apiError";
 import { FEATURED_LABEL, type FeaturedKind } from "@/lib/directory";
 import { isLicenseStatus, licenseStatusSentence, UNCHECKED_SENTENCE } from "@/lib/licenseStatus";
+import { isSettingKey } from "@/lib/siteSettings";
+import { SETTINGS_TEXT } from "@/lib/siteSettingsText";
 
 export interface AuditRow {
   action: string;
@@ -46,6 +48,7 @@ const TITLE: Record<string, string> = {
   admin_doctor_updated: "تعديل من الإدارة",
   approval_notified: "إبلاغ بالقبول",
   admin_identity_reviewed: "مراجعة هوية طبيب مقبول",
+  directory_setting_changed: "تغيير إعداد الدليل",
   signup_duplicate_license: "تسجيل بترخيص مسجَّل",
   doctor_profile_edited: "تعديل صاحب الحساب لملفه",
   doctor_photo_changed: "تغيير صاحب الحساب لصورته",
@@ -133,6 +136,12 @@ function profileEditDetail(m: Record<string, unknown>): string {
   return parts.join(" · ");
 }
 
+/** What a directory switch was set to: «البحث قبل القبول»: فُتح. */
+function settingChange(m: Record<string, unknown>): string {
+  const label = isSettingKey(m.setting) ? SETTINGS_TEXT[m.setting].title : String(m.setting ?? "");
+  return `${quote(label)}: ${m.enabled ? "فُتح" : "أُعيد إغلاقه"}`;
+}
+
 /** An admin re-checking or correcting a licence number. */
 function licenseCheckDetail(m: Record<string, unknown>): string {
   const parts: string[] = [];
@@ -192,6 +201,8 @@ export function auditDetail(row: AuditRow, institutionName: (id: string) => stri
       return [isLicenseStatus(m.license_status) ? licenseStatusSentence(m.license_status) : "", m.note ? `الملاحظة: ${quote(m.note)}` : ""]
         .filter(Boolean)
         .join(" · ");
+    case "directory_setting_changed":
+      return settingChange(m);
     case "ci_login":
       return "اختبار آلي (CI)";
     case "dev_password_login":

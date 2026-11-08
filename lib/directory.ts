@@ -32,6 +32,10 @@ export interface SearchHit {
    *  never travel in a search or a card: the viewer asks for one doctor's
    *  (POST /api/doctors/[id]/contact), counted against a daily budget (#16). */
   has_contact: boolean;
+  /** Only while the admins' «contacts_without_tap» switch is on and the viewer
+   *  is accepted (lib/siteSettings.ts, contactsInline): then the card shows
+   *  them with no tap. Absent otherwise. */
+  contact?: ContactDetails;
   subspecialty: string | null;
   bio: string | null;
   career_stage: "resident" | "specialist" | null;
@@ -146,11 +150,30 @@ interface DirectoryRow {
     | null;
 }
 
-export function toSearchHits(data: unknown): SearchHit[] {
-  return ((data ?? []) as DirectoryRow[]).map(toSearchHit);
+/** `withContact` keeps each row's numbers on its card (see SearchHit.contact);
+ *  left out, they are dropped here and travel only by the reveal route. */
+export function toSearchHits(data: unknown, withContact = false): SearchHit[] {
+  return ((data ?? []) as DirectoryRow[]).map((d) => toSearchHit(d, withContact));
 }
 
-function toSearchHit(d: DirectoryRow): SearchHit {
+/** The numbers of listed doctors already read without them (the cached
+ *  dashboard sections), by id and in one query. A failed read leaves the cards
+ *  as they were, behind the tap. */
+export async function withContacts<T extends SearchHit>(service: SupabaseClient, hits: T[]): Promise<T[]> {
+  if (hits.length === 0) return hits;
+  const { data, error } = await service
+    .from("listed_doctors")
+    .select("id, phone_display, phone_e164, email")
+    .in("id", hits.map((h) => h.id));
+  if (error) {
+    console.error("[directory] contacts read failed", error);
+    return hits;
+  }
+  const byId = new Map((data ?? []).map((r) => [r.id as string, toContactDetails(r)]));
+  return hits.map((h) => (h.has_contact && byId.has(h.id) ? { ...h, contact: byId.get(h.id) } : h));
+}
+
+function toSearchHit(d: DirectoryRow, withContact: boolean): SearchHit {
   // PostgREST returns nested relations as arrays, even on FK joins.
   const specialties = (d.doctor_specialties ?? [])
     .flatMap((row) => {
@@ -178,13 +201,15 @@ function toSearchHit(d: DirectoryRow): SearchHit {
       ...(w.institution_id !== undefined && { institution_id: w.institution_id }),
     }));
 
+  const hasContact = Boolean(d.phone_display || d.phone_e164 || d.email);
   return {
     id: d.id,
     arabic_first_name: d.arabic_first_name,
     arabic_family_name: d.arabic_family_name,
     hebrew_first_name: d.hebrew_first_name,
     hebrew_family_name: d.hebrew_family_name,
-    has_contact: Boolean(d.phone_display || d.phone_e164 || d.email),
+    has_contact: hasContact,
+    ...(withContact && hasContact && { contact: toContactDetails(d) }),
     subspecialty: d.subspecialty,
     bio: d.bio,
     career_stage: d.career_stage,

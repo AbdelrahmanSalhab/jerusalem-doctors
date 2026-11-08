@@ -4,14 +4,15 @@
 
 import { expect, type Page } from "@playwright/test";
 
-const TABS = ["الأطباء", "الطلبات", "القوائم", "الإحصائيات", "سجل النشاط"];
+const TABS = ["الأطباء", "الطلبات", "الإعدادات", "الإحصائيات", "سجل النشاط"];
 
 /** A page of each group, the tab that holds it and the pills under that tab. */
 const GROUPS: { path: string; tab: string; pills: string[]; lit: string }[] = [
   { path: "/admin/requests", tab: "الطلبات", pills: ["طلبات الأرقام", "البلاغات"], lit: "طلبات الأرقام" },
   { path: "/admin/reports", tab: "الطلبات", pills: ["طلبات الأرقام", "البلاغات"], lit: "البلاغات" },
-  { path: "/admin/institutions", tab: "القوائم", pills: ["المستشفيات", "التخصصات"], lit: "المستشفيات" },
-  { path: "/admin/specialties", tab: "القوائم", pills: ["المستشفيات", "التخصصات"], lit: "التخصصات" },
+  { path: "/admin/institutions", tab: "الإعدادات", pills: ["المستشفيات", "التخصصات", "الدليل"], lit: "المستشفيات" },
+  { path: "/admin/specialties", tab: "الإعدادات", pills: ["المستشفيات", "التخصصات", "الدليل"], lit: "التخصصات" },
+  { path: "/admin/settings", tab: "الإعدادات", pills: ["المستشفيات", "التخصصات", "الدليل"], lit: "الدليل" },
   { path: "/admin/audit", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات", "تسجيلات لم تكتمل"], lit: "كل الأحداث" },
   { path: "/admin/audit?action=alert", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات", "تسجيلات لم تكتمل"], lit: "التنبيهات" },
   { path: "/admin/signups", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات", "تسجيلات لم تكتمل"], lit: "تسجيلات لم تكتمل" },
@@ -88,6 +89,15 @@ export async function checkStatsLinks(page: Page) {
 }
 
 /** On a phone: five tabs fit without scrolling, and what is tapped is 44 px tall. */
+/** The directory's switches: both listed, each with the words that say what it gives up. Presses nothing. */
+export async function checkSettings(page: Page) {
+  const r = await page.goto("/admin/settings");
+  expect(r?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: "إعدادات الدليل" })).toBeVisible();
+  await expect(page.getByRole("switch")).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: "ما تتنازل عنه" })).toHaveCount(2);
+}
+
 export async function checkPhone(page: Page) {
   await page.goto("/admin");
   const row = await tabsOf(page).evaluate((n) => ({ sw: n.scrollWidth, cw: n.clientWidth }));

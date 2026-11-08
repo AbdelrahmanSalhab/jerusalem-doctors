@@ -193,6 +193,9 @@ async function reset(db: SupabaseClient) {
     await must(`clear ${table}`, db.from(table).delete().not("id", "is", null));
   }
   await must("clear registry", db.from("moh_practitioners").delete().gte("license_number", 0));
+  // Both directory switches closed, as a fresh database has them: a run that stopped
+  // with one open must not change what the next run's pending and accepted doctors see.
+  await must("close the directory switches", db.from("site_settings").update({ search_before_review: false, contacts_without_tap: false }).eq("id", true));
   const users = await must("list users", db.auth.admin.listUsers({ perPage: 1000 }));
   for (const u of users.users) await must("delete user", db.auth.admin.deleteUser(u.id));
 }
