@@ -113,7 +113,10 @@ export function PushSwitch({ publicKey }: { publicKey: string }) {
   }, [message]);
 
   // Off until the keys are set (the runbook says how), and until mounted.
-  if (!publicKey || state === null) return null;
+  // And while there is nothing to tap: a blocked permission or a browser without
+  // push is the admin's to fix elsewhere, and a row of text on every page says it
+  // to someone who cannot act on it here.
+  if (!publicKey || state === null || state === "denied" || state === "unsupported") return null;
 
   const run = async (task: () => Promise<string | null>) => {
     setBusy(true);
