@@ -93,7 +93,7 @@ export function NavTabs({ tabs, label }: { tabs: NavTab[]; label: string }) {
               href={c.href}
               aria-current={c === lit ? "page" : undefined}
               className={
-                "whitespace-nowrap rounded-full border px-3 py-1 text-sm transition-colors pointer-coarse:py-2.5 " +
+                "whitespace-nowrap rounded-full border px-3 py-1 text-sm transition-colors pointer-coarse:py-3 " +
                 (c === lit ? "border-foreground bg-foreground/5 font-semibold" : "border-line bg-surface text-muted hover:border-foreground/40 hover:text-foreground")
               }
             >
