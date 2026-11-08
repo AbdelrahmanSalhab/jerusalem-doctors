@@ -9,17 +9,18 @@ const png = () => new File([PNG], "me.png", { type: "image/png" });
 
 function service(opts: { uploadError?: unknown; updateError?: unknown; removeError?: unknown } = {}) {
   const updates: unknown[] = [];
+  const removed: string[][] = [];
   const client = {
     storage: {
       from: () => ({
         upload: async () => ({ error: opts.uploadError ?? null }),
-        remove: async () => ({ error: opts.removeError ?? null }),
+        remove: async (names: string[]) => (removed.push(names), { error: opts.removeError ?? null }),
         getPublicUrl: (p: string) => ({ data: { publicUrl: `https://cdn.test/${p}` } }),
       }),
     },
     from: () => ({ update: (v: unknown) => (updates.push(v), { eq: async () => ({ error: opts.updateError ?? null }) }) }),
   } as unknown as SupabaseClient;
-  return { client, updates };
+  return { client, updates, removed };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -30,6 +31,18 @@ describe("uploadDoctorPhoto", () => {
     const out = await uploadDoctorPhoto(client, "d1", png(), "t");
     expect(out).toMatchObject({ url: expect.stringContaining("https://cdn.test/") });
     expect(updates[0]).toMatchObject({ profile_picture_url: expect.stringContaining("?v=") });
+  });
+
+  it("removes the same doctor's photo under the other types, so a replaced photo does not linger", async () => {
+    const { client, removed } = service();
+    await uploadDoctorPhoto(client, "d1", png(), "t");
+    expect(removed).toEqual([["d1.jpg", "d1.webp"]]);
+  });
+
+  it("keeps the new photo when clearing the old one fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await uploadDoctorPhoto(service({ removeError: { message: "x" } }).client, "d1", png(), "t");
+    expect(out).toMatchObject({ url: expect.stringContaining("d1.png") });
   });
 
   it("refuses a file over 2 MB, and bytes that are not an image whatever the client says", async () => {
