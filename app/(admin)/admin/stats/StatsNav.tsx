@@ -15,10 +15,10 @@ const SECTIONS = [
   ["usage", "الاستخدام"],
 ] as const;
 
-export function StatsNav() {
+export function StatsNav({ omit = [] }: { /** Sections this load does not draw (no data), so no link goes nowhere. */ omit?: string[] }) {
   return (
     <nav aria-label="أقسام الصفحة" className="-mt-4 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:flex-wrap">
-      {SECTIONS.map(([id, label]) => (
+      {SECTIONS.filter(([id]) => !omit.includes(id)).map(([id, label]) => (
         <a
           key={id}
           href={`#${id}`}

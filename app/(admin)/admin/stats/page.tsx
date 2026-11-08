@@ -62,7 +62,7 @@ export default async function AdminStatsPage() {
         </p>
       </header>
 
-      <StatsNav />
+      <StatsNav omit={codes ? [] : ["otp"]} />
 
       <Section title="يحتاج انتباهك">
         {attentionTotal === 0 ? (

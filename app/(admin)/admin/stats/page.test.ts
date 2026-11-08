@@ -127,10 +127,20 @@ describe("/admin/stats with no activity yet", () => {
     expect(html).toContain("أعلى يوم 3");
   });
 
-  it("offers a jump link to every section it draws", async () => {
+  it("links to sections the page draws, and every link has its target", async () => {
+    const { default: Page } = await import("./page");
+    const html = renderToStaticMarkup(await Page());
+    const nav = html.match(/<nav aria-label="أقسام الصفحة"[\s\S]*?<\/nav>/)?.[0] ?? "";
+    const targets = [...nav.matchAll(/href="#([a-z]+)"/g)].map((m) => m[1]);
+    expect(targets.length).toBeGreaterThan(8);
+    for (const id of targets) expect(html, id).toContain(`id="${id}"`);
+  });
+
+  it("leaves a section out of the links when it has nothing to draw", async () => {
     const { StatsNav } = await import("./StatsNav");
-    const html = renderToStaticMarkup(StatsNav());
-    for (const id of ["doctors", "otp", "install", "usage", "system"]) expect(html).toContain(`href="#${id}"`);
+    const html = renderToStaticMarkup(StatsNav({ omit: ["otp"] }));
+    expect(html).not.toContain('href="#otp"');
+    expect(html).toContain('href="#install"');
   });
 });
 
