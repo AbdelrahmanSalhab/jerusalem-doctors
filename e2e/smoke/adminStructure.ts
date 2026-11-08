@@ -4,16 +4,17 @@
 
 import { expect, type Page } from "@playwright/test";
 
-const TABS = ["الأطباء", "الوارد", "القوائم", "الإحصائيات", "سجل النشاط"];
+const TABS = ["الأطباء", "الطلبات", "القوائم", "الإحصائيات", "سجل النشاط"];
 
 /** A page of each group, the tab that holds it and the pills under that tab. */
 const GROUPS: { path: string; tab: string; pills: string[]; lit: string }[] = [
-  { path: "/admin/requests", tab: "الوارد", pills: ["طلبات الأرقام", "البلاغات", "تسجيلات لم تكتمل"], lit: "طلبات الأرقام" },
-  { path: "/admin/signups", tab: "الوارد", pills: ["طلبات الأرقام", "البلاغات", "تسجيلات لم تكتمل"], lit: "تسجيلات لم تكتمل" },
+  { path: "/admin/requests", tab: "الطلبات", pills: ["طلبات الأرقام", "البلاغات"], lit: "طلبات الأرقام" },
+  { path: "/admin/reports", tab: "الطلبات", pills: ["طلبات الأرقام", "البلاغات"], lit: "البلاغات" },
   { path: "/admin/institutions", tab: "القوائم", pills: ["المستشفيات", "التخصصات"], lit: "المستشفيات" },
   { path: "/admin/specialties", tab: "القوائم", pills: ["المستشفيات", "التخصصات"], lit: "التخصصات" },
-  { path: "/admin/audit", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات"], lit: "كل الأحداث" },
-  { path: "/admin/audit?action=alert", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات"], lit: "التنبيهات" },
+  { path: "/admin/audit", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات", "تسجيلات لم تكتمل"], lit: "كل الأحداث" },
+  { path: "/admin/audit?action=alert", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات", "تسجيلات لم تكتمل"], lit: "التنبيهات" },
+  { path: "/admin/signups", tab: "سجل النشاط", pills: ["كل الأحداث", "التنبيهات", "تسجيلات لم تكتمل"], lit: "تسجيلات لم تكتمل" },
 ];
 
 const tabsOf = (page: Page) => page.getByRole("navigation", { name: "أقسام الإدارة" });
@@ -69,7 +70,9 @@ export async function checkDoctorsPage(page: Page) {
   } else {
     await expect(bottom.getByRole("button", { name: "قبول العضوية" }), "no accept bar with nobody waiting").toHaveCount(0);
   }
-  if (n > 1) await expect(panel.getByRole("link", { name: "التالي" }), "the next doctor").toBeVisible();
+  // With more than one doctor in the list there is somewhere to step to, whichever row this is.
+  if (n > 1) expect(await panel.getByRole("link", { name: /^(التالي|السابق)$/ }).count(), "a doctor to step to").toBeGreaterThan(0);
+  await expect(panel.getByText(/^\d+ من \d+$/), "which doctor of how many").toBeVisible();
   // Danger zone last.
   await expect(panel.getByText("الحذف النهائي").first()).toBeVisible();
   await page.keyboard.press("Escape");
