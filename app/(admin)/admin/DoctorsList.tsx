@@ -159,7 +159,7 @@ export function DoctorsList({
           {page > 1 ? (
             <Link
               href={adminDoctorsHref({ filter, q, page: page - 1 })}
-              className="rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5"
+              className="rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5 pointer-coarse:py-3"
             >
               الأحدث
             </Link>
@@ -172,7 +172,7 @@ export function DoctorsList({
           {page < pages ? (
             <Link
               href={adminDoctorsHref({ filter, q, page: page + 1 })}
-              className="rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5"
+              className="rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5 pointer-coarse:py-3"
             >
               الأقدم
             </Link>
