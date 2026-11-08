@@ -8,6 +8,7 @@ export const APPROVAL_METHODS = [
   { key: "colleague_vouched", label: "زميل أعرفه ويوثق به أكّد لي أنه هو" },
   { key: "institution_called", label: "اتصلت بمكان عمله على رقم بحثت عنه بنفسي (مقسم المستشفى مثلًا)" },
   { key: "documents_seen", label: "رأيت صورة ترخيصه أو هويته" },
+  { key: "info_matches", label: "المعلومات مطابقة" },
 ] as const;
 
 export type ApprovalMethod = (typeof APPROVAL_METHODS)[number]["key"];
