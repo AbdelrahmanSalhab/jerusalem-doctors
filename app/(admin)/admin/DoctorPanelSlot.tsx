@@ -23,6 +23,8 @@ export function DoctorPanelSlot({
   viewHref,
   editHref,
   canResetSecondFactor = false,
+  prevHref,
+  nextHref,
 }: {
   detail: DoctorDetail | null;
   /** Offer a super admin the reset of another admin's second factor. */
@@ -36,6 +38,9 @@ export function DoctorPanelSlot({
   viewHref: string;
   /** This panel, with the editor open. */
   editHref: string;
+  /** The doctors either side in the list this was opened from (read-only view only). */
+  prevHref?: string;
+  nextHref?: string;
 }) {
   if (!detail) {
     return (
@@ -50,7 +55,7 @@ export function DoctorPanelSlot({
 
   if (!editing) {
     return (
-      <DoctorPanel closeHref={closeHref} title={title}>
+      <DoctorPanel closeHref={closeHref} title={title} prevHref={prevHref} nextHref={nextHref}>
         <DoctorPanelBody detail={detail} closeHref={closeHref} editHref={editHref} canResetSecondFactor={canResetSecondFactor} />
       </DoctorPanel>
     );

@@ -8,9 +8,8 @@
 // different things, so they stay three, with the effect of each spelled out
 // and one line saying whether the doctor is actually findable right now.
 
-import { useState } from "react";
-import { ApprovedNotice } from "./ApprovedNotice";
-import { ApprovalReasonPrompt, type PatchResult, type ReasonKind } from "./ApprovalReasonPrompt";
+import type { PatchResult } from "./ApprovalReasonPrompt";
+import type { Approval } from "./useApproval";
 import {
   directoryVisibility,
   STATE_GROUP_HEADING,
@@ -20,7 +19,7 @@ import {
   type StateField,
   type VisibilityFlags,
 } from "@/lib/admin/doctorState";
-import { approvalNeedsReason, toneChip } from "@/lib/licenseStatus";
+import { toneChip } from "@/lib/licenseStatus";
 
 export interface SwitchDoctor extends VisibilityFlags {
   id: string;
@@ -35,33 +34,21 @@ export function StateSwitches({
   doctor,
   busy,
   onPatch,
+  approval,
 }: {
   doctor: SwitchDoctor;
   busy: boolean;
   onPatch: (body: Record<string, unknown>) => Promise<PatchResult>;
+  /** Accepting is its own flow (useApproval), whose prompt and message sit in the bar at the foot of the panel. */
+  approval: Approval;
 }) {
-  const [asking, setAsking] = useState(false);
-  const [told, setTold] = useState(false);
-  const [kind, setKind] = useState<ReasonKind>("unconfirmed");
   const visibility = directoryVisibility(doctor);
   const value = (field: StateField) => doctor[field];
 
   const toggle = (field: StateField) => {
     const next = !value(field);
-    // Accepting an unverified licence opens the prompt at once; any other
-    // acceptance asks the server, which answers with the question to put.
-    if (field === "is_admin_approved" && next && approvalNeedsReason(doctor.license_verification_status)) {
-      setKind("unconfirmed");
-      setAsking(true);
-      return;
-    }
-    void onPatch({ [field]: next }).then((r) => {
-      if (r === true && field === "is_admin_approved" && next) setTold(true);
-      if (typeof r === "object") {
-        setKind(r.ask);
-        setAsking(true);
-      }
-    });
+    if (field === "is_admin_approved" && next) approval.start();
+    else void onPatch({ [field]: next });
   };
 
   return (
@@ -116,28 +103,6 @@ export function StateSwitches({
         {visibility.sentence}
       </p>
 
-      {told && doctor.is_admin_approved && (
-        <ApprovedNotice doctorId={doctor.id} phone={doctor.phone_e164} firstName={doctor.arabic_first_name} listed={visibility.listed} />
-      )}
-
-      {asking && (
-        <ApprovalReasonPrompt
-          name={`${doctor.arabic_first_name} ${doctor.arabic_family_name}`}
-          status={doctor.license_verification_status}
-          region={doctor.license_region}
-          busy={busy}
-          kind={kind}
-          onCancel={() => setAsking(false)}
-          onConfirm={async (reason, method) => {
-            const ok = await onPatch({ is_admin_approved: true, approval_reason: reason, approval_method: method });
-            if (ok === true) {
-              setAsking(false);
-              setTold(true);
-            }
-            return ok === true;
-          }}
-        />
-      )}
     </section>
   );
 }

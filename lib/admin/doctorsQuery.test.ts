@@ -91,9 +91,9 @@ describe("the filter list", () => {
       "identity",
       "stage",
       "clinic",
+      "approved",
       "hidden",
       "suspended",
-      "approved",
     ]);
     for (const f of DOCTOR_FILTERS) expect(f.label).toMatch(/[؀-ۿ]/);
   });

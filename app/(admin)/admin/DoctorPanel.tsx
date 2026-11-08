@@ -10,26 +10,35 @@
 // Closing is a navigation back to the list URL, which means the browser's
 // Back button closes it too.
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /** The read-only record fits a narrow sheet; the profile editor's workplace
  *  rows do not. */
+const STEP = "rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-3";
+
 const WIDTH = { md: "max-w-xl", lg: "max-w-3xl" } as const;
 
 export function DoctorPanel({
   closeHref,
   title,
   width = "md",
+  prevHref,
+  nextHref,
   children,
 }: {
   closeHref: string;
   title: string;
   width?: keyof typeof WIDTH;
+  /** The doctors either side in the list behind the panel, to go through it without closing. */
+  prevHref?: string;
+  nextHref?: string;
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
+  const box = useRef<HTMLDivElement>(null);
 
   const close = () => router.push(closeHref, { scroll: false });
 
@@ -52,6 +61,12 @@ export function DoctorPanel({
     };
   }, []);
 
+  // Stepping to the next doctor reuses this panel: start them at the top, where
+  // the licence check is, not wherever the last one was scrolled to.
+  useEffect(() => {
+    box.current?.scrollTo({ top: 0 });
+  }, [title]);
+
   // Focus starts on the heading so a keyboard or screen-reader user lands
   // inside the panel rather than back at the top of the list.
   useEffect(() => {
@@ -66,11 +81,12 @@ export function DoctorPanel({
         className="fixed inset-0 z-40 bg-foreground/40"
       />
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby="doctor-panel-title"
         className={
-          "fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-y-auto border-s border-line bg-surface shadow-lg " +
+          "fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-y-auto overscroll-contain border-s border-line bg-surface shadow-lg " +
           WIDTH[width]
         }
       >
@@ -83,13 +99,25 @@ export function DoctorPanel({
           >
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={close}
-            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5"
-          >
-            إغلاق
-          </button>
+          {/* Said when the panel moves on to another doctor (focus stays on the link, for the next press). */}
+          <p role="status" className="sr-only">
+            {title}
+          </p>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {prevHref && (
+              <Link href={prevHref} scroll={false} className={STEP}>
+                السابق
+              </Link>
+            )}
+            {nextHref && (
+              <Link href={nextHref} scroll={false} className={STEP}>
+                التالي
+              </Link>
+            )}
+            <button type="button" onClick={close} className={STEP + " ms-2"}>
+              إغلاق
+            </button>
+          </div>
         </div>
         <div className="flex flex-col gap-5 px-4 py-4">{children}</div>
       </div>

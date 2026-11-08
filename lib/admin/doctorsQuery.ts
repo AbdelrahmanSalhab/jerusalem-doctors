@@ -7,23 +7,23 @@
 
 export const ADMIN_PAGE_SIZE = 25;
 
-/** `tile`: shown as a count box above the list rather than a pill.
- *  `attention`: a non-zero count is work waiting for an admin. */
+/** `attention`: a non-zero count is work waiting for an admin. The bar shows
+ *  those first, in amber, and leaves one with nothing in it out. */
 export const DOCTOR_FILTERS = [
   // Not "all doctors": the list also holds the admins who are not doctors,
   // which /admin/stats leaves out of its total.
-  { key: "all", label: "كل الحسابات", tile: true },
-  { key: "pending", label: "بانتظار القبول", tile: true, attention: true },
-  { key: "license", label: "ترخيص يحتاج مراجعة", tile: true, attention: true },
+  { key: "all", label: "كل الحسابات" },
+  { key: "pending", label: "بانتظار القبول", attention: true },
+  { key: "license", label: "ترخيص يحتاج مراجعة", attention: true },
   // Accepted, but no admin has satisfied themselves it is them (#16): the
   // doctors the signup accepted on a registry match alone, before every
   // acceptance asked how the admin knew.
   { key: "identity", label: "لم تُراجَع هويته", attention: true },
   { key: "stage", label: "مقيم والسجل يقول أخصائي", attention: true },
   { key: "clinic", label: "عيادة بلا عنوان أو هاتف", attention: true },
-  { key: "hidden", label: "مخفي من الدليل", tile: true },
-  { key: "suspended", label: "حساب مغلق / طلب حذف" },
   { key: "approved", label: "مقبولون" },
+  { key: "hidden", label: "مخفي من الدليل" },
+  { key: "suspended", label: "حساب مغلق / طلب حذف" },
 ] as const;
 
 export type DoctorFilter = (typeof DOCTOR_FILTERS)[number]["key"];

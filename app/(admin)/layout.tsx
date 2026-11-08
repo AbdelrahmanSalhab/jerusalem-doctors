@@ -23,28 +23,37 @@ export default async function AdminLayout({
           label="أقسام الإدارة"
           tabs={[
             { href: "/admin", label: "الأطباء", exact: true },
+            // Opens on whatever is waiting, a report before a number request.
+            {
+              href: reports > 0 ? "/admin/reports" : "/admin/requests",
+              label: "الوارد",
+              badge: requests + reports,
+              badgeLabel: `${requests + reports} بانتظار الرد`,
+              children: [
+                { href: "/admin/requests", label: "طلبات الأرقام", badge: requests, badgeLabel: `${requests} بانتظار الرد` },
+                { href: "/admin/reports", label: "البلاغات", badge: reports, badgeLabel: `${reports} بلاغ مفتوح` },
+                // A nudge list, not work: never counted.
+                { href: "/admin/signups", label: "تسجيلات لم تكتمل" },
+              ],
+            },
+            {
+              href: "/admin/institutions",
+              label: "القوائم",
+              children: [
+                { href: "/admin/institutions", label: "المستشفيات" },
+                { href: "/admin/specialties", label: "التخصصات" },
+              ],
+            },
             { href: "/admin/stats", label: "الإحصائيات" },
-            { href: "/admin/institutions", label: "المستشفيات" },
-            { href: "/admin/specialties", label: "التخصصات" },
             {
-              href: "/admin/requests",
-              label: "طلبات الأرقام",
-              badge: requests,
-              badgeLabel: `${requests} بانتظار الرد`,
-            },
-            {
-              href: "/admin/reports",
-              label: "البلاغات",
-              badge: reports,
-              badgeLabel: `${reports} بلاغ مفتوح`,
-            },
-            { href: "/admin/signups", label: "تسجيلات لم تكتمل" },
-            { href: "/admin/audit", label: "سجل النشاط" },
-            {
-              href: "/admin/audit?action=alert",
-              label: "التنبيهات",
+              href: "/admin/audit",
+              label: "سجل النشاط",
               badge: alerts,
               badgeLabel: `${countOf(alerts, ALERT_NOUN)} في آخر 24 ساعة`,
+              children: [
+                { href: "/admin/audit", label: "كل الأحداث" },
+                { href: "/admin/audit?action=alert", label: "التنبيهات", badge: alerts, badgeLabel: `${countOf(alerts, ALERT_NOUN)} في آخر 24 ساعة` },
+              ],
             },
           ]}
         />
