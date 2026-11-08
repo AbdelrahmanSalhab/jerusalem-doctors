@@ -139,7 +139,7 @@ export default async function AdminAuditPage({
                   {doctor && doctor !== "حساب محذوف" && (
                     <Link
                       href={`/admin?doctor=${r.target_doctor_id}`}
-                      className="self-start rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5"
+                      className="self-start rounded-md border border-line px-3 py-1.5 hover:bg-foreground/5 pointer-coarse:py-3"
                     >
                       فتح الطبيب في قائمة الأطباء
                     </Link>
@@ -171,7 +171,7 @@ export default async function AdminAuditPage({
       {pages > 1 && (
         <nav aria-label="صفحات السجل" className="flex items-center justify-between gap-3 text-sm">
           {page > 1 ? (
-            <Link href={auditHref(params, { page: page - 1 })} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
+            <Link href={auditHref(params, { page: page - 1 })} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5 pointer-coarse:py-3">
               السابق
             </Link>
           ) : (
@@ -181,7 +181,7 @@ export default async function AdminAuditPage({
             الصفحة {page} من {pages}
           </span>
           {page < pages ? (
-            <Link href={auditHref(params, { page: page + 1 })} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5">
+            <Link href={auditHref(params, { page: page + 1 })} className="rounded border border-line px-3 py-1.5 hover:bg-foreground/5 pointer-coarse:py-3">
               التالي
             </Link>
           ) : (
