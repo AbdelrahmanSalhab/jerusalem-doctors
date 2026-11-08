@@ -46,7 +46,7 @@ test("a doctor reports a card, someone reports by licence, and an admin closes a
   const admin = await browser.newContext({ storageState: stateFile("admin") });
   const a = await admin.newPage();
   await a.goto("/admin/reports");
-  await expect(a.getByRole("link", { name: /البلاغات\s*2/ })).toBeVisible();
+  await expect(a.getByRole("link", { name: /البلاغات.*2 بلاغ مفتوح/ })).toBeVisible();
   const first = a.getByRole("listitem").filter({ hasText: "هذه ليست الدكتورة ليلى الحقيقية" });
   await first.getByRole("button", { name: "إغلاق…" }).click();
   await first.getByLabel("ملاحظة الإغلاق").fill("تواصلت مع الطرفين، الملف صحيح");
