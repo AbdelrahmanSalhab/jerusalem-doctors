@@ -166,7 +166,8 @@ test.describe("alerts", () => {
 
   test("the alerts tab counts what needs attention and opens the log on alerts", async ({ page }) => {
     await page.goto("/admin");
-    const tab = page.getByRole("link", { name: /التنبيهات/ });
+    // The count is on the activity tab, which opens on the alerts while there are any.
+    const tab = page.getByRole("navigation", { name: "أقسام الإدارة" }).getByRole("link", { name: /سجل النشاط/ });
     await expect(tab.getByLabel("تنبيه واحد في آخر 24 ساعة")).toHaveText("1");
     await tab.click();
     await expect(page).toHaveURL(/\/admin\/audit\?action=alert/);

@@ -46,7 +46,8 @@ export default async function AdminLayout({
             },
             { href: "/admin/stats", label: "الإحصائيات" },
             {
-              href: "/admin/audit",
+              // Opens on the alerts while there are any.
+              href: alerts > 0 ? "/admin/audit?action=alert" : "/admin/audit",
               label: "سجل النشاط",
               badge: alerts,
               badgeLabel: `${countOf(alerts, ALERT_NOUN)} في آخر 24 ساعة`,
