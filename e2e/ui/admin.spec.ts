@@ -148,3 +148,26 @@ test("a licence the registry does not list leaves «ترخيص يحتاج مرا
     await doctor.remove();
   }
 });
+
+test.describe("the tab bar", () => {
+  test("groups pages, and lights the one pill that is open", async ({ page }) => {
+    await page.goto("/admin/audit?action=alert");
+    const tabs = page.getByRole("navigation", { name: "أقسام الإدارة" });
+    await expect(tabs.getByRole("link", { name: /سجل النشاط/ })).toHaveAttribute("aria-current", "true");
+    const pills = page.getByRole("navigation", { name: /سجل النشاط: صفحات القسم/ });
+    await expect(pills.getByRole("link", { name: /التنبيهات/ })).toHaveAttribute("aria-current", "page");
+    await expect(pills.getByRole("link", { name: "كل الأحداث" })).not.toHaveAttribute("aria-current", "page");
+
+    await page.goto("/admin/audit");
+    await expect(pills.getByRole("link", { name: "كل الأحداث" })).toHaveAttribute("aria-current", "page");
+    await expect(pills.getByRole("link", { name: /التنبيهات/ })).not.toHaveAttribute("aria-current", "page");
+
+    // The pages the inbox groups share one tab, and the tab says it is open.
+    await page.goto("/admin/signups");
+    await expect(tabs.getByRole("link", { name: /الوارد/ })).toHaveAttribute("aria-current", "true");
+    await page.goto("/admin/specialties");
+    await expect(tabs.getByRole("link", { name: "القوائم" })).toHaveAttribute("aria-current", "true");
+    // Open already, the tab goes to the page the admin is on rather than the group's landing.
+    await expect(tabs.getByRole("link", { name: "القوائم" })).toHaveAttribute("href", "/admin/specialties");
+  });
+});
