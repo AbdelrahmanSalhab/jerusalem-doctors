@@ -6,6 +6,7 @@ const audits: Record<string, unknown>[] = [];
 /** The licence status the doctor being patched currently has. */
 let licenseStatus: string | null = "verified";
 let alreadyAccepted = false;
+let accountOpen = true;
 let doctorExists = true;
 let readError: unknown = null;
 let updateError: unknown = null;
@@ -34,7 +35,7 @@ vi.mock("@/lib/supabase/service", () => ({
           maybeSingle: async () =>
             table === "audit_logs"
               ? { data: corrected ? { id: "a1" } : null, error: auditReadError }
-              : { data: doctorExists ? { license_verification_status: licenseStatus, is_admin_approved: alreadyAccepted } : null, error: readError },
+              : { data: doctorExists ? { license_verification_status: licenseStatus, is_admin_approved: alreadyAccepted, is_active: accountOpen } : null, error: readError },
         };
         chain.eq = (col: string, v: unknown) => (table === "audit_logs" && auditAsks.push(`${col}=${String(v)}`), chain);
         chain.limit = () => chain;
@@ -67,6 +68,7 @@ async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") 
 beforeEach(() => {
   corrected = false;
   alreadyAccepted = false;
+  accountOpen = true;
   auditReadError = null;
   auditAsks.length = 0;
   updates.length = 0;
@@ -117,6 +119,35 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
     expect(await res.json()).toMatchObject({ unchanged: true });
     expect(updates).toEqual([]);
     expect(audits).toEqual([]);
+  });
+
+  it("does not let an admin accept their own account", async () => {
+    const res = await call(
+      { is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" },
+      "00000000-0000-4000-8000-00000000a001",
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("cannot_approve_self");
+    expect(updates).toEqual([]);
+    expect(audits).toEqual([]);
+  });
+
+  it("does not accept a closed account, unless the same request opens it", async () => {
+    accountOpen = false;
+    const body = { is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى", approval_method: "institution_called" };
+    const refused = await call(body);
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).code).toBe("account_closed");
+    expect(updates).toEqual([]);
+
+    expect((await call({ ...body, is_active: true })).status).toBe(200);
+    expect(updates[0]).toMatchObject({ is_admin_approved: true, is_active: true });
+  });
+
+  it("still lets a closed account be accepted-off, or an admin change their own other settings", async () => {
+    accountOpen = false;
+    expect((await call({ is_admin_approved: false })).status).toBe(200);
+    expect((await call({ is_visible: false }, "00000000-0000-4000-8000-00000000a001")).status).toBe(200);
   });
 
   it("wants the method as well as the reason", async () => {
