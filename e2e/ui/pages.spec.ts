@@ -26,6 +26,7 @@ const PAGES: [string, Who][] = [
   ["/admin/stats", "admin"],
   ["/admin/institutions", "admin"],
   ["/admin/specialties", "admin"],
+  ["/admin/settings", "admin"],
   ["/admin/audit", "admin"],
 ];
 

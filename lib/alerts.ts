@@ -99,6 +99,12 @@ export const ALERTS = {
     level: "warning",
     todo: "أخبر فريق التطوير: إما حذف بيانات قديمة (سجل النشاط، أحداث الاستخدام) أو الانتقال إلى خطة Supabase مدفوعة قبل بلوغ الحد.",
   },
+  directory_setting_on: {
+    sentry: "Directory protection switched off by an admin",
+    ar: "فتح أحد المشرفين مفتاحًا في إعدادات الدليل",
+    level: "info",
+    todo: "افتح «الإعدادات» ثم «الدليل» لترى أي مفتاح فُتح وماذا يغيّر. سجل النشاط يذكر من فتحه. إن لم تكونوا اتفقتم على ذلك فأغلقه من المفتاح نفسه.",
+  },
   ratelimit_timeout: {
     sentry: "Rate limiter timed out (fail-open)",
     ar: "تأخر نظام حماية الطلبات، فسُمح بالطلبات دون فحص",
@@ -127,6 +133,7 @@ const PUSH_TO: Partial<Record<AlertCode, string>> = {
   db_size_high: "/admin/stats",
   number_requested: "/admin/requests",
   deletion_requested: "/admin?status=suspended",
+  directory_setting_on: "/admin/settings",
 };
 
 /** The alerts that go to one admin at a time, in turn, so the same person is

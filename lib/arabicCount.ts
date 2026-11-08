@@ -18,6 +18,9 @@ export const DOCTORS: NounForms = { one: "طبيب واحد", two: "طبيبان
 /** After a preposition (مع، من): genitive two. */
 export const COLLEAGUES_GEN: NounForms = { one: "زميل واحد", two: "زميلين", few: "زملاء", many: "زميلًا", hundred: "زميل" };
 
+export const DAYS: NounForms = { one: "يوم واحد", two: "يومين", few: "أيام", many: "يومًا", hundred: "يوم" };
+export const SEARCHES: NounForms = { one: "بحث واحد", two: "بحثان", few: "عمليات بحث", many: "بحثًا", hundred: "بحث" };
+
 export const ALERT_NOUN: NounForms = { one: "تنبيه واحد", two: "تنبيهان", few: "تنبيهات", many: "تنبيهًا", hundred: "تنبيه" };
 
 export const EVENTS: NounForms = { one: "حدث واحد", two: "حدثان", few: "أحداث", many: "حدثًا", hundred: "حدث" };

@@ -79,7 +79,7 @@ export function NavTabs({ tabs, label }: { tabs: NavTab[]; label: string }) {
             // A group is "true", not "page": the pill under it carries the page.
             aria-current={active(t) ? (t.children ? "true" : "page") : undefined}
             className={
-              "shrink-0 whitespace-nowrap border-b-2 px-2.5 py-2 text-sm transition-colors pointer-coarse:py-3 sm:px-3 " +
+              "shrink-0 whitespace-nowrap border-b-2 px-2 py-2 text-sm transition-colors pointer-coarse:py-3 sm:px-3 " +
               (active(t) ? "border-foreground font-semibold text-foreground" : "border-transparent text-muted hover:text-foreground")
             }
           >

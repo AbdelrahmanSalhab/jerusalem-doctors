@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DoctorWorkplace } from "@/lib/db/types";
 import { ProfileReminder } from "@/components/ProfileReminder";
 import { WaitingPanel } from "./WaitingPanel";
@@ -6,8 +7,9 @@ import { InstallInvite } from "@/components/install/InstallInvite";
 import { DashboardSearch } from "./DashboardSearch";
 import { searchFromParams } from "@/lib/searchFilters";
 import { ViewerProvider } from "@/components/ViewerContext";
-import { cachedDirectoryOverview, cachedInstitutions, cachedSpecialties } from "@/lib/cachedReads";
-import { rankRecent } from "@/lib/directory";
+import { cachedDirectoryOverview, cachedInstitutions, cachedSiteSettings, cachedSpecialties } from "@/lib/cachedReads";
+import { rankRecent, withContacts, type FeaturedDoctors, type SearchHit } from "@/lib/directory";
+import { ALL_OFF, contactsInline } from "@/lib/siteSettings";
 import { canSeeDirectory } from "@/lib/auth/directoryAccess";
 import { requireDoctor } from "@/lib/auth/session";
 import { profileGaps } from "@/lib/profile/reminders";
@@ -19,7 +21,19 @@ const EMPTY_OVERVIEW: [
   Awaited<ReturnType<typeof cachedSpecialties>>,
   Awaited<ReturnType<typeof cachedDirectoryOverview>>,
   Awaited<ReturnType<typeof cachedInstitutions>>,
-] = [[], { featured: { doctor: null, graduates: [] }, counts: { listed: null, byDomain: {}, byInstitution: {} }, recent: [] }, []];
+  Awaited<ReturnType<typeof cachedSiteSettings>>,
+] = [[], { featured: { doctor: null, graduates: [] }, counts: { listed: null, byDomain: {}, byInstitution: {} }, recent: [] }, [], ALL_OFF];
+
+/** Over the search of a doctor the admins let in before accepting them
+ *  (search_before_review): the one thing they would otherwise assume wrong. */
+function InReviewNotice() {
+  return (
+    <p role="status" className="rounded-md border border-warn-line bg-warn-bg p-4 text-sm text-warn">
+      <strong className="font-semibold">طلبك قيد المراجعة.</strong> تستطيع البحث الآن، لكن اسمك لا يظهر لزملائك حتى
+      يقبل أحد المشرفين حسابك، وسنراسلك على واتساب حين يحدث ذلك.
+    </p>
+  );
+}
 
 function ExistingAccountNotice() {
   return (
@@ -31,6 +45,21 @@ function ExistingAccountNotice() {
       </Link>
     </p>
   );
+}
+
+type Sections = { featured: FeaturedDoctors; recent: SearchHit[] };
+
+/** The dashboard's cached sections with their doctors' numbers, when this viewer is to see them. */
+async function withNumbers(sections: Sections, inline: boolean, service: SupabaseClient): Promise<Sections> {
+  if (!inline) return sections;
+  const { featured, recent } = sections;
+  const read = await withContacts(service, [...(featured.doctor ? [featured.doctor] : []), ...featured.graduates, ...recent]);
+  const byId = new Map(read.map((h) => [h.id, h]));
+  const pick = (h: SearchHit) => byId.get(h.id) ?? h;
+  return {
+    featured: { doctor: featured.doctor && pick(featured.doctor), graduates: featured.graduates.map(pick) },
+    recent: recent.map(pick),
+  };
 }
 
 export default async function DashboardPage({
@@ -51,14 +80,14 @@ export default async function DashboardPage({
   // same (specialties, featured doctors, counts) comes from the cache
   // (lib/cachedReads.ts); only this doctor's own rows are read each time.
   const service = createSupabaseServiceClient();
-  const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview(), cachedInstitutions()]);
+  const reads = Promise.all([cachedSpecialties(), cachedDirectoryOverview(), cachedInstitutions(), cachedSiteSettings()]);
   // Started early, but a doctor not yet accepted never gets them: they are not
   // awaited or rendered below, only left to finish (and cache) quietly.
   reads.catch(() => {});
   const me = await requireDoctor();
   const approved = await canSeeDirectory(me);
   const [
-    [specialties, { featured, counts, recent }, allInstitutions],
+    [specialties, { featured, counts, recent }, allInstitutions, settings],
     { data: myWorkplaces },
     { data: mySpecialties },
   ] =
@@ -117,6 +146,9 @@ export default async function DashboardPage({
     },
     (name) => domainByName.get(name),
   );
+  // The cache holds no numbers, so with «contacts_without_tap» on and an
+  // accepted viewer, the sections get theirs here, in one read, per viewer.
+  const sections = await withNumbers({ featured, recent: newThisWeek }, contactsInline(settings, me), service);
   // Staff accounts (admin, hidden from the directory) have no card to improve.
   const gaps =
     me.is_admin && !me.is_visible
@@ -137,6 +169,8 @@ export default async function DashboardPage({
 
       {existing && <ExistingAccountNotice />}
 
+      {!me.is_admin_approved && !me.is_admin && <InReviewNotice />}
+
       <InstallInvite />
 
       {gaps.length > 0 && <ProfileReminder gaps={gaps} />}
@@ -145,10 +179,10 @@ export default async function DashboardPage({
         <DashboardSearch
           specialties={specialties ?? []}
           initial={initialSearch}
-          featured={featured}
+          featured={sections.featured}
           listed={counts.listed}
           domainCounts={counts.byDomain}
-          recent={newThisWeek}
+          recent={sections.recent}
           institutions={allInstitutions
             .filter((i) => counts.byInstitution[i.id])
             .map((i) => ({ id: i.id, name_ar: i.name_ar, kind: i.kind, count: counts.byInstitution[i.id] }))}

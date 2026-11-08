@@ -9,6 +9,7 @@
 import { revalidateTag, unstable_cache } from "next/cache";
 import { fetchDirectoryCounts, fetchFeatured, fetchRecent } from "@/lib/directory";
 import { fetchInstitutions } from "@/lib/institutions";
+import { fetchSiteSettings } from "@/lib/siteSettings";
 import { fetchActiveSpecialties } from "@/lib/specialties/catalogue";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -77,4 +78,17 @@ export const cachedDirectoryOverview =
  *  dashboard shows it at once rather than within the minute. */
 export function directoryChanged(): void {
   clear("directory");
+}
+
+const readSettings = () => fetchSiteSettings(createSupabaseServiceClient());
+/** The admins' switches (lib/siteSettings.ts): read on every search and
+ *  every dashboard. Cleared by the save; the minute is the backstop for an
+ *  edit made in the SQL editor. Off with the directory's cache in the e2e run. */
+export const cachedSiteSettings =
+  DIRECTORY_TTL > 0 ? unstable_cache(readSettings, ["site-settings"], { tags: ["site-settings"], revalidate: DIRECTORY_TTL }) : readSettings;
+
+/** After an admin flips a switch: the next request reads the new value, here
+ *  and on every instance, instead of the old one for up to a minute. */
+export function siteSettingsChanged(): void {
+  clear("site-settings");
 }

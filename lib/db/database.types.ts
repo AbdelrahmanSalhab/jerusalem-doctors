@@ -343,6 +343,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"site_settings": {
+                  Row: {
+                    "contacts_without_tap": boolean,"id": boolean,"search_before_review": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "contacts_without_tap"?: boolean,"id"?: boolean,"search_before_review"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "contacts_without_tap"?: boolean,"id"?: boolean,"search_before_review"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"specialties": {
                   Row: {
                     "code": string | null,"id": string,"is_active": boolean,"name_ar": string,"name_ar_normalized": string,"name_en": string | null,"name_he": string | null,"parent_id": string | null,"sort_order": number | null
