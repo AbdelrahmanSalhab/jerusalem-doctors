@@ -100,9 +100,21 @@ export function PushSwitch({ publicKey }: { publicKey: string }) {
     return (await registration?.pushManager.getSubscription()) ? "on" : "off";
   }, []);
 
+  // Nothing to tap when the page opens (blocked, or no push here): the line is left out.
+  // But not after a tap that ended that way: the admin is owed what happened.
+  const [quiet, setQuiet] = useState(false);
+
   useEffect(() => {
     if (!publicKey) return;
-    void read().then(setState).catch(() => setState("unsupported"));
+    void read()
+      .then((first) => {
+        setState(first);
+        setQuiet(first === "denied" || first === "unsupported");
+      })
+      .catch(() => {
+        setState("unsupported");
+        setQuiet(true);
+      });
   }, [publicKey, read]);
 
   // A result stays a few seconds, then the status comes back.
@@ -113,7 +125,7 @@ export function PushSwitch({ publicKey }: { publicKey: string }) {
   }, [message]);
 
   // Off until the keys are set (the runbook says how), and until mounted.
-  if (!publicKey || state === null) return null;
+  if (!publicKey || state === null || quiet) return null;
 
   const run = async (task: () => Promise<string | null>) => {
     setBusy(true);
