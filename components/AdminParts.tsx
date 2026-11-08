@@ -7,14 +7,17 @@ import Link from "next/link";
 export function Section({
   title,
   note,
+  id,
   children,
 }: {
   title: string;
   note?: string;
+  /** The anchor a page's section nav jumps to. */
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-3">
+    <section id={id} className="flex scroll-mt-4 flex-col gap-3">
       <div>
         <h2 className="text-lg font-semibold">{title}</h2>
         {note && <p className="text-sm text-muted">{note}</p>}

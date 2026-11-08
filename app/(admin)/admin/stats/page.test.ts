@@ -110,12 +110,37 @@ describe("/admin/stats", () => {
 });
 
 describe("/admin/stats with no activity yet", () => {
-  it("labels an empty month's peak as 0, not 1", async () => {
+  it("says an empty month is empty, in a line rather than a chart of flat bars", async () => {
     const { DailyBars } = await import("./StatsParts");
     const html = renderToStaticMarkup(
       DailyBars({ label: "أطباء بحثوا", days: [{ day: "2026-10-18", value: 0 }, { day: "2026-10-19", value: 0 }] }),
     );
-    expect(html).toContain("أعلى يوم 0");
+    expect(html).toContain("أطباء بحثوا: لا شيء في آخر 30 يومًا");
+    expect(html).not.toContain("<figure");
+  });
+
+  it("labels a month's peak as the highest day, not 1", async () => {
+    const { DailyBars } = await import("./StatsParts");
+    const html = renderToStaticMarkup(
+      DailyBars({ label: "أطباء بحثوا", days: [{ day: "2026-10-18", value: 0 }, { day: "2026-10-19", value: 3 }] }),
+    );
+    expect(html).toContain("أعلى يوم 3");
+  });
+
+  it("links to sections the page draws, and every link has its target", async () => {
+    const { default: Page } = await import("./page");
+    const html = renderToStaticMarkup(await Page());
+    const nav = html.match(/<nav aria-label="أقسام الصفحة"[\s\S]*?<\/nav>/)?.[0] ?? "";
+    const targets = [...nav.matchAll(/href="#([a-z]+)"/g)].map((m) => m[1]);
+    expect(targets.length).toBeGreaterThan(8);
+    for (const id of targets) expect(html, id).toContain(`id="${id}"`);
+  });
+
+  it("leaves a section out of the links when it has nothing to draw", async () => {
+    const { StatsNav } = await import("./StatsNav");
+    const html = renderToStaticMarkup(StatsNav({ omit: ["otp"] }));
+    expect(html).not.toContain('href="#otp"');
+    expect(html).toContain('href="#install"');
   });
 });
 

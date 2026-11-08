@@ -34,6 +34,7 @@ export function InstallSection({ rows }: { rows: FunnelRow[] }) {
   const doctors = new Map(rows.map((r) => [`${r.kind}|${r.platform ?? ""}`, r.doctors]));
   return (
     <Section
+      id="install"
       title="الإضافة إلى الشاشة الرئيسية (آخر 30 يومًا)"
       note="عدد الأطباء في كل خطوة، والمجموع يعدّ الطبيب مرة واحدة. iPhone لا يؤكد التثبيت، فالمقياس الحقيقي هو من فتحه من الشاشة الرئيسية."
     >

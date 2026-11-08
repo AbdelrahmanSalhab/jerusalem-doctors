@@ -42,6 +42,7 @@ export function OtpSection({ stats }: { stats: OtpStats | null }) {
   const reports = stats.delivered + stats.undelivered + stats.voice;
   return (
     <Section
+      id="otp"
       title="رموز التحقق (آخر 7 أيام)"
       note={`الرمز صالح لمدة ${validityText()}. تقارير التسليم من SMS4FREE؛ إن بقيت صفرًا فقد تكون ميزة غير مفعّلة في الحساب.`}
     >

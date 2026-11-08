@@ -26,7 +26,7 @@ const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 export function UsageSection({ days }: { days: MetricsDay[] }) {
   if (days.length === 0) {
     return (
-      <Section title="الاستخدام الفعلي">
+      <Section id="usage" title="الاستخدام الفعلي">
         <p className="rounded-lg border border-line p-3 text-sm">
           لا قياسات بعد. يُسجَّل كل يوم بعد منتصف الليل (بتوقيت غرينتش).
         </p>
@@ -38,6 +38,7 @@ export function UsageSection({ days }: { days: MetricsDay[] }) {
   const smsPeak = Math.max(...days.map((d) => d.counts.sms_sent ?? 0));
   return (
     <Section
+      id="usage"
       title="الاستخدام الفعلي"
       note="مقيس يوميًا، لا تقديرًا. اليوم بتوقيت غرينتش. الحدود هي حدود الخطط المجانية."
     >
