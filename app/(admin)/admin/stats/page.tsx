@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth/session";
 import { fetchAvailableSms } from "@/lib/otp/sms4free";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import { Attention, BarList, DailyBars, Section, Tile, TileGrid } from "./StatsParts";
+import { StatsNav } from "./StatsNav";
 import { type FunnelRow, InstallSection } from "./InstallSection";
 import { OTP_LATE_AFTER, type OtpStats, OtpSection } from "./OtpSection";
 import { type MetricsDay, UsageSection } from "./UsageSection";
@@ -60,6 +61,8 @@ export default async function AdminStatsPage() {
           {new Date(s.generated_at).toLocaleString("en-GB", { timeZone: "Asia/Jerusalem" })}
         </p>
       </header>
+
+      <StatsNav />
 
       <Section title="يحتاج انتباهك">
         {attentionTotal === 0 ? (
@@ -120,7 +123,7 @@ export default async function AdminStatsPage() {
         )}
       </Section>
 
-      <Section title="الأطباء">
+      <Section id="doctors" title="الأطباء">
         <TileGrid>
           <Tile label="المجموع" value={d.total} />
           <Tile label="ظاهرون في الدليل" value={d.listed} sub={pct(d.listed, d.total)} />
@@ -136,6 +139,7 @@ export default async function AdminStatsPage() {
       </Section>
 
       <Section
+        id="activity"
         title="النشاط"
         note="الدخول يُسجَّل عند إدخال رمز فقط، والجلسة تبقى طويلًا، فالأرقام أقل من الاستخدام الفعلي."
       >
@@ -149,6 +153,7 @@ export default async function AdminStatsPage() {
       </Section>
 
       <Section
+        id="contact"
         title="التواصل (آخر 7 أيام)"
         note="ضغطات واتساب والاتصال والإضافة لجهات الاتصال على بطاقات الأطباء: المقياس الحقيقي لفائدة الدليل."
       >
@@ -173,6 +178,7 @@ export default async function AdminStatsPage() {
       <InstallSection rows={(install.data ?? []) as FunnelRow[]} />
 
       <Section
+        id="signup"
         title="التسجيل والدخول (آخر 7 أيام)"
         note={u.since ? `يُجمع منذ ${u.since.slice(0, 10)}.` : "يبدأ الجمع من الآن."}
       >
@@ -208,7 +214,7 @@ export default async function AdminStatsPage() {
         </TileGrid>
       </Section>
 
-      <Section title="من هم الأطباء">
+      <Section id="who" title="من هم الأطباء">
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-2">
             <h3 className="font-medium">المرحلة المهنية</h3>
@@ -261,7 +267,7 @@ export default async function AdminStatsPage() {
         </div>
       </Section>
 
-      <Section title="التخصصات" note="كل تخصص فرعي محسوب ضمن تخصصه الرئيسي، والطبيب قد يُحسب في أكثر من تخصص.">
+      <Section id="specialties" title="التخصصات" note="كل تخصص فرعي محسوب ضمن تخصصه الرئيسي، والطبيب قد يُحسب في أكثر من تخصص.">
         <BarList total={d.total} items={s.domains} />
       </Section>
 
@@ -284,7 +290,7 @@ export default async function AdminStatsPage() {
         </Section>
       </div>
 
-      <Section title="اكتمال الملفات" note="من ينقصه شيء يظهر أقل في البحث أو بطاقة أفقر.">
+      <Section id="profiles" title="اكتمال الملفات" note="من ينقصه شيء يظهر أقل في البحث أو بطاقة أفقر.">
         <BarList
           total={d.total}
           items={[
@@ -295,7 +301,7 @@ export default async function AdminStatsPage() {
         />
       </Section>
 
-      <Section title="حالة النظام">
+      <Section id="system" title="حالة النظام">
         <TileGrid>
           <Tile
             label="رصيد رسائل SMS"

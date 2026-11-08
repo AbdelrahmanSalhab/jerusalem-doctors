@@ -110,12 +110,27 @@ describe("/admin/stats", () => {
 });
 
 describe("/admin/stats with no activity yet", () => {
-  it("labels an empty month's peak as 0, not 1", async () => {
+  it("says an empty month is empty, in a line rather than a chart of flat bars", async () => {
     const { DailyBars } = await import("./StatsParts");
     const html = renderToStaticMarkup(
       DailyBars({ label: "أطباء بحثوا", days: [{ day: "2026-10-18", value: 0 }, { day: "2026-10-19", value: 0 }] }),
     );
-    expect(html).toContain("أعلى يوم 0");
+    expect(html).toContain("أطباء بحثوا: لا شيء في آخر 30 يومًا");
+    expect(html).not.toContain("<figure");
+  });
+
+  it("labels a month's peak as the highest day, not 1", async () => {
+    const { DailyBars } = await import("./StatsParts");
+    const html = renderToStaticMarkup(
+      DailyBars({ label: "أطباء بحثوا", days: [{ day: "2026-10-18", value: 0 }, { day: "2026-10-19", value: 3 }] }),
+    );
+    expect(html).toContain("أعلى يوم 3");
+  });
+
+  it("offers a jump link to every section it draws", async () => {
+    const { StatsNav } = await import("./StatsNav");
+    const html = renderToStaticMarkup(StatsNav());
+    for (const id of ["doctors", "otp", "install", "usage", "system"]) expect(html).toContain(`href="#${id}"`);
   });
 });
 

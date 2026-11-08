@@ -52,6 +52,8 @@ export function DailyBars({
   // Scale to at least 1 so an empty month draws flat bars, not NaN heights.
   const max = Math.max(1, peak);
   const total = days.reduce((n, d) => n + d.value, 0);
+  // A month of nothing is a line, not a chart of flat bars.
+  if (total === 0) return <p className="text-sm text-muted">{label}: لا شيء في آخر 30 يومًا.</p>;
   return (
     <figure className="flex flex-col gap-2">
       <figcaption className="text-sm text-muted">
