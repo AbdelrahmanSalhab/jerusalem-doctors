@@ -65,7 +65,7 @@ export function AcceptBar({
 
   if (!body && !notice) return null;
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex max-h-[70dvh] flex-col gap-2 overflow-y-auto overscroll-contain border-t border-line bg-surface px-4 py-3 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)]">
+    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 flex max-h-[70dvh] flex-col gap-2 overflow-y-auto overscroll-contain border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)]">
       {notice && (
         <p
           role={notice.ok ? "status" : "alert"}

@@ -64,6 +64,21 @@ test.describe("accepting a doctor", () => {
     }
   });
 
+  test("keeps Tab inside the open panel, and says which doctor of how many it is", async ({ page }) => {
+    await page.goto("/admin?status=pending&q=طالب");
+    await page.getByRole("button", { name: "مراجعة وقبول" }).first().click();
+    const panel = page.getByRole("dialog");
+    await expect(panel.getByText(/^\d+ من \d+$/)).toBeVisible();
+    for (let i = 0; i < 60; i++) {
+      await page.keyboard.press("Tab");
+      expect(await page.evaluate(() => document.querySelector('[role="dialog"]')!.contains(document.activeElement)), `Tab ${i}`).toBe(true);
+    }
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await page.evaluate(() => document.querySelector('[role="dialog"]')!.contains(document.activeElement)), `Shift+Tab ${i}`).toBe(true);
+    }
+  });
+
   // The registry says "verified", but an admin set the number by hand: the
   // match says nothing about who the doctor is, so accepting asks why.
   test("asks for a reason when an admin set the verified number by hand", async ({ page }) => {
@@ -184,9 +199,13 @@ test.describe("the tab bar", () => {
     await expect(pills.getByRole("link", { name: "كل الأحداث" })).toHaveAttribute("aria-current", "page");
     await expect(pills.getByRole("link", { name: /التنبيهات/ })).not.toHaveAttribute("aria-current", "page");
 
-    // The pages the inbox groups share one tab, and the tab says it is open.
+    // The pages a tab groups share it, and the tab says it is open.
+    await page.goto("/admin/reports");
+    await expect(tabs.getByRole("link", { name: /الطلبات/ })).toHaveAttribute("aria-current", "true");
+    // Unfinished signups are a log of nudges, not work: with the activity log.
     await page.goto("/admin/signups");
-    await expect(tabs.getByRole("link", { name: /الوارد/ })).toHaveAttribute("aria-current", "true");
+    await expect(tabs.getByRole("link", { name: /سجل النشاط/ })).toHaveAttribute("aria-current", "true");
+    await expect(pills.getByRole("link", { name: "تسجيلات لم تكتمل" })).toHaveAttribute("aria-current", "page");
     await page.goto("/admin/specialties");
     await expect(tabs.getByRole("link", { name: "القوائم" })).toHaveAttribute("aria-current", "true");
     // Open already, the tab goes to the page the admin is on rather than the group's landing.

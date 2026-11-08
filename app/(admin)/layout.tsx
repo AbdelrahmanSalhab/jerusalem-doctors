@@ -26,14 +26,12 @@ export default async function AdminLayout({
             // Opens on whatever is waiting, a report before a number request.
             {
               href: reports > 0 ? "/admin/reports" : "/admin/requests",
-              label: "الوارد",
+              label: "الطلبات",
               badge: requests + reports,
               badgeLabel: `${requests + reports} بانتظار الرد`,
               children: [
                 { href: "/admin/requests", label: "طلبات الأرقام", badge: requests, badgeLabel: `${requests} بانتظار الرد` },
                 { href: "/admin/reports", label: "البلاغات", badge: reports, badgeLabel: `${reports} بلاغ مفتوح` },
-                // A nudge list, not work: never counted.
-                { href: "/admin/signups", label: "تسجيلات لم تكتمل" },
               ],
             },
             {
@@ -53,6 +51,8 @@ export default async function AdminLayout({
               children: [
                 { href: "/admin/audit", label: "كل الأحداث" },
                 { href: "/admin/audit?action=alert", label: "التنبيهات", badge: alerts, badgeLabel: `${countOf(alerts, ALERT_NOUN)} في آخر 24 ساعة` },
+                // A nudge list, not work and never counted: it sits with the log, not an inbox.
+                { href: "/admin/signups", label: "تسجيلات لم تكتمل" },
               ],
             },
           ]}
