@@ -196,7 +196,9 @@ test("WhatsApp opens with the viewer's introduction, and the press is counted @p
   const before = (await db.from("usage_events").select("*", { count: "exact", head: true })).count ?? 0;
   await search(page, "ليلى");
   await reveal(page);
-  const wa = page.getByRole("link", { name: "واتساب" }).first();
+  // The doctor's card, not the site's own «مساعدة عبر واتساب» link, which can come first.
+  const wa = page.locator("article", { hasText: "ليلى" }).getByRole("link", { name: "واتساب" }).first();
+  await expect(wa).toBeVisible();
   const href = (await wa.getAttribute("href"))!;
   expect(href).toMatch(/^https:\/\/wa\.me\/972521234502\?text=/);
   expect(decodeURIComponent(href)).toContain("سامر");
