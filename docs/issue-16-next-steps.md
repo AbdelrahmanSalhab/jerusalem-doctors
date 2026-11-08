@@ -86,3 +86,26 @@ Then C, then B only if email sending exists.
   acceptance message comes from an admin's own WhatsApp) stay open: both are
   decisions about admin workload and a sending channel.
 - `bulk_registry_check` has no label on the audit page yet (shows the raw key).
+
+## Two switches (2026-11-08)
+
+Two of the protections above can be given up from `/admin/settings`, one at a
+time, both closed in a fresh database (`site_settings`, migration
+`20261108090000`). Each change is in the activity log with who made it, and
+opening one sends the other admins an alert.
+
+- **`search_before_review`**: a doctor an admin has not accepted may search.
+  They are still not listed themselves, and their numbers still come by tap
+  with the small budget (`revealLimit(null)`), so an account in review gets no
+  more than a newly accepted one. `canSeeDirectory` is the only place that
+  reads it.
+- **`contacts_without_tap`**: cards arrive with the number and email (search
+  results, and the dashboard sections, which the cache keeps number-free and
+  `withContacts` fills per viewer). Only for an accepted viewer or an admin: an
+  account in review keeps the tap even when the first switch lets it search.
+  The reveal route is not called, so its daily budget and its alert do not
+  apply; what remains is the search limit (30 a minute, 600 a day) and the
+  alert at the daily one.
+
+An unreadable table or a missing row reads as both closed
+(`fetchSiteSettings`), so code deployed before the migration behaves as it did.

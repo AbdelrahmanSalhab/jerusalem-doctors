@@ -35,11 +35,12 @@ export default async function AdminLayout({
               ],
             },
             {
-              href: "/admin/institutions",
-              label: "القوائم",
+              href: "/admin/settings",
+              label: "الإعدادات",
               children: [
                 { href: "/admin/institutions", label: "المستشفيات" },
                 { href: "/admin/specialties", label: "التخصصات" },
+                { href: "/admin/settings", label: "الدليل" },
               ],
             },
             { href: "/admin/stats", label: "الإحصائيات" },

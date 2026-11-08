@@ -187,6 +187,13 @@ test("a licence the registry does not list leaves «ترخيص يحتاج مرا
 });
 
 test.describe("the tab bar", () => {
+  // The row scrolls sideways when it does not fit, which hides the tabs past the edge.
+  test("the five tabs fit a phone without scrolling sideways @phone", async ({ page }) => {
+    await page.goto("/admin");
+    const row = await page.getByRole("navigation", { name: "أقسام الإدارة" }).evaluate((n) => ({ scroll: n.scrollWidth, shown: n.clientWidth }));
+    expect(row.scroll).toBeLessThanOrEqual(row.shown + 1);
+  });
+
   test("groups pages, and lights the one pill that is open", async ({ page }) => {
     await page.goto("/admin/audit?action=alert");
     const tabs = page.getByRole("navigation", { name: "أقسام الإدارة" });
@@ -207,8 +214,12 @@ test.describe("the tab bar", () => {
     await expect(tabs.getByRole("link", { name: /سجل النشاط/ })).toHaveAttribute("aria-current", "true");
     await expect(pills.getByRole("link", { name: "تسجيلات لم تكتمل" })).toHaveAttribute("aria-current", "page");
     await page.goto("/admin/specialties");
-    await expect(tabs.getByRole("link", { name: "القوائم" })).toHaveAttribute("aria-current", "true");
+    await expect(tabs.getByRole("link", { name: "الإعدادات" })).toHaveAttribute("aria-current", "true");
     // Open already, the tab goes to the page the admin is on rather than the group's landing.
-    await expect(tabs.getByRole("link", { name: "القوائم" })).toHaveAttribute("href", "/admin/specialties");
+    await expect(tabs.getByRole("link", { name: "الإعدادات" })).toHaveAttribute("href", "/admin/specialties");
+    // The directory's switches are a page of the same group.
+    await page.goto("/admin/settings");
+    await expect(tabs.getByRole("link", { name: "الإعدادات" })).toHaveAttribute("aria-current", "true");
+    await expect(page.getByRole("navigation", { name: /الإعدادات: صفحات القسم/ }).getByRole("link", { name: "الدليل" })).toHaveAttribute("aria-current", "page");
   });
 });

@@ -7,7 +7,7 @@ import { devices } from "@playwright/test";
 import { join } from "node:path";
 import { expect, test } from "../fixtures";
 import { repoMigrations } from "../../lib/migrationFiles";
-import { checkDoctorsPage, checkPhone, checkStatsLinks, checkTabs } from "./adminStructure";
+import { checkDoctorsPage, checkPhone, checkSettings, checkStatsLinks, checkTabs } from "./adminStructure";
 
 // The iPhone preset without its browser choice, which a describe cannot set.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -82,6 +82,7 @@ test.describe("signed in as an admin", () => {
   test("the admin panel has the grouped tabs and their pills", async ({ page }) => checkTabs(page));
   test("the doctors page has one filter bar, and a row opens the panel", async ({ page }) => checkDoctorsPage(page));
   test("the stats page links to every section it has", async ({ page }) => checkStatsLinks(page));
+  test("the settings page lists both directory switches", async ({ page }) => checkSettings(page));
 
   test.describe("on a phone", () => {
     // A real phone preset: bare hasTouch leaves the pointer "fine", so pointer-coarse: sizes never apply.

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { cardChips, rankRecent, type SearchHit, toContactDetails, toSearchHits } from "@/lib/directory";
+import { describe, expect, it, vi } from "vitest";
+import { cardChips, rankRecent, type SearchHit, toContactDetails, toSearchHits, withContacts } from "@/lib/directory";
 
 const ROW = {
   id: "d1",
@@ -51,6 +51,48 @@ describe("toSearchHits", () => {
 
   it("returns [] for no data", () => {
     expect(toSearchHits(null)).toEqual([]);
+  });
+
+  it("carries the numbers on the card only when asked to, and only for a doctor who has any", () => {
+    const withNumbers = { ...ROW, phone_display: "050-123-4567", phone_e164: "+972501234567", email: "ahmad@example.test" };
+    const [hit] = toSearchHits([withNumbers], true);
+    expect(hit.contact).toEqual({
+      phone_display: "050-123-4567",
+      phone_e164: "+972501234567",
+      email: "ahmad@example.test",
+      whatsapp_url: expect.stringContaining("972501234567"),
+    });
+    expect(toSearchHits([withNumbers])[0]).not.toHaveProperty("contact");
+    expect(toSearchHits([ROW], true)[0]).not.toHaveProperty("contact");
+  });
+});
+
+describe("withContacts", () => {
+  const hit = (id: string, has_contact: boolean) => ({ ...toSearchHits([{ ...ROW, id }])[0], has_contact });
+  const client = (result: { data: unknown; error: unknown }) => {
+    const inFn = vi.fn(async () => result);
+    const select = vi.fn(() => ({ in: inFn }));
+    return { from: vi.fn(() => ({ select })), select, inFn } as const;
+  };
+
+  it("reads the listed doctors' numbers in one query and attaches them by id", async () => {
+    const service = client({ data: [{ id: "a", phone_display: "050-1", phone_e164: "+972501", email: null }], error: null });
+    const out = await withContacts(service as never, [hit("a", true), hit("b", true)]);
+    expect(service.from).toHaveBeenCalledWith("listed_doctors");
+    expect(service.inFn).toHaveBeenCalledWith("id", ["a", "b"]);
+    expect(out[0].contact).toMatchObject({ phone_display: "050-1", phone_e164: "+972501" });
+    // Not listed any more, so nothing to attach.
+    expect(out[1]).not.toHaveProperty("contact");
+  });
+
+  it("leaves the cards behind the tap when the read fails, and reads nothing for no cards", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const failing = client({ data: null, error: { message: "boom" } });
+    const cards = [hit("a", true)];
+    expect(await withContacts(failing as never, cards)).toEqual(cards);
+    const idle = client({ data: [], error: null });
+    expect(await withContacts(idle as never, [])).toEqual([]);
+    expect(idle.from).not.toHaveBeenCalled();
   });
 });
 

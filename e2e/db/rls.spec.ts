@@ -137,6 +137,23 @@ test.describe("row-level security", () => {
     expect(slot.data ?? []).toEqual([]);
   });
 
+  // The switches hold the #16 protections: only the app, through the admin
+  // route, may change them. A signed-in admin session is no exception.
+  test("no signed-in session reads or flips a directory switch through the REST API", async () => {
+    const db = serviceClient();
+    const open = { search_before_review: true, contacts_without_tap: true };
+    for (const [who, client] of [["doctor", doctor], ["admin", await signedIn(ACCOUNTS.admin)]] as const) {
+      const read = await client.from("site_settings").select("*");
+      expect(read.data ?? [], `${who} read`).toEqual([]);
+      const write = await client.from("site_settings").update(open).eq("id", true).select();
+      expect(write.data ?? [], `${who} update`).toEqual([]);
+      const insert = await client.from("site_settings").insert({ id: false, ...open }).select();
+      expect(insert.data ?? [], `${who} insert`).toEqual([]);
+    }
+    const row = await db.from("site_settings").select("search_before_review, contacts_without_tap");
+    expect(row.data).toEqual([{ search_before_review: false, contacts_without_tap: false }]);
+  });
+
   test("helpers the policies use are not callable through the API", () => {
     // private.is_admin() (migration 20261021103844): the policies call it,
     // nobody else should.

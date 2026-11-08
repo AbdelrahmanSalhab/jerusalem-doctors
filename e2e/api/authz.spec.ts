@@ -50,6 +50,8 @@ const POLICY: Record<string, Policy> = {
   "POST /api/admin/doctors/[id]/license/find-by-name": "admin",
   "POST /api/admin/doctors/[id]/license/reviewed": "admin",
   "PATCH /api/admin/doctors/[id]": "admin",
+  // The directory's two switches (lib/siteSettings.ts).
+  "PATCH /api/admin/settings": "admin",
   "POST /api/admin/doctors/[id]/photo": "admin",
   "DELETE /api/admin/doctors/[id]/photo": "admin",
   "PATCH /api/admin/doctors/[id]/profile": "admin",

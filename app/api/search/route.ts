@@ -8,13 +8,15 @@
 //
 // Speed: a search is two rounds of work in parallel, not a chain of trips.
 //   1. the signed-in doctor (session checked locally, one row read), with
-//      the institutions list from the cache (lib/cachedReads.ts)
+//      the institutions list and the admins' switches from the cache
+//      (lib/cachedReads.ts)
 //   2. the rate limit (Redis), with the search query itself
 // The usage count is written after the response is sent.
 
 import { after } from "next/server";
 import { z } from "zod";
-import { cachedInstitutions } from "@/lib/cachedReads";
+import { cachedInstitutions, cachedSiteSettings } from "@/lib/cachedReads";
+import { contactsInline } from "@/lib/siteSettings";
 import { institutionsMatching } from "@/lib/institutions";
 import { SEARCH_PAGE_SIZE, toSearchHits } from "@/lib/directory";
 import { WORKPLACE_TYPES } from "@/lib/workplace";
@@ -56,11 +58,15 @@ export const GET = withJsonErrors(async (req: Request) => {
 
   // requireDoctor, not getCurrentDoctor: a deactivated doctor's session must
   // not keep reading the directory. Its redirect throws, which lands here.
-  const [me, institutions] = await Promise.all([requireDoctor().catch(() => null), cachedInstitutions()]);
+  const [me, institutions, settings] = await Promise.all([
+    requireDoctor().catch(() => null),
+    cachedInstitutions(),
+    cachedSiteSettings(),
+  ]);
   if (!me) {
     return jsonError(401, { error: "unauthenticated", code: "unauthenticated" });
   }
-  // A doctor not yet accepted does not search (#16).
+  // A doctor not yet accepted does not search (#16), unless the admins let them.
   const refused = await refuseUnlessApproved(me);
   if (refused) return refused;
   if (!parsed.success) {
@@ -111,7 +117,9 @@ export const GET = withJsonErrors(async (req: Request) => {
   // A swallowed error would read as "nobody matched".
   if (found.error) throw found.error;
 
-  const hits = toSearchHits(found.data);
+  // Numbers travel in the results only when the admins' switch says so, and
+  // only to an accepted viewer; otherwise one is asked for by tap (#16).
+  const hits = toSearchHits(found.data, contactsInline(settings, me));
   const results = hits.slice(0, SEARCH_PAGE_SIZE);
   // No search text is kept. A specialty filter that finds nobody tells us
   // which specialties the directory is missing. The production smoke test's

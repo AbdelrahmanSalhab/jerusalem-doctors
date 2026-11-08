@@ -5,12 +5,18 @@
 // not in the directory), so an admin passes, but only once past the second
 // factor: a leaked admin password alone must not open the directory.
 //
+// One switch in /admin/settings relaxes the first rule: with
+// search_before_review on, an open account may read the directory before an
+// admin accepts it. It is not listed itself until then (listed_doctors), and
+// its numbers still come by tap (lib/siteSettings.ts, contactsInline).
+//
 // Every route and page that reads or acts on the directory calls this
 // (e2e/api/authz.spec.ts lists each API route's policy, so a new route cannot
 // ship without someone deciding which kind it is).
 
 import { jsonError } from "@/lib/api/respond";
 import { awaitingSecondFactor } from "@/lib/auth/session";
+import { cachedSiteSettings } from "@/lib/cachedReads";
 
 interface Viewer {
   is_active: boolean;
@@ -21,7 +27,9 @@ interface Viewer {
 export async function canSeeDirectory(d: Viewer): Promise<boolean> {
   if (!d.is_active) return false;
   if (d.is_admin && (await awaitingSecondFactor())) return false;
-  return d.is_admin_approved || d.is_admin;
+  if (d.is_admin_approved || d.is_admin) return true;
+  // Read only for an account in review: an accepted doctor never waits on it.
+  return (await cachedSiteSettings()).search_before_review;
 }
 
 /** The 403 for a route that reads or acts on the directory, or null to go on. */
