@@ -3,13 +3,21 @@
 // Everything in the panel that writes: the three switches, the career stage,
 // the featured slot, and deleting the account.
 //
+// The record itself (licence check, workplaces, contact) comes in as children
+// and is placed by who is looking at it. For a doctor waiting to be let in the
+// record comes first and the switches after it, with the accept bar stuck to the
+// foot of the panel; for anyone else the switches come first, which is what an
+// admin opens a settled doctor to change. Deleting is always last.
+//
 // One client component owns the save call so a server-rendered panel body can
 // stay plain markup, and so a failure reports once, inline, instead of through
 // window.alert.
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { AcceptBar } from "./AcceptBar";
 import { StateSwitches, type SwitchDoctor } from "./StateSwitches";
+import { useApproval } from "./useApproval";
 import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
 import type { PatchResult } from "./ApprovalReasonPrompt";
 import {
@@ -30,7 +38,15 @@ export interface ControlsDoctor extends SwitchDoctor {
   seeking_work: boolean;
 }
 
-export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoctor; closeHref: string }) {
+export function DoctorPanelControls({
+  doctor,
+  closeHref,
+  children,
+}: {
+  doctor: ControlsDoctor;
+  closeHref: string;
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -58,6 +74,13 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
         });
         return false;
       }
+      // Accepted by someone else already (a stale tab): nothing was done, so there is
+      // nothing to tell the doctor about a second time.
+      if (payload?.unchanged) {
+        setNotice({ ok: true, text: "سبق قبول هذا الطبيب، ولم يتغيّر شيء." });
+        startTransition(() => router.refresh());
+        return false;
+      }
       setNotice({ ok: true, text: "حُفظ التغيير." });
       startTransition(() => router.refresh());
       return true;
@@ -78,10 +101,15 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
     });
 
   const currentStage = stageFromCareerStage(doctor.career_stage);
+  const approval = useApproval(doctor.license_verification_status, patch);
+  // Settled when the panel opens for this doctor (it is keyed by doctor), not followed
+  // as they change: the record would otherwise move below the switches, and remount with
+  // the licence checks' unsaved state, the moment an acceptance lands.
+  const [waiting] = useState(() => doctor.is_active && !doctor.is_admin_approved);
 
   return (
     <div className="flex flex-col gap-5">
-      {notice && (
+      {notice && !waiting && (
         <p
           role={notice.ok ? "status" : "alert"}
           className={
@@ -93,7 +121,8 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
         </p>
       )}
 
-      <StateSwitches doctor={doctor} busy={busy} onPatch={patch} />
+      {waiting && children}
+      <StateSwitches doctor={doctor} busy={busy} onPatch={patch} approval={approval} />
 
       <section className="flex flex-col gap-2">
         <h3 className="text-base font-semibold">المرحلة المهنية</h3>
@@ -155,7 +184,10 @@ export function DoctorPanelControls({ doctor, closeHref }: { doctor: ControlsDoc
         )}
       </section>
 
+      {!waiting && children}
+
       <DangerZone doctor={doctor} closeHref={closeHref} busy={busy} setBusy={setBusy} setNotice={setNotice} />
+      <AcceptBar doctor={doctor} busy={busy} approval={approval} notice={waiting ? notice : null} />
     </div>
   );
 }

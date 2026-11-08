@@ -4,15 +4,17 @@
 // same shape components/DoctorRow.tsx uses on the doctor-facing side.
 //
 // The name is the button that opens the panel, not the whole row: the row also
-// carries the accept action, and a button inside a button is invalid markup.
+// carries a button of its own, and a button inside a button is invalid markup.
+//
+// A waiting doctor's button opens the same panel: accepting is a decision to
+// take with the licence check and the rest of the record in front of the admin
+// (#16), so the row never accepts on its own.
 
 import { Avatar } from "@/components/Avatar";
-import { ApprovalReasonPrompt, type PatchResult, type ReasonKind } from "./ApprovalReasonPrompt";
 import type { DoctorRowData } from "./DoctorsList";
 import { directoryVisibility, staffKind } from "@/lib/admin/doctorState";
 import { careerStageBadge } from "@/lib/careerStage";
-import { approvalNeedsReason, licenseDisplay, toneChip } from "@/lib/licenseStatus";
-import { useState } from "react";
+import { licenseDisplay, toneChip } from "@/lib/licenseStatus";
 
 function specialtyNames(row: DoctorRowData): string[] {
   return (row.doctor_specialties ?? [])
@@ -36,16 +38,12 @@ export function DoctorListRow({
   busy,
   open,
   onOpen,
-  onPatch,
 }: {
   row: DoctorRowData;
   busy: boolean;
   open: boolean;
   onOpen: () => void;
-  onPatch: (body: Record<string, unknown>) => Promise<PatchResult>;
 }) {
-  const [asking, setAsking] = useState(false);
-  const [kind, setKind] = useState<ReasonKind>("unconfirmed");
   const name = `${row.arabic_first_name} ${row.arabic_family_name}`;
   const licence = licenseDisplay({ status: row.license_verification_status, region: row.license_region });
   const stage = row.career_stage ? careerStageBadge(row.career_stage, row.residency_start_year) : "طب عام";
@@ -54,24 +52,6 @@ export function DoctorListRow({
   // Staff and the CI account carry placeholder doctor fields: say what they
   // are instead of «د.», a stage and a licence nobody holds.
   const staff = staffKind(row);
-
-  // Every acceptance needs a reason. An unconfirmed licence (a Palestinian one
-  // is unverifiable by design, not suspect) opens the prompt at once; any other
-  // goes to the server first, which knows whether a number was set by hand and
-  // so which question to ask (identity, or the corrected number).
-  const accept = () => {
-    if (approvalNeedsReason(row.license_verification_status)) {
-      setKind("unconfirmed");
-      setAsking(true);
-    } else {
-      void onPatch({ is_admin_approved: true }).then((r) => {
-        if (typeof r === "object") {
-          setKind(r.ask);
-          setAsking(true);
-        }
-      });
-    }
-  };
 
   return (
     <div
@@ -148,40 +128,24 @@ export function DoctorListRow({
           <button
             type="button"
             disabled={busy}
-            onClick={accept}
-            className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-sm text-success hover:opacity-90 disabled:opacity-50"
+            onClick={onOpen}
+            className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-sm text-success hover:opacity-90 disabled:opacity-50 pointer-coarse:py-3"
           >
-            قبول العضوية
+            مراجعة وقبول
           </button>
         ) : (
-          <span className="text-xs text-muted">انضمّ {joinedOn(row.created_at)}</span>
+          <>
+            <span className="text-xs text-muted">انضمّ {joinedOn(row.created_at)}</span>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-3"
+            >
+              التفاصيل
+            </button>
+          </>
         )}
-        <button
-          type="button"
-          onClick={onOpen}
-          className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5"
-        >
-          التفاصيل
-        </button>
       </div>
-
-      {asking && (
-        <div className="md:col-span-4">
-          <ApprovalReasonPrompt
-            name={name}
-            status={row.license_verification_status}
-            region={row.license_region}
-            busy={busy}
-            kind={kind}
-            onCancel={() => setAsking(false)}
-            onConfirm={async (reason, method) => {
-              const ok = await onPatch({ is_admin_approved: true, approval_reason: reason, approval_method: method });
-              if (ok === true) setAsking(false);
-              return ok === true;
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
