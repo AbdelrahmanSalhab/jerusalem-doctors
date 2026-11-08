@@ -22,7 +22,7 @@ export function StatsNav() {
         <a
           key={id}
           href={`#${id}`}
-          className="shrink-0 whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1 text-sm text-muted hover:border-foreground/40 hover:text-foreground pointer-coarse:py-2.5"
+          className="shrink-0 whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1 text-sm text-muted hover:border-foreground/40 hover:text-foreground pointer-coarse:py-3"
         >
           {label}
         </a>
