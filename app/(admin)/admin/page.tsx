@@ -188,9 +188,10 @@ export default async function AdminDoctorsPage({
 
   const listHref = adminDoctorsHref({ filter: params.filter, q: params.q, page: params.page });
 
-  // The doctors either side of the open one, on this page of this list. One just
-  // accepted has left a filter such as "waiting", so it is not in the rows any
-  // more: the next one is then the first row, which is who comes up after them.
+  // The doctors either side of the open one, on this page of this list (a next past
+  // the last row of the page is not offered). One just accepted has left a filter such
+  // as "waiting", so it is not in the rows any more: the next is then the first row,
+  // the first doctor the list still holds.
   const at = rows.findIndex((r) => r.id === params.doctorId);
   const stepTo = (id: string | undefined) => (id ? adminDoctorsHref(params, { doctorId: id }) : undefined);
   const prevHref = stepTo(at > 0 ? rows[at - 1].id : undefined);

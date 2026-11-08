@@ -264,15 +264,18 @@ describe("/admin doctor panel", () => {
   it("puts the record before the switches for a doctor who waits, with the accept bar at the foot", async () => {
     const html = await render({ doctor: DOCTOR.id });
     expect(html.indexOf("التحقق من الترخيص")).toBeLessThan(html.indexOf("المرحلة المهنية"));
-    expect(html.lastIndexOf("قبول العضوية")).toBeGreaterThan(html.lastIndexOf("آخر الأحداث"));
     expect(html.indexOf("الحذف النهائي")).toBeGreaterThan(html.indexOf("آخر الأحداث"));
+    // The bar itself (the switch of the same name is not it): last in the panel, after the delete section.
+    expect(html.indexOf("sticky bottom-0")).toBeGreaterThan(html.indexOf("الحذف النهائي"));
+    expect(html.indexOf("بانتظار القبول</span><button")).toBeGreaterThan(html.indexOf("sticky bottom-0"));
   });
 
   it("keeps the switches first for a doctor who is already in", async () => {
     DATA.doctor_detail = { ...DOCTOR, is_admin_approved: true };
     const html = await render({ doctor: DOCTOR.id });
     expect(html.indexOf("المرحلة المهنية")).toBeLessThan(html.indexOf("التحقق من الترخيص"));
-    expect(html).not.toContain("بانتظار القبول</span><button");
+    // No bar for a doctor who is already in.
+    expect(html).not.toContain("sticky bottom-0");
   });
 
   it("explains why the licence only partly matched, naming the rule", async () => {

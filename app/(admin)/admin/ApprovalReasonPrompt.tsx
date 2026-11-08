@@ -11,7 +11,7 @@
 // decision someone made for a reason, and six months later the activity log
 // should still say what it was.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { licenseStatusLabel, PS_LABEL } from "@/lib/licenseStatus";
 import { APPROVAL_METHODS, APPROVAL_REASON_MIN, type ApprovalMethod } from "@/lib/admin/approvalMethods";
 
@@ -54,6 +54,13 @@ export function ApprovalReasonPrompt({
   const [reason, setReason] = useState("");
   const [method, setMethod] = useState<ApprovalMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The question appears where the admin tapped, often below the fold or in a bar:
+  // bring it into view and make it the place a keyboard or screen reader is at.
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    form.current?.focus({ preventScroll: true });
+    form.current?.scrollIntoView({ block: "nearest" });
+  }, []);
 
   const label = region === "PS" ? PS_LABEL : licenseStatusLabel(status);
 
@@ -82,8 +89,12 @@ export function ApprovalReasonPrompt({
 
   return (
     <form
+      ref={form}
+      tabIndex={-1}
+      role="group"
+      aria-label={heading}
       onSubmit={submit}
-      className="flex flex-col gap-3 rounded-lg border border-warn-line bg-warn-bg p-3 text-sm"
+      className="flex flex-col gap-3 rounded-lg border border-warn-line bg-warn-bg p-3 text-sm outline-none"
     >
       <div>
         <p className="font-semibold">{heading}</p>
@@ -95,7 +106,7 @@ export function ApprovalReasonPrompt({
       <fieldset className="flex flex-col gap-1.5">
         <legend className="sr-only">طريقة التأكد</legend>
         {APPROVAL_METHODS.map((m) => (
-          <label key={m.key} className="flex items-start gap-2">
+          <label key={m.key} className="flex items-start gap-2 pointer-coarse:py-1.5">
             <input
               type="radio"
               name="approval_method"
@@ -122,7 +133,7 @@ export function ApprovalReasonPrompt({
         <button
           type="submit"
           disabled={busy}
-          className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-50"
+          className="rounded-md border border-success-line bg-success-bg px-3 py-1.5 text-success hover:opacity-90 disabled:opacity-50 pointer-coarse:py-3"
         >
           {submitLabel}
         </button>
@@ -130,7 +141,7 @@ export function ApprovalReasonPrompt({
           type="button"
           onClick={onCancel}
           disabled={busy}
-          className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50"
+          className="rounded-md border border-line bg-surface px-3 py-1.5 hover:bg-foreground/5 disabled:opacity-50 pointer-coarse:py-3"
         >
           إلغاء
         </button>

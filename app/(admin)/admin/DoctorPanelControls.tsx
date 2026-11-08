@@ -74,6 +74,13 @@ export function DoctorPanelControls({
         });
         return false;
       }
+      // Accepted by someone else already (a stale tab): nothing was done, so there is
+      // nothing to tell the doctor about a second time.
+      if (payload?.unchanged) {
+        setNotice({ ok: true, text: "سبق قبول هذا الطبيب، ولم يتغيّر شيء." });
+        startTransition(() => router.refresh());
+        return false;
+      }
       setNotice({ ok: true, text: "حُفظ التغيير." });
       startTransition(() => router.refresh());
       return true;
@@ -95,11 +102,14 @@ export function DoctorPanelControls({
 
   const currentStage = stageFromCareerStage(doctor.career_stage);
   const approval = useApproval(doctor.license_verification_status, patch);
-  const waiting = doctor.is_active && !doctor.is_admin_approved;
+  // Settled when the panel opens for this doctor (it is keyed by doctor), not followed
+  // as they change: the record would otherwise move below the switches, and remount with
+  // the licence checks' unsaved state, the moment an acceptance lands.
+  const [waiting] = useState(() => doctor.is_active && !doctor.is_admin_approved);
 
   return (
     <div className="flex flex-col gap-5">
-      {notice && (
+      {notice && !waiting && (
         <p
           role={notice.ok ? "status" : "alert"}
           className={
@@ -177,7 +187,7 @@ export function DoctorPanelControls({
       {!waiting && children}
 
       <DangerZone doctor={doctor} closeHref={closeHref} busy={busy} setBusy={setBusy} setNotice={setNotice} />
-      <AcceptBar doctor={doctor} busy={busy} approval={approval} />
+      <AcceptBar doctor={doctor} busy={busy} approval={approval} notice={waiting ? notice : null} />
     </div>
   );
 }

@@ -41,6 +41,9 @@ export interface DoctorRowData {
   doctor_specialties: { specialty: { name_ar: string } | { name_ar: string }[] | null }[] | null;
 }
 
+/** The queues an admin works through; never hidden, even at 0. */
+const QUEUES: ReadonlySet<DoctorFilter> = new Set(["pending", "license", "identity"]);
+
 export function DoctorsList({
   rows,
   filter,
@@ -94,10 +97,12 @@ export function DoctorsList({
         </form>
 
         {/* Every filter, as how many doctors it opens. The ones that are work for
-            an admin turn amber while they have any, and are left out while they
-            have none (unless open). Wraps rather than scrolling sideways. */}
+            an admin turn amber while they have any. The three review queues are
+            always here, so a count that failed to load reads as a 0 you can see;
+            the other two are left out while they have none (unless open). Wraps
+            rather than scrolling sideways. */}
         <nav aria-label="تصنيفات الأطباء" className="flex flex-wrap gap-1.5">
-          {DOCTOR_FILTERS.filter((f) => f.key === filter || !("attention" in f) || counts[f.key] > 0).map((f) => {
+          {DOCTOR_FILTERS.filter((f) => f.key === filter || !("attention" in f) || QUEUES.has(f.key) || counts[f.key] > 0).map((f) => {
             const active = f.key === filter;
             const n = counts[f.key];
             const waiting = "attention" in f && n > 0;

@@ -38,6 +38,7 @@ export function DoctorPanel({
 }) {
   const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
+  const box = useRef<HTMLDivElement>(null);
 
   const close = () => router.push(closeHref, { scroll: false });
 
@@ -60,6 +61,12 @@ export function DoctorPanel({
     };
   }, []);
 
+  // Stepping to the next doctor reuses this panel: start them at the top, where
+  // the licence check is, not wherever the last one was scrolled to.
+  useEffect(() => {
+    box.current?.scrollTo({ top: 0 });
+  }, [title]);
+
   // Focus starts on the heading so a keyboard or screen-reader user lands
   // inside the panel rather than back at the top of the list.
   useEffect(() => {
@@ -74,11 +81,12 @@ export function DoctorPanel({
         className="fixed inset-0 z-40 bg-foreground/40"
       />
       <div
+        ref={box}
         role="dialog"
         aria-modal="true"
         aria-labelledby="doctor-panel-title"
         className={
-          "fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-y-auto border-s border-line bg-surface shadow-lg " +
+          "fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-y-auto overscroll-contain border-s border-line bg-surface shadow-lg " +
           WIDTH[width]
         }
       >
@@ -91,6 +99,10 @@ export function DoctorPanel({
           >
             {title}
           </h2>
+          {/* Said when the panel moves on to another doctor (focus stays on the link, for the next press). */}
+          <p role="status" className="sr-only">
+            {title}
+          </p>
           <div className="flex shrink-0 items-center gap-1.5">
             {prevHref && (
               <Link href={prevHref} scroll={false} className={STEP}>
@@ -102,7 +114,7 @@ export function DoctorPanel({
                 التالي
               </Link>
             )}
-            <button type="button" onClick={close} className={STEP}>
+            <button type="button" onClick={close} className={STEP + " ms-2"}>
               إغلاق
             </button>
           </div>

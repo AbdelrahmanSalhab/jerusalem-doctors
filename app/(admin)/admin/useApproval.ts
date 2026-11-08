@@ -18,6 +18,8 @@ export function useApproval(status: string | null, onPatch: (body: Record<string
   /** An unverified licence opens the prompt at once; any other acceptance asks
    *  the server first, which knows whether a number was set by hand. */
   const start = () => {
+    // Accepted before and let go again: this is a new acceptance.
+    setTold(false);
     if (approvalNeedsReason(status)) {
       setKind("unconfirmed");
       setAsking(true);
