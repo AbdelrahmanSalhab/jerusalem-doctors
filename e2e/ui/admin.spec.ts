@@ -4,7 +4,7 @@ import { createDoctor, serviceClient } from "../seed";
 
 test.use({ storageState: stateFile("admin") });
 
-test("the tiles count doctors, not the hidden admin account", async ({ page }) => {
+test("the filter bar counts doctors, not the hidden admin account", async ({ page }) => {
   await page.goto("/admin");
   // Seeded: one doctor waiting (منتظر القبول), one hidden (خفي المخفي); the
   // hidden non-doctor admin is in neither.
@@ -23,6 +23,9 @@ test.describe("accepting a doctor", () => {
     await page.goto("/admin?status=pending&q=طالب");
     // The search leaves this doctor alone on screen.
     await expect(page.getByText("طالب القبول")).toBeVisible();
+    // The row opens the panel; the decision is taken there, record in view.
+    await page.getByRole("button", { name: "مراجعة وقبول" }).click();
+    await expect(page.getByText("التحقق من الترخيص")).toBeVisible();
     await page.getByRole("button", { name: "قبول العضوية" }).click();
     // Even an exact registry match asks how the admin knows (#16).
     await expect(page.getByText(/لا يثبت أنه صاحبها/)).toBeVisible();
@@ -45,6 +48,22 @@ test.describe("accepting a doctor", () => {
     await doctor.close();
   });
 
+  test("goes through the waiting doctors with التالي, without closing the panel", async ({ page }) => {
+    const second = await createDoctor({ first: "طالب", family: "الثاني", approved: false });
+    try {
+      await page.goto("/admin?status=pending&q=طالب");
+      await expect(page.getByText("طالب الثاني")).toBeVisible();
+      await page.getByRole("button", { name: "مراجعة وقبول" }).first().click();
+      const panel = page.getByRole("dialog");
+      const first = await panel.getByRole("heading", { level: 2 }).innerText();
+      await panel.getByRole("link", { name: "التالي" }).click();
+      await expect(panel.getByRole("heading", { level: 2 })).not.toHaveText(first);
+      await expect(panel.getByRole("link", { name: "السابق" })).toBeVisible();
+    } finally {
+      await second.remove();
+    }
+  });
+
   // The registry says "verified", but an admin set the number by hand: the
   // match says nothing about who the doctor is, so accepting asks why.
   test("asks for a reason when an admin set the verified number by hand", async ({ page }) => {
@@ -55,6 +74,9 @@ test.describe("accepting a doctor", () => {
     });
     await page.goto("/admin?status=pending&q=طالب");
     await expect(page.getByText("طالب القبول")).toBeVisible();
+    // The row opens the panel; the decision is taken there, record in view.
+    await page.getByRole("button", { name: "مراجعة وقبول" }).click();
+    await expect(page.getByText("التحقق من الترخيص")).toBeVisible();
     await page.getByRole("button", { name: "قبول العضوية" }).click();
     await expect(page.getByText(/حدّدته الإدارة بيدها/)).toBeVisible();
     expect((await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved).toBe(false);

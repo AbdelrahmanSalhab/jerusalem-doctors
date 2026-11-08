@@ -10,22 +10,30 @@
 // Closing is a navigation back to the list URL, which means the browser's
 // Back button closes it too.
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 /** The read-only record fits a narrow sheet; the profile editor's workplace
  *  rows do not. */
+const STEP = "rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5 pointer-coarse:py-2.5";
+
 const WIDTH = { md: "max-w-xl", lg: "max-w-3xl" } as const;
 
 export function DoctorPanel({
   closeHref,
   title,
   width = "md",
+  prevHref,
+  nextHref,
   children,
 }: {
   closeHref: string;
   title: string;
   width?: keyof typeof WIDTH;
+  /** The doctors either side in the list behind the panel, to go through it without closing. */
+  prevHref?: string;
+  nextHref?: string;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -83,13 +91,21 @@ export function DoctorPanel({
           >
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={close}
-            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm hover:bg-foreground/5"
-          >
-            إغلاق
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {prevHref && (
+              <Link href={prevHref} scroll={false} className={STEP}>
+                السابق
+              </Link>
+            )}
+            {nextHref && (
+              <Link href={nextHref} scroll={false} className={STEP}>
+                التالي
+              </Link>
+            )}
+            <button type="button" onClick={close} className={STEP}>
+              إغلاق
+            </button>
+          </div>
         </div>
         <div className="flex flex-col gap-5 px-4 py-4">{children}</div>
       </div>

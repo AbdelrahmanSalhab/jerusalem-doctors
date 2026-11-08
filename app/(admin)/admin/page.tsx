@@ -9,7 +9,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { DoctorsList, type DoctorRowData } from "./DoctorsList";
 import { DoctorPanelSlot } from "./DoctorPanelSlot";
 import { fetchDoctorDetail } from "@/lib/admin/doctorDetail";
-import { Tile, TileGrid } from "@/components/AdminParts";
 import { countOf, DOCTORS } from "@/lib/arabicCount";
 import { isSuperAdmin } from "@/lib/auth/superAdmin";
 import { requireAdmin } from "@/lib/auth/session";
@@ -189,29 +188,23 @@ export default async function AdminDoctorsPage({
 
   const listHref = adminDoctorsHref({ filter: params.filter, q: params.q, page: params.page });
 
+  // The doctors either side of the open one, on this page of this list. One just
+  // accepted has left a filter such as "waiting", so it is not in the rows any
+  // more: the next one is then the first row, which is who comes up after them.
+  const at = rows.findIndex((r) => r.id === params.doctorId);
+  const stepTo = (id: string | undefined) => (id ? adminDoctorsHref(params, { doctorId: id }) : undefined);
+  const prevHref = stepTo(at > 0 ? rows[at - 1].id : undefined);
+  const nextHref = stepTo(at >= 0 ? rows[at + 1]?.id : rows[0]?.id);
+
   return (
     <main className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">الأطباء</h1>
         <p className="text-sm text-muted">
           {listed.error ? "تعذّر تحميل القائمة." : `${countOf(total, DOCTORS)} في هذا التصنيف.`}
+          {params.filter === "all" && staff > 0 && ` منها ${staff} من الإدارة وليسوا أطباء.`}
         </p>
       </header>
-
-      {/* The main filters, as counts; the rest are pills under the search. */}
-      <TileGrid>
-        {DOCTOR_FILTERS.filter((f) => "tile" in f).map((f) => (
-          <Tile
-            key={f.key}
-            label={f.label}
-            value={filterCounts[f.key]}
-            sub={f.key === "all" && staff > 0 ? `منها ${staff} من الإدارة وليسوا أطباء` : undefined}
-            href={adminDoctorsHref({ filter: f.key, q: "", page: 1 })}
-            tone={"attention" in f && filterCounts[f.key] > 0 ? "warn" : "plain"}
-            current={f.key === params.filter}
-          />
-        ))}
-      </TileGrid>
 
       <DoctorsList
         rows={rows}
@@ -231,6 +224,8 @@ export default async function AdminDoctorsPage({
           closeHref={listHref}
           viewHref={adminDoctorsHref(params, { doctorId: params.doctorId })}
           editHref={adminDoctorsHref(params, { doctorId: params.doctorId, editing: true })}
+          prevHref={prevHref}
+          nextHref={nextHref}
           canResetSecondFactor={detail?.doctor.is_admin === true && detail.doctor.id !== viewer.id && (await isSuperAdmin(service, viewer.auth_user_id))}
         />
       )}

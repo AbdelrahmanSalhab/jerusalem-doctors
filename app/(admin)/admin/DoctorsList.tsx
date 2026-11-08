@@ -1,22 +1,16 @@
 "use client";
 
-// The doctors list: filter chips, search, rows, paging.
+// The doctors list: one filter bar, search, rows, paging.
 //
-// Two things the old table got wrong, besides its looks. A single
-// useTransition disabled every control in every row whenever one of them was
-// saving, so the whole table froze on one click; each row now carries its own
-// busy state. And a failed save went to window.alert; it now reads inline,
-// where the admin is looking.
+// Accepting a doctor happens in their panel, where the licence check and the
+// rest of what is known about them sit, not on the row: a row only says who is
+// waiting and opens that panel. So the list saves nothing itself.
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ApprovedNotice } from "./ApprovedNotice";
 import { DoctorListRow } from "./DoctorListRow";
 import { adminDoctorsHref, DOCTOR_FILTERS, type DoctorFilter } from "@/lib/admin/doctorsQuery";
-import { directoryVisibility } from "@/lib/admin/doctorState";
-import { apiErrorMessage, fieldErrorMessage } from "@/lib/client/apiError";
-import type { PatchResult } from "./ApprovalReasonPrompt";
 
 export interface DoctorRowData {
   id: string;
@@ -47,11 +41,6 @@ export interface DoctorRowData {
   doctor_specialties: { specialty: { name_ar: string } | { name_ar: string }[] | null }[] | null;
 }
 
-export interface Notice {
-  ok: boolean;
-  text: string;
-}
-
 export function DoctorsList({
   rows,
   filter,
@@ -72,11 +61,6 @@ export function DoctorsList({
 }) {
   const router = useRouter();
   const [search, setSearch] = useState(q);
-  const [busy, setBusy] = useState<Record<string, boolean>>({});
-  const [notice, setNotice] = useState<Notice | null>(null);
-  // The doctor just accepted: the row leaves the waiting list, so the admin
-  // is handed the WhatsApp message here, not on the row.
-  const [accepted, setAccepted] = useState<{ id: string; phone: string; firstName: string; listed: boolean } | null>(null);
   const [navigating, startTransition] = useTransition();
 
   const here = { filter, q, page };
@@ -84,48 +68,6 @@ export function DoctorsList({
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(() => router.push(adminDoctorsHref({ filter, q: search, page: 1 })));
-  };
-
-  /** One row's save. Returns true when it stuck, so a row can close its own
-   *  editor only on success. */
-  const patchDoctor = async (id: string, body: Record<string, unknown>): Promise<PatchResult> => {
-    setBusy((b) => ({ ...b, [id]: true }));
-    setNotice(null);
-    setAccepted(null);
-    try {
-      const res = await fetch(`/api/admin/doctors/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const payload = await res.json().catch(() => ({}));
-      // The server knows something the row does not (a number found by name):
-      // hand back that a reason is wanted so the prompt can open.
-      if (payload?.code === "approval_reason_required" && !body.approval_reason) {
-        return { ask: payload.reason_kind ?? "unconfirmed" };
-      }
-      if (!res.ok) {
-        setNotice({
-          ok: false,
-          text: fieldErrorMessage(payload?.fields) ?? apiErrorMessage(payload?.code, "تعذّر حفظ التغيير. حاول مجددًا."),
-        });
-        return false;
-      }
-      setNotice({ ok: true, text: "حُفظ التغيير." });
-      const row = body.is_admin_approved === true ? rows.find((r) => r.id === id) : undefined;
-      setAccepted(
-        row
-          ? { id, phone: row.phone_e164, firstName: row.arabic_first_name, listed: directoryVisibility({ ...row, is_admin_approved: true }).listed }
-          : null,
-      );
-      startTransition(() => router.refresh());
-      return true;
-    } catch {
-      setNotice({ ok: false, text: "تعذّر الاتصال. تحقّق من الشبكة وحاول مجددًا." });
-      return false;
-    } finally {
-      setBusy((b) => ({ ...b, [id]: false }));
-    }
   };
 
   const openDoctor = (id: string) => {
@@ -151,11 +93,11 @@ export function DoctorsList({
           </button>
         </form>
 
-        {/* The filters without a box above (the page's tiles). Each pill shows
-            how many doctors it opens; one that is work for an admin turns
-            amber while it has any. Wraps rather than scrolling sideways. */}
-        <nav aria-label="تصنيفات أخرى" className="flex flex-wrap gap-1.5">
-          {DOCTOR_FILTERS.filter((f) => !("tile" in f)).map((f) => {
+        {/* Every filter, as how many doctors it opens. The ones that are work for
+            an admin turn amber while they have any, and are left out while they
+            have none (unless open). Wraps rather than scrolling sideways. */}
+        <nav aria-label="تصنيفات الأطباء" className="flex flex-wrap gap-1.5">
+          {DOCTOR_FILTERS.filter((f) => f.key === filter || !("attention" in f) || counts[f.key] > 0).map((f) => {
             const active = f.key === filter;
             const n = counts[f.key];
             const waiting = "attention" in f && n > 0;
@@ -165,7 +107,7 @@ export function DoctorsList({
                 href={adminDoctorsHref({ filter: f.key, q, page: 1 })}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors " +
+                  "flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors pointer-coarse:py-2.5 " +
                   (active
                     ? "border-foreground bg-foreground/5 font-semibold"
                     : waiting
@@ -180,19 +122,6 @@ export function DoctorsList({
           })}
         </nav>
       </div>
-
-      {notice && (
-        <p
-          role={notice.ok ? "status" : "alert"}
-          className={
-            "rounded-md border px-3 py-2 text-sm " +
-            (notice.ok ? "border-success-line bg-success-bg text-success" : "border-danger-line bg-danger-bg text-danger")
-          }
-        >
-          {notice.text}
-        </p>
-      )}
-      {accepted && <ApprovedNotice doctorId={accepted.id} phone={accepted.phone} firstName={accepted.firstName} listed={accepted.listed} />}
 
       <div className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
         <div
@@ -212,10 +141,9 @@ export function DoctorsList({
             <DoctorListRow
               key={r.id}
               row={r}
-              busy={Boolean(busy[r.id]) || navigating}
+              busy={navigating}
               open={r.id === openDoctorId}
               onOpen={() => openDoctor(r.id)}
-              onPatch={(body) => patchDoctor(r.id, body)}
             />
           ))
         )}

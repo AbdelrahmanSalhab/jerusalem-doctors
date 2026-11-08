@@ -143,7 +143,9 @@ describe("/admin doctors list", () => {
   it("marks a doctor who is waiting for a decision", async () => {
     const html = await render();
     expect(html).toContain("بانتظار القبول");
-    expect(html).toContain("قبول العضوية");
+    // The row opens the panel to review the doctor; it does not accept on its own.
+    expect(html).toContain("مراجعة وقبول");
+    expect(html).not.toContain("قبول العضوية");
   });
 
   it("shows the licence verdict on the row", async () => {
@@ -228,6 +230,49 @@ describe("/admin doctor panel", () => {
         synced_at: "2026-10-19T03:00:00Z",
       },
     ];
+  });
+
+  const ROWS = ["d1", "d2", "d3"].map((n) => ({ ...DOCTOR, id: `00000000-0000-4000-8000-0000000000${n}` }));
+  const href = (html: string, label: string) => html.match(new RegExp(`href="([^"]*)"[^>]*>${label}<`))?.[1];
+
+  it("steps to the doctors either side in the list, and keeps the filter", async () => {
+    DATA.doctors = ROWS;
+    DATA.doctor_detail = ROWS[1];
+    const html = await render({ status: "pending", doctor: ROWS[1].id });
+    expect(href(html, "السابق")).toContain(`doctor=${ROWS[0].id}`);
+    expect(href(html, "التالي")).toContain(`doctor=${ROWS[2].id}`);
+    expect(href(html, "التالي")).toContain("status=pending");
+  });
+
+  it("has nothing before the first doctor and nothing after the last", async () => {
+    DATA.doctors = ROWS;
+    DATA.doctor_detail = ROWS[0];
+    expect(href(await render({ doctor: ROWS[0].id }), "السابق")).toBeUndefined();
+    DATA.doctor_detail = ROWS[2];
+    expect(href(await render({ doctor: ROWS[2].id }), "التالي")).toBeUndefined();
+  });
+
+  it("goes on to the first of the list once the open doctor has left it", async () => {
+    // Accepted from the waiting list: the refreshed list no longer holds them.
+    DATA.doctors = ROWS.slice(1);
+    DATA.doctor_detail = ROWS[0];
+    const html = await render({ status: "pending", doctor: ROWS[0].id });
+    expect(href(html, "التالي")).toContain(`doctor=${ROWS[1].id}`);
+    expect(href(html, "السابق")).toBeUndefined();
+  });
+
+  it("puts the record before the switches for a doctor who waits, with the accept bar at the foot", async () => {
+    const html = await render({ doctor: DOCTOR.id });
+    expect(html.indexOf("التحقق من الترخيص")).toBeLessThan(html.indexOf("المرحلة المهنية"));
+    expect(html.lastIndexOf("قبول العضوية")).toBeGreaterThan(html.lastIndexOf("آخر الأحداث"));
+    expect(html.indexOf("الحذف النهائي")).toBeGreaterThan(html.indexOf("آخر الأحداث"));
+  });
+
+  it("keeps the switches first for a doctor who is already in", async () => {
+    DATA.doctor_detail = { ...DOCTOR, is_admin_approved: true };
+    const html = await render({ doctor: DOCTOR.id });
+    expect(html.indexOf("المرحلة المهنية")).toBeLessThan(html.indexOf("التحقق من الترخيص"));
+    expect(html).not.toContain("بانتظار القبول</span><button");
   });
 
   it("explains why the licence only partly matched, naming the rule", async () => {
