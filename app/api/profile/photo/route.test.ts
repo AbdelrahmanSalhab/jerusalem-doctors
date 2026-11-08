@@ -19,6 +19,7 @@ vi.mock("@/lib/supabase/service", () => ({
           uploadSpy(path, opts.contentType);
           return { error: null };
         },
+        remove: async () => ({ error: null }),
         getPublicUrl: (path: string) => ({ data: { publicUrl: `https://cdn.test/${path}` } }),
       }),
     },
