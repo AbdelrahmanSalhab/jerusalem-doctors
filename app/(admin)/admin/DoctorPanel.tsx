@@ -26,6 +26,7 @@ export function DoctorPanel({
   width = "md",
   prevHref,
   nextHref,
+  position,
   children,
 }: {
   closeHref: string;
@@ -34,6 +35,8 @@ export function DoctorPanel({
   /** The doctors either side in the list behind the panel, to go through it without closing. */
   prevHref?: string;
   nextHref?: string;
+  /** "3 of 9": where this doctor is in that list. */
+  position?: { n: number; of: number };
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -45,6 +48,23 @@ export function DoctorPanel({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") close();
+      // Tab stays in the panel: the list behind it is covered, and not for a keyboard to wander into.
+      if (e.key === "Tab" && box.current) {
+        const items = [...box.current.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(
+          (el) => !(el as HTMLButtonElement).disabled && el.offsetParent !== null,
+        );
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        const here = document.activeElement;
+        if (e.shiftKey && (here === first || here === box.current || !box.current.contains(here))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (here === last || !box.current.contains(here))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -104,6 +124,11 @@ export function DoctorPanel({
             {title}
           </p>
           <div className="flex shrink-0 items-center gap-1.5">
+            {position && (
+              <span className="px-1 text-sm tabular-nums text-muted">
+                {position.n} من {position.of}
+              </span>
+            )}
             {prevHref && (
               <Link href={prevHref} scroll={false} className={STEP}>
                 السابق

@@ -19,6 +19,7 @@ import {
   pageCount,
   pageRange,
   parseAdminDoctorsParams,
+  type AdminDoctorsParams,
   type DoctorFilter,
 } from "@/lib/admin/doctorsQuery";
 import { toIlikeTerm } from "@/lib/normalize/arabic";
@@ -134,23 +135,22 @@ function applyFilter<
   }
 }
 
-export default async function AdminDoctorsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const viewer = await requireAdmin();
-  const params = parseAdminDoctorsParams(await searchParams);
-  const service = createSupabaseServiceClient();
-  const { from, to } = pageRange(params.page);
-
+/** The doctors list for a filter and search, newest first. The page's own rows, and the
+ *  one row beyond its edge that the panel's next and previous reach for (columns "id"). */
+function listing(
+  service: SupabaseClient,
+  params: AdminDoctorsParams,
+  columns: string,
+  range: { from: number; to: number },
+  withCount = false,
+) {
   let query = service
     .from("doctors")
-    .select(ROW_COLUMNS, { count: "exact" })
+    .select(columns, withCount ? { count: "exact" } : undefined)
     .order("created_at", { ascending: false })
     // Ties on created_at would shuffle between pages without this.
     .order("id", { ascending: false })
-    .range(from, to);
+    .range(range.from, range.to);
 
   query = applyFilter(query, params.filter);
 
@@ -167,6 +167,20 @@ export default async function AdminDoctorsPage({
       );
     }
   }
+  return query;
+}
+
+export default async function AdminDoctorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const viewer = await requireAdmin();
+  const params = parseAdminDoctorsParams(await searchParams);
+  const service = createSupabaseServiceClient();
+  const { from, to } = pageRange(params.page);
+
+  const query = listing(service, params, ROW_COLUMNS, { from, to }, true);
 
   const [listed, filterCounts, staff, detail, specialties] = await Promise.all([
     query,
@@ -183,19 +197,30 @@ export default async function AdminDoctorsPage({
     redirect(adminDoctorsHref({ ...params, page: 1 }));
   }
 
-  const rows = (listed.data ?? []) as DoctorRowData[];
+  const rows = (listed.data ?? []) as unknown as DoctorRowData[];
   const total = listed.count ?? 0;
 
   const listHref = adminDoctorsHref({ filter: params.filter, q: params.q, page: params.page });
 
-  // The doctors either side of the open one, on this page of this list (a next past
-  // the last row of the page is not offered). One just accepted has left a filter such
-  // as "waiting", so it is not in the rows any more: the next is then the first row,
-  // the first doctor the list still holds.
+  // The doctors either side of the open one. One just accepted has left a filter such as
+  // "waiting", so it is not in the rows any more: the next is then the first row, the first
+  // doctor the list still holds. At the edge of a page, the row beyond it is looked up (its id
+  // alone), so stepping goes on to the next page and back to the last of the one before.
   const at = rows.findIndex((r) => r.id === params.doctorId);
-  const stepTo = (id: string | undefined) => (id ? adminDoctorsHref(params, { doctorId: id }) : undefined);
-  const prevHref = stepTo(at > 0 ? rows[at - 1].id : undefined);
-  const nextHref = stepTo(at >= 0 ? rows[at + 1]?.id : rows[0]?.id);
+  const pages = pageCount(total, ADMIN_PAGE_SIZE);
+  const edgeId = async (index: number) => {
+    const r = await listing(service, params, "id", { from: index, to: index });
+    return (r.data as unknown as { id: string }[] | null)?.[0]?.id;
+  };
+  const [afterId, beforeId] = await Promise.all([
+    at >= 0 && at === rows.length - 1 && params.page < pages ? edgeId(to + 1) : undefined,
+    at === 0 && params.page > 1 ? edgeId(from - 1) : undefined,
+  ]);
+  const stepTo = (id: string | undefined, page = params.page) => (id ? adminDoctorsHref({ ...params, page }, { doctorId: id }) : undefined);
+  const prevHref = at > 0 ? stepTo(rows[at - 1].id) : stepTo(beforeId, params.page - 1);
+  const nextHref = at >= 0 ? (rows[at + 1] ? stepTo(rows[at + 1].id) : stepTo(afterId, params.page + 1)) : stepTo(rows[0]?.id);
+  // Where they are in the list, when they are in it.
+  const position = at >= 0 ? { n: from + at + 1, of: total } : undefined;
 
   return (
     <main className="flex flex-col gap-6">
@@ -213,7 +238,7 @@ export default async function AdminDoctorsPage({
         counts={filterCounts}
         q={params.q}
         page={params.page}
-        pages={pageCount(total, ADMIN_PAGE_SIZE)}
+        pages={pages}
         openDoctorId={params.doctorId}
       />
 
@@ -227,6 +252,7 @@ export default async function AdminDoctorsPage({
           editHref={adminDoctorsHref(params, { doctorId: params.doctorId, editing: true })}
           prevHref={prevHref}
           nextHref={nextHref}
+          position={position}
           canResetSecondFactor={detail?.doctor.is_admin === true && detail.doctor.id !== viewer.id && (await isSuperAdmin(service, viewer.auth_user_id))}
         />
       )}
