@@ -33,6 +33,13 @@ test("a visitor is sent to the login page", async ({ page }) => {
   await expect(page).toHaveURL(/\/login/);
 });
 
+// The installed app has no address bar: an admin reaches the password sign-in from here.
+test("the login page links to the admins' email sign-in @phone", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("link", { name: "دخول المشرفين بالبريد وكلمة المرور" }).click();
+  await expect(page).toHaveURL(/\/login\/dev/);
+});
+
 test("the admin area does not exist for a doctor", async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: (await import("../helpers")).stateFile("doctor") });
   const res = await (await ctx.newPage()).goto("/admin");

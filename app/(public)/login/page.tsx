@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LoginForm } from "./LoginForm";
 import { isPhoneAuthDisabled } from "@/lib/auth/session";
 import { SupportContact } from "@/components/SupportContact";
@@ -33,6 +34,13 @@ export default async function LoginPage({
       )}
       <LoginForm />
       <SupportContact />
+      {/* The installed app has no address bar, so an admin could not reach /login/dev. It
+          is no secret (a password, a second factor and a rate limit guard it); it is not promoted. */}
+      <p className="mt-6 text-center text-sm text-foreground/70">
+        <Link href="/login/dev" className="underline">
+          دخول المشرفين بالبريد وكلمة المرور
+        </Link>
+      </p>
     </main>
   );
 }
