@@ -36,7 +36,7 @@ export default async function LoginPage({
       <SupportContact />
       {/* The installed app has no address bar, so an admin could not reach /login/dev. It
           is no secret (a password, a second factor and a rate limit guard it); it is not promoted. */}
-      <p className="mt-6 text-center text-sm text-foreground/60">
+      <p className="mt-6 text-center text-sm text-foreground/70">
         <Link href="/login/dev" className="underline">
           دخول المشرفين بالبريد وكلمة المرور
         </Link>
