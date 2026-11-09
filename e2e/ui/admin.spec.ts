@@ -155,9 +155,9 @@ test.describe("identity review of an accepted doctor", () => {
 
     await page.getByRole("button", { name: "قديم المراجعة" }).click();
     await page.getByRole("button", { name: "مراجعة الهوية" }).click();
-    // Both are asked for, like accepting.
+    // Either a method or a note is enough, like accepting.
     await page.getByRole("button", { name: "تمت مراجعة الهوية" }).click();
-    await expect(page.getByText("اختر كيف تأكّدت من هويته.")).toBeVisible();
+    await expect(page.getByText("اختر كيف تأكّدت من هويته، أو اكتب ملاحظة.")).toBeVisible();
     await page.getByRole("radio", { name: /رأيت صورة/ }).check();
     await page.getByLabel("سبب المراجعة").fill("رأيت صورة الترخيص الأصلية معه");
     await page.getByRole("button", { name: "تمت مراجعة الهوية" }).click();
