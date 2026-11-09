@@ -29,11 +29,28 @@ function token(claims: object, key = github.privateKey, header: object = { alg: 
   const body = `${b64(header)}.${b64(claims)}`;
   return `${body}.${sign("RSA-SHA256", Buffer.from(body), key).toString("base64url")}`;
 }
-const check = (t: string) => verifySmokeToken(t, keyOf, NOW);
+const SHA = "a".repeat(40);
+const merged = new Set([SHA]);
+const onMain = async (sha: string) => merged.has(sha);
+const check = (t: string) => verifySmokeToken(t, keyOf, NOW, onMain);
+const at = (ref: string, event_name = "deployment_status") => ({
+  workflow_ref: `${REPOSITORY}/.github/workflows/smoke.yml@${ref}`,
+  event_name,
+});
 
 describe("verifySmokeToken", () => {
   it("accepts GitHub's token for this repository's smoke workflow", async () => {
     expect(await check(token(CLAIMS))).toMatchObject({ jti: "a7c1", run_id: "123" });
+  });
+
+  it("accepts a production deploy's commit when it is on main", async () => {
+    expect(await check(token({ ...CLAIMS, ...at(SHA) }))).not.toBeNull();
+  });
+
+  it("refuses a commit that is not on main, and a sha on any other event", async () => {
+    expect(await check(token({ ...CLAIMS, ...at("b".repeat(40)) }))).toBeNull();
+    expect(await check(token({ ...CLAIMS, ...at(SHA, "workflow_dispatch") }))).toBeNull();
+    expect(await check(token({ ...CLAIMS, ...at(SHA.slice(0, 7)) }))).toBeNull();
   });
 
   it("refuses a token signed by anyone else, or with an unknown key", async () => {
@@ -96,5 +113,28 @@ describe("githubKey", () => {
     const { githubKey } = await import("./githubOidc");
     await expect(githubKey("k1")).rejects.toThrow("GitHub JWKS: 503");
     vi.unstubAllGlobals();
+  });
+});
+
+describe("githubOnMain", () => {
+  const ask = async (status: number, body: object, sha = "c".repeat(40)) => {
+    vi.resetModules();
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { githubOnMain } = await import("./githubOidc");
+    const result = await githubOnMain(sha);
+    vi.unstubAllGlobals();
+    return { result, fetchMock };
+  };
+
+  it("is true for a commit main is ahead of or equal to,", async () => {
+    expect((await ask(200, { status: "ahead" })).result).toBe(true);
+    expect((await ask(200, { status: "identical" })).result).toBe(true);
+  });
+
+  it("is false for a diverged commit, an error, or a rate limit", async () => {
+    expect((await ask(200, { status: "diverged" })).result).toBe(false);
+    expect((await ask(404, {})).result).toBe(false);
+    expect((await ask(403, {})).result).toBe(false);
   });
 });
