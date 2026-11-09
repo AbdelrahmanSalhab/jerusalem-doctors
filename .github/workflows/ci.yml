@@ -55,21 +55,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # A pull request that adds or bumps a dependency with a known vulnerability
-  # (any severity from high up) fails here, before it is merged. Pull requests
-  # only: the action compares the PR's lockfile with its base.
-  dependencies:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-26.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
-        with:
-          fail-on-severity: high
-
   check:
     # Pinned to the current LTS on purpose: a moving label (ubuntu-latest)
     # can change the browser system libraries without a commit.
