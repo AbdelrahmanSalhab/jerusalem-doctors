@@ -22,8 +22,8 @@ export const REASON_MIN = APPROVAL_REASON_MIN;
 export type ReasonKind = "unconfirmed" | "corrected_number" | "identity";
 /** What an approval attempt gives back: done, failed, or "ask for a reason". */
 export type PatchResult = boolean | { ask: ReasonKind };
-export const REASON_TOO_SHORT = `اكتب سببًا من ${APPROVAL_REASON_MIN} أحرف على الأقل.`;
-export const METHOD_MISSING = "اختر كيف تأكّدت من هويته.";
+export const REASON_TOO_SHORT = `إن كتبت ملاحظة فلتكن ${APPROVAL_REASON_MIN} أحرف على الأقل.`;
+export const METHOD_MISSING = "اختر كيف تأكّدت من هويته، أو اكتب ملاحظة.";
 
 export function ApprovalReasonPrompt({
   name,
@@ -49,7 +49,7 @@ export function ApprovalReasonPrompt({
   reasonLabel?: string;
   lead?: string;
   onCancel: () => void;
-  onConfirm: (reason: string, method: ApprovalMethod) => Promise<boolean>;
+  onConfirm: (reason: string | undefined, method: ApprovalMethod | undefined) => Promise<boolean>;
 }) {
   const [reason, setReason] = useState("");
   const [method, setMethod] = useState<ApprovalMethod | null>(null);
@@ -67,16 +67,16 @@ export function ApprovalReasonPrompt({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = reason.trim();
-    if (!method) {
+    if (!method && !trimmed) {
       setError(METHOD_MISSING);
       return;
     }
-    if (trimmed.length < REASON_MIN) {
+    if (trimmed && trimmed.length < REASON_MIN) {
       setError(REASON_TOO_SHORT);
       return;
     }
     setError(null);
-    await onConfirm(trimmed, method);
+    await onConfirm(trimmed || undefined, method ?? undefined);
   };
 
   const lead =
@@ -125,7 +125,7 @@ export function ApprovalReasonPrompt({
         rows={2}
         maxLength={300}
         aria-label={reasonLabel}
-        placeholder="مثال: اتصلت بمقسم المستشفى وأكّدوا أنه يعمل في قسم الأطفال."
+        placeholder="تكفي عن الاختيار أعلاه. مثال: اتصلت بمقسم المستشفى وأكّدوا أنه يعمل في قسم الأطفال."
         className="w-full rounded-md border border-line bg-surface px-3 py-2 text-base"
       />
       {error && <p className="text-danger">{error}</p>}
