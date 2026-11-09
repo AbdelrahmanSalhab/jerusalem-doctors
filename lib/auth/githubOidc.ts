@@ -9,6 +9,8 @@
 // write access can push a branch, and a preview deploy of it fires
 // deployment_status, which runs that branch's workflow file. Changing main
 // goes through review. Pull requests from forks get no id-token permission.
+// Vercel records each deployment's ref as a commit SHA, so a deployment_status
+// run names the workflow as smoke.yml@<sha>: that SHA must be on main.
 // https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect
 
 import { createPublicKey, verify, type JsonWebKey } from "node:crypto";
@@ -17,7 +19,7 @@ export const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 /** What the workflow asks for, and the only audience accepted. */
 export const CI_AUDIENCE = "jerusalem-doctors-smoke";
 export const REPOSITORY = "AbdelrahmanSalhab/jerusalem-doctors";
-const SMOKE_WORKFLOW = `${REPOSITORY}/.github/workflows/smoke.yml@refs/heads/main`;
+const SMOKE_WORKFLOW = `${REPOSITORY}/.github/workflows/smoke.yml@`;
 /** The smoke workflow's own triggers (.github/workflows/smoke.yml). */
 const EVENTS = new Set(["deployment_status", "schedule", "workflow_dispatch"]);
 /** GitHub issues them for a few minutes; older than this is a replay. */
@@ -52,6 +54,26 @@ export const githubKey: KeyLookup = async (kid) => {
   return cached.keys.find((k) => k.kid === kid);
 };
 
+/** Whether a commit is main's or one of its ancestors (a merged commit). */
+export type OnMain = (sha: string) => Promise<boolean>;
+const onMainShas = new Set<string>();
+
+export const githubOnMain: OnMain = async (sha) => {
+  if (onMainShas.has(sha)) return true;
+  // GITHUB_API_URL is the e2e stub; production never sets it. The repository
+  // is public, so no token; a failure or rate limit refuses, never allows.
+  const api = process.env.GITHUB_API_URL ?? "https://api.github.com";
+  const res = await fetch(`${api}/repos/${REPOSITORY}/compare/${sha}...main`, {
+    headers: { Accept: "application/vnd.github+json" },
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (!res.ok) return false;
+  const { status } = (await res.json()) as { status?: string };
+  const merged = status === "ahead" || status === "identical";
+  if (merged) onMainShas.add(sha);
+  return merged;
+};
+
 const json = (part: string) => JSON.parse(Buffer.from(part, "base64url").toString("utf8"));
 
 /** The token's claims if GitHub signed it for this repository's smoke
@@ -60,6 +82,7 @@ export async function verifySmokeToken(
   token: string,
   keyOf: KeyLookup = githubKey,
   now: number = Date.now() / 1000,
+  onMain: OnMain = githubOnMain,
 ): Promise<CiClaims | null> {
   try {
     const [h, p, s] = token.split(".");
@@ -79,11 +102,16 @@ export async function verifySmokeToken(
       typeof c.exp === "number" && c.exp > now &&
       fresh &&
       c.repository === REPOSITORY &&
-      typeof c.workflow_ref === "string" && c.workflow_ref === SMOKE_WORKFLOW &&
+      typeof c.workflow_ref === "string" && c.workflow_ref.startsWith(SMOKE_WORKFLOW) &&
       EVENTS.has(c.event_name) &&
       c.runner_environment === "github-hosted" &&
       typeof c.jti === "string" && c.jti.length > 0;
-    return ok ? (c as CiClaims) : null;
+    if (!ok) return null;
+    const ref = (c.workflow_ref as string).slice(SMOKE_WORKFLOW.length);
+    const onMainRef =
+      ref === "refs/heads/main" ||
+      (c.event_name === "deployment_status" && /^[0-9a-f]{40}$/.test(ref) && (await onMain(ref)));
+    return onMainRef ? (c as CiClaims) : null;
   } catch {
     return null;
   }
