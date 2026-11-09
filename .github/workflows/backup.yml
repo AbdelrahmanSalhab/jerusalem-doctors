@@ -36,8 +36,11 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     environment: backup
+    permissions:
+      contents: read
+      issues: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       # Supabase runs Postgres 17: pg_dump must be at least that new. The
@@ -92,3 +95,15 @@ jobs:
           HEALTHCHECK_URL: ${{ secrets.BACKUP_HEALTHCHECK_URL }}
         run: |
           if [ -n "$HEALTHCHECK_URL" ]; then curl -fsS -m 10 --retry 3 "$HEALTHCHECK_URL" >/dev/null; fi
+      # A red run nobody sees is the failure mode of a job that runs on its own:
+      # open (or add to) one issue, so it shows in the repository's notifications.
+      - name: Open an issue for the failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="The nightly backup failed"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then gh issue comment "$open" --body "Failed again: $RUN_URL"
+          else gh issue create --title "$title" --body "Last night has no backup until this is fixed. Run: $RUN_URL"; fi
