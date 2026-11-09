@@ -31,14 +31,14 @@ export function IdentityReview({
     return <p className="text-xs text-muted">روجعت هوية هذا الطبيب في {explainDate(reviewedAt)}.</p>;
   }
 
-  const confirm = async (reason: string, method: ApprovalMethod) => {
+  const confirm = async (reason: string | undefined, method: ApprovalMethod | undefined) => {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/admin/doctors/${doctorId}/identity-reviewed`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approval_reason: reason, approval_method: method }),
+        body: JSON.stringify({ ...(reason && { approval_reason: reason }), ...(method && { approval_method: method }) }),
       });
       if (!res.ok) {
         const payload = await res.json().catch(() => ({}));

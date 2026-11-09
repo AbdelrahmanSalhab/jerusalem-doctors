@@ -34,8 +34,13 @@ describe("POST /api/admin/doctors/[id]/identity-reviewed", () => {
     expect((await call({ approval_method: "info_matches", approval_reason: OK.approval_reason })).status).toBe(200);
   });
 
-  it("wants both the method and a reason of ten characters", async () => {
-    expect((await call({ approval_reason: OK.approval_reason })).status).toBe(400);
+  it("takes a method without a note", async () => {
+    db.queue("doctors", { data: { id: ID, is_admin: false, is_visible: true, is_admin_approved: true, identity_reviewed_at: null } }, { data: [{ id: ID }] });
+    expect((await call({ approval_method: "documents_seen" })).status).toBe(200);
+  });
+
+  it("wants a method or a note, and a note of ten characters", async () => {
+    expect((await call({})).status).toBe(400);
     expect((await call({ approval_method: "documents_seen", approval_reason: "تمام" })).status).toBe(400);
     expect((await call({ approval_method: "i_think_so", approval_reason: OK.approval_reason })).status).toBe(400);
     expect(db.argsOf("doctors", "update")).toEqual([]);

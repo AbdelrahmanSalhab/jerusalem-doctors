@@ -63,7 +63,7 @@ const Body = z.object({
   // Not a column: why an admin accepted a doctor whose licence the registry
   // does not confirm. It is stripped before the update and kept in the log.
   approval_reason: z.string().trim().min(APPROVAL_REASON_MIN).max(300).optional(),
-  // How the admin knew (lib/admin/approvalMethods.ts): required to accept.
+  // How the admin knew (lib/admin/approvalMethods.ts): this or a note is required to accept.
   approval_method: z.enum(APPROVAL_METHOD_KEYS).optional(),
 });
 
@@ -124,7 +124,7 @@ export const PATCH = withJsonErrors(async (
     }
   }
 
-  // Accepting a doctor always needs a reason. For an exact registry match it
+  // Accepting a doctor always needs the method; either the method or a note is enough. For an exact registry match it
   // says how the admin knew this is that doctor, because the match alone is
   // public data (#16); for an unconfirmed licence or a number set by hand it
   // says what the call rested on. The log keeps it.
@@ -132,7 +132,7 @@ export const PATCH = withJsonErrors(async (
   const unconfirmed = approving && approvalNeedsReason(licenseStatus);
   // Only looked up when it can change the answer.
   const corrected = approving && !unconfirmed && (await primaryNumberCorrected(service, id));
-  if (approving && (!approval_reason || !approval_method)) {
+  if (approving && !approval_method && !approval_reason) {
     return jsonError(400, {
       error: "approval_reason_required",
       code: "approval_reason_required",
@@ -178,8 +178,8 @@ export const PATCH = withJsonErrors(async (
     metadata: {
       ...fields,
       is_admin_approved: approvalChange,
-      ...(approval_reason && approving
-        ? { approval_reason, approval_method, license_status_at_approval: licenseStatus, ...(corrected ? { number_corrected_by_admin: true } : {}) }
+      ...((approval_method || approval_reason) && approving
+        ? { ...(approval_reason && { approval_reason }), ...(approval_method && { approval_method }), license_status_at_approval: licenseStatus, ...(corrected ? { number_corrected_by_admin: true } : {}) }
         : {}),
     },
   });

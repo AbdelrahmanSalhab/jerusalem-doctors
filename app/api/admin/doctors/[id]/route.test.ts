@@ -150,11 +150,25 @@ describe("PATCH /api/admin/doctors/[id]: accepting a doctor", () => {
     expect((await call({ is_visible: false }, "00000000-0000-4000-8000-00000000a001")).status).toBe(200);
   });
 
-  it("wants the method as well as the reason", async () => {
+  it("wants the method or a note, and nothing at all is refused", async () => {
     licenseStatus = "verified";
-    const res = await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى" });
+    const res = await call({ is_admin_approved: true });
     expect(res.status).toBe(400);
     expect(updates).toEqual([]);
+  });
+
+  it("accepts with a note alone", async () => {
+    licenseStatus = "verified";
+    expect((await call({ is_admin_approved: true, approval_reason: "اتصلت بمقسم المستشفى" })).status).toBe(200);
+    expect(audits[0].metadata).toMatchObject({ approval_reason: "اتصلت بمقسم المستشفى" });
+    expect(audits[0].metadata).not.toHaveProperty("approval_method");
+  });
+
+  it("accepts with a method alone", async () => {
+    licenseStatus = "verified";
+    expect((await call({ is_admin_approved: true, approval_method: "known_personally" })).status).toBe(200);
+    expect(audits[0].metadata).toMatchObject({ approval_method: "known_personally" });
+    expect(audits[0].metadata).not.toHaveProperty("approval_reason");
   });
 
   it("rejects a reason under ten characters, and a method it does not know", async () => {

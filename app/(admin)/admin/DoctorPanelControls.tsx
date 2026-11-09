@@ -64,7 +64,7 @@ export function DoctorPanelControls({
       const payload = await res.json().catch(() => ({}));
       // The server knows something the row does not (a number found by name):
       // hand back that a reason is wanted so the prompt can open.
-      if (payload?.code === "approval_reason_required" && !body.approval_reason) {
+      if (payload?.code === "approval_reason_required" && !body.approval_method && !body.approval_reason) {
         return { ask: payload.reason_kind ?? "unconfirmed" };
       }
       if (!res.ok) {

@@ -34,8 +34,8 @@ export function useApproval(status: string | null, onPatch: (body: Record<string
     });
   };
 
-  const confirm = async (reason: string, method: ApprovalMethod) => {
-    const ok = await onPatch({ is_admin_approved: true, approval_reason: reason, approval_method: method });
+  const confirm = async (reason: string | undefined, method: ApprovalMethod | undefined) => {
+    const ok = await onPatch({ is_admin_approved: true, ...(reason && { approval_reason: reason }), ...(method && { approval_method: method }) });
     if (ok === true) {
       setAsking(false);
       setTold(true);

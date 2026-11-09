@@ -48,6 +48,29 @@ test.describe("accepting a doctor", () => {
     await doctor.close();
   });
 
+  test("a method alone is enough to accept, and so is a note alone", async ({ page }) => {
+    const accept = async (fill: () => Promise<void>) => {
+      await page.goto("/admin?status=pending&q=طالب");
+      await page.getByRole("button", { name: "مراجعة وقبول" }).click();
+      await page.getByRole("button", { name: "قبول العضوية" }).click();
+      // Neither a method nor a note: the prompt says so and nothing is saved.
+      await page.getByRole("button", { name: "قبول العضوية" }).last().click();
+      await expect(page.getByText("اختر كيف تأكّدت من هويته، أو اكتب ملاحظة.")).toBeVisible();
+      await fill();
+      await page.getByRole("button", { name: "قبول العضوية" }).last().click();
+      await expect
+        .poll(async () => (await serviceClient().from("doctors").select("is_admin_approved").eq("id", waiting.id).single()).data?.is_admin_approved)
+        .toBe(true);
+    };
+    await accept(async () => {
+      await page.getByRole("radio", { name: /أعرفه شخصيًا/ }).check();
+    });
+    await serviceClient().from("doctors").update({ is_admin_approved: false, approved_at: null }).eq("id", waiting.id);
+    await accept(async () => {
+      await page.getByLabel("سبب القبول").fill("زميلي في القسم منذ سنتين");
+    });
+  });
+
   test("goes through the waiting doctors with التالي, without closing the panel", async ({ page }) => {
     const second = await createDoctor({ first: "طالب", family: "الثاني", approved: false });
     try {

@@ -2,7 +2,7 @@
 // themselves an accepted doctor is who they say (#16). The doctors accepted at
 // signup by a registry match alone, before every acceptance asked how the admin
 // knew, are cleared this way, one at a time: «لم تُراجَع هويته» lists them.
-// Needs the method and the reason, like accepting; both go to the activity log.
+// Needs the method or a note, like accepting; both go to the activity log.
 
 import { z } from "zod";
 import { APPROVAL_METHOD_KEYS, APPROVAL_REASON_MIN } from "@/lib/admin/approvalMethods";
@@ -11,10 +11,12 @@ import { requireAdminOrNull } from "@/lib/auth/adminApi";
 import { writeAudit } from "@/lib/audit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
-const Body = z.object({
-  approval_method: z.enum(APPROVAL_METHOD_KEYS),
-  approval_reason: z.string().trim().min(APPROVAL_REASON_MIN).max(300),
-});
+const Body = z
+  .object({
+    approval_method: z.enum(APPROVAL_METHOD_KEYS).optional(),
+    approval_reason: z.string().trim().min(APPROVAL_REASON_MIN).max(300).optional(),
+  })
+  .refine((b) => b.approval_method || b.approval_reason);
 
 export const POST = withJsonErrors(async (
   req: Request,
