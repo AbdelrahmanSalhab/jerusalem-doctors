@@ -28,7 +28,13 @@ test("sign in as the CI account", async ({ page, context, baseURL }) => {
   const { value } = await issued.json();
 
   const signIn = await page.request.post("/api/login/ci", { data: { token: value } });
-  expect(signIn.status(), "POST /api/login/ci (is CI_LOGIN_EMAIL set on Vercel?)").toBe(200);
+  // The claims the server judges (public repo data, never the token itself),
+  // so a refusal says which one it did not like.
+  const { workflow_ref, ref, event_name } = JSON.parse(Buffer.from(value.split(".")[1], "base64url").toString());
+  expect(
+    signIn.status(),
+    `POST /api/login/ci (is CI_LOGIN_EMAIL set on Vercel?) claims: ${JSON.stringify({ workflow_ref, ref, event_name })}`,
+  ).toBe(200);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard/);
   await context.storageState({ path: STATE });
