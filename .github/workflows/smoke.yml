@@ -31,13 +31,16 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      issues: write
     # Pinned to the current LTS on purpose: a moving label (ubuntu-latest)
     # can change the browser system libraries without a commit.
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: npm
@@ -55,7 +58,7 @@ jobs:
         run: npx -y @lhci/cli@0.15.1 autorun
       # Only the Lighthouse reports of the public pages. Never e2e/.results as a
       # whole: it holds the signed-in session, and the repository is public.
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure()
         with:
           name: smoke-lighthouse
@@ -63,3 +66,15 @@ jobs:
           retention-days: 14
           # The folders start with a dot, which upload-artifact skips by default.
           include-hidden-files: true
+      # A red run nobody sees is the failure mode of a job that runs on its own:
+      # open (or add to) one issue, so it shows in the repository's notifications.
+      - name: Open an issue for the failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Production smoke checks are failing"
+          open=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then gh issue comment "$open" --body "Failed again: $RUN_URL"
+          else gh issue create --title "$title" --body "The read-only checks against the live site failed. Run: $RUN_URL"; fi
