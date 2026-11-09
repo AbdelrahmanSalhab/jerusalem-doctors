@@ -4,10 +4,11 @@
 // the workflow file and the event that ran it. Checking that signature and
 // those claims replaces a stored password: there is nothing to leak.
 //
-// Who can obtain a token that passes: a workflow file at SMOKE_WORKFLOW in
-// this repository, on GitHub's own runners. Changing that file takes write
-// access to the repository, the same trust a secret relied on. Pull requests
-// from forks get no id-token permission.
+// Who can obtain a token that passes: the smoke workflow file as it stands on
+// main, on GitHub's own runners. A branch's copy never passes: anyone with
+// write access can push a branch, and a preview deploy of it fires
+// deployment_status, which runs that branch's workflow file. Changing main
+// goes through review. Pull requests from forks get no id-token permission.
 // https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect
 
 import { createPublicKey, verify, type JsonWebKey } from "node:crypto";
@@ -16,7 +17,7 @@ export const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 /** What the workflow asks for, and the only audience accepted. */
 export const CI_AUDIENCE = "jerusalem-doctors-smoke";
 export const REPOSITORY = "AbdelrahmanSalhab/jerusalem-doctors";
-const SMOKE_WORKFLOW = `${REPOSITORY}/.github/workflows/smoke.yml@`;
+const SMOKE_WORKFLOW = `${REPOSITORY}/.github/workflows/smoke.yml@refs/heads/main`;
 /** The smoke workflow's own triggers (.github/workflows/smoke.yml). */
 const EVENTS = new Set(["deployment_status", "schedule", "workflow_dispatch"]);
 /** GitHub issues them for a few minutes; older than this is a replay. */
@@ -78,7 +79,7 @@ export async function verifySmokeToken(
       typeof c.exp === "number" && c.exp > now &&
       fresh &&
       c.repository === REPOSITORY &&
-      typeof c.workflow_ref === "string" && c.workflow_ref.startsWith(SMOKE_WORKFLOW) &&
+      typeof c.workflow_ref === "string" && c.workflow_ref === SMOKE_WORKFLOW &&
       EVENTS.has(c.event_name) &&
       c.runner_environment === "github-hosted" &&
       typeof c.jti === "string" && c.jti.length > 0;

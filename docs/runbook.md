@@ -6,11 +6,11 @@ should fit in a single tab.
 ## At a glance
 
 - **Hosting:** Vercel, `jerusalem-doctors.vercel.app`
-- **DB / Auth:** Supabase project `nqpkkxfmfctuodcubgwf`
+- **DB / Auth:** Supabase (project ref in the Vercel env, `NEXT_PUBLIC_SUPABASE_URL`)
 - **Source of truth for licenses:** [data.gov.il dataset](https://data.gov.il/api/3/action/package_show?id=2721d62d-d0da-45fd-93ac-5e7809849222)
 - **Logs:** Vercel → Project → Logs (server-side `console.error` + 5xx)
 - **Audit log:** `/admin/audit` for app-level events
-- **Email-of-record:** `asalhab94@gmail.com`
+- **Email-of-record:** the account owner's (Vercel and Supabase billing contact)
 
 ## Common incidents
 
