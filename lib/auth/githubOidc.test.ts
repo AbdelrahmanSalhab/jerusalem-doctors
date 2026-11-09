@@ -50,6 +50,8 @@ describe("verifySmokeToken", () => {
   it.each([
     ["another repository", { repository: "someone/jerusalem-doctors" }],
     ["another workflow", { workflow_ref: `${REPOSITORY}/.github/workflows/ci.yml@refs/heads/main` }],
+    ["a branch's copy of the smoke workflow", { workflow_ref: `${REPOSITORY}/.github/workflows/smoke.yml@refs/heads/evil` }],
+    ["a tag's copy of the smoke workflow", { workflow_ref: `${REPOSITORY}/.github/workflows/smoke.yml@refs/tags/v1` }],
     ["a pull request", { event_name: "pull_request" }],
     ["a self-hosted runner", { runner_environment: "self-hosted" }],
     ["another audience", { aud: "https://github.com/AbdelrahmanSalhab" }],
