@@ -1,6 +1,7 @@
 // Where the e2e run's time went, as a Markdown table for the job summary:
 // per project (how long it was busy, from its first test starting to its last
-// one ending) and the slowest tests. Reads Playwright's JSON report; prints
+// one ending), the slowest tests, and the flaky ones: tests that failed and
+// then passed on a retry, which the run counts as green. Reads Playwright's JSON report; prints
 // nothing when there is none (a run that died before the tests).
 //
 //   node scripts/e2e-timing.mjs [e2e/.results/report.json] >> "$GITHUB_STEP_SUMMARY"
@@ -13,9 +14,11 @@ const report = JSON.parse(readFileSync(file, "utf8"));
 
 const projects = new Map();
 const tests = [];
+const flaky = [];
 const walk = (suite) => {
   for (const spec of suite.specs ?? []) {
     for (const t of spec.tests) {
+      if (t.status === "flaky") flaky.push(`${t.projectName}: ${spec.file}: ${spec.title}`);
       for (const r of t.results) {
         const start = Date.parse(r.startTime);
         const p = projects.get(t.projectName) ?? { tests: 0, busy: 0, first: Infinity, last: 0, retries: 0 };
@@ -41,5 +44,11 @@ for (const [name, p] of [...projects].sort((a, b) => a[1].first - b[1].first)) {
 lines.push("", "Slowest tests:", "", "| s | project | test |", "|---:|---|---|");
 for (const t of tests.sort((a, b) => b.ms - a.ms).slice(0, 10)) {
   lines.push(`| ${s(t.ms)} | ${t.project} | ${t.file}: ${t.title.replaceAll("|", "\\|")} |`);
+}
+if (flaky.length > 0) {
+  lines.push("", `### Flaky: passed only on a retry (${flaky.length})`, "");
+  for (const f of flaky) lines.push(`- ${f.replaceAll("|", "\\|")}`);
+  // A line GitHub shows on the run page, not only in the summary tab.
+  console.error(`::warning title=Flaky e2e tests::${flaky.length} passed only on a retry; see the job summary.`);
 }
 console.log(lines.join("\n"));

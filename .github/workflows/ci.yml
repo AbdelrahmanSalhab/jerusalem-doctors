@@ -5,9 +5,16 @@ on:
   push:
     branches: [main]
 
+# Nothing here writes to the repository; a job that needs more says so itself.
+permissions:
+  contents: read
+
+# A newer push to a pull request replaces its running checks. Runs on main are
+# never cancelled: two quick merges would otherwise cancel the first, which is
+# also the run that saves the Docker and Next caches.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Keys and tokens in the code or its history. The repo is public, so a
@@ -17,8 +24,9 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       # The binary, pinned and checked against its published hash; the
       # official action needs a licence for organisation repos.
@@ -28,14 +36,50 @@ jobs:
           tar -xzf gitleaks.tgz gitleaks
       - run: ./gitleaks detect --redact --verbose
 
+  # What the workflows themselves leave open: unpinned actions, a token with
+  # more rights than a job needs, credentials left in the checkout, injection
+  # through ${{ }} in a script. The token lets zizmor check pinned hashes
+  # against the real tags.
+  workflows:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+      - run: pip install zizmor==1.32.0
+      - run: zizmor --format plain .github/workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # A pull request that adds or bumps a dependency with a known vulnerability
+  # (any severity from high up) fails here, before it is merged. Pull requests
+  # only: the action compares the PR's lockfile with its base.
+  dependencies:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
+
   check:
     # Pinned to the current LTS on purpose: a moving label (ubuntu-latest)
     # can change the browser system libraries without a commit.
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: npm
@@ -83,8 +127,10 @@ jobs:
             browsers: chromium
             first: false
     steps:
-      - uses: actions/checkout@v7
-      - uses: supabase/setup-cli@v3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: supabase/setup-cli@689adcfb80d947100a1eab127289b97d1fb07b13 # v3
         with:
           version: 2.121.0
       # The Docker images (Supabase's and Redis's) come from our own Actions
@@ -98,7 +144,7 @@ jobs:
         run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
       - name: Restore Docker images
         id: images-cache
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/images.tar
           key: docker-images-supabase-2.121.0-${{ steps.images.outputs.day }}
@@ -113,7 +159,7 @@ jobs:
             if [ -f "$RUNNER_TEMP/images.tar" ]; then docker load -q -i "$RUNNER_TEMP/images.tar"; fi && mark "docker load" \
             && supabase start -x studio,realtime,edge-runtime,logflare,vector,imgproxy,mailpit,postgres-meta,supavisor && mark "supabase start" \
             && supabase seed buckets && mark "seed buckets"; echo $? > "$RUNNER_TEMP/supabase.exit") > "$RUNNER_TEMP/supabase.log" 2>&1 &
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: npm
@@ -125,7 +171,7 @@ jobs:
         id: os
         run: echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
       - name: Cache Playwright browsers
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.os.outputs.image }}-${{ matrix.browsers }}-${{ hashFiles('package-lock.json') }}
@@ -150,13 +196,13 @@ jobs:
       # images above), so branches do not fill the repository's cache quota.
       - name: Restore Next's build cache
         id: next-cache
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: .next/cache
           key: next-cache-${{ hashFiles('package-lock.json') }}-${{ steps.images.outputs.day }}
           restore-keys: next-cache-${{ hashFiles('package-lock.json') }}-
       - run: npm run build
-      - uses: actions/cache/save@v6
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: matrix.first && github.event_name == 'push' && steps.next-cache.outputs.cache-hit != 'true'
         with:
           path: .next/cache
@@ -190,7 +236,7 @@ jobs:
       - name: Save today's Docker images
         if: matrix.first && github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
         run: docker save -o "$RUNNER_TEMP/images.tar" $(docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>')
-      - uses: actions/cache/save@v6
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: matrix.first && github.event_name == 'push' && steps.images-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ runner.temp }}/images.tar
@@ -202,7 +248,7 @@ jobs:
       - name: Timing summary
         if: always()
         run: node scripts/e2e-timing.mjs >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure()
         with:
           name: playwright-report-${{ matrix.slug }}
