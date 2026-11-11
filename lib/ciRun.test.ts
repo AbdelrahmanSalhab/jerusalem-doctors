@@ -5,13 +5,13 @@ const req = (v?: string) => new Request("https://x.test", { headers: v === undef
 
 describe("ciRunOf", () => {
   it("reads a GitHub Actions run URL", () => {
-    const run = "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123";
+    const run = "https://github.com/Salhab-Brothers/jerusalem-doctors/actions/runs/123";
     expect(ciRunOf(req(run))).toBe(run);
     expect(ciRunOf(req(`${run}/attempts/2`))).toBe(`${run}/attempts/2`);
   });
 
   it("reads a repo script's URL (the production timing script)", () => {
-    const script = "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/blob/main/scripts/perf/measure.ts";
+    const script = "https://github.com/Salhab-Brothers/jerusalem-doctors/blob/main/scripts/perf/measure.ts";
     expect(ciRunOf(req(script))).toBe(script);
     expect(ciRunOf(req("https://github.com/a/b/blob/main/app/page.tsx"))).toBeNull();
   });

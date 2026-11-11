@@ -32,7 +32,7 @@ interface Path {
 const enc = encodeURIComponent;
 /** Marks every request as this script's, so its sign-in shows as an
  *  automated test and its searches stay out of the usage stats (lib/ciRun.ts). */
-const MARK = ["-H", "x-ci-run: https://github.com/AbdelrahmanSalhab/jerusalem-doctors/blob/main/scripts/perf/measure.ts"];
+const MARK = ["-H", "x-ci-run: https://github.com/Salhab-Brothers/jerusalem-doctors/blob/main/scripts/perf/measure.ts"];
 const PATHS: Path[] = [
   { group: "public", path: "/" },
   { group: "public", path: "/login" },
