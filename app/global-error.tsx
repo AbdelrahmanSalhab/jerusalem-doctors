@@ -4,6 +4,7 @@
 // so we render our own minimal <html>+<body>. Keeps the user oriented even
 // when the site shell is broken.
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -15,6 +16,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("[global-error]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
