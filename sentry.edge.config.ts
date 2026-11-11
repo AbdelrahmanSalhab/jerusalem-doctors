@@ -10,6 +10,8 @@ if (dsn) {
     environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV,
     // Errors only: no performance tracing, so no request or render data
     // leaves as spans. The span scrubbing below stays as a safety net.
+    // The deploy an error came from, so a fix can be matched to its commit.
+    release: process.env.VERCEL_GIT_COMMIT_SHA,
     tracesSampleRate: 0,
     dataCollection: PRIVATE_DATA_COLLECTION,
     beforeSend: scrubEvent,

@@ -22,6 +22,8 @@ if (dsn) {
     environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? "development",
     // Errors only: no performance tracing, so no request or render data
     // leaves as spans. The span scrubbing below stays as a safety net.
+    // The deploy an error came from, so a fix can be matched to its commit.
+    release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
     tracesSampleRate: 0,
     // The same scrubbing as the server: browser errors carry page URLs
     // (/admin?q=0521234567) and breadcrumbs too (lib/sentryScrub.ts).

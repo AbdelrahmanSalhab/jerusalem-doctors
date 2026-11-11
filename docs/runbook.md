@@ -618,6 +618,19 @@ badge counts warnings and urgent alerts from the last 24 hours. The rate
 limiter's timeout alert reaches the log at most once an hour (Sentry once a
 minute), so a slow Redis cannot flood it.
 
+### Is the site up? (uptime monitor)
+
+Nothing inside the app can tell you the site is down: the alerts above come
+from code that is running. Use an outside monitor (UptimeRobot, Better Stack
+or similar, the free plans are enough): an HTTPS check every 5 minutes on
+`https://<site>/health`, expecting status 200 and `"ok":true` in the body,
+alerting to a channel an admin reads. `/health` answers 503 when the database
+is unreachable, so one check covers the site and Supabase. Set it up once;
+there is no code for it.
+
+Errors from the app's error pages (a page that crashed for a visitor) reach
+Sentry too, tagged with the commit of the deploy (`release`).
+
 ### Notifications on admins' phones
 
 The alerts above that need someone to act also reach each admin's phone or

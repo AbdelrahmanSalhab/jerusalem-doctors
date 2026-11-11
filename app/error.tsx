@@ -3,6 +3,7 @@
 // Per-route error boundary, caught by Next when a server component or
 // route handler throws. Stays inside the site shell (header + footer).
 
+import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -15,6 +16,8 @@ export default function ErrorPage({
 }) {
   useEffect(() => {
     console.error("[route-error]", error);
+    // The boundary swallows the error, so the server hook never sees it.
+    Sentry.captureException(error);
   }, [error]);
 
   return (

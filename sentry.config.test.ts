@@ -31,6 +31,7 @@ describe.each([["server", "./sentry.server.config"], ["edge", "./sentry.edge.con
       expect(opts.tracesSampleRate).toBe(0);
       expect(opts.beforeSendSpan).toBe(scrub.scrubSpan);
       expect(opts.traceLifecycle).toBe("stream");
+      expect(opts).toHaveProperty("release");
       expect(opts).not.toHaveProperty("sendDefaultPii");
     });
   },
