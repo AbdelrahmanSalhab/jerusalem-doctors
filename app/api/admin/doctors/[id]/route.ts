@@ -13,6 +13,7 @@ import { CAREER_STAGES, RESIDENCY_YEAR_MIN } from "@/lib/careerStage";
 import { FEATURED_KINDS } from "@/lib/directory";
 import { jsonError, jsonOk, withJsonErrors } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
+import { refuseAdminTarget } from "@/lib/auth/adminTarget";
 import { allPhotoPaths, PHOTO_BUCKET } from "@/lib/photo";
 import type { TablesUpdate } from "@/lib/db/database.types";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -95,7 +96,7 @@ export const PATCH = withJsonErrors(async (
 
   const current = await service
     .from("doctors")
-    .select("license_verification_status, is_admin_approved, is_active")
+    .select("license_verification_status, is_admin_approved, is_active, is_admin")
     .eq("id", id)
     .maybeSingle();
   if (current.error && current.error.code !== "PGRST116") {
@@ -105,6 +106,8 @@ export const PATCH = withJsonErrors(async (
   if (!current.data) {
     return jsonError(404, { error: "not_found", code: "not_found" });
   }
+  const protectedTarget = await refuseAdminTarget(service, admin, { id, is_admin: current.data.is_admin });
+  if (protectedTarget) return protectedTarget;
   const licenseStatus = current.data.license_verification_status as string | null;
 
   // Already accepted (a stale tab, two admins at once): nothing to do, and
@@ -163,10 +166,23 @@ export const PATCH = withJsonErrors(async (
     ...(approving && (unconfirmed || corrected) && { license_reviewed_at: new Date().toISOString() }),
   };
 
-  const r = await service.from("doctors").update(updates).eq("id", id);
+  // Accepting only lands on a doctor who is still waiting and still open: a
+  // second admin's accept, or a deletion request, that arrived since the read
+  // above changes the answer, and an unconditional write would overwrite it.
+  let write = service.from("doctors").update(updates).eq("id", id);
+  if (approving) {
+    write = write.eq("is_admin_approved", false);
+    if (fields.is_active !== true) write = write.eq("is_active", true);
+  }
+  const r = await write.select("id");
   if (r.error) {
     console.error("[admin.doctors.patch] update failed", r.error);
     return jsonError(500, { error: "update_failed", code: "update_failed" });
+  }
+  if (approving && (r.data ?? []).length === 0) {
+    const now = await service.from("doctors").select("is_admin_approved, is_active").eq("id", id).maybeSingle();
+    if (now.data?.is_admin_approved) return jsonOk({ ok: true, unchanged: true });
+    return jsonError(409, { error: "account_closed", code: "account_closed" });
   }
   // Approving, hiding or featuring shows on every dashboard at once.
   directoryChanged();
@@ -204,13 +220,15 @@ export const DELETE = withJsonErrors(async (
   const service = createSupabaseServiceClient();
   const found = await service
     .from("doctors")
-    .select("id, is_active, auth_user_id")
+    .select("id, is_active, auth_user_id, is_admin")
     .eq("id", id)
     .maybeSingle();
   if (found.error && found.error.code !== "PGRST116") throw found.error;
   if (!found.data) {
     return jsonError(404, { error: "not_found", code: "not_found" });
   }
+  const protectedTarget = await refuseAdminTarget(service, admin, { id, is_admin: found.data.is_admin });
+  if (protectedTarget) return protectedTarget;
   // Only a suspended account (a deletion request suspends it) can be erased,
   // so one misclick on an active doctor can't destroy them.
   if (found.data.is_active) {

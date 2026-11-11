@@ -21,6 +21,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { jsonError, jsonOk, withJsonErrors, zodFields } from "@/lib/api/respond";
 import { requireAdminOrNull } from "@/lib/auth/adminApi";
+import { refuseAdminTarget } from "@/lib/auth/adminTarget";
 import { writeAudit } from "@/lib/audit";
 import {
   AdminProfileFieldsSchema,
@@ -45,7 +46,7 @@ import { directoryChanged } from "@/lib/cachedReads";
 const CURRENT_COLUMNS = `
   id, auth_user_id, arabic_first_name, arabic_family_name,
   hebrew_first_name, hebrew_family_name, phone_e164, phone_display,
-  career_stage, seeking_work, retired
+  career_stage, seeking_work, retired, is_admin
 `;
 
 interface CurrentRow {
@@ -60,6 +61,7 @@ interface CurrentRow {
   career_stage: "resident" | "specialist" | null;
   seeking_work: boolean;
   retired: boolean;
+  is_admin: boolean | null;
 }
 
 const fail = (f: SaveFailure) =>
@@ -98,6 +100,8 @@ export const PATCH = withJsonErrors(async (req: Request, ctx: { params: Promise<
   }
   if (!found.data) return jsonError(404, { error: "not_found", code: "not_found" });
   const current = found.data as CurrentRow;
+  const protectedTarget = await refuseAdminTarget(service, admin, current);
+  if (protectedTarget) return protectedTarget;
 
   const ruleFailure = profileRuleFailure(parsed, current);
   if (ruleFailure) return fail(ruleFailure);

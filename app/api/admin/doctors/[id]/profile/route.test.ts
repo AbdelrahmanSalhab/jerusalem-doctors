@@ -366,3 +366,19 @@ describe("PATCH /api/admin/doctors/[id]/profile: refusals and failures", () => {
     expect(audits[0]).toMatchObject({ metadata: { phone_not_sms_deliverable: true } });
   });
 });
+
+describe("PATCH /api/admin/doctors/[id]/profile: another admin", () => {
+  it("refuses a phone change on a peer admin, so no one can take over a sign-in", async () => {
+    doctor = { ...BASE, is_admin: true };
+    const res = await call({ phone: "050-999-8888" });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "admin_protected" });
+    expect(saves).toHaveLength(0);
+    expect(authCalls).toHaveLength(0);
+  });
+
+  it("still edits an ordinary doctor", async () => {
+    doctor = { ...BASE, is_admin: false };
+    expect((await call({ phone: "050-999-8888" })).status).toBe(200);
+  });
+});

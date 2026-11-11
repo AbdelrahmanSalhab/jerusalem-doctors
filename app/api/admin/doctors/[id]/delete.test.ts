@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const steps: string[] = [];
-let doctor: { id: string; is_active: boolean; auth_user_id: string | null } | null;
+let doctor: { id: string; is_active: boolean; auth_user_id: string | null; is_admin?: boolean } | null;
 let photoError: unknown;
 let userError: { status?: number } | null;
 let rowError: unknown;
@@ -194,5 +194,16 @@ describe("DELETE /api/admin/doctors/[id]", () => {
     const out = await del();
     expect(out.status).toBe(500);
     expect(steps).not.toContain("delete:doctors");
+  });
+});
+
+describe("DELETE /api/admin/doctors/[id]: another admin", () => {
+  it("is refused for an admin who is not a super admin, and erases nothing", async () => {
+    steps.length = 0;
+    doctor = { id: "00000000-0000-4000-8000-0000000000d1", is_active: false, auth_user_id: "auth-1", is_admin: true };
+    const { status, body } = await del();
+    expect(status).toBe(403);
+    expect(body).toMatchObject({ code: "admin_protected" });
+    expect(steps).toEqual([]);
   });
 });

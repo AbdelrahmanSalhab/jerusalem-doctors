@@ -8,6 +8,15 @@ let licenseStatus: string | null = "verified";
 let alreadyAccepted = false;
 let accountOpen = true;
 let doctorExists = true;
+/** The doctor being patched is an admin (another admin acting on a peer). */
+let targetIsAdmin = false;
+/** Whether the conditional accept finds a row still waiting and open. */
+let acceptLands = true;
+/** What a second read of the row finds once the accept landed nowhere. */
+let approvedMeanwhile = false;
+let reads = 0;
+/** The conditions the accept update carried. */
+const updateEqs: string[] = [];
 let readError: unknown = null;
 let updateError: unknown = null;
 /** Whether the log holds a primary licence correction for the doctor. */
@@ -35,7 +44,7 @@ vi.mock("@/lib/supabase/service", () => ({
           maybeSingle: async () =>
             table === "audit_logs"
               ? { data: corrected ? { id: "a1" } : null, error: auditReadError }
-              : { data: doctorExists ? { license_verification_status: licenseStatus, is_admin_approved: alreadyAccepted, is_active: accountOpen } : null, error: readError },
+              : { data: doctorExists ? { license_verification_status: licenseStatus, is_admin_approved: alreadyAccepted || (reads++ > 0 && approvedMeanwhile), is_active: accountOpen, is_admin: targetIsAdmin } : null, error: readError },
         };
         chain.eq = (col: string, v: unknown) => (table === "audit_logs" && auditAsks.push(`${col}=${String(v)}`), chain);
         chain.limit = () => chain;
@@ -43,7 +52,11 @@ vi.mock("@/lib/supabase/service", () => ({
       },
       update(values: Record<string, unknown>) {
         updates.push(values);
-        return { eq: async () => ({ error: updateError }) };
+        const chain: Record<string, unknown> = {
+          select: async () => ({ data: acceptLands ? [{ id: "d1" }] : [], error: updateError }),
+        };
+        chain.eq = (col: string, v: unknown) => (updateEqs.push(`${col}=${String(v)}`), chain);
+        return chain;
       },
       insert: async (row: Record<string, unknown>) => {
         if (table === "audit_logs") audits.push(row);
@@ -66,6 +79,11 @@ async function call(body: unknown, id = "00000000-0000-4000-8000-0000000000d1") 
 }
 
 beforeEach(() => {
+  targetIsAdmin = false;
+  acceptLands = true;
+  approvedMeanwhile = false;
+  reads = 0;
+  updateEqs.length = 0;
   corrected = false;
   alreadyAccepted = false;
   accountOpen = true;
@@ -358,5 +376,54 @@ describe("PATCH /api/admin/doctors/[id]: failures", () => {
     expect((await call({ is_visible: false })).status).toBe(500);
     expect(audits).toHaveLength(0);
     expect(directoryChanged).not.toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/admin/doctors/[id]: two things at once", () => {
+  const accept = { is_admin_approved: true, approval_method: "known_personally" };
+
+  it("accepts only a doctor who is still waiting and still open", async () => {
+    expect((await call(accept)).status).toBe(200);
+    expect(updateEqs).toEqual(expect.arrayContaining(["id=00000000-0000-4000-8000-0000000000d1", "is_admin_approved=false", "is_active=true"]));
+  });
+
+  it("does not insist on an open account when the same request opens it", async () => {
+    accountOpen = false;
+    expect((await call({ ...accept, is_active: true })).status).toBe(200);
+    expect(updateEqs).not.toContain("is_active=true");
+  });
+
+  it("leaves other edits unconditional", async () => {
+    await call({ featured: "graduate" });
+    expect(updateEqs).toEqual(["id=00000000-0000-4000-8000-0000000000d1"]);
+  });
+
+  it("answers 'already accepted' when another admin accepted first, and writes no second audit row", async () => {
+    acceptLands = false;
+    approvedMeanwhile = true;
+    const res = await call(accept);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ unchanged: true });
+    expect(audits).toHaveLength(0);
+    expect(directoryChanged).not.toHaveBeenCalled();
+  });
+
+  it("refuses with account_closed when a deletion request closed the account first", async () => {
+    acceptLands = false;
+    const res = await call(accept);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "account_closed" });
+    expect(audits).toHaveLength(0);
+  });
+});
+
+describe("PATCH /api/admin/doctors/[id]: another admin", () => {
+  it("is refused for an admin who is not a super admin, before anything is written", async () => {
+    targetIsAdmin = true;
+    const res = await call({ is_active: false });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "admin_protected" });
+    expect(updates).toHaveLength(0);
+    expect(audits).toHaveLength(0);
   });
 });
