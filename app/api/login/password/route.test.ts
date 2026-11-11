@@ -160,8 +160,8 @@ describe("the record", () => {
   });
 
   it("names the CI run when the production smoke test signs in", async () => {
-    await call(GOOD, { "x-ci-run": "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123" });
-    expect(audits[0]).toMatchObject({ metadata: { ci_run: "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/123" } });
+    await call(GOOD, { "x-ci-run": "https://github.com/Salhab-Brothers/jerusalem-doctors/actions/runs/123" });
+    expect(audits[0]).toMatchObject({ metadata: { ci_run: "https://github.com/Salhab-Brothers/jerusalem-doctors/actions/runs/123" } });
   });
 
   it("slows guessing down", async () => {
