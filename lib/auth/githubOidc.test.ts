@@ -71,7 +71,7 @@ describe("verifySmokeToken", () => {
     ["a tag's copy of the smoke workflow", { workflow_ref: `${REPOSITORY}/.github/workflows/smoke.yml@refs/tags/v1` }],
     ["a pull request", { event_name: "pull_request" }],
     ["a self-hosted runner", { runner_environment: "self-hosted" }],
-    ["another audience", { aud: "https://github.com/AbdelrahmanSalhab" }],
+    ["another audience", { aud: "https://github.com/Salhab-Brothers" }],
     ["another issuer", { iss: "https://example.com" }],
     ["an expired token", { exp: NOW - 1 }],
     ["an old token", { iat: NOW - 11 * 60 }],

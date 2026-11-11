@@ -18,7 +18,7 @@ import { createPublicKey, verify, type JsonWebKey } from "node:crypto";
 export const GITHUB_ISSUER = "https://token.actions.githubusercontent.com";
 /** What the workflow asks for, and the only audience accepted. */
 export const CI_AUDIENCE = "jerusalem-doctors-smoke";
-export const REPOSITORY = "AbdelrahmanSalhab/jerusalem-doctors";
+export const REPOSITORY = "Salhab-Brothers/jerusalem-doctors";
 const SMOKE_WORKFLOW = `${REPOSITORY}/.github/workflows/smoke.yml@`;
 /** The smoke workflow's own triggers (.github/workflows/smoke.yml). */
 const EVENTS = new Set(["deployment_status", "schedule", "workflow_dispatch"]);

@@ -34,7 +34,7 @@ test("a GitHub token from the smoke workflow signs in the CI account, once", asy
       .eq("action", "ci_login")
       .eq("actor_doctor_id", ci.id);
     expect(data?.map((r) => r.metadata)).toEqual([
-      { ci_run: "https://github.com/AbdelrahmanSalhab/jerusalem-doctors/actions/runs/4242", event: "deployment_status" },
+      { ci_run: "https://github.com/Salhab-Brothers/jerusalem-doctors/actions/runs/4242", event: "deployment_status" },
     ]);
   } finally {
     await ctx.dispose();
@@ -47,8 +47,8 @@ test("anything but the smoke workflow's fresh token is refused", async () => {
   await flushRateLimits();
   const ctx = await http.newContext({ baseURL: BASE_URL });
   for (const claims of [
-    { workflow_ref: "AbdelrahmanSalhab/jerusalem-doctors/.github/workflows/ci.yml@refs/heads/main" },
-    { workflow_ref: "AbdelrahmanSalhab/jerusalem-doctors/.github/workflows/smoke.yml@refs/heads/some-branch" },
+    { workflow_ref: "Salhab-Brothers/jerusalem-doctors/.github/workflows/ci.yml@refs/heads/main" },
+    { workflow_ref: "Salhab-Brothers/jerusalem-doctors/.github/workflows/smoke.yml@refs/heads/some-branch" },
     { repository: "someone/jerusalem-doctors" },
     { event_name: "pull_request" },
     { exp: Math.floor(Date.now() / 1000) - 1 },
