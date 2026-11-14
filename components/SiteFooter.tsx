@@ -1,4 +1,4 @@
-const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
+const DEVELOPER_URL = "https://linktr.ee/SalhabBrothers";
 const WHATSAPP_URL = "https://wa.me/972524209156";
 
 export function SiteFooter() {
@@ -19,9 +19,9 @@ export function SiteFooter() {
           </a>
         </nav>
         <p className="text-xs">
-          تطوير:{" "}
-          <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
-            عبدالرحمن سلهب
+          تطوير{" "}
+          <a href={DEVELOPER_URL} dir="ltr" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+            SalhabBrothers
           </a>
         </p>
       </div>

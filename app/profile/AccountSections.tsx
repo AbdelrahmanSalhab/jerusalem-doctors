@@ -2,9 +2,10 @@
 // account deletion.
 
 import { useRouter } from "next/navigation";
+import { LinktreeIcon, WhatsAppIcon } from "@/components/BrandIcons";
 import { Section } from "./ProfileFields";
 
-const LINKEDIN_URL = "https://www.linkedin.com/in/abdelrahman-salhab/";
+const LINKTREE_URL = "https://linktr.ee/SalhabBrothers";
 const WHATSAPP_URL = "https://wa.me/972524209156";
 
 export function HelpSection() {
@@ -19,17 +20,19 @@ export function HelpSection() {
           href={WHATSAPP_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 rounded-md bg-[#25d366] px-4 py-2.5 text-center font-medium text-white hover:opacity-90"
+          className="flex flex-1 items-center justify-center gap-2 rounded-md bg-[#25d366] px-4 py-2.5 text-center font-medium text-white hover:opacity-90"
         >
+          <WhatsAppIcon />
           مراسلة المطوّر عبر واتساب
         </a>
         <a
-          href={LINKEDIN_URL}
+          href={LINKTREE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 rounded-md border border-foreground/20 px-4 py-2.5 text-center hover:bg-foreground/5"
+          className="flex flex-1 items-center justify-center gap-2 rounded-md border border-foreground/20 px-4 py-2.5 text-center hover:bg-foreground/5"
         >
-          ملف LinkedIn
+          <LinktreeIcon />
+          رابط الفريق على Linktree
         </a>
       </div>
     </Section>

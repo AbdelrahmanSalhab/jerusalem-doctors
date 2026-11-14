@@ -77,7 +77,7 @@ export default function PrivacyPage() {
           <h2 className="mb-1.5 text-lg font-bold">التواصل</h2>
           <p>
             للاستفسار أو الإبلاغ عن أي مشكلة، تواصل مع المطوّر عبر روابط
-            الذيل في كل صفحة (واتساب أو LinkedIn).
+            الذيل في كل صفحة (واتساب أو Linktree).
           </p>
         </section>
       </article>
